@@ -450,6 +450,116 @@ def _normalize_sort(sort):
     return out
 
 
+class _NeedAll(Exception):
+    pass
+
+
+def _needed_fields(pipeline) -> Optional[set]:
+    """Conservative superset of the top-level input fields an aggregation pipeline can read,
+    or None when it may read the whole document ($$ROOT, $graphLookup, ...). Used to copy only
+    those fields out of the store instead of whole documents (much less memory and CPU for
+    reports over large collections)."""
+    fields = set()
+
+    def add_path(path):
+        if not isinstance(path, str) or not path:
+            return
+        top = path.split(".", 1)[0]
+        if top:
+            fields.add(top)
+
+    def scan_expr(node):
+        if isinstance(node, str):
+            if node.startswith("$$"):
+                name = node[2:].split(".", 1)[0]
+                if name in ("ROOT", "CURRENT"):
+                    raise _NeedAll()
+            elif node.startswith("$"):
+                add_path(node[1:])
+        elif isinstance(node, dict):
+            for k, v in node.items():
+                if k in ("$getField", "$setField", "$unsetField", "$function", "$accumulator",
+                         "$where"):
+                    raise _NeedAll()
+                scan_expr(v)
+        elif isinstance(node, (list, tuple)):
+            for v in node:
+                scan_expr(v)
+
+    def scan_query(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k == "$expr":
+                    scan_expr(v)
+                elif k == "$where" or k == "$text":
+                    raise _NeedAll()
+                elif k.startswith("$"):
+                    scan_query(v)
+                else:
+                    add_path(k)
+                    scan_query(v)
+        elif isinstance(node, (list, tuple)):
+            for v in node:
+                scan_query(v)
+
+    def scan_pipeline(stages) -> bool:
+        """Scan stages; True when the pipeline output no longer contains the input documents
+        as such (a $group/$project-inclusion/... reshaped them), i.e. unread fields of the input
+        can never reach the output."""
+        for stage in stages:
+            if not isinstance(stage, dict) or len(stage) != 1:
+                raise _NeedAll()
+            (op, arg), = stage.items()
+            if op == "$match":
+                scan_query(arg)
+            elif op == "$project":
+                if not isinstance(arg, dict):
+                    raise _NeedAll()
+                exclusion = any((v is False or (type(v) in (int, float) and v == 0))
+                                for k, v in arg.items() if k != "_id")
+                for k, v in arg.items():
+                    add_path(k)
+                    scan_expr(v)
+                if not exclusion:
+                    return True  # inclusion projection reshapes the document
+            elif op in ("$addFields", "$set", "$sort"):
+                if not isinstance(arg, dict):
+                    raise _NeedAll()
+                for k, v in arg.items():
+                    add_path(k)
+                    scan_expr(v)
+            elif op in ("$unset", "$limit", "$skip", "$sample"):
+                pass
+            elif op == "$unwind":
+                scan_expr(arg)
+            elif op == "$lookup":
+                if not isinstance(arg, dict):
+                    raise _NeedAll()
+                add_path(arg.get("localField"))
+                scan_expr(arg.get("let") or {})
+            elif op in ("$group", "$bucket", "$bucketAuto", "$sortByCount", "$replaceRoot",
+                        "$replaceWith", "$count"):
+                scan_expr(arg)
+                return True
+            elif op == "$facet":
+                if not isinstance(arg, dict):
+                    raise _NeedAll()
+                for sub in arg.values():
+                    if not scan_pipeline(sub):
+                        raise _NeedAll()
+                return True
+            else:
+                raise _NeedAll()
+        return False
+
+    try:
+        if not scan_pipeline(pipeline):
+            return None
+    except _NeedAll:
+        return None
+    return fields
+
+
 def _has_unique(indexes: dict) -> bool:
     return any(spec.get("unique") for spec in indexes.values())
 
@@ -644,8 +754,13 @@ class LCollection(_MMCollection):
                 else:
                     break
                 i += 1
-        docs = self.query(spec, None, sort, skip, limit)
         rest = pipeline[i:]
+        projection = None
+        if rest:
+            needed = _needed_fields(rest)
+            if needed is not None:
+                projection = {f: 1 for f in needed if f != "_id"} or {"_id": 1}
+        docs = self.query(spec, projection, sort, skip, limit)
         if not rest:
             return docs
         return list(mongomock.aggregate.process_pipeline(docs, self.database, rest, None))

@@ -894,6 +894,135 @@ def _with_prefilter(pipeline):
     return [{"$match": dict(pre, **match)}] + list(pipeline[1:])
 
 
+def _has_field_ref(node) -> bool:
+    if isinstance(node, str):
+        if node.startswith("$$"):
+            return node[2:].split(".", 1)[0] in ("ROOT", "CURRENT")
+        return node.startswith("$")
+    if isinstance(node, dict):
+        if list(node.keys()) == ["$literal"]:
+            return False
+        return any(_has_field_ref(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_has_field_ref(v) for v in node)
+    return False
+
+
+class _ExprCandidates:
+    """Candidate pre-selection for correlated ``$lookup`` sub-pipelines.
+
+    For ``$expr`` clauses of the form ``$eq: [<foreign expr>, <constant>]`` or
+    ``$in: [<constant>, <foreign array expr>]`` (constants = substituted ``let`` values), the
+    foreign expression is evaluated ONCE per foreign document and hashed, so each outer
+    document only examines the few matching foreign documents instead of the whole
+    collection. ``$and``/``$or`` combine candidate sets. The full ``$match`` is still applied
+    to the candidates, so results are identical; this only avoids O(outer x foreign) scans.
+    """
+
+    def __init__(self, foreign):
+        self._foreign = foreign
+        self._docs = None
+        self._indexes = {}
+
+    def _all_docs(self):
+        if self._docs is None:
+            st = getattr(self._foreign, "_store", None)
+            if st is not None and hasattr(st, "_documents"):
+                self._docs = list(st._documents.values())
+            else:  # pragma: no cover - plain mongomock collection
+                self._docs = list(self._foreign.find())
+        return self._docs
+
+    def _index(self, fexpr, as_array):
+        try:
+            key = (bson.encode({"e": fexpr}), as_array)
+        except Exception:  # noqa: BLE001
+            return None
+        idx = self._indexes.get(key)
+        if idx is not None:
+            return idx
+        mapping, always = {}, set()
+        for d in self._all_docs():
+            _id = d.get("_id")
+            try:
+                v = aggregate._parse_expression(fexpr, d)
+            except KeyError:
+                continue  # missing never equals a constant
+            except Exception:  # noqa: BLE001 - keep docs whose evaluation errors
+                always.add(_id)
+                continue
+            if as_array:
+                if not isinstance(v, list):
+                    always.add(_id)
+                    continue
+                vals = v
+            else:
+                vals = [v]
+            for x in vals:
+                try:
+                    mapping.setdefault(x, set()).add(_id)
+                except TypeError:
+                    always.add(_id)
+        idx = self._indexes[key] = (mapping, always)
+        return idx
+
+    def _lookup(self, fexpr, value, as_array):
+        idx = self._index(fexpr, as_array)
+        if idx is None:
+            return None
+        mapping, always = idx
+        try:
+            hit = mapping.get(value)
+        except TypeError:
+            return None
+        return (set(hit) if hit else set()) | always
+
+    @staticmethod
+    def _const(expr):
+        try:
+            return True, aggregate._parse_expression(expr, {})
+        except KeyError:
+            return False, None
+
+    def candidates(self, expr):
+        """Superset of matching foreign _ids, or None when unknown (scan everything)."""
+        if not _has_field_ref(expr):
+            ok, val = self._const(expr)
+            return None if ok and helpers.mongodb_to_bool(val) else set()
+        if not isinstance(expr, dict) or len(expr) != 1:
+            return None
+        (op, args), = expr.items()
+        if op == "$eq" and isinstance(args, list) and len(args) == 2:
+            a, b = args
+            for f, c in ((a, b), (b, a)):
+                if _has_field_ref(f) and not _has_field_ref(c):
+                    ok, val = self._const(c)
+                    return self._lookup(f, val, False) if ok else set()
+            return None
+        if op == "$in" and isinstance(args, list) and len(args) == 2:
+            needle, hay = args
+            if not _has_field_ref(needle) and _has_field_ref(hay):
+                ok, val = self._const(needle)
+                return self._lookup(hay, val, True) if ok else None
+            return None
+        if op == "$and" and isinstance(args, list):
+            best = None
+            for sub in args:
+                c = self.candidates(sub)
+                if c is not None:
+                    best = c if best is None else (best & c)
+            return best
+        if op == "$or" and isinstance(args, list):
+            acc = set()
+            for sub in args:
+                c = self.candidates(sub)
+                if c is None:
+                    return None
+                acc |= c
+            return acc
+        return None
+
+
 def _handle_lookup_stage(in_collection, database, options):
     if "pipeline" not in options:
         return _orig_lookup(in_collection, database, options)
@@ -905,6 +1034,7 @@ def _handle_lookup_stage(in_collection, database, options):
     foreign_field = options.get("foreignField")
     cache = {}
     agg = getattr(foreign, "aggregate_list", None)
+    expr_cands = _ExprCandidates(foreign)
     for doc in in_collection:
         variables = {}
         for k, expr in let.items():
@@ -920,7 +1050,6 @@ def _handle_lookup_stage(in_collection, database, options):
                 lv = None
             cond = {"$in": lv} if isinstance(lv, list) else lv
             sub = [{"$match": {foreign_field: cond}}] + list(sub)
-        sub = _with_prefilter(sub)
         try:
             ck = bson.encode({"p": sub})
         except Exception:  # noqa: BLE001 - unencodable values: no caching
@@ -928,10 +1057,16 @@ def _handle_lookup_stage(in_collection, database, options):
         if ck is not None and ck in cache:
             doc[as_field] = copy.deepcopy(cache[ck])
             continue
+        run_sub = _with_prefilter(sub)
+        if run_sub and list(run_sub[0].keys()) == ["$match"] and \
+                isinstance(run_sub[0]["$match"], dict) and "$expr" in run_sub[0]["$match"]:
+            cands = expr_cands.candidates(run_sub[0]["$match"]["$expr"])
+            if cands is not None:
+                run_sub = [{"$match": {"_id": {"$in": list(cands)}}}] + list(run_sub)
         if agg is not None:
-            result = agg(sub)
+            result = agg(run_sub)
         else:
-            result = list(foreign.aggregate(sub))
+            result = list(foreign.aggregate(run_sub))
         if ck is not None:
             cache[ck] = result
             result = copy.deepcopy(result)
