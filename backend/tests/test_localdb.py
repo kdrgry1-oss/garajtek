@@ -600,3 +600,28 @@ def test_match_cache_is_invalidated_by_every_write(dbpath):
         close(db)
 
     run(scenario())
+
+
+def test_second_process_is_refused_while_db_is_open(dbpath):
+    """localdb is single-process: a second process must fail loudly, not diverge."""
+    import subprocess
+
+    async def scenario():
+        db = fresh(dbpath)
+        await db.c.insert_one({"id": "1"})
+        code = ("import asyncio,sys; sys.path.insert(0, %r)\n"
+                "from localdb import AsyncIOMotorClient\n"
+                "from localdb.storage import DatabaseInUseError\n"
+                "try:\n"
+                "    AsyncIOMotorClient(path=%r)\n"
+                "except DatabaseInUseError:\n"
+                "    sys.exit(7)\n"
+                % (os.path.dirname(os.path.dirname(os.path.abspath(__file__))), dbpath))
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, timeout=60)
+        assert r.returncode == 7, r.stderr.decode()[-500:]
+        close(db)
+        # after close the file is free again for another process
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, timeout=60)
+        assert r.returncode == 0, r.stderr.decode()[-500:]
+
+    run(scenario())

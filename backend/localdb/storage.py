@@ -16,6 +16,10 @@ from __future__ import annotations
 
 import os
 import sqlite3
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX
+    fcntl = None
 import sys
 import threading
 from typing import Iterable, Iterator, List, Optional, Sequence, Tuple
@@ -54,6 +58,32 @@ def decode_doc(blob: bytes) -> dict:
     return compact(bson.decode(blob, DECODE_OPTS))
 
 
+class DatabaseInUseError(RuntimeError):
+    """Another process already serves this database file."""
+
+
+def _acquire_process_lock(path: str):
+    """Exclusive, non-blocking advisory lock on ``<db>.lock`` for the life of the process.
+
+    The in-memory copy is authoritative while the app runs, so a second writer (a second
+    uvicorn worker, or reset_admin.py / import_data.py run while the service is up) would
+    silently diverge and lose writes. Refuse to open instead. The kernel drops the lock when
+    the process exits (also on SIGKILL). Online backups (``python -m localdb.backup``) do not
+    take this lock."""
+    if fcntl is None:
+        return None
+    fd = os.open(path + ".lock", os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as e:
+        os.close(fd)
+        raise DatabaseInUseError(
+            f"localdb: {path} başka bir süreç tarafından kullanılıyor (uygulama çalışıyor "
+            f"olabilir). Bu işlem için önce servisi durdurun: systemctl stop garajtek-api. "
+            f"(another process holds {path}.lock; localdb is single-process)") from e
+    return fd
+
+
 class Storage:
     """Thin, thread-safe wrapper around a single SQLite connection."""
 
@@ -61,6 +91,7 @@ class Storage:
         self.path = path
         d = os.path.dirname(os.path.abspath(path))
         os.makedirs(d, exist_ok=True)
+        self._lockfd = _acquire_process_lock(path)
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(path, isolation_level=None, check_same_thread=False,
                                      timeout=30)
@@ -234,6 +265,12 @@ class Storage:
             except Exception:
                 pass
             self._conn.close()
+            if self._lockfd is not None:
+                try:
+                    os.close(self._lockfd)  # releases the flock
+                except OSError:
+                    pass
+                self._lockfd = None
 
 
 def iter_rows(path: str) -> Iterable[Tuple[str, str, Optional[dict]]]:  # pragma: no cover
