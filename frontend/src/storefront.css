@@ -39,8 +39,8 @@
 
 /* Form alanlarında hiçbir odak halkası/kutusu yok (tarayıcı varsayılanı dahil); odak göstergesi
    yalnız kenarlık/alt-çizgi rengi (aşağıdaki :focus kuralı). Mobilde dokunma vurgusu da kapalı. */
-.storefront-shell :where(input, select, textarea):focus,
-.storefront-shell :where(input, select, textarea):focus-visible {
+.storefront-shell :where(input, select, textarea):where(:not(.electro *)):focus,
+.storefront-shell :where(input, select, textarea):where(:not(.electro *)):focus-visible {
   outline: none;
   box-shadow: none;
 }
@@ -49,21 +49,21 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.storefront-shell :where(input, select, textarea) {
+.storefront-shell :where(input, select, textarea):where(:not(.electro *)) {
   border-color: var(--sf-border);
   border-radius: var(--sf-radius-sm);
 }
 
-.storefront-shell :where(input, select, textarea):focus {
+.storefront-shell :where(input, select, textarea):where(:not(.electro *)):focus {
   border-color: var(--sf-ink);
 }
 
-.storefront-shell :where(button, [role="button"]) {
+.storefront-shell :where(button, [role="button"]):where(:not(.electro *)) {
   transition-property: color, background-color, border-color, opacity, transform;
   transition-duration: 180ms;
 }
 
-.storefront-shell :where(button, input, select, textarea):disabled {
+.storefront-shell :where(button, input, select, textarea):where(:not(.electro *)):disabled {
   cursor: not-allowed;
   opacity: 0.48;
 }
@@ -90,17 +90,10 @@
   background-color: var(--sf-canvas);
 }
 
-.sf-page h1 {
-  color: var(--sf-ink);
-  text-wrap: balance;
-}
+.sf-page h1 { text-wrap: balance; }
 
 .sf-page :where(p, li) { text-wrap: pretty; }
 
-.storefront-shell[data-storefront-section="static"] .sf-page main {
-  color: var(--sf-ink-soft);
-  line-height: 1.7;
-}
 
 .sf-panel {
   border: 1px solid var(--sf-border);

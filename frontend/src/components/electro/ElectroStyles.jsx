@@ -5,9 +5,10 @@
 import { useLayoutEffect } from "react";
 import { useLocation } from "react-router-dom";
 
+// Open Sans artık tema CSS'inde kendi sunucumuzdan (public/electro/fonts) yüklenir.
+// ?v= içerik özeti (craco.config.js) → tema değişince önbellek kırılır.
 const LINKS = [
-  ["electro-font", "https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&display=swap"],
-  ["electro-css", "/electro/electro.css?v=2"],
+  ["electro-css", `/electro/electro.css?v=${process.env.REACT_APP_ELECTRO_CSS_VER || "1"}`],
 ];
 
 export default function ElectroStyles() {

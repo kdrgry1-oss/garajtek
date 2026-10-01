@@ -233,7 +233,7 @@
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
         <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
         <noscript><link href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" /></noscript>
-        <!-- VİTRİN TEMASI (Electro): Bootstrap tabanlı tema CSS'i yalnız MAĞAZA sayfalarında yüklenir
+        <!-- VİTRİN TEMASI: Bootstrap tabanlı tema CSS'i yalnız MAĞAZA sayfalarında yüklenir
              (/admin'de hiç yüklenmez). Tüm kurallar `.electro` sarmalayıcısına kapsamlıdır (bkz.
              scripts/build-electro-css.js) → admin/ödeme gibi Tailwind ekranlarına sızmaz. Parser-inserted
              (document.write) olduğundan ilk boyamadan önce uygulanır → FOUC/CLS yok. SPA içi /admin
@@ -242,8 +242,7 @@
             (function () {
                 try {
                     if (location.pathname.indexOf("/admin") === 0) return;
-                    document.write('<link id="electro-font" rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&display=swap" />'
-                        + '<link id="electro-css" rel="stylesheet" href="/electro/electro.css?v=2" />');
+                    document.write('<link id="electro-css" rel="stylesheet" href="/electro/electro.css?v=%REACT_APP_ELECTRO_CSS_VER%" />');
                 } catch (e) { /* yoksay */ }
             })();
         </script>

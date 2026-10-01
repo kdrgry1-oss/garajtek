@@ -4,24 +4,11 @@
    Bu dosyadaki TÜM kurallar `.electro` altında → admin (Tailwind) etkilenmez.
    ========================================================================== */
 
-/* --- Tailwind preflight ↔ Bootstrap uyumu (yalnız .electro içinde) -------- */
-/* Tailwind preflight `* { border-style: solid }` Bootstrap'in yalnız border-width veren kurallarında
-   (ör. .nav-tab .nav-link) istenmeyen çerçeve çizdiriyordu → tarayıcı varsayılanına (none) dön. */
-.electro *, .electro *::before, .electro *::after { border-style: none; border-color: currentColor; }
-.electro img, .electro svg, .electro video, .electro canvas, .electro iframe, .electro embed, .electro object {
-  display: inline-block;
-  vertical-align: middle;
-}
-.electro ul, .electro ol { padding-left: 2.5rem; }
-.electro ul { list-style: disc; }
-.electro ol { list-style: decimal; }
-.electro nav ul, .electro nav ol { list-style: none; }
-.electro button { background-color: transparent; }
-.electro [type="search"] { -webkit-appearance: textfield; outline-offset: -2px; }
+/* Tailwind preflight artık .electro DIŞINA kapsamlı (scripts/tailwind-scoped-preflight.js) →
+   burada tarayıcı varsayılanlarını geri yükleyen "uyum" kurallarına gerek yok; tema, orijinal
+   HTML şablondaki gibi Bootstrap reboot + tarayıcı varsayılanlarıyla çalışır. */
 /* Tailwind'in `.collapse { visibility: collapse }` yardımcı sınıfı Bootstrap .collapse'ı gizlemesin */
 .electro .collapse, .electro .collapse.show { visibility: visible; }
-/* index.css global .btn-primary/.btn-secondary (Tailwind @apply) sızıntısını nötrle */
-.electro .btn-primary, .electro .btn-secondary { text-transform: none; letter-spacing: normal; }
 .electro .btn-add-cart { padding: 0; }
 .electro a:focus-visible, .electro button:focus-visible { outline: 2px solid #333e48; outline-offset: 2px; }
 .electro .font-size-11 { font-size: 0.6875rem; }

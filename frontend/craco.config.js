@@ -31,6 +31,15 @@ require("dotenv").config();
     if (process.env[k] === undefined) process.env[k] = v;
   });
   process.env.REACT_APP_SITE_URL = siteUrl; // sondaki "/" kırpılmış hali (canonical = SITE_URL + "/")
+  // Vitrin teması CSS'i (public/electro/electro.css) hash'siz bir dosya → içerik özeti sorgu
+  // parametresi olur (?v=<özet>): tema güncellenince tarayıcı/Cloudflare eski CSS'i KULLANMAZ.
+  try {
+    const sum = require("crypto").createHash("md5")
+      .update(fs.readFileSync(path.resolve(__dirname, "public/electro/electro.css"))).digest("hex").slice(0, 10);
+    process.env.REACT_APP_ELECTRO_CSS_VER = sum;
+  } catch (e) {
+    process.env.REACT_APP_ELECTRO_CSS_VER = String(Date.now());
+  }
 })();
 
 // Check if we're in development/preview mode (not production build)

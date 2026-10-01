@@ -81,5 +81,7 @@ module.exports = {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  // Preflight (CSS reset) vitrin teması (.electro) DIŞINA kapsamlı eklenir — bkz. scripts/tailwind-scoped-preflight.js
+  corePlugins: { preflight: false },
+  plugins: [require("tailwindcss-animate"), require("./scripts/tailwind-scoped-preflight")],
 };
