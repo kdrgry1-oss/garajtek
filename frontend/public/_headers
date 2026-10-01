@@ -1,0 +1,33 @@
+# Cloudflare Pages / Netlify _headers
+# Cloudflare Pages varsayılan asset önbelleğini kullanırız. Özel, bir yıllık
+# `immutable` kuralı dağıtım anında henüz yayılmamış bir hash istendiğinde SPA
+# fallback HTML'ini JavaScript yolu altında kalıcı olarak önbelleğe alabiliyordu.
+
+# --- GÜVENLİK BAŞLIKLARI (tüm yollar) ---
+# CSP hariç bu başlıklar analitik/pixel'leri KIRMAZ; hemen aktif.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  # microphone=(self): yalnız KENDİ sitemiz (admin "Bana Sor" sesli soru) mikrofon
+  # isteyebilir; dış siteler/iframe'ler yine erişemez. '()' tamamen kapatıyordu —
+  # tarayıcı izni açık olsa bile kayıt "izin verilmedi" hatası veriyordu.
+  Permissions-Policy: geolocation=(), microphone=(self), camera=(), payment=(self)
+  # FedCM desteklemeyen tarayıcılarda GIS popup'ının ana pencereyle haberleşebilmesi
+  # gerekir. `same-origin` tek başına bu kanalı kesip boş/tepkisiz popup üretiyordu.
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  # DENETİM SEC-5 F-03: storefront (kart verisi girilen origin) HSTS taşımıyordu.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  # CSP: aşağıdaki satırı, sitede kullanılan TÜM 3. parti host'lar (GTM, Google,
+  # Meta, TikTok, iyzico, fontlar, API alan adınız) test edildikten SONRA aç.
+  # Yanlış CSP storefront'u/analitiği kırabileceğinden varsayılan KAPALI bırakıldı.
+  # Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://analytics.tiktok.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://api.ORNEK-ALANADI.com https://www.google-analytics.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'
+
+# HTML her zaman taze
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Hash'li JS/CSS dosyaları için burada özel Cache-Control tanımlamayız.
+# Pages'in dağıtım-aware varsayılan önbelleği güncel asset setini atomik tutar.

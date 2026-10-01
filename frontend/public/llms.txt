@@ -1,0 +1,21 @@
+# Mağaza
+
+> Bu dosya, backend'in dinamik /llms.txt ucuna erişilemediğinde sunulan statik
+> yedektir. Gerçek içerik (mağaza adı, kategoriler, iletişim, sosyal medya)
+> İşletme/Firma ayarlarından üretilir (functions/llms.txt.js → backend /llms.txt).
+
+Bu site bir online mağazadır. Güncel ürün, kategori ve sayfa listesi için
+site haritasına (sitemap) bakınız.
+
+## Önemli sayfalar
+
+- Ana sayfa: /
+- Arama: /arama
+
+## Notlar
+
+- Ürün detay sayfaları schema.org Product yapısal verisi (isim, fiyat, stok, marka,
+  görsel) içerir; kategori ve ürün sayfaları ayrı canonical + başlık/açıklama taşır.
+
+Bu dosya yapay zeka asistanlarının (LLM) mağazayı ve ürünlerini doğru anlaması için
+sağlanmıştır (llms.txt standardı).

@@ -1,0 +1,184 @@
+name: Security Scan
+
+# Amaç: her push + PR'da OTOMATİK güvenlik taraması yapıp SONUÇLARI görünür kılmak.
+#   1) SAST (CodeQL)          → kod açıkları (injection/XSS vb.) → Security sekmesi
+#   2) Secret Scan (gitleaks) → koda sızmış şifre/anahtar        → Security sekmesi + özet
+#   3) Dependency Audit       → açığı olan kütüphaneler          → iş özeti (Summary)
+#
+# NOT: Bu tarama KODU denetler; CANLI saldırı tespiti DEĞİLDİR (onu Cloudflare WAF +
+# uygulamadaki rate-limit/ban katmanı yapar). Tarayıcının çalışamaması ve secret
+# bulgusu job'u kırmızı yapar; ayrıntılar Security sekmesi + Summary'de görünür.
+# (Amazon SP-API Restricted Role / DPP: otomatik SAST + secret + bağımlılık taraması.)
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"   # haftalık (Pazartesi 03:00 UTC)
+  workflow_dispatch: {}    # panelden elle tetikleme
+
+permissions:
+  contents: read
+  security-events: write   # SARIF sonuçlarını Security sekmesine yaz
+  actions: read
+  issues: write            # bulgu varsa SLA takibi için otomatik issue aç/güncelle
+
+jobs:
+  # 1) SAST — CodeQL (Python backend + JavaScript frontend)
+  codeql:
+    name: CodeQL SAST (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          # DİKKAT: girdi adı 'languages' (çoğul). 'language' (tekil) yok sayılır →
+          # CodeQL TÜM dilleri otomatik algılar (repodaki Swift dahil) ve Swift Linux
+          # runner'da desteklenmediği için init "configuration error" ile çöker.
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # 2) Secret scanning — gitleaks (CLI, tam git geçmişi). Marketplace action'a bağımlı
+  #    DEĞİL (lisans/kurulum takılmaları yaşanmasın); SARIF Security sekmesine yüklenir.
+  gitleaks:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          VER="8.21.2"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+      - name: Run gitleaks
+        run: |
+          gitleaks detect --source . --report-format sarif --report-path gitleaks.sarif \
+            --redact --exit-code 1
+      - name: Özet (kaç bulgu)
+        if: always()
+        run: |
+          if [ -f gitleaks.sarif ]; then
+            N=$(python3 -c "import json;d=json.load(open('gitleaks.sarif'));print(len(d.get('runs',[{}])[0].get('results',[])))" 2>/dev/null || echo "?")
+            echo "### 🔐 Gitleaks — koda sızmış sır taraması" >> "$GITHUB_STEP_SUMMARY"
+            echo "Bulgu sayısı: **$N** (redakte). Ayrıntı: Security → Code scanning." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### 🔐 Gitleaks — rapor üretilemedi (loglara bakın)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload SARIF (Security sekmesi)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks.sarif
+        continue-on-error: true
+
+      # §5/§10: bulgu varsa SLA takibi için otomatik güvenlik issue'su aç/güncelle.
+      # Yalnız main'e push + planlı/elle tetiklemede (PR'larda gürültü yapmaz). Başlıkla dedup edilir.
+      - name: Bulgu varsa güvenlik issue'su (SLA takibi)
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let n;
+            try {
+              const runs = JSON.parse(fs.readFileSync('gitleaks.sarif','utf8')).runs;
+              if (!Array.isArray(runs) || !runs.length || runs.some(r => !Array.isArray(r.results))) throw new Error('Invalid SARIF');
+              n = runs.reduce((total, run) => total + run.results.length, 0);
+            } catch (e) {
+              core.setFailed('Gitleaks raporu doğrulanamadı; mevcut güvenlik issue’ları kapatılmadı.');
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const title = '🔐 Security: gitleaks sır bulgusu (SLA takibi)';
+            const open = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: 'security', per_page: 50 });
+            const dup = open.data.find(i => i.title === title);
+            if (!n) {
+              if (dup) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: dup.number, body: 'Yeni tarama: **0 bulgu**. Otomatik yeniden test başarılı; issue kapatılıyor.' });
+                await github.rest.issues.update({ owner, repo, issue_number: dup.number, state: 'closed' });
+              }
+              core.info('gitleaks: bulgu yok.');
+              return;
+            }
+            const today = new Date().toISOString().slice(0, 10);
+            const body = [
+              `**Discovery date:** ${today}`,
+              `**Affected system:** repository — gitleaks secret scan`,
+              `**Severity:** Critical`,
+              `**Owner:** _atanacak_`,
+              `**Due date (SLA):** Critical → en geç 7 takvim günü`,
+              `**Status:** open`,
+              `**Finding count:** ${n} (redakte — ayrıntı: Security → Code scanning → gitleaks)`,
+              `**Remediation evidence:** _fix sonrası doldurulacak_`,
+              `**Retest result:** _rescan sonrası doldurulacak_`,
+              '',
+              `Run: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            if (dup) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: dup.number, body: `Yeni tarama (${today}): **${n}** bulgu.\n\n${body}` });
+              core.info(`Mevcut issue #${dup.number} güncellendi.`);
+            } else {
+              const created = await github.rest.issues.create({ owner, repo, title, body, labels: ['security', 'sla-critical'] });
+              core.info(`Issue #${created.data.number} açıldı.`);
+            }
+        continue-on-error: true
+
+  # 3) Bağımlılık açık taraması — backend (pip-audit) + frontend (yarn audit).
+  #    Bulgu veya tarama hatası başarısızdır; eksik tarama temiz sayılmaz.
+  dependencies:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: pip-audit (backend)
+        run: |
+          python -m pip install pip-audit
+          echo "### 🐍 Backend bağımlılık açıkları (pip-audit)" >> "$GITHUB_STEP_SUMMARY"
+          audit_status=0
+          pip-audit -r backend/requirements.txt -f json -o pipaudit.json || audit_status=$?
+          python scripts/check_dependency_audit.py pip pipaudit.json "$audit_status" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        if: always()
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: yarn audit (frontend)
+        if: always()
+        working-directory: frontend
+        run: |
+          echo "### 📦 Frontend bağımlılık açıkları (yarn audit)" >> "$GITHUB_STEP_SUMMARY"
+          corepack enable
+          audit_status=0
+          yarn audit --groups dependencies --json > yarnaudit.jsonl || audit_status=$?
+          python ../scripts/check_dependency_audit.py yarn yarnaudit.jsonl "$audit_status" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve dependency audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit
+          path: |
+            pipaudit.json
+            frontend/yarnaudit.jsonl

@@ -1,0 +1,391 @@
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi.responses import Response, RedirectResponse
+from datetime import datetime, timezone
+import asyncio
+from collections import OrderedDict
+import base64
+import uuid
+import os
+
+from .deps import db, get_current_user, require_auth, require_admin, logger
+from services import r2_storage as r2
+
+router = APIRouter(prefix="/upload", tags=["upload"])
+# Geriye dönük uyumluluk: bazı kayıtlarda görsel URL'si /api/files/... olarak saklandı
+files_router = APIRouter(prefix="/files", tags=["upload"])
+
+APP_NAME = (os.environ.get("STORAGE_APP_NAME") or "store").strip()
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Yeni yüklemeler Cloudflare R2'ye (S3 uyumlu) gider ve doğrudan R2 CDN'den
+# sunulur. Bu, MongoDB'yi base64 görsel yükünden kurtarır ve yüklemeyi hızlandırır.
+# R2 yapılandırılmamışsa eski davranışa (MongoDB + disk) düşer.
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB — DSLR çıkışı hero görselleri 10MB'ı aşıyor; Pillow zaten resize+WebP ile küçültüyor
+
+
+# Yüklemede maksimum uzun kenar (px) — ürün görsel ızgarası + PDP zoom için yeterli,
+# eskiden olduğu gibi 1700-2500px ham görselleri (yavaş decode/paint → "boş çıkıyor"
+# şikayeti) önler. PNG/JPG → WebP'e çevrilir, format başına ortalama %60-80 küçülür.
+MAX_UPLOAD_LONG_EDGE = 2000
+UPLOAD_WEBP_QUALITY = 88
+
+
+def _optimize_for_upload(data: bytes, content_type: str):
+    """Yüklenen görseli WebP'e çevirip gerekirse küçültür.
+
+    Animasyonlu GIF / SVG gibi optimize edilemeyecek türlerde (None, None, None)
+    döner → çağıran orijinal bytes'ı olduğu gibi yükler (davranış bozulmaz).
+    """
+    if not content_type or "svg" in content_type:
+        return None, None, None
+    try:
+        from PIL import Image, ImageOps
+        import io
+
+        im = Image.open(io.BytesIO(data))
+
+        # Animasyonlu GIF/WebP → dokunma (kareleri kaybetmemek için)
+        if getattr(im, "is_animated", False):
+            return None, None, None
+
+        im = ImageOps.exif_transpose(im)  # telefon fotoğraflarında yanlış dönüşü düzelt
+
+        if max(im.width, im.height) > MAX_UPLOAD_LONG_EDGE:
+            ratio = MAX_UPLOAD_LONG_EDGE / float(max(im.width, im.height))
+            im = im.resize(
+                (max(1, int(im.width * ratio)), max(1, int(im.height * ratio))),
+                Image.LANCZOS,
+            )
+
+        # Şeffaflığı koru (RGBA/LA/transparan P), yoksa RGB'ye düş
+        if im.mode == "P" and "transparency" in im.info:
+            im = im.convert("RGBA")
+        elif im.mode not in ("RGB", "RGBA"):
+            im = im.convert("RGB")
+
+        out = io.BytesIO()
+        im.save(out, format="WEBP", quality=UPLOAD_WEBP_QUALITY, method=6)
+        return out.getvalue(), "image/webp", "webp"
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"upload optimize failed, orijinal yüklenecek: {e}")
+        return None, None, None
+
+
+# DENETİM (injection-redteam): image/svg+xml KALDIRILDI. SVG optimize edilmeden R2'ye
+# yazılıp CDN'den inline servis ediliyordu → herhangi bir üye çalıştırılabilir
+# SVG (stored-XSS) yükleyebiliyordu. Raster formatlar güvenli (PIL ile yeniden kodlanır).
+_ALLOWED_IMAGE_TYPES = {
+    "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif",
+    "image/avif", "image/heic", "image/heif", "image/bmp",
+}
+
+
+@router.post("/image")
+async def upload_image(file: UploadFile = File(...), user=Depends(require_admin)):  # yalnız personel (denetim 2026-09-29)
+    """Görseli optimize edip (resize+WebP) Cloudflare R2'ye yükler; R2 kapalıysa MongoDB+disk'e düşer."""
+    # GÜVENLİK: geniş "image/*" yerine açık allowlist — sahte/garip content-type reddedilir.
+    if not file.content_type or file.content_type.split(";")[0].strip().lower() not in _ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Sadece resim dosyaları yüklenebilir (jpeg/png/webp/gif/svg)")
+
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Dosya çok büyük (maks 25MB)")
+
+    content_type = file.content_type
+    # PIL CPU-yoğun → iş parçacığında (olay döngüsünü kilitleyip TÜM siteyi bekletmesin)
+    opt_data, opt_type, opt_ext = await asyncio.to_thread(_optimize_for_upload, data, content_type)
+    if opt_data is not None:
+        data, content_type = opt_data, opt_type
+        ext = opt_ext
+    else:
+        ext = file.filename.split(".")[-1].lower() if "." in (file.filename or "") else "jpg"
+    filename = f"{uuid.uuid4()}.{ext}"
+
+    # 1) Cloudflare R2 (tercih edilen)
+    if r2.is_enabled():
+        key = f"uploads/{filename}"
+        try:
+            public_url = await asyncio.to_thread(r2.put_object, key, data, content_type)
+            await db.files.insert_one({
+                "id": str(uuid.uuid4()),
+                "storage_path": filename,
+                "r2_key": key,
+                "r2_url": public_url,
+                "original_filename": file.filename,
+                "content_type": content_type,
+                "size": len(data),
+                "is_deleted": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            return {"success": True, "path": filename, "url": public_url}
+        except Exception as e:
+            logger.error(f"R2 upload failed, falling back to db/disk: {e}")
+
+    # 2) Fallback: MongoDB (kalıcı) + disk (önbellek)
+    try:
+        with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
+            f.write(data)
+    except Exception as e:
+        logger.warning(f"upload disk write failed: {e}")
+
+    await db.files.insert_one({
+        "id": str(uuid.uuid4()),
+        "storage_path": filename,
+        "original_filename": file.filename,
+        "content_type": content_type,
+        "size": len(data),
+        "data_b64": base64.b64encode(data).decode("ascii"),
+        "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return {
+        "success": True,
+        "path": filename,
+        "url": f"/api/upload/files/{filename}",
+    }
+
+
+MAX_VIDEO_BYTES = 100 * 1024 * 1024  # 100 MB — hero slider videoları
+
+
+@router.post("/video")
+async def upload_video(file: UploadFile = File(...), user=Depends(require_admin)):  # yalnız personel (denetim 2026-09-29)
+    """Video yükler (hero slider slaytı için) → Cloudflare R2 CDN'e; optimize edilmez,
+    olduğu gibi CDN'den servis edilir (anasayfayı yormaz). R2 kapalıysa MongoDB+disk'e düşer."""
+    ct = (file.content_type or "").split(";")[0].strip().lower()
+    # GÜVENLİK: açık video allowlist — sahte content-type ile keyfi dosya deposu engeli.
+    _ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime",
+                            "video/x-msvideo", "video/mpeg", "video/ogg"}
+    if ct not in _ALLOWED_VIDEO_TYPES:
+        raise HTTPException(status_code=400, detail="Sadece video dosyaları yüklenebilir (mp4/webm/mov)")
+    data = await file.read()
+    if len(data) > MAX_VIDEO_BYTES:
+        raise HTTPException(status_code=400, detail="Video çok büyük (maks 100MB)")
+    ext = (file.filename.split(".")[-1].lower() if "." in (file.filename or "") else "mp4")
+    if ext not in ("mp4", "webm", "mov", "m4v", "ogg"):
+        ext = "mp4"
+    filename = f"{uuid.uuid4()}.{ext}"
+
+    # 1) Cloudflare R2 (tercih edilen — CDN'den doğrudan servis)
+    if r2.is_enabled():
+        key = f"uploads/{filename}"
+        try:
+            public_url = await asyncio.to_thread(r2.put_object, key, data, ct)
+            await db.files.insert_one({
+                "id": str(uuid.uuid4()), "storage_path": filename, "r2_key": key,
+                "r2_url": public_url, "original_filename": file.filename,
+                "content_type": ct, "size": len(data), "is_video": True,
+                "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            return {"success": True, "path": filename, "url": public_url, "is_video": True}
+        except Exception as e:
+            logger.error(f"R2 video upload failed, falling back to db/disk: {e}")
+
+    # 2) Fallback: disk + MongoDB
+    try:
+        with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
+            f.write(data)
+    except Exception as e:
+        logger.warning(f"video disk write failed: {e}")
+    await db.files.insert_one({
+        "id": str(uuid.uuid4()), "storage_path": filename,
+        "original_filename": file.filename, "content_type": ct, "size": len(data),
+        "data_b64": base64.b64encode(data).decode("ascii"), "is_video": True,
+        "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "path": filename, "url": f"/api/upload/files/{filename}", "is_video": True}
+
+
+async def _serve(path: str, w: int = 0, q: int = 90):
+    record = await db.files.find_one({"storage_path": path, "is_deleted": False})
+
+    # 0) R2'ye taşınmış/yüklenmişse → R2 public URL'ine yönlendir (CDN servis eder).
+    #    SADECE mutlak http(s) URL'e yönlendir; eski/bozuk relatif r2_url ("/uploads/..")
+    #    varsa GÖZ ARDI et ve DB/disk içeriğinden servis et (görsel kaybolmasın).
+    _r2 = (record or {}).get("r2_url") or ""
+    if _r2 and str(_r2).lower().startswith("http"):
+        return RedirectResponse(url=_r2, status_code=302)
+
+    content = None
+    ctype = (record or {}).get("content_type", "image/jpeg")
+    # 1) MongoDB içeriği (eski yüklemeler için güvenilir kaynak)
+    if record and record.get("data_b64"):
+        try:
+            content = base64.b64decode(record["data_b64"])
+        except Exception as e:
+            logger.warning(f"serve db decode failed for {path}: {e}")
+    # 2) Disk önbelleği (fallback) — PATH TRAVERSAL KORUMASI:
+    #    `path` ham URL segmentidir. `..`, mutlak yol veya sembolik kaçışla
+    #    UPLOAD_DIR dışına çıkılamamalı. realpath ile taban dizin içinde
+    #    kaldığını doğrula; aksi halde 404 (bilgi sızdırma) ver.
+    if content is None:
+        base_dir = os.path.realpath(UPLOAD_DIR)
+        candidate = os.path.realpath(os.path.join(base_dir, path))
+        if (candidate == base_dir or candidate.startswith(base_dir + os.sep)) and os.path.isfile(candidate):
+            with open(candidate, "rb") as f:
+                content = f.read()
+    if content is None:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # İçerik-adresli (uuid) dosyalar değişmez → 1 yıl immutable cache (PageSpeed + tekrar ziyaret)
+    headers = {"Cache-Control": "public, max-age=31536000, immutable",
+               "X-Content-Type-Options": "nosniff"}
+    # SVG XSS KORUMASI: SVG top-level açılırsa içindeki <script> çalışır. attachment ile
+    # top-level render engellenir (<img> ile gömme etkilenmez, orada script zaten çalışmaz).
+    if "svg" in (ctype or "").lower():
+        headers["Content-Disposition"] = "attachment"
+        headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+
+    # On-the-fly optimize/resize — yalnızca ?w= verildiyse ve raster görselse.
+    if w and w > 0 and ctype.startswith("image/") and "svg" not in ctype:
+        try:
+            def _resize_webp():
+                from PIL import Image
+                import io
+                im = Image.open(io.BytesIO(content))
+                if im.width > w:
+                    ratio = w / float(im.width)
+                    im = im.resize((w, max(1, int(im.height * ratio))), Image.LANCZOS)
+                if im.mode in ("RGBA", "P", "LA"):
+                    im = im.convert("RGB")
+                out = io.BytesIO()
+                im.save(out, format="WEBP", quality=max(40, min(int(q), 95)), method=4)
+                return out.getvalue()
+            # PIL CPU-yoğun → iş parçacığında (olay döngüsü kilitlenmesin)
+            return Response(content=await asyncio.to_thread(_resize_webp), media_type="image/webp", headers=headers)
+        except Exception as e:
+            logger.warning(f"resize failed {path}: {e}")
+    return Response(content=content, media_type=ctype, headers=headers)
+
+
+# =============================================================================
+# JPEG proxy — pazaryeri (Amazon) görsel aktarımı için. Amazon WebP KABUL ETMEZ
+# (yalnız JPEG/PNG/TIFF/GIF); ürün görsellerimiz R2'de WebP saklanıyor → Amazon
+# webp'leri sessizce düşürüyordu ("resimler aktarılmıyor"). Bu uç origin görseli
+# çekip tam çözünürlükte (≤2000px) JPEG'e çevirir. Cloudflare cdn-cgi transform
+# kotasına (ERROR 9422) bağlı DEĞİL → güvenilir. Amazon URL'i bir kez çekip cache'ler.
+# =============================================================================
+def _cdn_host() -> str:
+    from urllib.parse import urlparse as _up
+    _c = (os.environ.get("CDN_URL") or os.environ.get("R2_PUBLIC_URL") or "").strip()
+    return (_up(_c if "://" in _c else "https://" + _c).hostname or "").lower() if _c else ""
+
+
+# Yalnız kendi CDN'imiz (env CDN_URL / R2_PUBLIC_URL) + eski Ticimax statik alanı.
+_JPEG_ALLOWED_HOSTS = {h for h in (_cdn_host(), "static.ticimax.cloud") if h}
+
+# Pazaryeri (HB/Amazon) yüzlerce görseli AYNI ANDA ilk kez çektiğinde her biri ayrı PIL
+# dönüşümü yapıyordu → işlemci doyup panel + vitrin saniyelerce bekliyordu. Aynı anda en
+# fazla 2 dönüşüm; sonuçlar küçük bir bellek önbelleğinde (≈64 MB) tutulur.
+_JPEG_SEM = asyncio.Semaphore(2)
+_JPEG_CACHE: "OrderedDict[str, bytes]" = OrderedDict()
+_JPEG_CACHE_MAX = 64 * 1024 * 1024
+_jpeg_cache_bytes = 0
+
+
+def _jpeg_cache_put(key: str, data: bytes):
+    global _jpeg_cache_bytes
+    if len(data) > 8 * 1024 * 1024:
+        return
+    if key in _JPEG_CACHE:
+        return
+    _JPEG_CACHE[key] = data
+    _jpeg_cache_bytes += len(data)
+    while _jpeg_cache_bytes > _JPEG_CACHE_MAX and _JPEG_CACHE:
+        _, old = _JPEG_CACHE.popitem(last=False)
+        _jpeg_cache_bytes -= len(old)
+
+
+@router.get("/jpeg/{token}.jpg")
+async def image_to_jpeg_ext(token: str, w: int = 2000):
+    """Amazon media_location için .jpg UZANTILI proxy: /api/upload/jpeg/<urlsafe-b64(src)>.jpg.
+    Amazon (ERROR 20015) dosya türünü URL/uzantı + içerikten doğrular; uzantısız
+    ?src= biçimi reddediliyordu. Aynı SSRF/boyut korumalarıyla to-jpeg'e delege eder."""
+    import base64
+    try:
+        pad = "=" * (-len(token) % 4)
+        src = base64.urlsafe_b64decode((token + pad).encode()).decode("utf-8")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Geçersiz görsel anahtarı")
+    return await image_to_jpeg(src, w)
+
+
+@router.get("/to-jpeg")
+async def image_to_jpeg(src: str, w: int = 2000):
+    """src (yalnız izinli CDN host) görselini tam çözünürlükte JPEG'e çevirip döndürür.
+    SSRF koruması: host beyaz-listesi. Amazon media_location için kullanılır."""
+    from urllib.parse import urlparse
+    try:
+        u = urlparse(src)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Geçersiz URL")
+    if u.scheme not in ("http", "https") or (u.hostname or "") not in _JPEG_ALLOWED_HOSTS:
+        raise HTTPException(status_code=400, detail="İzin verilmeyen kaynak")
+    _ck = f"{src}|{w}"
+    _hdr = {"Cache-Control": "public, max-age=31536000, immutable"}
+    if _ck in _JPEG_CACHE:
+        _JPEG_CACHE.move_to_end(_ck)
+        return Response(content=_JPEG_CACHE[_ck], media_type="image/jpeg", headers=_hdr)
+    try:
+        async with _JPEG_SEM:
+            if _ck in _JPEG_CACHE:
+                return Response(content=_JPEG_CACHE[_ck], media_type="image/jpeg", headers=_hdr)
+            data = await _to_jpeg_bytes(src, w)
+        _jpeg_cache_put(_ck, data)
+        return Response(content=data, media_type="image/jpeg", headers=_hdr)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"[to-jpeg] dönüştürme hatası src={src[:120]}: {e}")
+        raise HTTPException(status_code=502, detail="Görsel dönüştürülemedi")
+
+
+async def _to_jpeg_bytes(src: str, w: int) -> bytes:
+    import httpx
+    from PIL import Image, ImageOps
+    import io
+    # DENETİM (cost-redteam #6): indirilen boyutu ve piksel sayısını sınırla
+    # (decompression-bomb RAM/CPU + CDN egress amplifikasyonu engeli).
+    Image.MAX_IMAGE_PIXELS = 40_000_000  # ~40MP üstü reddedilir
+    # DENETİM (verify-redteam #1): follow_redirects=False — aksi halde izinli host bir
+    # yönlendirmeyle iç ağ/özel IP'ye (SSRF) yönlendirebilirdi (allowlist yalnız ilk hop'ta).
+    async with httpx.AsyncClient(timeout=25, follow_redirects=False) as client:
+        r = await client.get(src)
+        if r.status_code in (301, 302, 303, 307, 308):
+            raise HTTPException(status_code=400, detail="Yönlendirme kabul edilmez")
+        r.raise_for_status()
+        raw = r.content
+    if len(raw) > 20 * 1024 * 1024:  # 20MB kaynak üst sınırı
+        raise HTTPException(status_code=413, detail="Kaynak görsel çok büyük")
+    def _to_jpeg():
+        img = Image.open(io.BytesIO(raw))
+        img = ImageOps.exif_transpose(img)
+        # Şeffaflığı beyaz zemine indir (JPEG alfa desteklemez)
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGBA")
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1])
+            img = bg
+        else:
+            img = img.convert("RGB")
+        _w = max(200, min(int(w or 2000), 2000))
+        if img.width > _w:
+            img.thumbnail((_w, _w * 4), Image.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=90)
+        return out.getvalue()
+    # PIL CPU-yoğun → iş parçacığında (olay döngüsü kilitlenmesin); eşzamanlılık _JPEG_SEM ile sınırlı.
+    return await asyncio.to_thread(_to_jpeg)
+
+
+@router.get("/files/{path:path}")
+async def get_file(path: str, w: int = 0, q: int = 90):
+    return await _serve(path, w, q)
+
+
+@files_router.get("/{path:path}")
+async def get_file_legacy(path: str, w: int = 0, q: int = 90):
+    """Eski kayıtlardaki /api/files/... URL'lerini de servis et (resize destekli)."""
+    return await _serve(path, w, q)
