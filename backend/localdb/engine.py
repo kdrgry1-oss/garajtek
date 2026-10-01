@@ -46,7 +46,7 @@ from pymongo.results import (BulkWriteResult, DeleteResult, InsertManyResult, In
                              UpdateResult)
 
 from . import shims
-from .storage import DECODE_OPTS, Storage, encode_key
+from .storage import DECODE_OPTS, Storage, decode_doc, encode_key
 
 logger = logging.getLogger("localdb")
 
@@ -659,7 +659,7 @@ class LCollection(_MMCollection):
         if "_id" not in document:
             document["_id"] = ObjectId()
         blob = bson.encode(document)
-        clean = bson.decode(blob, DECODE_OPTS)
+        clean = decode_doc(blob)
         st = self._store
         if not st.loaded and not _has_unique(st.indexes):
             # Append-only fast path: no need to load the collection into memory.
@@ -687,7 +687,7 @@ class LCollection(_MMCollection):
                 d["_id"] = ObjectId()
             b = bson.encode(d)
             blobs.append(b)
-            cleans.append(bson.decode(b, DECODE_OPTS))
+            cleans.append(decode_doc(b))
         st = self._store
         if not st.loaded and not _has_unique(st.indexes):
             try:
@@ -1083,7 +1083,7 @@ class Engine:
                     blob = bson.encode(doc)
                     ups.append((key, blob))
                     # Keep memory byte-identical to disk (ms datetimes, Int64, lists...).
-                    docs[k] = bson.decode(blob, DECODE_OPTS)
+                    docs[k] = decode_doc(blob)
             self.storage.write(dbname, st.name, ups, dels)
         except Exception:
             logger.critical("localdb: failed to persist %d change(s) in %s.%s — in-memory "
