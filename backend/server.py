@@ -464,6 +464,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Category slug repair start warning: {e}")
 
+    # Garajtek kategori ağacı: categories koleksiyonu BOŞSA data/garajtek_categories.json'dan
+    # yüklenir (+ header mega menü kaydı yoksa yazılır). Doluysa hiçbir şeye dokunmaz.
+    try:
+        import asyncio as _asyncio
+        from seed_categories import seed_if_empty as _seed_categories_if_empty
+        _asyncio.create_task(_seed_categories_if_empty())
+    except Exception as e:
+        logger.warning(f"Category seed start warning: {e}")
+
     # Kupon ilk-sipariş istisna listesi (müşteri destek istisnası) — idempotent seed.
     try:
         import asyncio as _asyncio
