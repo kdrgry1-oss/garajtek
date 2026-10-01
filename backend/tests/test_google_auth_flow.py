@@ -35,6 +35,13 @@ deps.register_failed_login_ip = lambda *_a, **_k: None
 deps.client_ip_from_request = lambda *_a, **_k: "127.0.0.1"
 deps.limiter = None
 deps.validate_strong_password = lambda *_a, **_k: None
+
+
+async def _secure_social_link(user, _provider):
+    return user
+
+
+deps.secure_social_link = _secure_social_link
 sys.modules[deps.__name__] = deps
 
 spec = importlib.util.spec_from_file_location(
