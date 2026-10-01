@@ -101,9 +101,20 @@ async def upload_image(file: UploadFile = File(...), user=Depends(require_admin)
         ext = opt_ext
     else:
         ext = file.filename.split(".")[-1].lower() if "." in (file.filename or "") else "jpg"
-    filename = f"{uuid.uuid4()}.{ext}"
+    return await store_image_bytes(data, content_type, ext, file.filename)
 
-    # 1) Cloudflare R2 (tercih edilen)
+
+async def store_image_bytes(data: bytes, content_type: str, ext: str, original_filename: str = "",
+                            extra: dict | None = None) -> dict:
+    """Hazır (optimize edilmiş) görsel baytlarını etkin depoya yazar ve db.files kaydı açar.
+
+    Sıra: Cloudflare R2 / yerel MEDIA_DIR (r2.is_enabled) → yoksa MongoDB(base64)+disk.
+    `extra` db.files kaydına eklenir (ör. demo içerik etiketi). Dönüş: {success, path, url}.
+    """
+    filename = f"{uuid.uuid4()}.{ext}"
+    extra = dict(extra or {})
+
+    # 1) Cloudflare R2 / yerel medya dizini (tercih edilen)
     if r2.is_enabled():
         key = f"uploads/{filename}"
         try:
@@ -113,11 +124,12 @@ async def upload_image(file: UploadFile = File(...), user=Depends(require_admin)
                 "storage_path": filename,
                 "r2_key": key,
                 "r2_url": public_url,
-                "original_filename": file.filename,
+                "original_filename": original_filename,
                 "content_type": content_type,
                 "size": len(data),
                 "is_deleted": False,
                 "created_at": datetime.now(timezone.utc).isoformat(),
+                **extra,
             })
             return {"success": True, "path": filename, "url": public_url}
         except Exception as e:
@@ -133,12 +145,13 @@ async def upload_image(file: UploadFile = File(...), user=Depends(require_admin)
     await db.files.insert_one({
         "id": str(uuid.uuid4()),
         "storage_path": filename,
-        "original_filename": file.filename,
+        "original_filename": original_filename,
         "content_type": content_type,
         "size": len(data),
         "data_b64": base64.b64encode(data).decode("ascii"),
         "is_deleted": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        **extra,
     })
 
     return {
@@ -146,6 +159,25 @@ async def upload_image(file: UploadFile = File(...), user=Depends(require_admin)
         "path": filename,
         "url": f"/api/upload/files/{filename}",
     }
+
+
+async def delete_stored_file(record: dict) -> None:
+    """store_image_bytes ile yazılmış bir dosyayı depodan ve db.files'tan siler (best-effort)."""
+    key = record.get("r2_key")
+    if key:
+        try:
+            await asyncio.to_thread(r2.delete_object, key)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"stored file delete failed {key}: {e}")
+    sp = record.get("storage_path") or ""
+    if sp:
+        p = os.path.realpath(os.path.join(UPLOAD_DIR, sp))
+        if p.startswith(os.path.realpath(UPLOAD_DIR) + os.sep) and os.path.isfile(p):
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
+    await db.files.delete_one({"id": record.get("id")})
 
 
 MAX_VIDEO_BYTES = 100 * 1024 * 1024  # 100 MB — hero slider videoları

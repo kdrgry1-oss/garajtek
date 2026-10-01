@@ -167,6 +167,18 @@ def put_object(key: str, data: bytes, content_type: str = "application/octet-str
     raise RuntimeError("Nesne deposu yapılandırılmamış (R2_* veya MEDIA_DIR gerekli)")
 
 
+def delete_object(key: str) -> None:
+    """Nesneyi etkin depodan siler (yoksa sessizce geçer)."""
+    if r2_configured():
+        _get_client().delete_object(Bucket=os.environ["R2_BUCKET"], Key=key.lstrip("/"))
+        return
+    if local_configured():
+        try:
+            os.unlink(_local_path(key))
+        except FileNotFoundError:
+            pass
+
+
 def get_object(key: str):
     """Nesneyi okur → (bytes, content_type). Yoksa (None, None)."""
     if r2_configured():
