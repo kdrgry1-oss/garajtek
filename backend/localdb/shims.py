@@ -460,6 +460,118 @@ def _op_str_len_bytes(parser, args):
     return len(v.encode("utf-8"))
 
 
+def _num(v):
+    if isinstance(v, bson.decimal128.Decimal128):
+        return float(v.to_decimal())
+    return v
+
+
+def _parse_args(parser, args):
+    if not isinstance(args, list):
+        args = [args]
+    out = []
+    for a in args:
+        try:
+            out.append(_num(parser.parse(a)))
+        except KeyError:
+            out.append(None)
+    return out
+
+
+def _is_number(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) or isinstance(v, bool)
+
+
+def _op_add(parser, args):
+    vals = _parse_args(parser, args)
+    if any(v is None for v in vals):
+        return None
+    date = None
+    total = 0
+    for v in vals:
+        if isinstance(v, datetime.datetime):
+            if date is not None:
+                raise OperationFailure("only one date allowed in an $add expression")
+            date = v
+        elif isinstance(v, (int, float)):
+            total += v
+        else:
+            raise OperationFailure("$add only supports numeric or date types, not %s"
+                                   % _bson_type_name(v))
+    if date is not None:
+        return date + datetime.timedelta(milliseconds=total)
+    return total
+
+
+def _op_subtract(parser, args):
+    a, b = _parse_args(parser, args)
+    if a is None or b is None:
+        return None
+    if isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
+        return int((a - b).total_seconds() * 1000)
+    if isinstance(a, datetime.datetime) and isinstance(b, (int, float)):
+        return a - datetime.timedelta(milliseconds=b)
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return a - b
+    raise OperationFailure("can't $subtract %s from %s" % (_bson_type_name(b),
+                                                           _bson_type_name(a)))
+
+
+def _op_multiply(parser, args):
+    vals = _parse_args(parser, args)
+    if any(v is None for v in vals):
+        return None
+    out = 1
+    for v in vals:
+        if not isinstance(v, (int, float)):
+            raise OperationFailure("$multiply only supports numeric types, not %s"
+                                   % _bson_type_name(v))
+        out *= v
+    return out
+
+
+def _op_divide(parser, args):
+    a, b = _parse_args(parser, args)
+    if a is None or b is None:
+        return None
+    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+        raise OperationFailure("$divide only supports numeric types")
+    if b == 0:
+        raise OperationFailure("can't $divide by zero")
+    return a / b
+
+
+def _op_round(parser, args):
+    vals = _parse_args(parser, args)
+    v = vals[0]
+    place = int(vals[1]) if len(vals) > 1 and vals[1] is not None else 0
+    if v is None:
+        return None
+    d = decimal.Decimal(repr(v)).quantize(decimal.Decimal(1).scaleb(-place),
+                                         rounding=decimal.ROUND_HALF_EVEN)
+    return int(d) if isinstance(v, int) or place <= 0 and isinstance(v, int) else float(d)
+
+
+def _op_mod(parser, args):
+    a, b = _parse_args(parser, args)
+    if a is None or b is None:
+        return None
+    if b == 0:
+        raise OperationFailure("can't $mod by zero")
+    import math
+    return math.fmod(a, b) if isinstance(a, float) or isinstance(b, float) else \
+        int(math.fmod(a, b))
+
+
+def _unary_math(fn):
+    def handler(parser, args):
+        v = _parse_args(parser, args)[0]
+        if v is None:
+            return None
+        return fn(v)
+    return handler
+
+
 _EXTRA_OPERATORS = {
     "$convert": _op_convert,
     "$toString": _simple(_to_string),
@@ -486,6 +598,13 @@ _EXTRA_OPERATORS = {
     "$concat": _op_concat,
     "$strLenCP": _op_str_len_cp,
     "$strLenBytes": _op_str_len_bytes,
+    "$add": _op_add,
+    "$subtract": _op_subtract,
+    "$multiply": _op_multiply,
+    "$divide": _op_divide,
+    "$round": _op_round,
+    "$mod": _op_mod,
+    "$abs": _unary_math(abs),
 }
 
 
