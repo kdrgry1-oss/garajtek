@@ -8,6 +8,7 @@ import axios from "axios";
 import { sanitizeHtml } from "../lib/sanitizeHtml";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import Breadcrumb from "../components/electro/Breadcrumb";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -114,54 +115,51 @@ export default function FAQ() {
   const panel = data.find((t) => t.id === activeTab) || data[0];
 
   return (
-    <div className="sf-page min-h-screen bg-white flex flex-col">
+    <div className="sf-page" data-testid="faq-page">
       <Header />
-      <main className="flex-1 max-w-[1200px] w-full mx-auto px-3 md:px-4 pt-8 pb-24">
-        <h1 className="text-center text-[22px] md:text-[28px] font-bold mb-6 md:mb-8">Sıkça Sorulan Sorular</h1>
-
-        {/* Sekmeler */}
-        <div role="tablist" aria-label="SSS Kategorileri" className="flex flex-wrap justify-center gap-2.5 md:gap-3.5">
-          {data.map((t) => {
-            const active = t.id === activeTab;
-            return (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={active}
-                onClick={() => { setActiveTab(t.id); setOpenKey(null); }}
-                className={`rounded-md px-3.5 py-3.5 md:px-5 md:py-4 min-w-[140px] md:min-w-[160px] text-xs md:text-sm font-bold tracking-wide transition-all bg-white ${
-                  active ? "border border-black shadow-[0_0_0_1px_#111_inset]" : "border border-gray-200 hover:border-gray-400 hover:-translate-y-px"
-                }`}
-                type="button"
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Panel */}
-        <div className="mt-5 md:mt-6">
-          <div className="space-y-2.5">
+      <main id="content" role="main" className="electro el-page">
+        <Breadcrumb items={[{ label: "Sıkça Sorulan Sorular" }]} />
+        <div className="container">
+          <div className="mb-8 text-center">
+            <h1>Sıkça Sorulan Sorular</h1>
+            <p className="text-gray-44">Aradığınız cevabı bulamazsanız <a href="/sayfa/iletisim" className="text-blue">bize ulaşın</a>.</p>
+          </div>
+          <div className="position-relative text-center z-index-2 mb-6">
+            <ul className="nav nav-classic nav-tab nav-tab-sm px-md-3 justify-content-start justify-content-lg-center flex-nowrap flex-lg-wrap overflow-auto overflow-lg-visble border-md-down-bottom-0 pb-1 pb-lg-0 mb-n1 mb-lg-0" role="tablist" aria-label="SSS Kategorileri">
+              {data.map((t) => {
+                const active = t.id === activeTab;
+                return (
+                  <li className="nav-item flex-shrink-0 flex-lg-shrink-1" key={t.id}>
+                    <a href={`#${t.id}`} role="tab" aria-selected={active} className={`nav-link${active ? " active" : ""}`}
+                      onClick={(e) => { e.preventDefault(); setActiveTab(t.id); setOpenKey(null); }}>
+                      <div className="d-md-flex justify-content-md-center align-items-md-center">{t.label}</div>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+          <div className="border-bottom border-color-1 mb-6 rounded-0">
+            <h3 className="section-title mb-0 pb-2 font-size-25">{panel.label}</h3>
+          </div>
+          <div id="basicsAccordion" className="mb-12">
             {panel.items.map((item, i) => {
               const key = `${panel.id}:${i}`;
-              const open = openKey === key;
+              const open = openKey === key || (openKey === null && i === 0);
               return (
-                <div key={key}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenKey(open ? null : key)}
-                    className={`w-full text-left bg-white border border-gray-200 rounded-md px-4 py-4 flex items-center justify-between gap-3 font-semibold text-sm md:text-[15px] ${open ? "rounded-b-none" : ""}`}
-                  >
-                    <span>{item.q}</span>
-                    <span className={`text-xl leading-none transition-transform ${open ? "rotate-90" : ""}`}>›</span>
-                  </button>
-                  {open && (
-                    <div
-                      className="bg-white border border-t-0 border-gray-200 rounded-b-md px-4 py-4 text-sm text-gray-700 font-normal leading-relaxed [&_b]:font-semibold [&_b]:text-black"
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.a) }}
-                    />
-                  )}
+                <div className="card mb-3 border-top-0 border-left-0 border-right-0 border border-color-1 rounded-0" key={key}>
+                  <div className="card-header card-collapse bg-transparent-on-hover border-0">
+                    <h5 className="mb-0">
+                      <button type="button" className={`px-0 btn btn-link btn-block d-flex justify-content-between card-btn py-3 font-size-20 border-0 text-left${open ? "" : " collapsed"}`}
+                        aria-expanded={open} onClick={() => setOpenKey(open ? `${panel.id}:none` : key)}>
+                        <span>{item.q}</span>
+                        <span className="card-btn-arrow"><i className={`fas ${open ? "fa-chevron-up" : "fa-chevron-down"} text-gray-90 font-size-18`} /></span>
+                      </button>
+                    </h5>
+                  </div>
+                  <div className={`collapse${open ? " show" : ""}`}>
+                    <div className="card-body pl-0 pb-6 el-prose" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.a) }} />
+                  </div>
                 </div>
               );
             })}

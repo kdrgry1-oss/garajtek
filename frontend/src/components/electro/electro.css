@@ -182,3 +182,12 @@
 .electro .el-logo__dot { display: inline-block; width: .27em; height: .27em; margin-left: .06em; border-radius: 50%; background: var(--electro-primary); }
 .electro .bg-primary-down-lg .el-logo__dot { background: #333e48; }
 @media (min-width: 1200px) { .electro .bg-primary-down-lg .el-logo__dot { background: var(--electro-primary); } }
+
+/* CMS içerik tipografisi (statik sayfalar, ürün açıklaması, SSS cevapları) */
+.electro .el-prose h2 { font-size: 1.5rem; margin: 2rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid #ddd; }
+.electro .el-prose h3 { font-size: 1.125rem; font-weight: 600; margin: 1.5rem 0 .75rem; color: #333e48; }
+.electro .el-prose h4 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 .5rem; }
+.electro .el-prose p, .electro .el-prose li { color: #5a5a5a; }
+.electro .el-prose a { color: #0062bd; text-decoration: underline; }
+.electro .el-prose blockquote { border-left: 3px solid var(--electro-primary); padding-left: 1rem; font-style: italic; }
+.electro .el-prose hr { margin: 1.5rem 0; }
