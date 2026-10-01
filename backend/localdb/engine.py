@@ -516,6 +516,34 @@ class LCollection(_MMCollection):
                     st._pending.add(k)
                 yield doc
 
+    def _ensure_uniques(self, new_data):
+        """Unique-index check (``new_data`` is already stored). Unlike mongomock, documents
+        outside a partial index's filter are skipped up front (as MongoDB does), and the
+        candidate lookup stops at the first duplicate."""
+        for index in self._store.indexes.values():
+            if not index.get("unique"):
+                continue
+            pfe = index.get("partialFilterExpression")
+            if pfe is not None and not filtering.filter_applies(pfe, new_data):
+                continue
+            values = {}
+            for key, _ in index.get("key") or []:
+                try:
+                    values[key] = helpers.get_value_by_dot(new_data, key)
+                except KeyError:
+                    values[key] = None
+            if index.get("sparse") and all(v is None for v in values.values()):
+                continue
+            spec = {"$and": [pfe, values]} if pfe is not None else values
+            count = 0
+            for _ in self._iter_documents(spec):
+                count += 1
+                if count > 1:
+                    raise DuplicateKeyError(
+                        "E11000 duplicate key error collection: %s index: %s dup key: %r"
+                        % (self.full_name, "_".join(f"{k}_{d}" for k, d in index["key"]),
+                           values), 11000)
+
     # -- reads ---------------------------------------------------------------
     def _select(self, spec, sort=None):
         if spec is None:
