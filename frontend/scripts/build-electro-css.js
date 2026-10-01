@@ -1,6 +1,7 @@
 /**
  * Electro (ThemeForest "Electro – Electronics eCommerce HTML Template" v2.0) CSS'ini
- * vitrine uyarlar → public/electro/electro.css
+ * vitrine uyarlar → scripts/electro/electro.full.css (tam, kapsamlı) — ardından
+ * scripts/purge-electro-css.js kullanılan sınıflara göre budayıp public/electro/electro.css üretir.
  *
  * - Tüm kurallar `.electro` kapsamına alınır (html/body/:root → .electro). Böylece Bootstrap 4
  *   tabanlı tema CSS'i yalnız `.electro` sarmalayıcısı içindeki vitrin bileşenlerini etkiler;
@@ -79,10 +80,11 @@ css = root.toString();
 // yorumları at, gereksiz boşlukları sıkıştır
 css = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\n\s*\n/g, "\n");
 fs.mkdirSync(OUT_DIR, { recursive: true });
-fs.writeFileSync(path.join(OUT_DIR, "electro.css"), css);
+fs.mkdirSync(path.join(__dirname, "electro"), { recursive: true });
+fs.writeFileSync(path.join(__dirname, "electro", "electro.full.css"), css);
 
 // fontlar
 const copy = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(from, to); };
 for (const f of ["font-electro.woff", "font-electro.ttf"]) copy(A(`fonts/${f}`), path.join(OUT_DIR, "fonts", f));
 for (const f of ["fa-brands-400.woff2", "fa-regular-400.woff2", "fa-solid-900.woff2"]) copy(A(`vendor/font-awesome/webfonts/${f}`), path.join(OUT_DIR, "webfonts", f));
-console.log("electro.css:", (css.length / 1024).toFixed(0), "KB");
+console.log("electro.full.css:", (css.length / 1024).toFixed(0), "KB — şimdi: node scripts/purge-electro-css.js");

@@ -7,7 +7,7 @@ import { useLocation } from "react-router-dom";
 
 const LINKS = [
   ["electro-font", "https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&display=swap"],
-  ["electro-css", "/electro/electro.css?v=1"],
+  ["electro-css", "/electro/electro.css?v=2"],
 ];
 
 export default function ElectroStyles() {
