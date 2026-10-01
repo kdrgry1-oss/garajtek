@@ -364,3 +364,87 @@ def test_command_ping_and_backup(dbpath, tmp_path):
         assert (await restored.k.find_one({}, {"_id": 0})) == {"a": 1}
         restored.client.close()
     run(go())
+
+
+# ------------------------------------------------------------------ compiled matcher
+def test_compiled_matcher_equals_mongomock():
+    """localdb.matcher must give exactly mongomock's filter_applies result (or raise the
+    same exception type) for every filter/document pair."""
+    import collections
+    import random
+
+    from mongomock import filtering
+    from localdb.matcher import compile_filter
+
+    rnd = random.Random(7)
+    dt = datetime.datetime(2026, 1, 2, 3, 4, 5)
+    scalars = [None, 0, 1, 2.5, True, False, "", "a", "Abc", "çelik raf", "ŞIK", dt, "2026-01-02"]
+
+    def rvalue(depth=0):
+        r = rnd.random()
+        if depth < 2 and r < 0.15:
+            return [rvalue(depth + 1) for _ in range(rnd.randint(0, 3))]
+        if depth < 2 and r < 0.25:
+            return {rnd.choice("abxy"): rvalue(depth + 1) for _ in range(rnd.randint(0, 2))}
+        return rnd.choice(scalars)
+
+    def rdoc():
+        d = {k: rvalue() for k in "abc" if rnd.random() < 0.8}
+        if rnd.random() < 0.6:
+            d["v"] = [{"s": rnd.choice(scalars), "x": rvalue(1)} for _ in range(rnd.randint(0, 3))]
+        return d
+
+    keys = ["a", "b", "c", "v.s", "v.x", "a.x", "v.0.s", "zz"]
+
+    def rclause(depth=0):
+        r = rnd.random()
+        if depth < 2 and r < 0.15:
+            op = rnd.choice(["$and", "$or", "$nor"])
+            return {op: [rclause(depth + 1) for _ in range(rnd.randint(1, 3))]}
+        k = rnd.choice(keys)
+        r = rnd.random()
+        if r < 0.3:
+            return {k: rnd.choice(scalars)}
+        if r < 0.45:
+            return {k: {"$regex": rnd.choice(["a", "^A", "ç", "[ıi]k", "b.c"]),
+                        "$options": rnd.choice(["i", "", "im", "u"])}}
+        if r < 0.5:
+            return {k: {"$regex": rnd.choice(["a", "^A"])}}
+        if r < 0.6:
+            return {k: {"$in": rnd.sample(scalars, 3)}}
+        if r < 0.65:
+            return {k: {"$exists": rnd.choice([True, False])}}
+        if r < 0.75:
+            op = rnd.choice(["$gt", "$gte", "$lt", "$lte", "$eq"])
+            return {k: {op: rnd.choice(scalars)}}
+        if r < 0.8:
+            return {k: {"$gte": 1, "$lt": 3}}
+        if r < 0.85:
+            return {k: {"$ne": rnd.choice(scalars)}}
+        if r < 0.9:
+            return {k: {"$size": rnd.randint(0, 2)}}
+        if r < 0.95:
+            return {k: {"$elemMatch": {"s": rnd.choice(scalars)}}}
+        return {k: rvalue()}
+
+    def outcome(fn):
+        try:
+            return ("ok", bool(fn()))
+        except Exception as e:  # noqa: BLE001
+            return ("err", type(e).__name__)
+
+    docs = [rdoc() for _ in range(60)]
+    stats = collections.Counter()
+    for _ in range(400):
+        spec = {}
+        for _ in range(rnd.randint(1, 3)):
+            spec.update(rclause())
+        pred = compile_filter(spec)
+        for d in docs:
+            want = outcome(lambda: filtering.filter_applies(spec, d))
+            got = outcome(lambda: pred(d))
+            assert got == want, (spec, d, got, want)
+            stats[got] += 1
+    # the random corpus must exercise matches, non-matches and errors
+    assert stats[("ok", True)] > 1000 and stats[("ok", False)] > 1000
+    print(dict(stats))

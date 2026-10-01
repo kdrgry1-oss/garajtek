@@ -46,6 +46,7 @@ from pymongo.results import (BulkWriteResult, DeleteResult, InsertManyResult, In
                              UpdateResult)
 
 from . import shims
+from .matcher import compile_filter
 from .storage import DECODE_OPTS, Storage, decode_doc, encode_key
 
 logger = logging.getLogger("localdb")
@@ -617,8 +618,9 @@ class LCollection(_MMCollection):
 
     @staticmethod
     def _yield_matching(st, filter, docs):
+        match = compile_filter(filter)
         for doc in docs:
-            if filtering.filter_applies(filter, doc):
+            if match(doc):
                 touched = st._touched
                 if touched is not None:
                     k = _store_key(doc.get("_id"))
