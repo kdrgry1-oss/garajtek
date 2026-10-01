@@ -32,6 +32,7 @@ import { FolderOpen, RefreshCw, Printer, FileText, MessageSquare, Package, Truck
 import CustomerOrderHistory from "./CustomerOrderHistory";
 import axios from "axios";
 import OrderEventsLog from "../../components/admin/OrderEventsLog";
+import OrderCargoActions, { CARRIER_OPTIONS } from "../../components/admin/OrderCargoActions";
 import MultiSelect from "../../components/admin/MultiSelect";
 import OrderMarketplaceInfo from "../../components/admin/OrderMarketplaceInfo";
 import OrderPaymentDetail from "../../components/admin/OrderPaymentDetail";
@@ -155,6 +156,12 @@ export default function AdminOrders({ unpaidView = false }) {
   const [slipUploading, setSlipUploading] = useState(false);
   const [bulkAction, setBulkAction] = useState("");
   const [selectedCargo, setSelectedCargo] = useState("MNG");
+  // Varsayılan kargo firması (Kargo Ayarları) → toplu barkod / kargoya ver modalının başlangıç seçimi
+  useEffect(() => {
+    axios.get(`${API}/cargo-carriers`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      .then(({ data }) => { if (data?.default_carrier) setSelectedCargo(data.default_carrier); })
+      .catch(() => { /* ayar okunamazsa MNG kalır */ });
+  }, []);
   const [shipModalOpen, setShipModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [cargoTrackingNumbers, setCargoTrackingNumbers] = useState({});
@@ -1169,6 +1176,15 @@ export default function AdminOrders({ unpaidView = false }) {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
           <span className="text-sm font-medium">{selectedOrders.length} sipariş seçildi</span>
           <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={selectedCargo}
+              onChange={(e) => setSelectedCargo(e.target.value)}
+              className="border px-2 py-1.5 rounded text-sm bg-white"
+              title="Toplu barkod oluşturulacak kargo firması"
+              data-testid="bulk-cargo-carrier-select"
+            >
+              {CARRIER_OPTIONS.map(c => (<option key={c.value} value={c.value}>{c.label}</option>))}
+            </select>
             <button 
               onClick={handleBulkCargoBarcode}
               className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700"
@@ -1777,6 +1793,17 @@ export default function AdminOrders({ unpaidView = false }) {
                     Faturayı Sıfırla
                   </button>
                 )}
+                {/* Kargo: firma seç → barkod oluştur / takibi yenile / iptal (MNG-DHL, Aras, PTT) */}
+                <OrderCargoActions
+                  order={selectedOrder}
+                  onChanged={async () => {
+                    fetchOrders();
+                    try {
+                      const r = await axios.get(`${API}/orders/${selectedOrder.id}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+                      if (r.data) setSelectedOrder(r.data);
+                    } catch { /* detay tazelenemezse liste yine güncellenir */ }
+                  }}
+                />
                 {/* Kargo oluşturma (DHL E-Commerce / Manuel Kargo) ve 'Onay SMS' butonları
                     kaldırıldı — istek üzerine. Kargo takip no VARSA etiket + kargo SMS kalır. */}
                 {(selectedOrder.cargo?.tracking_number || selectedOrder.cargo_tracking_number) && (

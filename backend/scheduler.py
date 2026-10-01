@@ -996,6 +996,23 @@ def _parse_tr_dt(s: str):
     return None
 
 
+async def _multi_carrier_poll_tick():
+    """Her 30 dk: Aras Kargo / PTT Kargo ile gönderilen site siparişlerinin takip durumunu çeker
+    (ilk okutma → Kargoya Verildi, teslim → Teslim Edildi; bildirimler sipariş durum ayarlarına göre).
+    Mantık cargo_carriers/service.py:poll_tick içindedir."""
+    from routes.deps import db  # lazy
+    try:
+        from cargo_carriers import get_carrier_settings
+        from cargo_carriers.service import poll_tick
+        if not (await get_carrier_settings(db)).get("auto_sync", True):
+            return
+        st = await asyncio.wait_for(poll_tick(db), timeout=900)
+        if st.get("processed") or st.get("errors"):
+            logger.info(f"[scheduler][cargo] aras/ptt senkron: {st}")
+    except Exception as e:
+        logger.exception(f"[scheduler][cargo] aras/ptt senkron hatası: {e}")
+
+
 async def _dhl_cargo_poll_tick():
     """Her 5 dk: site (web) siparislerini MNG/DHL e-Commerce API'sinden sorgula.
       - GONDERI_NO / takip linki olustuysa -> 'shipped' (Kargoya Verildi) + bildirim
@@ -1046,6 +1063,8 @@ async def _dhl_cargo_poll_tick():
             {"cargo_provider_name": {"$nin": [None, ""]}},
             {"cargo_barcode_created": True},
         ],
+        # Aras/PTT gönderileri kendi taşıyıcısında sorgulanır (_multi_carrier_poll_tick)
+        "cargo_provider_code": {"$nin": ["ARAS", "PTT"]},
         "created_at": {"$gt": cutoff},
     }
     try:
@@ -1923,6 +1942,16 @@ def start_scheduler():
         minutes=30,
         id="dhl_cargo_poll",
         next_run_time=datetime.now(timezone.utc) + timedelta(seconds=60),
+        max_instances=1,
+        coalesce=True,
+    )
+    # Aras Kargo / PTT Kargo takip senkronu — her 30 dk (cargo_carriers/service.py:poll_tick)
+    _add(
+        _multi_carrier_poll_tick,
+        "interval",
+        minutes=30,
+        id="multi_carrier_cargo_poll",
+        next_run_time=datetime.now(timezone.utc) + timedelta(seconds=150),
         max_instances=1,
         coalesce=True,
     )

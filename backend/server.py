@@ -727,6 +727,10 @@ api_router.include_router(stock_notify_router)
 from routes.payment import router as payment_router
 api_router.include_router(payment_router)
 
+# Çoklu kargo firması (MNG/DHL + Aras Kargo + PTT Kargo) — cargo_carriers/
+from routes.cargo_carriers import router as cargo_carriers_router
+api_router.include_router(cargo_carriers_router)
+
 # Include all route modules
 api_router.include_router(auth_router)
 api_router.include_router(products_router)

@@ -4614,8 +4614,9 @@ async def _get_mng_settings() -> dict:
             _cc = _dpd("cargo", _cc)   # A1.1: sırları çöz (at-rest şifreli)
         except Exception:
             pass
-        if (_cc.get("active_provider") == "mng"):
-            _cargo = ((_cc.get("providers") or {}).get("mng") or {})
+        # Çoklu taşıyıcı (Aras/PTT eklendi): varsayılan firma başka olsa da MNG bilgileri
+        # kayıtlıysa kullanılır — aksi halde varsayılanı Aras/PTT yapmak MNG senkronunu durdururdu.
+        _cargo = ((_cc.get("providers") or {}).get("mng") or {})
     except Exception:
         _cargo = {}
 
@@ -4674,6 +4675,10 @@ async def create_cargo_barcode(
     Şu an MNG Kargo entegrasyonu canlı; diğer firmalar için manuel takip no input'u gerekir.
     """
     company = (cargo_company or "MNG").upper()
+    if company in ("AUTO", "DEFAULT"):
+        # Kargo Ayarları'ndaki varsayılan taşıyıcı (MNG / ARAS / PTT) — cargo_carriers.registry
+        from cargo_carriers import resolve_default_code as _cc_default
+        company = await _cc_default(db)
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
@@ -4701,6 +4706,12 @@ async def create_cargo_barcode(
             "cargo_provider_name": order.get("cargo_provider_name") or company,
             "message": "Sipariş zaten kargo barkoduna sahip",
         }
+
+    # Aras Kargo / PTT Kargo: canlı SOAP entegrasyonu (cargo_carriers/service.py) — aynı sipariş alanları
+    from cargo_carriers import normalize_code as _cc_norm
+    if _cc_norm(company) in ("ARAS", "PTT"):
+        from cargo_carriers.service import create_shipment_for_order as _cc_create
+        return await _cc_create(db, order, _cc_norm(company), current_user)
 
     if company != "MNG":
         # Diğer firmalar için sahte/placeholder takip no üret (henüz canlı entegrasyon yok)
@@ -5021,6 +5032,11 @@ async def refresh_cargo_tracking(order_id: str, current_user: dict = Depends(req
                 + (f"Mevcut takip: {_tn}" if _tn else "Takip no pazaryeri tarafından atandığında senkronla gelecek.")
             ),
         }
+
+    # ── Aras / PTT ile gönderilmiş site siparişi → ilgili taşıyıcının takip servisi ──
+    if str(order.get("cargo_provider_code") or "").upper() in ("ARAS", "PTT"):
+        from cargo_carriers.service import refresh_order_tracking as _cc_refresh
+        return await _cc_refresh(db, order)
 
     # ── Site siparişi: MNG'den durum çek (hata yutulmaz, kategorize edilir) ──
     settings = await _get_mng_settings()
@@ -5859,6 +5875,14 @@ async def get_cargo_label(order_id: str, current_user: dict = Depends(require_pe
     sender = await _get_sender_info()
     mng = await _get_mng_settings()
     sender_company = mng.get("customer_code") or sender["name"] or ""
+    # Aras / PTT: etiket barkodu = taşıyıcının okuttuğu barkod (Aras parça barkodu / PTT 13 haneli
+    # barkod). Şube bu barkodu okutur; altında sipariş no da basılı kalır (tracking_line).
+    _cc_code = str(order.get("cargo_provider_code") or "").upper()
+    _cc_bc = (order.get("cargo_barcode_number") or cargo_obj.get("barcode") or "") if _cc_code in ("ARAS", "PTT") else ""
+    if _cc_bc:
+        main_barcode = str(_cc_bc)
+        tracking_line = f"Sipariş No: {siparis_no}"
+        sender_company = sender["name"] or sender_company
     sender_addr_line = f"{sender['address']}, {sender['district']}/{sender['city']}".strip(" ,/")
 
     ship = order.get("shipping_address") or {}
@@ -5899,14 +5923,20 @@ async def get_cargo_label(order_id: str, current_user: dict = Depends(require_pe
 
     # Kargo bilgileri (paylaşılan referans şablonuna göre)
     cargo_company_display = "DHL E-Commerce"  # MNG ibaresi kaldırıldı
+    if _cc_bc:
+        cargo_company_display = "Aras Kargo" if _cc_code == "ARAS" else "PTT Kargo"
     payment_method = (order.get("payment_method") or "").lower()
     is_kapida = payment_method in ("cash_on_delivery", "kapida")
     odeme_turu = "Kapıda Ödemeli" if is_kapida else "Peşin Ödemeli"
     kargo_tipi = f"{odeme_turu} Kargo"
+    if _cc_bc and is_kapida:
+        _cod_amt = float(cargo_obj.get("cod_amount") or order.get("total") or 0)
+        kargo_tipi = f"{kargo_tipi} · Tahsilat {_cod_amt:.2f} TL"
 
     # Telefon formatı: 5435955290 → 543 595 52 90
     html = _render_cargo_label_html(
-        siparis_no=str(siparis_no),
+        # Aras/PTT: çubukların altındaki yazı = taşıyıcı barkodu (okunamazsa elle girilir); sipariş no tracking_line'da
+        siparis_no=str(main_barcode) if _cc_bc else str(siparis_no),
         main_barcode=str(main_barcode),
         sender_company=sender_company,
         sender_phone=sender.get("phone", "") or "",
