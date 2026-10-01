@@ -6,11 +6,28 @@ thread cannot interleave with the event loop.
 """
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from typing import Any, Dict, List, Optional
 
+from pymongo.errors import DuplicateKeyError, PyMongoError
+
 from .engine import Engine, _normalize_sort
+
+logger = logging.getLogger("localdb")
+
+
+def _log_failure(target: str, method: str, exc: BaseException) -> None:
+    """Engine gaps (NotImplementedError, AssertionError, TypeError...) are logged loudly so
+    they are visible even when the application swallows the exception."""
+    if isinstance(exc, DuplicateKeyError):
+        return
+    if isinstance(exc, PyMongoError):
+        logger.warning("localdb %s.%s: %s: %s", target, method, type(exc).__name__, exc)
+    else:
+        logger.error("localdb %s.%s failed: %s: %s", target, method, type(exc).__name__, exc,
+                     exc_info=True)
 
 _ENGINES: Dict[str, Engine] = {}
 _ENGINES_LOCK = threading.Lock()
@@ -238,8 +255,12 @@ class AsyncIOMotorCollection:
     def _call(self, _method, /, *args, **kwargs):
         engine = self.database.client._engine()
         with engine.lock:
-            return getattr(engine.database(self.database.name).get_collection(self._name),
-                           _method)(*args, **kwargs)
+            try:
+                return getattr(engine.database(self.database.name).get_collection(self._name),
+                               _method)(*args, **kwargs)
+            except Exception as e:
+                _log_failure(self.full_name, _method, e)
+                raise
 
     def with_options(self, *args, **kwargs):
         return self
@@ -334,7 +355,11 @@ class AsyncIOMotorDatabase:
     def _call(self, _method, /, *args, **kwargs):
         engine = self.client._engine()
         with engine.lock:
-            return getattr(engine.database(self.name), _method)(*args, **kwargs)
+            try:
+                return getattr(engine.database(self.name), _method)(*args, **kwargs)
+            except Exception as e:
+                _log_failure(self.name, _method, e)
+                raise
 
     async def command(self, command, value=1, *args, **kwargs):
         return self._call("command", command, value)

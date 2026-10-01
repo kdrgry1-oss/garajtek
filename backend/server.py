@@ -122,6 +122,7 @@ from routes.mobile import router as mobile_router
 from routes.admin_mobile import router as admin_mobile_router
 from routes.secrets_vault import router as secrets_vault_router
 from routes.system_health import router as system_health_router
+from routes.mail_admin import router as mail_admin_router  # kendi mail sunucusu (deploy/mail)
 from routes.reports_v2 import router as reports_v2_router, costs_router as product_costs_router
 from routes.production_hooks import router as production_hooks_router
 from routes.size_recommender import router as size_rec_router
@@ -1022,6 +1023,7 @@ api_router.include_router(admin_mobile_router)
 # Secrets Vault (encrypted credentials store) + System Health monitoring
 api_router.include_router(secrets_vault_router)
 api_router.include_router(system_health_router)
+api_router.include_router(mail_admin_router)
 # Iteration 42 — Yeni rapor seti (stok değer, hızlı/yavaş satan, iade oranı, kanal kâr)
 api_router.include_router(reports_v2_router)
 api_router.include_router(product_costs_router)

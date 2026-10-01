@@ -150,6 +150,7 @@ PERMISSION_TREE = [
             {"key": "settings.company", "label": "Şirket Bilgileri"},
             {"key": "settings.site", "label": "Site Ayarları"},
             {"key": "settings.emails", "label": "E-posta Şablonları"},
+            {"key": "settings.mail_server", "label": "Mail Sunucusu Yönetimi"},
         ],
     },
     {
