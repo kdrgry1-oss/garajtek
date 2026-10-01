@@ -18,9 +18,10 @@ APP_NAME = (os.environ.get("STORAGE_APP_NAME") or "store").strip()
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Yeni yüklemeler Cloudflare R2'ye (S3 uyumlu) gider ve doğrudan R2 CDN'den
-# sunulur. Bu, MongoDB'yi base64 görsel yükünden kurtarır ve yüklemeyi hızlandırır.
-# R2 yapılandırılmamışsa eski davranışa (MongoDB + disk) düşer.
+# Yeni yüklemeler nesne deposuna gider: Cloudflare R2 (R2_* tanımlıysa) ya da yerel
+# disk (MEDIA_DIR → web sunucusu /media/ altında servis eder, Cloudflare önbelleğe alır).
+# Bu, veritabanını base64 görsel yükünden kurtarır. İkisi de yoksa eski davranışa
+# (veritabanı + disk) düşer. Bkz. services/r2_storage.py.
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB — DSLR çıkışı hero görselleri 10MB'ı aşıyor; Pillow zaten resize+WebP ile küçültüyor
 
 
@@ -273,8 +274,15 @@ def _cdn_host() -> str:
     return (_up(_c if "://" in _c else "https://" + _c).hostname or "").lower() if _c else ""
 
 
-# Yalnız kendi CDN'imiz (env CDN_URL / R2_PUBLIC_URL) + eski Ticimax statik alanı.
-_JPEG_ALLOWED_HOSTS = {h for h in (_cdn_host(), "static.ticimax.cloud") if h}
+def _media_host() -> str:
+    """Yerel disk deposunun (MEDIA_DIR → /media/) public host'u — R2 yoksa görseller buradadır."""
+    from urllib.parse import urlparse as _up
+    _m = r2.media_public_base() if r2.local_configured() else ""
+    return (_up(_m).hostname or "").lower() if _m else ""
+
+
+# Yalnız kendi CDN'imiz (env CDN_URL / R2_PUBLIC_URL), yerel medya host'u + eski Ticimax statik alanı.
+_JPEG_ALLOWED_HOSTS = {h for h in (_cdn_host(), _media_host(), "static.ticimax.cloud") if h}
 
 # Pazaryeri (HB/Amazon) yüzlerce görseli AYNI ANDA ilk kez çektiğinde her biri ayrı PIL
 # dönüşümü yapıyordu → işlemci doyup panel + vitrin saniyelerce bekliyordu. Aynı anda en

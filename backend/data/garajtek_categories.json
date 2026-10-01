@@ -1,0 +1,814 @@
+{
+  "version": 1,
+  "description": "Garajtek kategori ağacı (grayzer.net + algikitelli.com.tr menü yapısından derlenmiş; isimler ve SEO metinleri özgündür). source: grayzer|algikitelli|both = arama ile doğrulandı, inferred = sektör standardına göre eklendi.",
+  "categories": [
+    {
+      "slug": "liftler",
+      "name": "Liftler",
+      "parent": null,
+      "sort_order": 10,
+      "icon": "arrow-up-from-line",
+      "meta_title": "Liftler | Garajtek",
+      "meta_description": "Liftler: iki ve dört sütunlu, makaslı ve motosiklet liftleri. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "iki-sutunlu-liftler",
+      "name": "İki Sütunlu Liftler",
+      "parent": "liftler",
+      "sort_order": 10,
+      "meta_title": "İki Sütunlu Liftler | Garajtek",
+      "meta_description": "İki Sütunlu Liftler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "makasli-liftler",
+      "name": "Makaslı Liftler",
+      "parent": "liftler",
+      "sort_order": 20,
+      "meta_title": "Makaslı Liftler | Garajtek",
+      "meta_description": "Makaslı Liftler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "dort-sutunlu-liftler",
+      "name": "Dört Sütunlu Liftler",
+      "parent": "liftler",
+      "sort_order": 30,
+      "meta_title": "Dört Sütunlu Liftler | Garajtek",
+      "meta_description": "Dört Sütunlu Liftler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "motosiklet-liftleri",
+      "name": "Motosiklet Liftleri",
+      "parent": "liftler",
+      "sort_order": 40,
+      "meta_title": "Motosiklet Liftleri | Garajtek",
+      "meta_description": "Motosiklet Liftleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "lift-aksesuarlari",
+      "name": "Lift Aksesuarları",
+      "parent": "liftler",
+      "sort_order": 50,
+      "meta_title": "Lift Aksesuarları | Garajtek",
+      "meta_description": "Lift Aksesuarları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "kompresorler",
+      "name": "Kompresörler",
+      "parent": null,
+      "sort_order": 20,
+      "icon": "gauge",
+      "meta_title": "Kompresörler | Garajtek",
+      "meta_description": "Kompresörler: pistonlu, sessiz ve vidalı hava kompresörleri, havalı aletler ve hava hattı ekipmanları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "pistonlu-kompresorler",
+      "name": "Pistonlu Kompresörler",
+      "parent": "kompresorler",
+      "sort_order": 10,
+      "meta_title": "Pistonlu Kompresörler | Garajtek",
+      "meta_description": "Pistonlu Kompresörler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "sessiz-ve-yagsiz-kompresorler",
+      "name": "Sessiz ve Yağsız Kompresörler",
+      "parent": "kompresorler",
+      "sort_order": 20,
+      "meta_title": "Sessiz ve Yağsız Kompresörler | Garajtek",
+      "meta_description": "Sessiz ve Yağsız Kompresörler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "vidali-kompresorler",
+      "name": "Vidalı Kompresörler",
+      "parent": "kompresorler",
+      "sort_order": 30,
+      "meta_title": "Vidalı Kompresörler | Garajtek",
+      "meta_description": "Vidalı Kompresörler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "havali-aletler",
+      "name": "Havalı Aletler",
+      "parent": "kompresorler",
+      "sort_order": 40,
+      "meta_title": "Havalı Aletler | Garajtek",
+      "meta_description": "Havalı Aletler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "havali-somun-sokme-makineleri",
+      "name": "Havalı Somun Sökme Makineleri",
+      "parent": "havali-aletler",
+      "sort_order": 10,
+      "meta_title": "Havalı Somun Sökme Makineleri | Garajtek",
+      "meta_description": "Havalı Somun Sökme Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "havali-circir-kollari",
+      "name": "Havalı Cırcır Kolları",
+      "parent": "havali-aletler",
+      "sort_order": 20,
+      "meta_title": "Havalı Cırcır Kolları | Garajtek",
+      "meta_description": "Havalı Cırcır Kolları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "havali-taslama-ve-zimparalar",
+      "name": "Havalı Taşlama ve Zımparalar",
+      "parent": "havali-aletler",
+      "sort_order": 30,
+      "meta_title": "Havalı Taşlama ve Zımparalar | Garajtek",
+      "meta_description": "Havalı Taşlama ve Zımparalar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "havali-tabancalar",
+      "name": "Havalı Tabancalar",
+      "parent": "havali-aletler",
+      "sort_order": 40,
+      "meta_title": "Havalı Tabancalar | Garajtek",
+      "meta_description": "Havalı Tabancalar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "hava-hortumlari-ve-makaralari",
+      "name": "Hava Hortumları ve Makaraları",
+      "parent": "kompresorler",
+      "sort_order": 50,
+      "meta_title": "Hava Hortumları ve Makaraları | Garajtek",
+      "meta_description": "Hava Hortumları ve Makaraları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "rakor-ve-hava-baglanti-elemanlari",
+      "name": "Rakor ve Hava Bağlantı Elemanları",
+      "parent": "kompresorler",
+      "sort_order": 60,
+      "meta_title": "Rakor ve Hava Bağlantı Elemanları | Garajtek",
+      "meta_description": "Rakor ve Hava Bağlantı Elemanları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "lastik-ekipmanlari",
+      "name": "Lastik Ekipmanları",
+      "parent": null,
+      "sort_order": 30,
+      "icon": "disc",
+      "meta_title": "Lastik Ekipmanları | Garajtek",
+      "meta_description": "Lastik Ekipmanları: lastik sökme takma, balans ve şişirme makineleri. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "lastik-sokme-takma-makineleri",
+      "name": "Lastik Sökme Takma Makineleri",
+      "parent": "lastik-ekipmanlari",
+      "sort_order": 10,
+      "meta_title": "Lastik Sökme Takma Makineleri | Garajtek",
+      "meta_description": "Lastik Sökme Takma Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "lastik-balans-makineleri",
+      "name": "Lastik Balans Makineleri",
+      "parent": "lastik-ekipmanlari",
+      "sort_order": 20,
+      "meta_title": "Lastik Balans Makineleri | Garajtek",
+      "meta_description": "Lastik Balans Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "lastik-sisirme-cihazlari",
+      "name": "Lastik Şişirme Cihazları",
+      "parent": "lastik-ekipmanlari",
+      "sort_order": 30,
+      "meta_title": "Lastik Şişirme Cihazları | Garajtek",
+      "meta_description": "Lastik Şişirme Cihazları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "lastik-tamir-malzemeleri",
+      "name": "Lastik Tamir Malzemeleri",
+      "parent": "lastik-ekipmanlari",
+      "sort_order": 40,
+      "meta_title": "Lastik Tamir Malzemeleri | Garajtek",
+      "meta_description": "Lastik Tamir Malzemeleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "oto-servis-ekipmanlari",
+      "name": "Oto Servis Ekipmanları",
+      "parent": null,
+      "sort_order": 40,
+      "icon": "car",
+      "meta_title": "Oto Servis Ekipmanları | Garajtek",
+      "meta_description": "Oto Servis Ekipmanları: fren, motor, klima ve araç bakım servis ekipmanları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "fren-hava-alma-cihazlari",
+      "name": "Fren Hava Alma Cihazları",
+      "parent": "oto-servis-ekipmanlari",
+      "sort_order": 10,
+      "meta_title": "Fren Hava Alma Cihazları | Garajtek",
+      "meta_description": "Fren Hava Alma Cihazları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "motor-toplama-sehpalari-ve-tezgahlari",
+      "name": "Motor Toplama Sehpaları ve Tezgahları",
+      "parent": "oto-servis-ekipmanlari",
+      "sort_order": 20,
+      "meta_title": "Motor Toplama Sehpaları ve Tezgahları | Garajtek",
+      "meta_description": "Motor Toplama Sehpaları ve Tezgahları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "klima-gaz-dolum-cihazlari",
+      "name": "Klima Gaz Dolum Cihazları",
+      "parent": "oto-servis-ekipmanlari",
+      "sort_order": 30,
+      "meta_title": "Klima Gaz Dolum Cihazları | Garajtek",
+      "meta_description": "Klima Gaz Dolum Cihazları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "doseme-ve-klips-sokme-aletleri",
+      "name": "Döşeme ve Klips Sökme Aletleri",
+      "parent": "oto-servis-ekipmanlari",
+      "sort_order": 40,
+      "meta_title": "Döşeme ve Klips Sökme Aletleri | Garajtek",
+      "meta_description": "Döşeme ve Klips Sökme Aletleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "oto-yikama-ekipmanlari",
+      "name": "Oto Yıkama Ekipmanları",
+      "parent": "oto-servis-ekipmanlari",
+      "sort_order": 50,
+      "meta_title": "Oto Yıkama Ekipmanları | Garajtek",
+      "meta_description": "Oto Yıkama Ekipmanları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "kaldirma-ekipmanlari",
+      "name": "Kaldırma Ekipmanları",
+      "parent": null,
+      "sort_order": 50,
+      "icon": "truck",
+      "meta_title": "Kaldırma Ekipmanları | Garajtek",
+      "meta_description": "Kaldırma Ekipmanları: hidrolik krikolar, şanzıman krikoları, motor vinçleri ve presler. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "yer-krikolari",
+      "name": "Yer Krikoları",
+      "parent": "kaldirma-ekipmanlari",
+      "sort_order": 10,
+      "meta_title": "Yer Krikoları | Garajtek",
+      "meta_description": "Yer Krikoları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "sanziman-krikolari",
+      "name": "Şanzıman Krikoları",
+      "parent": "kaldirma-ekipmanlari",
+      "sort_order": 20,
+      "meta_title": "Şanzıman Krikoları | Garajtek",
+      "meta_description": "Şanzıman Krikoları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "motor-vincleri",
+      "name": "Motor Vinçleri",
+      "parent": "kaldirma-ekipmanlari",
+      "sort_order": 30,
+      "meta_title": "Motor Vinçleri | Garajtek",
+      "meta_description": "Motor Vinçleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "hidrolik-presler",
+      "name": "Hidrolik Presler",
+      "parent": "kaldirma-ekipmanlari",
+      "sort_order": 40,
+      "meta_title": "Hidrolik Presler | Garajtek",
+      "meta_description": "Hidrolik Presler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "kriko-sehpalari",
+      "name": "Kriko Sehpaları",
+      "parent": "kaldirma-ekipmanlari",
+      "sort_order": 50,
+      "meta_title": "Kriko Sehpaları | Garajtek",
+      "meta_description": "Kriko Sehpaları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "hidrolik-duzeltme-setleri",
+      "name": "Hidrolik Düzeltme Setleri",
+      "parent": "kaldirma-ekipmanlari",
+      "sort_order": 60,
+      "meta_title": "Hidrolik Düzeltme Setleri | Garajtek",
+      "meta_description": "Hidrolik Düzeltme Setleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "takim-arabalari-ve-tezgahlar",
+      "name": "Takım Arabaları ve Tezgahlar",
+      "parent": null,
+      "sort_order": 60,
+      "icon": "archive",
+      "meta_title": "Takım Arabaları ve Tezgahlar | Garajtek",
+      "meta_description": "Takım Arabaları ve Tezgahlar: boş ve dolu takım arabaları, takım tezgahları ve atölye depolama. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "takim-arabalari",
+      "name": "Takım Arabaları",
+      "parent": "takim-arabalari-ve-tezgahlar",
+      "sort_order": 10,
+      "meta_title": "Takım Arabaları | Garajtek",
+      "meta_description": "Takım Arabaları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "dolu-takim-arabalari",
+      "name": "Dolu Takım Arabaları",
+      "parent": "takim-arabalari-ve-tezgahlar",
+      "sort_order": 20,
+      "meta_title": "Dolu Takım Arabaları | Garajtek",
+      "meta_description": "Dolu Takım Arabaları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "takim-tezgahlari",
+      "name": "Takım Tezgahları",
+      "parent": "takim-arabalari-ve-tezgahlar",
+      "sort_order": 30,
+      "meta_title": "Takım Tezgahları | Garajtek",
+      "meta_description": "Takım Tezgahları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "dolap-ve-panolar",
+      "name": "Dolap ve Panolar",
+      "parent": "takim-arabalari-ve-tezgahlar",
+      "sort_order": 40,
+      "meta_title": "Dolap ve Panolar | Garajtek",
+      "meta_description": "Dolap ve Panolar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "tasima-arabalari",
+      "name": "Taşıma Arabaları",
+      "parent": "takim-arabalari-ve-tezgahlar",
+      "sort_order": 50,
+      "meta_title": "Taşıma Arabaları | Garajtek",
+      "meta_description": "Taşıma Arabaları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "el-aletleri",
+      "name": "El Aletleri",
+      "parent": null,
+      "sort_order": 70,
+      "icon": "wrench",
+      "meta_title": "El Aletleri | Garajtek",
+      "meta_description": "El Aletleri: anahtar, tornavida, pense, allen-torx ve çekiç gibi profesyonel el aletleri. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "anahtarlar",
+      "name": "Anahtarlar",
+      "parent": "el-aletleri",
+      "sort_order": 10,
+      "meta_title": "Anahtarlar | Garajtek",
+      "meta_description": "Anahtarlar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "yildiz-iki-agiz-anahtarlar",
+      "name": "Yıldız İki Ağız Anahtarlar",
+      "parent": "anahtarlar",
+      "sort_order": 10,
+      "meta_title": "Yıldız İki Ağız Anahtarlar | Garajtek",
+      "meta_description": "Yıldız İki Ağız Anahtarlar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "circirli-anahtarlar",
+      "name": "Cırcırlı Anahtarlar",
+      "parent": "anahtarlar",
+      "sort_order": 20,
+      "meta_title": "Cırcırlı Anahtarlar | Garajtek",
+      "meta_description": "Cırcırlı Anahtarlar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "anahtar-takimlari",
+      "name": "Anahtar Takımları",
+      "parent": "anahtarlar",
+      "sort_order": 30,
+      "meta_title": "Anahtar Takımları | Garajtek",
+      "meta_description": "Anahtar Takımları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "tornavidalar",
+      "name": "Tornavidalar",
+      "parent": "el-aletleri",
+      "sort_order": 20,
+      "meta_title": "Tornavidalar | Garajtek",
+      "meta_description": "Tornavidalar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "penseler",
+      "name": "Penseler",
+      "parent": "el-aletleri",
+      "sort_order": 30,
+      "meta_title": "Penseler | Garajtek",
+      "meta_description": "Penseler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "allen-ve-torx",
+      "name": "Allen ve Torx",
+      "parent": "el-aletleri",
+      "sort_order": 40,
+      "meta_title": "Allen ve Torx | Garajtek",
+      "meta_description": "Allen ve Torx modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "cekic-ve-keskiler",
+      "name": "Çekiç ve Keskiler",
+      "parent": "el-aletleri",
+      "sort_order": 50,
+      "meta_title": "Çekiç ve Keskiler | Garajtek",
+      "meta_description": "Çekiç ve Keskiler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "tork-anahtarlari",
+      "name": "Tork Anahtarları",
+      "parent": "el-aletleri",
+      "sort_order": 60,
+      "meta_title": "Tork Anahtarları | Garajtek",
+      "meta_description": "Tork Anahtarları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "lokma-takimlari",
+      "name": "Lokma Takımları",
+      "parent": null,
+      "sort_order": 80,
+      "icon": "hexagon",
+      "meta_title": "Lokma Takımları | Garajtek",
+      "meta_description": "Lokma Takımları: lokma setleri, tekli lokmalar, darbeli lokmalar ve lokma kolları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "lokma-setleri",
+      "name": "Lokma Setleri",
+      "parent": "lokma-takimlari",
+      "sort_order": 10,
+      "meta_title": "Lokma Setleri | Garajtek",
+      "meta_description": "Lokma Setleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "tekli-lokmalar",
+      "name": "Tekli Lokmalar",
+      "parent": "lokma-takimlari",
+      "sort_order": 20,
+      "meta_title": "Tekli Lokmalar | Garajtek",
+      "meta_description": "Tekli Lokmalar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "darbeli-lokmalar",
+      "name": "Darbeli Lokmalar",
+      "parent": "lokma-takimlari",
+      "sort_order": 30,
+      "meta_title": "Darbeli Lokmalar | Garajtek",
+      "meta_description": "Darbeli Lokmalar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "lokma-kollari-ve-circirlar",
+      "name": "Lokma Kolları ve Cırcırlar",
+      "parent": "lokma-takimlari",
+      "sort_order": 40,
+      "meta_title": "Lokma Kolları ve Cırcırlar | Garajtek",
+      "meta_description": "Lokma Kolları ve Cırcırlar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "elektrikli-ve-sarjli-el-aletleri",
+      "name": "Elektrikli ve Şarjlı El Aletleri",
+      "parent": null,
+      "sort_order": 90,
+      "icon": "battery-charging",
+      "meta_title": "Elektrikli ve Şarjlı El Aletleri | Garajtek",
+      "meta_description": "Elektrikli ve Şarjlı El Aletleri: akülü vidalama, somun sıkma, taşlama, matkap ve polisaj makineleri. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "akulu-vidalama-makineleri",
+      "name": "Akülü Vidalama Makineleri",
+      "parent": "elektrikli-ve-sarjli-el-aletleri",
+      "sort_order": 10,
+      "meta_title": "Akülü Vidalama Makineleri | Garajtek",
+      "meta_description": "Akülü Vidalama Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "somun-sikma-makineleri",
+      "name": "Somun Sıkma Makineleri",
+      "parent": "elektrikli-ve-sarjli-el-aletleri",
+      "sort_order": 20,
+      "meta_title": "Somun Sıkma Makineleri | Garajtek",
+      "meta_description": "Somun Sıkma Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "taslama-makineleri",
+      "name": "Taşlama Makineleri",
+      "parent": "elektrikli-ve-sarjli-el-aletleri",
+      "sort_order": 30,
+      "meta_title": "Taşlama Makineleri | Garajtek",
+      "meta_description": "Taşlama Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "matkaplar",
+      "name": "Matkaplar",
+      "parent": "elektrikli-ve-sarjli-el-aletleri",
+      "sort_order": 40,
+      "meta_title": "Matkaplar | Garajtek",
+      "meta_description": "Matkaplar modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "polisaj-makineleri",
+      "name": "Polisaj Makineleri",
+      "parent": "elektrikli-ve-sarjli-el-aletleri",
+      "sort_order": 50,
+      "meta_title": "Polisaj Makineleri | Garajtek",
+      "meta_description": "Polisaj Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "kaynak-kesme-ve-aydinlatma",
+      "name": "Kaynak, Kesme ve Aydınlatma",
+      "parent": null,
+      "sort_order": 100,
+      "icon": "flame",
+      "meta_title": "Kaynak, Kesme ve Aydınlatma | Garajtek",
+      "meta_description": "Kaynak, Kesme ve Aydınlatma: kaynak ve kesme makineleri, LED çalışma lambaları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "kaynak-makineleri",
+      "name": "Kaynak Makineleri",
+      "parent": "kaynak-kesme-ve-aydinlatma",
+      "sort_order": 10,
+      "meta_title": "Kaynak Makineleri | Garajtek",
+      "meta_description": "Kaynak Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "plazma-kesme-makineleri",
+      "name": "Plazma Kesme Makineleri",
+      "parent": "kaynak-kesme-ve-aydinlatma",
+      "sort_order": 20,
+      "meta_title": "Plazma Kesme Makineleri | Garajtek",
+      "meta_description": "Plazma Kesme Makineleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "led-lambalar-ve-calisma-isiklari",
+      "name": "LED Lambalar ve Çalışma Işıkları",
+      "parent": "kaynak-kesme-ve-aydinlatma",
+      "sort_order": 30,
+      "meta_title": "LED Lambalar ve Çalışma Işıkları | Garajtek",
+      "meta_description": "LED Lambalar ve Çalışma Işıkları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "test-ve-ariza-tespit-cihazlari",
+      "name": "Test ve Arıza Tespit Cihazları",
+      "parent": null,
+      "sort_order": 110,
+      "icon": "activity",
+      "meta_title": "Test ve Arıza Tespit Cihazları | Garajtek",
+      "meta_description": "Test ve Arıza Tespit Cihazları: arıza tespit, akü test, kompresyon ve duman kaçak test cihazları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "ariza-tespit-cihazlari",
+      "name": "Arıza Tespit Cihazları",
+      "parent": "test-ve-ariza-tespit-cihazlari",
+      "sort_order": 10,
+      "meta_title": "Arıza Tespit Cihazları | Garajtek",
+      "meta_description": "Arıza Tespit Cihazları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "aku-test-ve-takviye-cihazlari",
+      "name": "Akü Test ve Takviye Cihazları",
+      "parent": "test-ve-ariza-tespit-cihazlari",
+      "sort_order": 20,
+      "meta_title": "Akü Test ve Takviye Cihazları | Garajtek",
+      "meta_description": "Akü Test ve Takviye Cihazları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "oto-test-kitleri",
+      "name": "Oto Test Kitleri",
+      "parent": "test-ve-ariza-tespit-cihazlari",
+      "sort_order": 30,
+      "meta_title": "Oto Test Kitleri | Garajtek",
+      "meta_description": "Oto Test Kitleri modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "duman-kacak-test-cihazlari",
+      "name": "Duman Kaçak Test Cihazları",
+      "parent": "test-ve-ariza-tespit-cihazlari",
+      "sort_order": 40,
+      "meta_title": "Duman Kaçak Test Cihazları | Garajtek",
+      "meta_description": "Duman Kaçak Test Cihazları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "both"
+    },
+    {
+      "slug": "antifriz-ve-sivi-olcerler",
+      "name": "Antifriz ve Sıvı Ölçerler",
+      "parent": "test-ve-ariza-tespit-cihazlari",
+      "sort_order": 50,
+      "meta_title": "Antifriz ve Sıvı Ölçerler | Garajtek",
+      "meta_description": "Antifriz ve Sıvı Ölçerler modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "fren-test-cihazlari",
+      "name": "Fren Test Cihazları",
+      "parent": "test-ve-ariza-tespit-cihazlari",
+      "sort_order": 60,
+      "meta_title": "Fren Test Cihazları | Garajtek",
+      "meta_description": "Fren Test Cihazları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "yaglama-ekipmanlari",
+      "name": "Yağlama Ekipmanları",
+      "parent": null,
+      "sort_order": 120,
+      "icon": "droplet",
+      "meta_title": "Yağlama Ekipmanları | Garajtek",
+      "meta_description": "Yağlama Ekipmanları: yağ boşaltma ve değiştirme cihazları, filtre sökme ve gres ekipmanları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "yag-bosaltma-ve-degistirme-cihazlari",
+      "name": "Yağ Boşaltma ve Değiştirme Cihazları",
+      "parent": "yaglama-ekipmanlari",
+      "sort_order": 10,
+      "meta_title": "Yağ Boşaltma ve Değiştirme Cihazları | Garajtek",
+      "meta_description": "Yağ Boşaltma ve Değiştirme Cihazları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "yag-filtre-sokme-ekipmanlari",
+      "name": "Yağ Filtre Sökme Ekipmanları",
+      "parent": "yaglama-ekipmanlari",
+      "sort_order": 20,
+      "meta_title": "Yağ Filtre Sökme Ekipmanları | Garajtek",
+      "meta_description": "Yağ Filtre Sökme Ekipmanları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "grayzer"
+    },
+    {
+      "slug": "gres-pompalari",
+      "name": "Gres Pompaları",
+      "parent": "yaglama-ekipmanlari",
+      "sort_order": 30,
+      "meta_title": "Gres Pompaları | Garajtek",
+      "meta_description": "Gres Pompaları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "ozel-aparatlar",
+      "name": "Özel Aparatlar",
+      "parent": null,
+      "sort_order": 130,
+      "icon": "settings",
+      "meta_title": "Özel Aparatlar | Garajtek",
+      "meta_description": "Özel Aparatlar: şanzıman, süspansiyon, motor ve triger işlemleri için özel servis aparatları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "sanziman-aparatlari",
+      "name": "Şanzıman Aparatları",
+      "parent": "ozel-aparatlar",
+      "sort_order": 10,
+      "meta_title": "Şanzıman Aparatları | Garajtek",
+      "meta_description": "Şanzıman Aparatları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "suspansiyon-ve-yay-aparatlari",
+      "name": "Süspansiyon ve Yay Aparatları",
+      "parent": "ozel-aparatlar",
+      "sort_order": 20,
+      "meta_title": "Süspansiyon ve Yay Aparatları | Garajtek",
+      "meta_description": "Süspansiyon ve Yay Aparatları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "motor-ve-triger-aparatlari",
+      "name": "Motor ve Triger Aparatları",
+      "parent": "ozel-aparatlar",
+      "sort_order": 30,
+      "meta_title": "Motor ve Triger Aparatları | Garajtek",
+      "meta_description": "Motor ve Triger Aparatları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "inferred"
+    },
+    {
+      "slug": "segman-aparatlari",
+      "name": "Segman Aparatları",
+      "parent": "ozel-aparatlar",
+      "sort_order": 40,
+      "meta_title": "Segman Aparatları | Garajtek",
+      "meta_description": "Segman Aparatları modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "servis-kurulum-paketleri",
+      "name": "Servis Kurulum Paketleri",
+      "parent": null,
+      "sort_order": 140,
+      "icon": "package",
+      "meta_title": "Servis Kurulum Paketleri | Garajtek",
+      "meta_description": "Servis Kurulum Paketleri: oto tamir, yıkama, oto elektrik ve motosiklet servisi için hazır kurulum paketleri. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "both"
+    },
+    {
+      "slug": "oto-tamir-servis-paketi",
+      "name": "Oto Tamir Servis Paketi",
+      "parent": "servis-kurulum-paketleri",
+      "sort_order": 10,
+      "meta_title": "Oto Tamir Servis Paketi | Garajtek",
+      "meta_description": "Oto Tamir Servis Paketi modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "oto-yikama-servis-paketi",
+      "name": "Oto Yıkama Servis Paketi",
+      "parent": "servis-kurulum-paketleri",
+      "sort_order": 20,
+      "meta_title": "Oto Yıkama Servis Paketi | Garajtek",
+      "meta_description": "Oto Yıkama Servis Paketi modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "oto-elektrik-servis-paketi",
+      "name": "Oto Elektrik Servis Paketi",
+      "parent": "servis-kurulum-paketleri",
+      "sort_order": 30,
+      "meta_title": "Oto Elektrik Servis Paketi | Garajtek",
+      "meta_description": "Oto Elektrik Servis Paketi modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "motosiklet-servis-paketi",
+      "name": "Motosiklet Servis Paketi",
+      "parent": "servis-kurulum-paketleri",
+      "sort_order": 40,
+      "meta_title": "Motosiklet Servis Paketi | Garajtek",
+      "meta_description": "Motosiklet Servis Paketi modelleri ve fiyatları Garajtek'te. Oto servis ve atölyeler için profesyonel ekipman.",
+      "source": "algikitelli"
+    },
+    {
+      "slug": "indirimli-urunler",
+      "name": "İndirimli Ürünler",
+      "parent": null,
+      "sort_order": 150,
+      "icon": "percent",
+      "meta_title": "İndirimli Ürünler | Garajtek",
+      "meta_description": "İndirimli Ürünler: kampanyalı ve indirimli atölye ekipmanları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
+      "source": "grayzer",
+      "show_in_menu": false
+    }
+  ]
+}
