@@ -125,6 +125,7 @@ class LazyCollectionStore(mm_store.CollectionStore):
         self._loaded = False
         self._docs_raw = collections.OrderedDict()
         self._touched = None
+        self._pending = set()
         self._seq: Dict[Any, int] = {}
         self._next_seq = 0
         self._hidx: Dict[str, Dict[Any, set]] = {}
@@ -164,6 +165,7 @@ class LazyCollectionStore(mm_store.CollectionStore):
         self._hidx.clear()
         self._hrev.clear()
         self._halways.clear()
+        self._pending = set()
 
     @property
     def loaded(self):
@@ -179,6 +181,7 @@ class LazyCollectionStore(mm_store.CollectionStore):
     def drop(self):
         super().drop()
         self._loaded = True
+        self._pending = set()
         self._seq = {}
         self._next_seq = 0
         self._hidx.clear()
@@ -205,12 +208,16 @@ class LazyCollectionStore(mm_store.CollectionStore):
             self._seq[key] = self._next_seq
             self._next_seq += 1
         super().__setitem__(key, val)
+        if self._hidx:
+            self.reindex((key,))
         if self._touched is not None:
             self._touched.add(key)
 
     def __delitem__(self, key):
         super().__delitem__(key)
         self._seq.pop(key, None)
+        if self._hidx:
+            self.reindex((key,))
         if self._touched is not None:
             self._touched.add(key)
 
@@ -481,11 +488,12 @@ class LCollection(_MMCollection):
         st = self._store
         if filter is None:
             filter = {}
+        if st._pending:
+            # Documents yielded earlier in this write operation may have been modified in
+            # place since: refresh their hash-index entries before using the index.
+            pending, st._pending = st._pending, set()
+            st.reindex(pending)
         cand = st.candidates(filter) if filter else None
-        if cand is not None and st._touched:
-            # The hash index is refreshed when the write operation ends; documents changed
-            # earlier in this operation may sit under stale keys, so always re-check them.
-            cand = cand | st._touched
         if cand is None:
             if st.is_empty:
                 filtering.filter_applies(filter, {})
@@ -503,7 +511,9 @@ class LCollection(_MMCollection):
             if filtering.filter_applies(filter, doc):
                 touched = st._touched
                 if touched is not None:
-                    touched.add(_store_key(doc.get("_id")))
+                    k = _store_key(doc.get("_id"))
+                    touched.add(k)
+                    st._pending.add(k)
                 yield doc
 
     # -- reads ---------------------------------------------------------------
@@ -1053,6 +1063,7 @@ class Engine:
                             dbname, st.name, exc_info=True)
             raise
         finally:
+            st._pending.clear()
             st.reindex(touched)
 
     def database_names(self) -> List[str]:

@@ -81,7 +81,80 @@ export default function Cart() {
   const [appliedPromotions, setAppliedPromotions] = useState([]);
 
   useEffect(() => {
-    const carousel = (title, list, testId, cta) => (list.length > 0 && (
+    if (items.length === 0) { setPromoDiscount(0); setAppliedPromotions([]); return; }
+    let cancel = false;
+    axios.post(`${API}/coupons/evaluate`, {
+      cart_total: total,
+      items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity })),
+      user_id: user?.id || null,
+      email: user?.email || "",
+      code: "",
+    }).then((res) => {
+      if (cancel) return;
+      const d = res.data || {};
+      setPromoDiscount(Number(d.total_discount || 0));
+      setAppliedPromotions(d.applied || []);
+    }).catch(() => {
+      if (!cancel) { setPromoDiscount(0); setAppliedPromotions([]); }
+    });
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, total, user?.id]);
+
+  // ÜCRETSİZ KARGO EŞİĞİ — sunucunun kararıyla AYNI taban: İNDİRİM SONRASI sepet tutarı
+  // (orders.create_order: (_subtotal - _server_discount) >= eşik). Eskiden indirimSİZ ara
+  // toplam baz alınıyordu → hem "X TL daha" yazısı yanlış çıkıyor hem de sepet ekranı
+  // "ücretsiz kargo" gösterip siparişte kargo ücreti ekleniyordu (tutarsızlık).
+  // Payment/points choices are not known in the cart: this is an estimate only.
+  const shipping = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee });
+  const netTotal = shipping.basis;
+  const remaining = freeShippingThreshold != null ? Math.max(0, freeShippingThreshold - netTotal) : 0;
+  const shippingCost = shipping.cost;
+
+  // Ürün-seviyesi indirim (sale_price + otomatik kampanya) — satırlarla birebir tutarlı özet.
+  const { listSum, productDisc, extraDisc, totalDisc, grand: _grandNoShip } = cartSummary(items, promoDiscount);
+  const grandTotal = _grandNoShip + shippingCost;
+  // Sepet-seviyesi kampanya adları (ör. "3 Al 2 Öde — Body"); kalemde zaten gösterilen
+  // otomatik yüzde kampanyaları hariç.
+  const extraTitles = (appliedPromotions || [])
+    .filter((p) => p && Number(p.discount) > 0 && p.type !== "percent")
+    .map((p) => p.title || p.code).filter(Boolean);
+
+  // Kombin / sale öneriler
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [deals, setDeals] = useState([]);
+
+  useEffect(() => {
+    if (items.length === 0) { setSuggestions([]); setDeals([]); return; }
+    let cancel = false;
+    setSuggestionsLoading(true);
+    const productIds = items.map((it) => it.productId).filter(Boolean);
+    Promise.all([
+      axios.post(`${API}/products/cart-suggestions`, { product_ids: productIds, limit: 8 }),
+      axios.post(`${API}/products/checkout-deals`, { product_ids: productIds, limit: 6 }),
+    ])
+      .then(([s, d]) => {
+        if (cancel) return;
+        setSuggestions(s.data?.items || []);
+        setDeals(d.data?.items || []);
+      })
+      .catch(() => { if (!cancel) { setSuggestions([]); setDeals([]); } })
+      .finally(() => { if (!cancel) setSuggestionsLoading(false); });
+    return () => { cancel = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
+
+  // GA4: view_cart — sepet sayfası görüntüleme (mount'ta bir kez)
+  useEffect(() => {
+    if (items.length === 0) return;
+    try {
+      trackViewCart({ total, items });
+    } catch (_) { /* silent */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const carousel = (title, list, testId, cta) => (list.length > 0 && (
     <div className="mb-6" data-testid={testId}>
       <div className="position-relative">
         <div className="border-bottom border-color-1 mb-2 d-flex justify-content-between align-items-end">

@@ -102,10 +102,12 @@ export default function CampaignProducts() {
             ) : shown.length === 0 ? (
               <div className="text-center py-16 text-gray-500">Bu kampanyada şu an ürün bulunmuyor.</div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-[2px] gap-y-3 md:gap-y-4">
-                {shown.map((product, idx) => (
-                  <ProductCard key={product.id} product={product} listName={`kampanya-${id}`} index={idx} />
-                ))}
+              <div className="electro">
+                <ul className="row list-unstyled products-group no-gutters">
+                  {shown.map((product, idx) => (
+                    <ProductCard key={product.id} product={product} as="li" className="col-6 col-md-4 col-xl-3" listName={`kampanya-${id}`} index={idx} />
+                  ))}
+                </ul>
               </div>
             )}
 

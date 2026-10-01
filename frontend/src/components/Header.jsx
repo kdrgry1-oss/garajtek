@@ -374,8 +374,8 @@ function HeaderIcons({ variant, onMobileSearch, mobileSearchOpen }) {
                 <MiniCartList items={items.slice(0, 5)} onNavigate={() => setMiniOpen(false)} removeItem={removeItem} updateQuantity={updateQuantity} compact />
                 {items.length > 5 && <div className="px-3 pb-2 font-size-13 text-gray-90">+{items.length - 5} ürün daha</div>}
                 <div className="flex-center-between px-4 pt-2">
-                  <Link to="/sepet" className="btn btn-soft-secondary mb-3 mb-md-0 font-weight-normal px-5 px-md-4 px-lg-5" onClick={() => setMiniOpen(false)}>Sepeti Gör</Link>
-                  <Link to="/odeme" className="btn btn-primary-dark-w ml-md-2 px-5 px-md-4 px-lg-5" onClick={() => setMiniOpen(false)}>Ödemeye Geç</Link>
+                  <Link to="/sepet" className="btn btn-soft-secondary mb-3 font-weight-normal px-4 text-nowrap flex-grow-1" onClick={() => setMiniOpen(false)}>Sepeti Gör</Link>
+                  <Link to="/odeme" className="btn btn-primary-dark-w mb-3 ml-2 px-4 text-nowrap flex-grow-1" onClick={() => setMiniOpen(false)}>Ödemeye Geç</Link>
                 </div>
               </>
             )}

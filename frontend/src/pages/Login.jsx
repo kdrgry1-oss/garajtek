@@ -285,7 +285,8 @@ export default function Login() {
     setLoading(true);
     try {
       if (reg) {
-        await register({ ...formData, first_name: formData.first_name.trim(), last_name: formData.last_name.trim() });
+        const { reg_email, reg_password, ...rest } = formData;
+        await register({ ...rest, email: reg_email || "", password: reg_password || "", first_name: formData.first_name.trim(), last_name: formData.last_name.trim() });
         toast.success("Kayıt başarılı!");
       } else {
         await login(formData.email, formData.password);
@@ -399,11 +400,11 @@ export default function Login() {
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="registerEmail">E-posta adresi <span className="text-danger">*</span></label>
-                    <input type="email" className="form-control" id="registerEmail" autoComplete="email" placeholder="E-posta adresi" value={formData.email} onChange={set("email")} required />
+                    <input type="email" className="form-control" id="registerEmail" autoComplete="email" placeholder="E-posta adresi" value={formData.reg_email || ""} onChange={set("reg_email")} required />
                   </div>
                   <div className="form-group mb-4">
                     <label className="form-label" htmlFor="registerPassword">Şifre <span className="text-danger">*</span></label>
-                    <input type="password" className="form-control" id="registerPassword" autoComplete="new-password" placeholder="En az 6 karakter" value={formData.password} onChange={set("password")} required minLength={6} />
+                    <input type="password" className="form-control" id="registerPassword" autoComplete="new-password" placeholder="En az 6 karakter" value={formData.reg_password || ""} onChange={set("reg_password")} required minLength={6} />
                   </div>
                   <p className="text-gray-90 mb-4">Kişisel verileriniz siparişlerinizi yönetmek ve deneyiminizi geliştirmek amacıyla <a href="/sayfa/kvkk" className="text-blue">KVKK Aydınlatma Metni</a>'nde açıklandığı şekilde işlenir.</p>
                   <div className="mb-6">
