@@ -394,7 +394,8 @@ def test_compiled_matcher_equals_mongomock():
             d["v"] = [{"s": rnd.choice(scalars), "x": rvalue(1)} for _ in range(rnd.randint(0, 3))]
         return d
 
-    keys = ["a", "b", "c", "v.s", "v.x", "a.x", "v.0.s", "zz"]
+    keys = ["a", "b", "c", "v.s", "v.x", "a.x", "v.0.s", "zz", "v.-1.s", "v.1", "a.0", "v",
+            "v.x.a", "a.b.x", "a."]
 
     def rclause(depth=0):
         r = rnd.random()
@@ -419,8 +420,10 @@ def test_compiled_matcher_equals_mongomock():
             return {k: {op: rnd.choice(scalars)}}
         if r < 0.8:
             return {k: {"$gte": 1, "$lt": 3}}
-        if r < 0.85:
+        if r < 0.82:
             return {k: {"$ne": rnd.choice(scalars)}}
+        if r < 0.85:
+            return {k: {"$nin": rnd.sample(scalars, 2)}}
         if r < 0.9:
             return {k: {"$size": rnd.randint(0, 2)}}
         if r < 0.95:
@@ -434,6 +437,15 @@ def test_compiled_matcher_equals_mongomock():
             return ("err", type(e).__name__)
 
     docs = [rdoc() for _ in range(60)]
+    from localdb.matcher import key_candidates
+    for d in docs:
+        for k in keys:
+            want = outcome(lambda: list(filtering.iter_key_candidates(k, d)) or None)
+            got = outcome(lambda: list(key_candidates(k)(d)) or None)
+            if want[0] == "ok":
+                assert list(key_candidates(k)(d)) == list(filtering.iter_key_candidates(k, d))
+            assert got == want
+
     stats = collections.Counter()
     for _ in range(400):
         spec = {}
@@ -448,3 +460,143 @@ def test_compiled_matcher_equals_mongomock():
     # the random corpus must exercise matches, non-matches and errors
     assert stats[("ok", True)] > 1000 and stats[("ok", False)] > 1000
     print(dict(stats))
+
+
+def test_fast_sort_key_equals_mongomock():
+    """localdb's resolve_sort_key must order exactly like mongomock's BsonComparable keys."""
+    import random
+
+    from bson import ObjectId
+    from mongomock import filtering
+    from localdb import matcher
+
+    rnd = random.Random(11)
+    oids = [ObjectId() for _ in range(3)]
+    pool = [None, 0, -1, 2.5, 3, True, False, "", "a", "B", "ç", datetime.datetime(2025, 1, 1),
+            datetime.datetime(2026, 5, 5), oids[0], oids[1], {"x": 1}, {"x": 2, "y": 1}, [],
+            [3, 1], ["b"], [[1]], b"zz", b"a"]
+
+    def rdoc(i):
+        d = {"i": i}
+        for k in ("a", "b"):
+            if rnd.random() < 0.85:
+                d[k] = rnd.choice(pool)
+        if rnd.random() < 0.5:
+            d["s"] = {"t": rnd.choice(pool)}
+        return d
+
+    def orig_key(key, doc):
+        value = filtering.resolve_key(key, doc)
+        if value is filtering.NOTHING:
+            return 1, filtering.BsonComparable(None)
+        if isinstance(value, (tuple, list)):
+            if not value:
+                return 0, filtering.BsonComparable(None)
+            return 1, filtering.BsonComparable(value[0])
+        return 1, filtering.BsonComparable(value)
+
+    for _ in range(300):
+        docs = [rdoc(i) for i in range(rnd.randint(1, 40))]
+        sort = [(rnd.choice(["a", "b", "s.t", "zz"]), rnd.choice([1, -1]))
+                for _ in range(rnd.randint(1, 3))]
+
+        def run_sort(keyfn):
+            out = docs
+            for k, direction in reversed(sort):
+                out = sorted(out, key=lambda x, k=k: keyfn(k, x), reverse=direction < 0)
+            return [d["i"] for d in out]
+
+        try:
+            want = ("ok", run_sort(orig_key))
+        except TypeError:
+            want = ("err",)
+        try:
+            got = ("ok", run_sort(matcher.resolve_sort_key))
+        except TypeError:
+            got = ("err",)
+        assert got == want, (sort, docs)
+
+
+def test_aggregate_topk_window_equals_plain_pipeline(dbpath):
+    """The two-phase $addFields/$sort/$skip/$limit plan must return exactly what running the
+    whole pipeline over every document returns (ties keep natural order)."""
+    import random
+
+    import mongomock
+
+    rnd = random.Random(5)
+    docs = []
+    for i in range(600):
+        d = {"id": str(i), "name": rnd.choice(["Raf", "Dolap", "Askı", None]),
+             "price": rnd.choice([10, 20.5, 30, None]), "big": "x" * 200,
+             "variants": [{"stock": rnd.randint(0, 3)} for _ in range(rnd.randint(0, 3))]}
+        if rnd.random() < 0.3:
+            d["created_at"] = rnd.choice(["2026-01-01", "2026-02-01"])
+        docs.append(d)
+
+    async def scenario():
+        db = fresh(dbpath)
+        await db.p.insert_many(docs)
+        await db.p.find_one({})
+        coll = db.client._engine().database("shop").get_collection("p")
+        pipes = []
+        for skip, limit in [(0, 20), (40, 20), (430, 20), (0, 1)]:
+            pipes.append([
+                {"$match": {"name": {"$ne": None}}},
+                {"$addFields": {"_eff": {"$sum": {"$map": {"input": {"$ifNull": ["$variants", []]},
+                                                           "as": "v", "in": "$$v.stock"}}}}},
+                {"$addFields": {"_in": {"$cond": [{"$gt": ["$_eff", 0]}, 1, 0]}}},
+                {"$sort": {"_in": -1, "created_at": -1, "price": 1}},
+                {"$skip": skip}, {"$limit": limit},
+                {"$project": {"_id": 0, "_eff": 0}},
+            ])
+        pipes.append([{"$set": {"k": {"$toUpper": "$name"}}}, {"$sort": {"k": 1}},
+                      {"$limit": 7}, {"$project": {"_id": 0, "id": 1, "k": 1}}])
+        for pipe in pipes:
+            got = await db.p.aggregate(pipe).to_list(None)
+            match = pipe[0]["$match"] if "$match" in pipe[0] else {}
+            rest = pipe[1:] if "$match" in pipe[0] else pipe
+            plain = list(mongomock.aggregate.process_pipeline(coll.query(match), coll.database,
+                                                              rest, None))
+            assert got == plain
+            assert got
+        # the two-phase plan is really used for these shapes
+        assert coll._aggregate_topk(pipes[0][0]["$match"], pipes[0][1:]) is not None
+        assert coll._aggregate_topk({}, pipes[-1]) is not None
+        close(db)
+
+    run(scenario())
+
+
+def test_match_cache_is_invalidated_by_every_write(dbpath):
+    async def scenario():
+        db = fresh(dbpath)
+        await db.c.insert_many([{"id": str(i), "n": i, "tag": "a" if i % 2 else "b"}
+                                for i in range(50)])
+        q = {"tag": {"$regex": "^a"}}
+        assert await db.c.count_documents(q) == 25
+        assert len(await db.c.find(q).to_list(None)) == 25  # served from the match cache
+        await db.c.update_one({"id": "1"}, {"$set": {"tag": "b"}})
+        assert await db.c.count_documents(q) == 24
+        await db.c.update_many({"n": {"$lt": 10}}, {"$set": {"tag": "a"}})
+        assert await db.c.count_documents(q) == 30
+        assert {d["id"] for d in await db.c.find(q, {"_id": 0}).to_list(None)} >= {"0", "2"}
+        await db.c.delete_many({"n": {"$gte": 40}})
+        assert await db.c.count_documents(q) == 25
+        await db.c.replace_one({"id": "3"}, {"id": "3", "n": 3, "tag": "zz"})
+        assert await db.c.count_documents(q) == 24
+        await db.c.insert_one({"id": "x", "tag": "abc"})
+        assert await db.c.count_documents(q) == 25
+        await db.c.find_one_and_update({"id": "x"}, {"$set": {"tag": "q"}})
+        assert len(await db.c.find(q).to_list(None)) == 24
+        await db.c.bulk_write([UpdateOne({"id": "5"}, {"$set": {"tag": "q"}})])
+        assert await db.c.count_documents(q) == 23
+        # returned documents are copies: mutating them never touches the store/cache
+        docs = await db.c.find(q).to_list(None)
+        docs[0]["tag"] = "mutated"
+        assert await db.c.count_documents(q) == 23
+        await db.c.drop()
+        assert await db.c.count_documents(q) == 0
+        close(db)
+
+    run(scenario())

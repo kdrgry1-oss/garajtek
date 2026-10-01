@@ -46,12 +46,13 @@ from pymongo.results import (BulkWriteResult, DeleteResult, InsertManyResult, In
                              UpdateResult)
 
 from . import shims
-from .matcher import compile_filter
+from .matcher import compile_filter, install_fast_sort
 from .storage import DECODE_OPTS, Storage, decode_doc, encode_key
 
 logger = logging.getLogger("localdb")
 
 shims.apply()
+install_fast_sort()
 
 _SCALARS = (str, int, float, type(None), ObjectId, datetime.datetime, bytes, uuid.UUID)
 
@@ -132,6 +133,11 @@ class LazyCollectionStore(mm_store.CollectionStore):
         self._hidx: Dict[str, Dict[Any, set]] = {}
         self._hrev: Dict[str, Dict[Any, tuple]] = {}
         self._halways: Dict[str, set] = {}
+        # Match cache: repr(filter) -> ordered store keys of the matching documents. A
+        # paginated endpoint typically runs count_documents(q) and find(q)/aggregate($match q)
+        # back to back; the second evaluation is served from here. Cleared on ANY change.
+        self._mcache: "collections.OrderedDict[str, list]" = collections.OrderedDict()
+        self._version = 0
         super().__init__(name)
         self.indexes = engine.storage.load_indexes(dbname, name)
         self._ttl_indexes = {k: v for k, v in self.indexes.items()
@@ -148,7 +154,13 @@ class LazyCollectionStore(mm_store.CollectionStore):
     def _documents(self, value):
         self._docs_raw = value
 
+    def bump(self):
+        self._version += 1
+        if self._mcache:
+            self._mcache.clear()
+
     def _load(self):
+        self.bump()
         self._loaded = True
         docs = collections.OrderedDict()
         seq = {}
@@ -180,6 +192,7 @@ class LazyCollectionStore(mm_store.CollectionStore):
         return super().is_created
 
     def drop(self):
+        self.bump()
         super().drop()
         self._loaded = True
         self._pending = set()
@@ -208,6 +221,7 @@ class LazyCollectionStore(mm_store.CollectionStore):
         if key not in docs:
             self._seq[key] = self._next_seq
             self._next_seq += 1
+        self.bump()
         super().__setitem__(key, val)
         if self._hidx:
             self.reindex((key,))
@@ -215,6 +229,7 @@ class LazyCollectionStore(mm_store.CollectionStore):
             self._touched.add(key)
 
     def __delitem__(self, key):
+        self.bump()
         super().__delitem__(key)
         self._seq.pop(key, None)
         if self._hidx:
@@ -561,6 +576,18 @@ def _needed_fields(pipeline) -> Optional[set]:
     return fields
 
 
+def _nondeterministic(node) -> bool:
+    """True when an expression tree uses $rand / $$NOW / $$CLUSTER_TIME / $function."""
+    if isinstance(node, str):
+        return node.startswith("$$NOW") or node.startswith("$$CLUSTER_TIME")
+    if isinstance(node, dict):
+        return any(k in ("$rand", "$function", "$sample") or _nondeterministic(v)
+                   for k, v in node.items())
+    if isinstance(node, (list, tuple)):
+        return any(_nondeterministic(v) for v in node)
+    return False
+
+
 def _has_unique(indexes: dict) -> bool:
     return any(spec.get("unique") for spec in indexes.values())
 
@@ -604,6 +631,18 @@ class LCollection(_MMCollection):
             # place since: refresh their hash-index entries before using the index.
             pending, st._pending = st._pending, set()
             st.reindex(pending)
+        ck = None
+        if filter and st._touched is None and not st._ttl_indexes and st.loaded:
+            try:
+                ck = repr(filter)
+            except Exception:  # noqa: BLE001
+                ck = None
+            if ck is not None:
+                hit = st._mcache.get(ck)
+                if hit is not None:
+                    st._mcache.move_to_end(ck)
+                    raw = st._docs_raw
+                    return iter([raw[k] for k in hit])
         cand = st.candidates(filter) if filter else None
         if cand is None:
             if st.is_empty:
@@ -614,7 +653,27 @@ class LCollection(_MMCollection):
             seq = st._seq
             raw = st._documents
             docs = [raw[k] for k in sorted(cand, key=lambda k: seq.get(k, 0)) if k in raw]
+        if ck is not None:
+            return self._yield_and_cache(st, filter, docs, ck)
         return self._yield_matching(st, filter, docs)
+
+    _MCACHE_SIZE = 16
+
+    @staticmethod
+    def _yield_and_cache(st, filter, docs, ck):
+        """Like _yield_matching (read-only use); remembers the result once the caller has
+        consumed it completely and nothing changed meanwhile."""
+        version = st._version
+        match = compile_filter(filter)
+        keys = []
+        for doc in docs:
+            if match(doc):
+                keys.append(_store_key(doc.get("_id")))
+                yield doc
+        if st._version == version and st._touched is None:
+            st._mcache[ck] = keys
+            while len(st._mcache) > LCollection._MCACHE_SIZE:
+                st._mcache.popitem(last=False)
 
     @staticmethod
     def _yield_matching(st, filter, docs):
@@ -757,6 +816,10 @@ class LCollection(_MMCollection):
                     break
                 i += 1
         rest = pipeline[i:]
+        if rest and not sort:
+            out = self._aggregate_topk(spec, rest)
+            if out is not None:
+                return out
         projection = None
         if rest:
             needed = _needed_fields(rest)
@@ -766,6 +829,48 @@ class LCollection(_MMCollection):
         if not rest:
             return docs
         return list(mongomock.aggregate.process_pipeline(docs, self.database, rest, None))
+
+    def _aggregate_topk(self, spec, rest) -> Optional[List[dict]]:
+        """``[$addFields|$set ..., $sort, ($skip), $limit, tail...]`` after the leading
+        $match (storefront product lists, admin order list): run the computed fields and the
+        sort on copies holding only the fields they read, keep the selected window, then
+        build only those documents in full. Same result as the plain pipeline (stable sort,
+        identical input order); None when the shape does not qualify."""
+        n_add = 0
+        while n_add < len(rest) and len(rest[n_add]) == 1 and \
+                next(iter(rest[n_add])) in ("$addFields", "$set"):
+            n_add += 1
+        if not n_add or n_add >= len(rest) or list(rest[n_add]) != ["$sort"]:
+            return None
+        j = n_add + 1
+        skip, limit = 0, None
+        while j < len(rest) and len(rest[j]) == 1:
+            (op, val), = rest[j].items()
+            if op == "$skip" and limit is None and isinstance(val, int) and val >= 0:
+                skip += val
+            elif op == "$limit" and isinstance(val, int) and val > 0:
+                limit = val if limit is None else min(limit, val)
+            else:
+                break
+            j += 1
+        if limit is None:
+            return None
+        head, tail = rest[:n_add + 1], rest[j:]
+        if _nondeterministic(head):
+            return None
+        needed = _needed_fields(head + [{"$count": "n"}])
+        if needed is None:
+            return None
+        light = self.query(spec, {f: 1 for f in needed if f != "_id"} or {"_id": 1})
+        if len(light) <= skip + limit:
+            return None  # small input: nothing to gain
+        window = head + ([{"$skip": skip}] if skip else []) + [{"$limit": limit}]
+        picked = list(mongomock.aggregate.process_pipeline(light, self.database, window, None))
+        order = [_store_key(d["_id"]) for d in picked]
+        raw = self._store._documents
+        full = [self._copy_only_fields(raw[k], None, dict) for k in order]
+        return list(mongomock.aggregate.process_pipeline(full, self.database,
+                                                         rest[:n_add] + tail, None))
 
     def aggregate(self, pipeline, session=None, **kwargs):
         return CommandCursor(self.aggregate_list(pipeline))
@@ -1208,6 +1313,7 @@ class Engine:
                             dbname, st.name, exc_info=True)
             raise
         finally:
+            st.bump()
             st._pending.clear()
             st.reindex(touched)
 

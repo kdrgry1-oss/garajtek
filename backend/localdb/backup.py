@@ -61,6 +61,7 @@ def backup(src: str, dest: str, compress: bool = False) -> str:
             with open(tmp, "rb") as fi, gzip.open(gz_tmp, "wb", compresslevel=6) as fo:
                 shutil.copyfileobj(fi, fo, 1024 * 1024)
             os.unlink(tmp)
+            os.chmod(gz_tmp, 0o600)  # same private mode as the plain .db (mkstemp)
             tmp = gz_tmp
         os.replace(tmp, dest)
         return dest
