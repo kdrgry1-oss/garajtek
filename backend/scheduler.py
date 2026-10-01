@@ -3808,7 +3808,7 @@ def start_scheduler():
     # Iter 43 — Günlük stok tükenme uyarısı (her gün sabah 9:00 UTC, ~12:00 TR)
     async def _daily_stockout_alert():
         try:
-            from routes.production_hooks import send_stockout_alert_email
+            from routes.reports_v2 import send_stockout_alert_email
             class _SystemAdmin:
                 def get(self, k, *a): return "system@localhost" if k == "email" else None
             await send_stockout_alert_email(admin=_SystemAdmin())

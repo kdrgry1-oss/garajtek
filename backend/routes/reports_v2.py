@@ -1067,152 +1067,6 @@ async def bulk_upsert_costs(payload: BulkCostIn, admin=Depends(require_admin)):
 
 
 # =============================================================================
-# TARİH BAZLI MAL ALIMI (kullanıcı, 2026-09-30): "hangi tarih aralığında ne kadar mal almışız,
-# o dönemde aldığımız ürünler ne kadar potansiyele sahip". Kaynak: İmalat Takip DEPO
-# SEVKİYATLARI (tarih + renk|beden adet). Alış fiyatı ürün kartındaki alış fiyatıyla AYNI
-# kural (_effective_unit_cost; ürün bulunamazsa imalat birim fiyatı × 1,10 KDV — ürün açarken
-# kullanılan kural). Potansiyel satış = adet × ürünün GEÇERLİ satış fiyatı (_eff_sale_price).
-# SALT OKUR.
-# =============================================================================
-def _norm_color(s) -> str:
-    import unicodedata as _ud
-    s = str(s or "").strip().replace("İ", "i").replace("I", "ı").lower()
-    s = _ud.normalize("NFKD", s)
-    return "".join(c for c in s if not _ud.combining(c)).replace("ı", "i")
-
-
-@router.get("/purchases")
-async def purchases_by_date(start_date: str = Query(...), end_date: str = Query(...),
-                            _=Depends(require_admin)):
-    sd, ed = str(start_date)[:10], str(end_date)[:10]
-    if not sd or not ed or sd > ed:
-        raise HTTPException(status_code=400, detail="Geçersiz tarih aralığı")
-    recs = await db.manufacturing.find(
-        {"deliveries": {"$elemMatch": {"date": {"$gte": sd, "$lte": ed + "T99"}}}},
-        {"_id": 0, "id": 1, "code": 1, "order_no": 1, "partner_name": 1, "product_name": 1,
-         "stock_code": 1, "unit_price": 1, "product_id": 1, "created_product_ids": 1, "deliveries": 1},
-    ).to_list(5000)
-    # Ürün eşleme: bağlı ürün id'leri + aynı stok kodlu ürünler (renk başına ayrı kart olabilir)
-    pids, codes = set(), set()
-    for r in recs:
-        for x in [r.get("product_id")] + list(r.get("created_product_ids") or []):
-            if x:
-                pids.add(str(x))
-        if r.get("stock_code"):
-            codes.add(str(r["stock_code"]).strip())
-    prods = await db.products.find(
-        {"$or": [{"id": {"$in": list(pids)}}, {"stock_code": {"$in": list(codes)}}],
-         "is_deleted": {"$ne": True}},
-        {"_id": 0, "id": 1, "name": 1, "stock_code": 1, "color": 1, "price": 1, "sale_price": 1,
-         "purchase_price": 1, "cost_price": 1, "urun_karti_id": 1, "variants.color": 1,
-         "variants.size": 1, "variants.price_adjustment": 1, "variants.price_diff": 1}).to_list(20000)
-    # Yedek eşleme: imalat ürün adı + renk = ürün kartı adı (ürün kartı imalattan bağımsız
-    # açıldıysa bağlantı/stok kodu tutmayabiliyor — ör. "Elen Yarasa Kol Basic" + "Beyaz").
-    _names = set()
-    for r in recs:
-        base = str(r.get("product_name") or "").strip()
-        if not base:
-            continue
-        _names.add(base)
-        for d in (r.get("deliveries") or []):
-            for key in (d.get("items") or {}):
-                if "|" in str(key):
-                    _names.add(f"{base} {str(key).split('|', 1)[0].strip()}")
-    if _names:
-        _seen = {p.get("id") for p in prods}
-        async for p in db.products.find(
-                {"name": {"$in": list(_names)}, "is_deleted": {"$ne": True}},
-                {"_id": 0, "id": 1, "name": 1, "stock_code": 1, "color": 1, "price": 1, "sale_price": 1,
-                 "purchase_price": 1, "cost_price": 1, "urun_karti_id": 1, "variants.color": 1,
-                 "variants.size": 1, "variants.price_adjustment": 1, "variants.price_diff": 1}):
-            if p.get("id") not in _seen:
-                prods.append(p)
-    by_name = {_norm_color(p.get("name")): p for p in prods if p.get("name")}
-    cost_map = await _build_cost_map([p["id"] for p in prods if p.get("id")])
-    by_id = {str(p["id"]): p for p in prods}
-    by_code: dict = defaultdict(list)
-    for p in prods:
-        by_code[str(p.get("stock_code") or "").strip()].append(p)
-
-    def _pick(rec, color):
-        cands = [by_id[x] for x in ([rec.get("product_id")] + list(rec.get("created_product_ids") or []))
-                 if x and str(x) in by_id]
-        cands += [p for p in by_code.get(str(rec.get("stock_code") or "").strip(), []) if p not in cands]
-        nc = _norm_color(color)
-        if nc:
-            for p in cands:
-                pcs = {_norm_color(p.get("color"))} | {_norm_color(v.get("color")) for v in (p.get("variants") or [])}
-                if nc in pcs:
-                    return p
-        base = str(rec.get("product_name") or "").strip()
-        byn = by_name.get(_norm_color(f"{base} {color}".strip())) or by_name.get(_norm_color(base))
-        if byn:
-            return byn
-        return cands[0] if cands else None
-
-    agg: dict = {}
-    for r in recs:
-        for d in (r.get("deliveries") or []):
-            dd = str(d.get("date") or "")[:10]
-            if not dd or dd < sd or dd > ed:
-                continue
-            for key, q in (d.get("items") or {}).items():
-                try:
-                    q = int(float(q or 0))
-                except Exception:
-                    q = 0
-                if q <= 0:
-                    continue
-                color = str(key).split("|", 1)[0] if "|" in str(key) else ""
-                size = str(key).split("|", 1)[1] if "|" in str(key) else str(key)
-                p = _pick(r, color)
-                unit_cost = 0.0
-                if p:
-                    unit_cost, _src = _effective_unit_cost(cost_map.get(str(p.get("id"))), p)
-                if unit_cost <= 0:
-                    unit_cost = round(_fval(r.get("unit_price")) * 1.10, 2)
-                unit_sale = _eff_sale_price(p) if p else 0.0
-                if p and unit_sale:
-                    for _v in (p.get("variants") or []):
-                        if str(_v.get("size") or "").strip().upper() == size.strip().upper():
-                            unit_sale = max(0.0, unit_sale + (_fval(_v.get("price_adjustment")) or _fval(_v.get("price_diff"))))
-                            break
-                k = (r.get("id"), p.get("id") if p else color)
-                a = agg.setdefault(k, {
-                    "product": (p or {}).get("name") or (f"{r.get('product_name') or ''} {color}".strip()),
-                    "card_id": str((p or {}).get("urun_karti_id") or ""),
-                    "stock_code": r.get("stock_code") or "", "partner": r.get("partner_name") or "",
-                    "order_no": r.get("order_no") or r.get("code") or "",
-                    "first_date": dd, "last_date": dd, "units": 0, "cost": 0.0, "sale": 0.0,
-                    "matched": bool(p), "sale_price": round(unit_sale, 2), "unit_cost": round(unit_cost, 2),
-                })
-                a["first_date"] = min(a["first_date"], dd)
-                a["last_date"] = max(a["last_date"], dd)
-                a["units"] += q
-                a["cost"] += q * unit_cost
-                a["sale"] += q * unit_sale
-    rows = []
-    for a in agg.values():
-        a["cost"] = round(a["cost"], 2)
-        a["sale"] = round(a["sale"], 2)
-        a["profit"] = round(a["sale"] - a["cost"], 2) if a["matched"] else None
-        a["margin_pct"] = round((a["sale"] - a["cost"]) / a["sale"] * 100, 2) if (a["matched"] and a["sale"]) else None
-        rows.append(a)
-    rows.sort(key=lambda x: -x["cost"])
-    tu = sum(x["units"] for x in rows)
-    tc = round(sum(x["cost"] for x in rows), 2)
-    ts = round(sum(x["sale"] for x in rows if x["matched"]), 2)
-    tcm = round(sum(x["cost"] for x in rows if x["matched"]), 2)
-    return {
-        "range": {"start": sd, "end": ed},
-        "totals": {"units": tu, "cost": tc, "sale": ts,
-                   "profit": round(ts - tcm, 2), "margin_pct": round((ts - tcm) / ts * 100, 2) if ts else None,
-                   "unmatched": sum(1 for x in rows if not x["matched"]), "rows": len(rows)},
-        "rows": rows,
-    }
-
-
-# =============================================================================
 # EKRANDAKİ TABLOYU EXCEL'E ÇEVİR (kullanıcı: "her bölümü ayrı ayrı excele alabilelim").
 # Panel ekranda gördüğü tabloyu (sütun + sıralı satırlar + toplam) gönderir; dosya ekranla
 # BİREBİR aynı olur. Yalnız admin; veri tabanına dokunmaz.
@@ -1287,3 +1141,73 @@ async def export_table_xlsx(req: _XReq, _=Depends(require_admin)):
     fname = f"{req.title}_{_now().strftime('%Y-%m-%d')}.xlsx"
     return Response(content=content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f"attachment; filename=\"rapor.xlsx\"; filename*=UTF-8''{quote(fname)}"})
+
+
+# =============================================================================
+# GÜNLÜK STOK TÜKENME UYARISI (e-posta) — zamanlayıcı (scheduler._daily_stockout_alert)
+# tarafından çağrılır. Eskiden routes/production_hooks.py'deydi; Üretim modülü kaldırılınca
+# rapor modülüne taşındı (HTTP ucu yok, yalnız sistem işi).
+# =============================================================================
+def _stockout_check_range(name: str, value, lo: int, hi: int) -> int:
+    """Parametre doğrulaması. Varsayılanlar düz Python int'tir (Query DEĞİL): zamanlayıcı
+    (scheduler._daily_stockout_alert) bu fonksiyonu FastAPI'siz, yalnız admin= ile çağırır."""
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail=f"{name} tam sayı olmalı")
+    if v < lo or v > hi:
+        raise HTTPException(status_code=422, detail=f"{name} {lo}-{hi} aralığında olmalı")
+    return v
+
+
+async def send_stockout_alert_email(admin=None, velocity_days: int = 30,
+                                    horizon_days: int = 60, target_cover_days: int = 60):
+    """Stok tükenme uyarısını email olarak gönderir. Parametreler (query) ekrandaki
+    Üretim Önerisi seçimleriyle aynıdır; verilmezse günlük cron varsayılanları 30/60/60."""
+    from security.alerts import send_alert
+    velocity_days = _stockout_check_range("velocity_days", velocity_days, 7, 180)
+    horizon_days = _stockout_check_range("horizon_days", horizon_days, 7, 365)
+    target_cover_days = _stockout_check_range("target_cover_days", target_cover_days, 14, 365)
+    params = {"velocity_days": velocity_days, "horizon_days": horizon_days,
+              "target_cover_days": target_cover_days}
+    # En kritik 20 ürünü çek
+    data = await stockout_forecast(velocity_days=velocity_days, horizon_days=horizon_days,
+                           target_cover_days=target_cover_days, min_velocity=0.05, _=admin)
+    items = data["items"][:20]
+    s = data["summary"]
+    if not items:
+        return {"ok": False, "message": "Uyarılacak ürün yok", "params": params}
+    _val = f"{s['total_production_value']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    lines = [f"Stok Tükenme Uyarısı\n",
+             f"Parametre: son {velocity_days} gün satış hızı, {horizon_days} gün tükenme ufku, "
+             f"{target_cover_days} gün hedef stok",
+             f"🔴 Kritik (≤14g): {s['critical']}",
+             f"🟠 Yüksek (≤30g): {s['high']}",
+             f"🟡 Uyarı: {s['warning']}",
+             f"Toplam üretim önerisi: {s['total_production_units']} adet "
+             f"(satış fiyatıyla ₺{_val})",
+             "", f"── EN ACİL ÜRÜNLER (ilk {len(items)} / {data.get('total', len(items))}) ──"]
+    for it in items:
+        lines.append(f"• {it['name']}")
+        lines.append(f"  Stok: {it['current_stock']} | Tükenme: {it['stockout_date_tr']} ({it['days_until_stockout']}g) | Üret: {it['suggested_production_qty']} adet")
+    # ALICI (beyaz etiket): İşletme Kuralları `stock.alert_email` → firma iletişim
+    # e-postası → (boşsa) security/alerts varsayılanı. Firma-özel adres kodda DEĞİL.
+    _to = None
+    try:
+        from scheduler import _stock_alert_recipients
+        from .deps import db as _db
+        _rcpts = await _stock_alert_recipients(_db)
+        _to = ", ".join(_rcpts) if _rcpts else None
+    except Exception:
+        _to = None
+    result = await send_alert(
+        kind="stockout_forecast",
+        level="critical" if s["critical"] > 0 else "warning",
+        title=f"Stok Tükenme Uyarısı: {len(items)} ürün için üretim gerekiyor",
+        body="\n".join(lines),
+        fingerprint="stockout_daily",
+        meta={"critical": s["critical"], "high": s["high"], "items": len(items), **params},
+        to_email=_to,
+    )
+    return {"ok": True, "alert": result, "items_count": len(items),
+            "total": data.get("total", len(items)), "params": params}
