@@ -163,7 +163,8 @@ export const navigationGroups = [
     icon: Settings,
     children: [
       { label: "Genel Ayarlar", path: "/admin/ayarlar", icon: Settings },
-      { label: "Webmail'e Git (Zoho)", href: "https://mail.zoho.eu", external: true, icon: Mail },
+      { label: "Mail Yönetimi", path: "/admin/mail-yonetimi", icon: Mail },
+      { label: "Webmail'e Git", href: "https://mail.garajtek.com", external: true, icon: Mail },
     ],
   },
 ];

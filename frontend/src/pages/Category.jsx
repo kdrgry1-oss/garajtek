@@ -1,30 +1,78 @@
+// Kategori / ürün listeleme — Electro "shop" sayfası (sol kenar çubuğu: kategori ağacı + filtreler +
+// son ürünler; sağda önerilen ürünler karuseli, araç çubuğu (görünüm, sıralama, adet, sayfa),
+// ızgara/liste görünümü ve sayfalama). Mevcut davranışlar korunur: URL tabanlı filtre/sıralama/sayfa,
+// üyelere özel kategori yönlendirmesi, view_item_list analitiği, kategori SEO'su, facet önbelleği.
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { X, Check } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ProductCard from "../components/ProductCard";
+import Breadcrumb from "../components/electro/Breadcrumb";
+import Carousel from "../components/electro/Carousel";
+import RangeSlider from "../components/electro/RangeSlider";
+import useCategoryTree, { findBySlug, categoryPath } from "../components/electro/useCategoryTree";
 import { trackViewItemList } from "../lib/dataLayer";
-import { slugify } from "../lib/slug";
 import { applyRuntimeSeo, setCategorySeo } from "../lib/seo";
 import { dedupeColorGroups } from "../lib/colorGroups";
 import { sortLikeSize } from "../utils/sizeSort";
-import { resolveColor, needsBorder, MULTI_GRADIENT } from "../lib/colorMap";
+import { resolveColor, MULTI_GRADIENT } from "../lib/colorMap";
+import { optimizeImg, firstImage } from "../lib/img";
+import { fmtPrice, priceOf, productHref } from "../components/electro/format";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const VIRTUAL = { "en-yeniler": "Yeni Ürünler", sale: "İndirimdeki Ürünler", "tum-urunler": "Tüm Ürünler", tumu: "Tüm Ürünler", all: "Tüm Ürünler" };
 
-// Bir ürünün kendi renk adını çözer (facet listesi için): variants[].color →
-// attributes(Web Color/Renk/Color) → color. Backend _pc_color ile aynı mantık.
 function pColor(p) {
   const v = (p.variants || []).find((x) => (x.color || "").trim());
   if (v) return v.color.trim();
-  const a = (p.attributes || []).find((x) =>
-    ["web color", "renk", "color"].includes((x.name || "").trim().toLowerCase())
-  );
+  const a = (p.attributes || []).find((x) => ["web color", "renk", "color"].includes((x.name || "").trim().toLowerCase()));
   if (a && (a.value || "").trim()) return a.value.trim();
   return (p.color || "").trim();
+}
+
+const SORTS = [
+  { label: "Varsayılan sıralama (en yeni)", value: "created_at:desc" },
+  { label: "Popülerliğe göre", value: "popular:desc" },
+  { label: "Fiyat: düşükten yükseğe", value: "price:asc" },
+  { label: "Fiyat: yüksekten düşüğe", value: "price:desc" },
+  { label: "İsim: A-Z", value: "name:asc" },
+];
+const PER_PAGE = [20, 40, 80];
+
+function CheckRow({ id, label, count, checked, onChange, swatch }) {
+  return (
+    <div className="form-group d-flex align-items-center justify-content-between mb-2 pb-1">
+      <div className="custom-control custom-checkbox">
+        <input type="checkbox" className="custom-control-input" id={id} checked={checked} onChange={onChange} />
+        <label className="custom-control-label" htmlFor={id}>
+          {swatch && <span className="d-inline-block rounded-circle border mr-1 align-middle" style={{ width: 12, height: 12, ...swatch }} />}
+          {label}{count != null && <span className="text-gray-25 font-size-12 font-weight-normal"> ({count})</span>}
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function FacetGroup({ title, items, selected, onToggle, idPrefix, swatchOf }) {
+  const [more, setMore] = useState(false);
+  if (!items.length) return null;
+  const shown = more ? items : items.slice(0, 5);
+  return (
+    <div className="border-bottom pb-4 mb-4">
+      <h4 className="font-size-14 mb-3 font-weight-bold">{title}</h4>
+      {shown.map(([val, count]) => (
+        <CheckRow key={val} id={`${idPrefix}-${val}`} label={val} count={count} checked={selected.includes(val)} onChange={() => onToggle(val)} swatch={swatchOf ? swatchOf(val) : null} />
+      ))}
+      {items.length > 5 && (
+        <button type="button" className="link link-collapse small font-size-13 text-gray-27 d-inline-flex mt-2 btn btn-link p-0" onClick={() => setMore((v) => !v)} aria-expanded={more}>
+          <span className="link__icon text-gray-27 bg-white"><span className="link__icon-inner">{more ? "−" : "+"}</span></span>
+          <span className="ml-1">{more ? "Daha az göster" : "Daha fazla göster"}</span>
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function Category() {
@@ -32,621 +80,397 @@ export default function Category() {
   const navigate = useNavigate();
   const { token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const tree = useCategoryTree();
 
-  // ÜYELERE ÖZEL kategori route guard: MİSAFİR (giriş yok) members_only kategoriye
-  // doğrudan URL ile giderse GİRİŞ sayfasına yönlendir (girişten sonra geri döner).
-  // (Backend zaten ürünleri gizler; bu, boş sayfa yerine net bir yönlendirme sağlar.)
+  // ÜYELERE ÖZEL kategori: misafir doğrudan URL ile gelirse giriş sayfasına yönlendir.
   useEffect(() => {
-    if (!slug || slug === "all" || token) return;   // üye/token varsa serbest
+    if (!slug || slug === "all" || token) return undefined;
     let cancel = false;
     (async () => {
       try {
         const r = await axios.get(`${API}/categories/${encodeURIComponent(slug)}`);
-        if (!cancel && (r.data?.members_only || r.data?.members_only_effective)) {
-          navigate(`/giris?redirect=${encodeURIComponent("/" + slug)}`, { replace: true });
-        }
-      } catch { /* kategori yoksa normal akış (404/boş) */ }
+        if (!cancel && (r.data?.members_only || r.data?.members_only_effective)) navigate(`/giris?redirect=${encodeURIComponent("/" + slug)}`, { replace: true });
+      } catch { /* kategori yoksa normal akış */ }
     })();
     return () => { cancel = true; };
   }, [slug, token, navigate]);
+
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  // Sayfa numarası URL'de tutulur (?page=3) — detaydan/geri dönünce remount olsa
-  // bile korunur ve deep-link paylaşılabilir. (Eskiden useState(1) idi → back → sayfa 1.)
-  const page = parseInt(searchParams.get("page") || "1", 10) || 1;
-  const setPage = (n) => {
-    const next = new URLSearchParams(searchParams);
-    if (!n || n <= 1) next.delete("page"); else next.set("page", String(n));
-    setSearchParams(next);
-  };
   const [pages, setPages] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [recommended, setRecommended] = useState([]);
+  const [latest, setLatest] = useState([]);
 
-  // Grid sütun tercihi localStorage'a kaydedilir. Seçenekler: 1 / 2 / 4
-  // Mobilde ilk yüklemede 2'li (Mango usulü); desktop'ta 4'lü varsayılan.
-  // Kullanıcı daha önce bilinçli seçim yaptıysa (localStorage) o korunur.
-  const [gridCols, setGridColsState] = useState(() => {
-    const saved = parseInt(localStorage.getItem("store_plp_grid") || "", 10);
-    if ([1, 2, 4].includes(saved)) return saved;
-    return typeof window !== "undefined" && window.innerWidth < 768 ? 2 : 4;
+  const page = parseInt(searchParams.get("page") || "1", 10) || 1;
+  const setParam = (mut) => { const next = new URLSearchParams(searchParams); mut(next); setSearchParams(next); };
+  const setPage = (n) => setParam((nx) => { if (!n || n <= 1) nx.delete("page"); else nx.set("page", String(n)); });
+
+  const [view, setViewState] = useState(() => {
+    try { const v = localStorage.getItem("el_plp_view"); if (["grid", "grid-ext", "list", "list-small"].includes(v)) return v; } catch { /* yoksay */ }
+    return "grid";
   });
-  const setGridCols = (n) => {
-    setGridColsState(n);
-    try { localStorage.setItem("store_plp_grid", String(n)); } catch (e) {}
-  };
+  const setView = (v) => { setViewState(v); try { localStorage.setItem("el_plp_view", v); } catch { /* yoksay */ } };
 
-  // --- Uygulanmış (URL'deki) filtreler ---
   const sort = searchParams.get("sort") || "created_at";
   const order = searchParams.get("order") || "desc";
   const minPrice = searchParams.get("min_price") || "";
   const maxPrice = searchParams.get("max_price") || "";
   const sizesParam = searchParams.get("sizes") || "";
   const colorsParam = searchParams.get("colors") || "";
+  const brandParam = searchParams.get("brand") || "";
+  const limit = PER_PAGE.includes(Number(searchParams.get("limit"))) ? Number(searchParams.get("limit")) : 20;
 
-  // --- Taslak (drawer içinde, henüz uygulanmamış) seçimler ---
-  const [stSort, setStSort] = useState(`${sort}:${order}`);
-  const [stMin, setStMin] = useState(minPrice);
-  const [stMax, setStMax] = useState(maxPrice);
-  const [stSizes, setStSizes] = useState(sizesParam ? sizesParam.split(",") : []);
-  const [stColors, setStColors] = useState(colorsParam ? colorsParam.split(",") : []);
+  // facet'ler (kategori başına önbellek)
+  const [facets, setFacets] = useState({ sizes: [], colors: [], brands: [], min: 0, max: 0 });
+  const facetCache = useRef(new Map());
 
-  // --- Facet (mevcut beden/renk seçenekleri) ---
-  const [facetSizes, setFacetSizes] = useState([]);
-  const [facetColors, setFacetColors] = useState([]);
-  const facetCacheRef = useRef(new Map()); // slug -> { sizes, colors }
-
-  // O15: Kategori (slug) değişince sayfayı 1'e sıfırla — aksi halde başka kategoriye geçince
-  // yeni kategori ESKİ sayfa numarasında açılıp boş/eksik liste (stok yokmuş gibi) gösteriyordu.
-  // İlk mount'ta ÇALIŞMAZ (yoksa /kadin?page=3 deep-link'inde page silinirdi);
-  // yalnız gerçek slug DEĞİŞİMİNDE sayfayı 1'e döndürür.
-  const prevSlugRef = useRef(slug);
+  const prevSlug = useRef(slug);
   useEffect(() => {
-    if (prevSlugRef.current !== slug) {
-      prevSlugRef.current = slug;
-      setPage(1);
-    }
+    if (prevSlug.current !== slug) { prevSlug.current = slug; setPage(1); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchProducts(controller.signal);
-    fetchCategories();
-    return () => controller.abort();  // hızlı sayfa/filtre değişiminde eski isteği iptal et (yarış → eski veri ezmesin)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, sort, order, minPrice, maxPrice, sizesParam, colorsParam, page]);
+    (async () => {
+      setLoading(true);
+      try {
+        let url = `${API}/products?page=${page}&limit=${limit}&sort=${sort}&order=${order}`;
+        if (slug && slug !== "all") url += `&category=${slug}`;
+        if (minPrice) url += `&min_price=${minPrice}`;
+        if (maxPrice) url += `&max_price=${maxPrice}`;
+        if (sizesParam) url += `&sizes=${encodeURIComponent(sizesParam)}`;
+        if (colorsParam) url += `&colors=${encodeURIComponent(colorsParam)}`;
+        if (brandParam) url += `&brand=${encodeURIComponent(brandParam)}`;
+        const res = await axios.get(url, { signal: controller.signal });
+        const fetched = res.data?.products || [];
+        setProducts(fetched);
+        setTotal(res.data?.total || 0);
+        setPages(res.data?.pages || 1);
+        if (fetched.length) { try { trackViewItemList({ products: fetched.slice(0, 24), listName: slug || "all" }); } catch (_) { /* silent */ } }
+      } catch (err) {
+        if (axios.isCancel?.(err) || err.name === "CanceledError") return;
+        console.error(err);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [slug, sort, order, minPrice, maxPrice, sizesParam, colorsParam, brandParam, page, limit]);
 
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "auto" }); }, [page]);
+
+  // facet + önerilen + son ürünler
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "auto" });
-  }, [page]);
-
-  const fetchProducts = async (signal) => {
-    setLoading(true);
-    try {
-      let url = `${API}/products?page=${page}&limit=24&sort=${sort}&order=${order}`;
-      if (slug && slug !== "all") url += `&category=${slug}`;
-      if (minPrice) url += `&min_price=${minPrice}`;
-      if (maxPrice) url += `&max_price=${maxPrice}`;
-      if (sizesParam) url += `&sizes=${encodeURIComponent(sizesParam)}`;
-      if (colorsParam) url += `&colors=${encodeURIComponent(colorsParam)}`;
-
-      const res = await axios.get(url, { signal });
-      const fetched = res.data?.products || [];
-      setProducts(fetched);
-      setTotal(res.data?.total || 0);
-      setPages(res.data?.pages || 1);
-      if (fetched.length > 0) {
-        try {
-          trackViewItemList({ products: fetched.slice(0, 24), listName: slug || "all" });
-        } catch (_) { /* silent */ }
-      }
-    } catch (err) {
-      if (axios.isCancel?.(err) || err.name === "CanceledError") return;  // iptal edilen istek — yeni istek zaten yolda
-      console.error(err);
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const res = await axios.get(`${API}/categories?visible_only=true`);
-      setCategories(res.data || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Drawer açıldığında: taslakları URL'den senkronla + facet'leri yükle.
-  const openFilter = async () => {
-    setStSort(`${sort}:${order}`);
-    setStMin(minPrice);
-    setStMax(maxPrice);
-    setStSizes(sizesParam ? sizesParam.split(",") : []);
-    setStColors(colorsParam ? colorsParam.split(",") : []);
-    setFilterOpen(true);
-    loadFacets();
-  };
-
-  const loadFacets = async () => {
     const key = slug || "all";
-    if (facetCacheRef.current.has(key)) {
-      const cached = facetCacheRef.current.get(key);
-      setFacetSizes(cached.sizes);
-      setFacetColors(cached.colors);
-      return;
+    let alive = true;
+    const catQ = slug && slug !== "all" ? `&category=${slug}` : "";
+    const apply = (f) => { if (alive) setFacets(f); };
+    if (facetCache.current.has(key)) apply(facetCache.current.get(key));
+    else {
+      axios.get(`${API}/products?page=1&limit=120&sort=created_at&order=desc${catQ}`).then((res) => {
+        const items = res.data?.products || [];
+        const count = (arr) => { const m = new Map(); arr.forEach((v) => { if (v) m.set(v, (m.get(v) || 0) + 1); }); return [...m.entries()]; };
+        let sizes = count(items.flatMap((p) => [...new Set((p.variants || []).map((v) => String(v.size || "").trim()).filter(Boolean))]));
+        try { sizes = sortLikeSize(sizes, (x) => x[0]); } catch (_) { /* yoksay */ }
+        const colors = count(items.map(pColor));
+        const brands = count(items.map((p) => String(p.brand || "").trim())).sort((a, b) => a[0].localeCompare(b[0], "tr"));
+        const prices = items.map((p) => priceOf(p).display).filter((n) => n > 0);
+        const f = { sizes, colors, brands, min: prices.length ? Math.floor(Math.min(...prices)) : 0, max: prices.length ? Math.ceil(Math.max(...prices)) : 0 };
+        facetCache.current.set(key, f);
+        apply(f);
+      }).catch(() => apply({ sizes: [], colors: [], brands: [], min: 0, max: 0 }));
     }
-    try {
-      let url = `${API}/products?page=1&limit=120&sort=created_at&order=desc`;
-      if (slug && slug !== "all") url += `&category=${slug}`;
-      const res = await axios.get(url);
-      const items = res.data?.products || [];
-      // Bedenler
-      const sizeMap = new Map();
-      for (const p of items) {
-        for (const v of p.variants || []) {
-          const s = (v.size || "").toString().trim();
-          if (s) sizeMap.set(s, true);
-        }
-      }
-      let sizes = [...sizeMap.keys()];
-      try { sizes = sortLikeSize(sizes.map((s) => ({ size: s })), (x) => x.size).map((x) => x.size); } catch (_) {}
-      // Renkler (benzersiz, ilk yazımı korunur)
-      const colorMap = new Map();
-      for (const p of items) {
-        const c = pColor(p);
-        if (c && !colorMap.has(c.toLowerCase())) colorMap.set(c.toLowerCase(), c);
-      }
-      const colors = [...colorMap.values()];
-      facetCacheRef.current.set(key, { sizes, colors });
-      setFacetSizes(sizes);
-      setFacetColors(colors);
-    } catch (err) {
-      setFacetSizes([]);
-      setFacetColors([]);
-    }
-  };
+    axios.get(`${API}/products?limit=10&sort=popular${catQ}`).then((r) => { if (alive) setRecommended(r.data?.products || []); }).catch(() => {});
+    axios.get(`${API}/products?limit=5&sort=created_at&order=desc`).then((r) => { if (alive) setLatest(r.data?.products || []); }).catch(() => {});
+    return () => { alive = false; };
+  }, [slug]);
 
-  const toggleSize = (s) =>
-    setStSizes((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
-  const toggleColor = (c) =>
-    setStColors((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+  // taslak fiyat aralığı (kaydırıcı)
+  const [range, setRange] = useState([0, 0]);
+  useEffect(() => {
+    setRange([minPrice ? Number(minPrice) : facets.min, maxPrice ? Number(maxPrice) : facets.max]);
+  }, [facets.min, facets.max, minPrice, maxPrice]);
 
-  // "Ürünleri Göster" — taslakları tek seferde URL'e yaz, listeyi yenile.
-  const applyFilters = () => {
-    const next = new URLSearchParams(searchParams);
-    const [sk, so] = stSort.split(":");
-    next.set("sort", sk); next.set("order", so);
-    if (stMin) next.set("min_price", stMin); else next.delete("min_price");
-    if (stMax) next.set("max_price", stMax); else next.delete("max_price");
-    if (stSizes.length) next.set("sizes", stSizes.join(",")); else next.delete("sizes");
-    if (stColors.length) next.set("colors", stColors.join(",")); else next.delete("colors");
-    next.delete("page");   // filtre değişince sayfa 1 — tek setSearchParams (yarış yok)
-    setSearchParams(next);
-    setFilterOpen(false);
-  };
+  const toggleList = (param, val) => setParam((nx) => {
+    const cur = (nx.get(param) || "").split(",").filter(Boolean);
+    const next = cur.includes(val) ? cur.filter((x) => x !== val) : [...cur, val];
+    if (next.length) nx.set(param, next.join(",")); else nx.delete(param);
+    nx.delete("page");
+  });
+  const applyPrice = () => setParam((nx) => {
+    if (range[0] > facets.min) nx.set("min_price", String(range[0])); else nx.delete("min_price");
+    if (range[1] < facets.max) nx.set("max_price", String(range[1])); else nx.delete("max_price");
+    nx.delete("page");
+  });
+  const applySort = (value) => setParam((nx) => { const [sk, so] = value.split(":"); nx.set("sort", sk); nx.set("order", so); nx.delete("page"); });
+  const clearAll = () => setSearchParams({});
 
-  const clearFilters = () => {
-    setStSort("created_at:desc");
-    setStMin(""); setStMax("");
-    setStSizes([]); setStColors([]);
-  };
+  const current = findBySlug(tree, slug);
+  const path = current ? categoryPath(tree, current) : [];
+  const categoryName = current?.name || VIRTUAL[slug] || slug?.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Tüm Ürünler";
+  const sidebarRoot = path[0] || null;
 
-  const currentCategory = categories.find((c) => c.slug === slug);
-  const categoryName =
-    currentCategory?.name ||
-    slug?.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) ||
-    "Tüm Ürünler";
-  // Breadcrumb için üst kategori (varsa): Anasayfa / Üst Kategori / Bu Sayfa
-  const parentCategory = currentCategory?.parent_id
-    ? categories.find((c) => String(c.id) === String(currentCategory.parent_id)) || null
-    : null;
-
-  // Per-sayfa SEO meta (title/description/canonical) — kategori sayfası artık ana sayfaya
-  // canonical'lanmıyor. slug "all" (tüm ürünler) hariç.
   useEffect(() => {
     if (slug && slug !== "all") {
       const controller = new AbortController();
-      applyRuntimeSeo(`/kategori/${slug}`, () => {
-        try { setCategorySeo(categoryName, slug, "", currentCategory?.description); } catch (_) {}
-      }, { signal: controller.signal });
-      return () => {
-        controller.abort();
-        document.querySelectorAll('script[data-seo="runtime"]').forEach((el) => el.remove());
-      };
+      applyRuntimeSeo(`/kategori/${slug}`, () => { try { setCategorySeo(categoryName, slug, "", current?.description); } catch (_) { /* yoksay */ } }, { signal: controller.signal });
+      return () => { controller.abort(); document.querySelectorAll('script[data-seo="runtime"]').forEach((el) => el.remove()); };
     }
     return undefined;
-  }, [slug, categoryName, currentCategory?.description]);
+  }, [slug, categoryName, current?.description]);
 
-  // Sıralama menüsü (toolbar ortası) — seçim URL'e yazılır, liste yenilenir
-  const [sortOpen, setSortOpen] = useState(false);
-  const applySort = (value) => {
-    const [sk, so] = value.split(":");
-    const next = new URLSearchParams(searchParams);
-    next.set("sort", sk); next.set("order", so);
-    next.delete("page");
-    setSearchParams(next);
-    setSortOpen(false);
-  };
-
-  const sortOptions = [
-    { label: "En Yeniler", value: "created_at:desc" },
-    { label: "Fiyat: Düşükten Yükseğe", value: "price:asc" },
-    { label: "Fiyat: Yüksekten Düşüğe", value: "price:desc" },
-    { label: "İsim: A-Z", value: "name:asc" },
-  ];
-
-  // Kullanıcının seçtiği sütun sayısı ÜST SINIR gibi davranır: dar ekranda (iPad dikey/telefon)
-  // kartlar okunaklı kalsın diye kademeli düşer. 4 → telefon/dikey 2, iPad yatay 3, masaüstü 4.
-  const gridClass = {
-    1: "grid-cols-1",
-    2: "grid-cols-2",
-    4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-  };
-
-  // Aktif (uygulanmış) filtre sayısı — toolbar rozetinde gösterilir.
   const activeCount = useMemo(() => {
     let n = 0;
     if (minPrice || maxPrice) n += 1;
-    if (sizesParam) n += sizesParam.split(",").filter(Boolean).length;
-    if (colorsParam) n += colorsParam.split(",").filter(Boolean).length;
-    if (!(sort === "created_at" && order === "desc")) n += 1;
+    [sizesParam, colorsParam, brandParam].forEach((s) => { if (s) n += s.split(",").filter(Boolean).length; });
     return n;
-  }, [minPrice, maxPrice, sizesParam, colorsParam, sort, order]);
+  }, [minPrice, maxPrice, sizesParam, colorsParam, brandParam]);
+
+  const list = dedupeColorGroups(products);
+  const from = total ? (page - 1) * limit + 1 : 0;
+  const to = Math.min(total, page * limit);
+  const showing = `${total} sonuçtan ${from}–${to} arası gösteriliyor`;
+  const swatchOf = (c) => { const col = resolveColor(c); return col?.type === "solid" ? { backgroundColor: col.value } : col?.type === "multi" ? { background: MULTI_GRADIENT } : { background: "#e5e5e5" }; };
+
+  const sidebar = (
+    <>
+      <div className="mb-6 border border-width-2 border-color-3 borders-radius-6" data-testid="category-sidebar">
+        <ul id="sidebarNav" className="list-unstyled mb-0 sidebar-navbar view-all">
+          <li><div className="dropdown-title">Kategorilere Göz At</div></li>
+          {tree.roots.map((c) => {
+            const open = sidebarRoot && sidebarRoot.id === c.id;
+            const kids = c.children || [];
+            return (
+              <li key={c.id}>
+                {kids.length ? (
+                  <>
+                    <Link className={`dropdown-toggle dropdown-toggle-collapse${open ? "" : " collapsed"}${current && current.id === c.id ? " font-weight-bold" : ""}`} to={`/${c.slug}`} aria-expanded={!!open}>
+                      {c.name}{c.product_count != null && <span className="text-gray-25 font-size-12 font-weight-normal"> ({c.product_count})</span>}
+                    </Link>
+                    <div className={`collapse${open ? " show" : ""}`}>
+                      <ul className="list-unstyled dropdown-list">
+                        {kids.map((k) => (
+                          <li key={k.id}>
+                            <Link className={`dropdown-item${current && (current.id === k.id || path.some((x) => x.id === k.id)) ? " font-weight-bold" : ""}`} to={`/${k.slug}`}>
+                              {k.name}{k.product_count != null && <span className="text-gray-25 font-size-12 font-weight-normal"> ({k.product_count})</span>}
+                            </Link>
+                            {(k.children || []).length > 0 && path.some((x) => x.id === k.id) && (
+                              <ul className="list-unstyled dropdown-list pl-3">
+                                {k.children.map((g) => (
+                                  <li key={g.id}><Link className={`dropdown-item${current && current.id === g.id ? " font-weight-bold" : ""}`} to={`/${g.slug}`}>{g.name}</Link></li>
+                                ))}
+                              </ul>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                ) : (
+                  <Link className={`dropdown-current${current && current.id === c.id ? " active font-weight-bold" : ""}`} to={`/${c.slug}`}>{c.name}</Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div className="mb-6" data-testid="filter-panel">
+        <div className="border-bottom border-color-1 mb-5 d-flex justify-content-between align-items-end">
+          <h3 className="section-title section-title__sm mb-0 pb-2 font-size-18">Filtreler</h3>
+          {activeCount > 0 && <button type="button" className="btn btn-link p-0 pb-2 font-size-13 text-gray-90" onClick={clearAll}>Temizle ({activeCount})</button>}
+        </div>
+        <FacetGroup title="Markalar" items={facets.brands} selected={brandParam.split(",").filter(Boolean)} onToggle={(v) => toggleList("brand", v)} idPrefix="brand" />
+        <FacetGroup title="Seçenek / Ölçü" items={facets.sizes} selected={sizesParam.split(",").filter(Boolean)} onToggle={(v) => toggleList("sizes", v)} idPrefix="size" />
+        <FacetGroup title="Renk" items={facets.colors} selected={colorsParam.split(",").filter(Boolean)} onToggle={(v) => toggleList("colors", v)} idPrefix="color" swatchOf={swatchOf} />
+        {facets.max > facets.min && (
+          <div className="range-slider">
+            <h4 className="font-size-14 mb-3 font-weight-bold">Fiyat</h4>
+            <RangeSlider min={facets.min} max={facets.max} step={1} value={range} onChange={setRange} />
+            <div className="mt-1 text-gray-111 d-flex mb-4">
+              <span className="mr-0dot5">Fiyat:&nbsp;</span>
+              <span data-testid="price-min">{fmtPrice(range[0])}</span>
+              <span className="mx-0dot5">&nbsp;—&nbsp;</span>
+              <span data-testid="price-max">{fmtPrice(range[1])}</span>
+            </div>
+            <button type="button" className="btn px-4 btn-primary-dark-w py-2 rounded-lg" onClick={() => { applyPrice(); setFilterOpen(false); }} data-testid="apply-filters-btn">Filtrele</button>
+          </div>
+        )}
+      </div>
+      {latest.length > 0 && (
+        <div className="mb-8">
+          <div className="border-bottom border-color-1 mb-5">
+            <h3 className="section-title section-title__sm mb-0 pb-2 font-size-18">Son Eklenenler</h3>
+          </div>
+          <ul className="list-unstyled">
+            {latest.map((p) => {
+              const pv = priceOf(p);
+              return (
+                <li className="mb-4" key={p.id}>
+                  <div className="row">
+                    <div className="col-auto">
+                      <Link to={productHref(p)} className="d-block width-75"><img className="img-fluid" src={optimizeImg(firstImage(p), 150)} alt={p.name} loading="lazy" width="75" height="75" /></Link>
+                    </div>
+                    <div className="col">
+                      <h3 className="text-lh-1dot2 font-size-14 mb-0"><Link to={productHref(p)}>{p.name}</Link></h3>
+                      <div className="font-weight-bold">
+                        {pv.hasDiscount && <del className="font-size-11 text-gray-9 d-block">{fmtPrice(pv.list)}</del>}
+                        <ins className="font-size-15 text-red text-decoration-none d-block">{fmtPrice(pv.display)}</ins>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+
+  const pageNums = (() => {
+    const out = [];
+    const s = Math.max(1, page - 2); const e = Math.min(pages, s + 4);
+    for (let i = Math.max(1, e - 4); i <= e; i++) out.push(i);
+    return out;
+  })();
 
   return (
-    <div className="sf-page min-h-screen bg-white" data-testid="category-page">
+    <div className="sf-page" data-testid="category-page">
       <Header />
-
-      <div className="w-full px-2 md:px-4 relative">
-        {/* ── MOBİL: ortalı breadcrumb + ortalı büyük başlık + 3 bölgeli toolbar ── */}
-        <div className="md:hidden">
-          <nav className="pt-5 flex items-center justify-center gap-2 text-[13px] flex-wrap" aria-label="breadcrumb" data-testid="category-breadcrumb">
-            <Link to="/" className="text-gray-400 hover:text-black transition-colors">Anasayfa</Link>
-            <span className="text-gray-300">/</span>
-            {parentCategory && (
-              <>
-                <Link to={`/${parentCategory.slug}`} className="text-gray-400 hover:text-black transition-colors">{parentCategory.name}</Link>
-                <span className="text-gray-300">/</span>
-              </>
-            )}
-            <span className="text-black">{categoryName}</span>
-          </nav>
-
-          <div className="pt-6 pb-6 text-center">
-            <h1 className="text-2xl font-normal tracking-tight text-stone-900">{categoryName}</h1>
-          </div>
-
-          <div className="grid grid-cols-3 items-stretch border-b">
-            <button
-              onClick={openFilter}
-              className="flex items-center justify-start gap-2 py-4 pr-2 text-sm hover:opacity-60 transition-opacity border-r border-gray-200"
-              data-testid="filter-btn"
-            >
-              <span className="text-xl leading-none font-light" aria-hidden="true">+</span>
-              <span>Filtreleme{activeCount > 0 ? ` (${activeCount})` : ""}</span>
-            </button>
-
-            <div className="relative border-r border-gray-200">
-              <button
-                onClick={() => setSortOpen((v) => !v)}
-                className="w-full h-full py-4 text-sm hover:opacity-60 transition-opacity"
-                data-testid="sort-btn"
-              >
-                Sıralama
-              </button>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 py-4 pl-2">
-              <span className="text-sm">Görünüm</span>
-              {[1, 2, 4].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setGridCols(n)}
-                  data-testid={`grid-${n}`}
-                  aria-label={`${n}'li görünüm`}
-                  className={`text-sm tabular-nums transition-colors ${gridCols === n ? "font-bold text-black" : "text-gray-400 hover:text-black"}`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── MASAÜSTÜ (SUUD tarzı): SOLDA başlık; altında solda breadcrumb, sağda
-            + Filtreleme | Sıralama Seçiniz | Görünüm 1 2 4 ── */}
-        <div className="hidden md:block">
-          <h1 className="pt-8 text-2xl font-normal tracking-tight text-stone-900">{categoryName}</h1>
-          <div className="flex items-center justify-between gap-4 mt-9 pb-3 border-b border-gray-100">
-            <nav className="flex items-center gap-2 text-sm flex-wrap" aria-label="breadcrumb" data-testid="category-breadcrumb-desktop">
-              <Link to="/" className="text-gray-400 hover:text-black transition-colors">Anasayfa</Link>
-              <span className="text-gray-300">/</span>
-              {parentCategory && (
-                <>
-                  <Link to={`/${parentCategory.slug}`} className="text-gray-400 hover:text-black transition-colors">{parentCategory.name}</Link>
-                  <span className="text-gray-300">/</span>
-                </>
+      <main id="content" role="main" className="electro el-page">
+        <Breadcrumb testId="category-breadcrumb" items={path.length ? path.map((c) => ({ label: c.name, to: `/${c.slug}` })) : [{ label: categoryName }]} />
+        <div className="container">
+          <div className="row mb-8">
+            <div className="d-none d-xl-block col-xl-3 col-wd-2gdot5">{sidebar}</div>
+            <div className="col-xl-9 col-wd-9gdot5">
+              {page === 1 && recommended.length > 0 && (
+                <div className="mb-6 d-none d-xl-block" data-testid="recommended-products">
+                  <div className="position-relative">
+                    <div className="border-bottom border-color-1 mb-2">
+                      <h3 className="d-inline-block section-title section-title__full mb-0 pb-2 font-size-22">Önerilen Ürünler</h3>
+                    </div>
+                    <Carousel perView={{ base: 2, md: 3, lg: 4, xl: 4, wd: 5 }} className="position-static overflow-hidden u-slick-overflow-visble pb-7 pt-2 px-1"
+                      arrows arrowsClassName="position-absolute top-0 font-size-17 u-slick__arrow-normal top-10" arrowLeftClassName="fa fa-angle-left right-1" arrowRightClassName="fa fa-angle-right right-0"
+                      dotsClassName="text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-3 mt-md-0">
+                      {recommended.map((p, i) => (
+                        <div className="js-slide products-group" key={p.id}>
+                          <ProductCard product={p} listName="recommended" index={i} innerClassName="product-item__inner px-wd-4 p-2 p-md-3" wishlistLabel="Favori" />
+                        </div>
+                      ))}
+                    </Carousel>
+                  </div>
+                </div>
               )}
-              <span className="text-black">{categoryName}</span>
-            </nav>
 
-            <div className="flex items-center">
-              <button
-                onClick={openFilter}
-                className="flex items-center gap-2 text-sm hover:opacity-60 transition-opacity pr-6"
-                data-testid="filter-btn-desktop"
-              >
-                <span className="text-xl leading-none font-light" aria-hidden="true">+</span>
-                <span>Filtreleme{activeCount > 0 ? ` (${activeCount})` : ""}</span>
-              </button>
-
-              <div className="relative pr-6">
-                <button
-                  onClick={() => setSortOpen((v) => !v)}
-                  className="text-sm hover:opacity-60 transition-opacity"
-                  data-testid="sort-btn-desktop"
-                >
-                  Sıralama Seçiniz
-                </button>
+              <div className="flex-center-between mb-3">
+                <h1 className="font-size-25 mb-0">{categoryName}</h1>
+                <p className="font-size-14 text-gray-90 mb-0" data-testid="result-count">{showing}</p>
               </div>
-
-              <div className="flex items-center gap-3 border-l border-gray-200 pl-6">
-                <span className="text-sm">Görünüm</span>
-                {[1, 2, 4].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setGridCols(n)}
-                    data-testid={`grid-desktop-${n}`}
-                    aria-label={`${n}'li görünüm`}
-                    className={`text-sm tabular-nums transition-colors ${gridCols === n ? "font-bold text-black underline underline-offset-4" : "text-gray-400 hover:text-black"}`}
-                  >
-                    {n}
+              <div className="bg-gray-1 flex-center-between borders-radius-9 py-1">
+                <div className="d-xl-none">
+                  <button type="button" className="btn btn-sm py-1 font-weight-normal" onClick={() => setFilterOpen(true)} data-testid="filter-btn">
+                    <i className="fas fa-sliders-h" /> <span className="ml-1">Filtreler{activeCount ? ` (${activeCount})` : ""}</span>
                   </button>
-                ))}
+                </div>
+                <div className="px-3 d-none d-xl-block">
+                  <ul className="nav nav-tab-shop" role="tablist">
+                    {[["grid", "fa fa-th", "Izgara"], ["grid-ext", "fa fa-align-justify", "Geniş ızgara"], ["list", "fa fa-list", "Liste"], ["list-small", "fa fa-th-list", "Küçük liste"]].map(([v, icon, label]) => (
+                      <li className="nav-item" key={v}>
+                        <a href={`#${v}`} className={`nav-link${view === v ? " active" : ""}`} onClick={(e) => { e.preventDefault(); setView(v); }} aria-label={label} title={label} data-testid={`grid-${v}`}>
+                          <div className="d-md-flex justify-content-md-center align-items-md-center"><i className={icon} /></div>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="d-flex">
+                  <div className="dropdown bootstrap-select js-select dropdown-select max-width-200 max-width-160-sm right-dropdown-0 px-2 px-xl-0 el-native-select">
+                    <button type="button" tabIndex={-1} aria-hidden="true" className="btn dropdown-toggle btn-sm bg-white font-weight-normal py-2 border text-gray-20 bg-lg-down-transparent border-lg-down-0">
+                      <div className="filter-option"><div className="filter-option-inner"><div className="filter-option-inner-inner">{(SORTS.find((s) => s.value === `${sort}:${order}`) || SORTS[0]).label}</div></div></div>
+                    </button>
+                    <select value={`${sort}:${order}`} onChange={(e) => applySort(e.target.value)} aria-label="Sıralama" data-testid="sort-btn">
+                      {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="ml-2 d-none d-xl-block dropdown bootstrap-select js-select dropdown-select max-width-120 el-native-select">
+                    <button type="button" tabIndex={-1} aria-hidden="true" className="btn dropdown-toggle btn-sm bg-white font-weight-normal py-2 border text-gray-20 bg-lg-down-transparent border-lg-down-0">
+                      <div className="filter-option"><div className="filter-option-inner"><div className="filter-option-inner-inner">{limit} Göster</div></div></div>
+                    </button>
+                    <select value={limit} onChange={(e) => setParam((nx) => { nx.set("limit", e.target.value); nx.delete("page"); })} aria-label="Sayfa başına ürün">
+                      {PER_PAGE.map((n) => <option key={n} value={n}>{n} Göster</option>)}
+                    </select>
+                  </div>
+                </div>
+                <nav className="px-3 flex-horizontal-center text-gray-20 d-none d-xl-flex" aria-label="Sayfa">
+                  <form className="min-width-50 mr-1" onSubmit={(e) => { e.preventDefault(); const v = parseInt(e.currentTarget.elements.p.value, 10); if (v >= 1 && v <= pages) setPage(v); }}>
+                    <input name="p" key={page} size="2" min="1" max={pages} step="1" type="number" className="form-control text-center px-2 height-35" defaultValue={page} aria-label="Sayfa numarası" />
+                  </form> / {pages}
+                  <button type="button" className="btn btn-link text-gray-30 font-size-20 ml-2 p-0" onClick={() => page < pages && setPage(page + 1)} disabled={page >= pages} aria-label="Sonraki sayfa">→</button>
+                </nav>
               </div>
+
+              <div className="tab-content">
+                <div className="tab-pane fade pt-2 show active" role="tabpanel">
+                  {loading ? (
+                    <ul className="row list-unstyled products-group no-gutters">
+                      {[...Array(8)].map((_, i) => <li key={i} className="col-6 col-md-3 p-3"><div className="el-skel" style={{ height: 300 }} /></li>)}
+                    </ul>
+                  ) : list.length === 0 ? (
+                    <div className="text-center py-10" data-testid="category-empty">
+                      <p className="font-size-16 text-gray-90">Bu kategoride ürün bulunamadı.</p>
+                      {activeCount > 0 && <button type="button" onClick={clearAll} className="btn btn-primary-dark-w px-5 rounded-pill">Filtreleri Temizle</button>}
+                    </div>
+                  ) : view === "list" || view === "list-small" ? (
+                    <ul className={`d-block list-unstyled products-group ${view === "list" ? "prodcut-list-view" : "prodcut-list-view-small"}`}>
+                      {list.map((p, i) => <ProductCard key={p.id} product={p} as="li" variant="listview" listName={slug || "all"} index={i} />)}
+                    </ul>
+                  ) : (
+                    <ul className="row list-unstyled products-group no-gutters" data-testid="product-grid">
+                      {list.map((p, i) => (
+                        <ProductCard key={p.id} product={p} as="li" listName={slug || "all"} index={i} wishlistLabel="Favori"
+                          className={view === "grid-ext" ? "col-6 col-md-4 col-wd-3 product-item__card" : "col-6 col-md-3 col-wd-2gdot4"} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {pages > 1 && (
+                <nav className="d-md-flex justify-content-between align-items-center border-top pt-3" aria-label="Sayfalama">
+                  <div className="text-center text-md-left mb-3 mb-md-0">{showing}</div>
+                  <ul className="pagination mb-0 pagination-shop justify-content-center justify-content-md-start">
+                    {page > 1 && <li className="page-item"><button type="button" className="page-link" onClick={() => setPage(page - 1)} aria-label="Önceki">‹</button></li>}
+                    {pageNums.map((n) => (
+                      <li className="page-item" key={n}><button type="button" className={`page-link${n === page ? " current" : ""}`} onClick={() => setPage(n)} aria-current={n === page ? "page" : undefined}>{n}</button></li>
+                    ))}
+                    {page < pages && <li className="page-item"><button type="button" className="page-link" onClick={() => setPage(page + 1)} aria-label="Sonraki">›</button></li>}
+                  </ul>
+                </nav>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Sıralama menüsü — mobil ve masaüstü butonlarının ortak açılır penceresi */}
-        {sortOpen && (
+        {/* Mobil filtre paneli (off-canvas) */}
+        {filterOpen && (
           <>
-            <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} aria-hidden="true" />
-            <div className="absolute right-4 md:right-10 z-20 bg-white border border-gray-200 shadow-lg min-w-[220px] py-1">
-              {sortOptions.map((o) => {
-                const cur = `${sort}:${order}` === o.value;
-                return (
-                  <button
-                    key={o.value}
-                    onClick={() => applySort(o.value)}
-                    className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${cur ? "font-semibold text-black" : "text-gray-600"}`}
-                  >
-                    {o.label} {cur && <Check size={14} />}
-                  </button>
-                );
-              })}
-            </div>
+            <div className="el-backdrop" onClick={() => setFilterOpen(false)} aria-hidden="true" />
+            <aside className="u-sidebar u-sidebar--left el-anim-left el-filter-sidebar" role="dialog" aria-modal="true" aria-label="Filtreler" data-testid="filter-drawer">
+              <div className="u-sidebar__scroller">
+                <div className="u-sidebar__container">
+                  <div className="position-absolute top-0 right-0 z-index-2 pt-4 pr-4 bg-white">
+                    <button type="button" className="close ml-auto" onClick={() => setFilterOpen(false)} aria-label="Kapat"><i className="ec ec-close-remove text-gray-90 font-size-20" /></button>
+                  </div>
+                  <div className="u-sidebar__body"><div className="u-sidebar__content pt-6">{sidebar}</div></div>
+                </div>
+              </div>
+            </aside>
           </>
         )}
-
-        {/* Products Grid */}
-        <div className="py-8">
-          {loading ? (
-            <div className={`grid ${gridClass[gridCols]} gap-x-[2px] gap-y-3 md:gap-y-4`}>
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="aspect-[2/3] bg-gray-100 mb-3" />
-                  <div className="h-3 bg-gray-100 w-1/3 mb-2" />
-                  <div className="h-4 bg-gray-100 w-3/4 mb-2" />
-                  <div className="h-4 bg-gray-100 w-1/4" />
-                </div>
-              ))}
-            </div>
-          ) : products.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-gray-500">Bu kategoride ürün bulunamadı</p>
-              {activeCount > 0 && (
-                <button
-                  onClick={() => { setSearchParams({}); }}
-                  className="mt-4 text-sm underline hover:no-underline"
-                >
-                  Filtreleri temizle
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className={`grid ${gridClass[gridCols]} gap-x-[2px] gap-y-3 md:gap-y-4`}>
-              {dedupeColorGroups(products).map((product, idx) => (
-                <ProductCard key={product.id} product={product} listName={slug || "all"} index={idx} />
-              ))}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {pages > 1 && (
-            <div className="flex justify-center items-center gap-2 mt-12">
-              {[...Array(pages)].map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setPage(i + 1)}
-                  className={`w-10 h-10 text-sm transition-colors ${
-                    page === i + 1 ? "bg-black text-white" : "border border-gray-300 hover:border-black"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Filter Drawer (Mango usulü) — soldan açılır, taslak seçim + alt "Ürünleri Göster" */}
-      <div
-        className={`fixed inset-0 z-40 transition-opacity duration-300 ${
-          filterOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-      >
-        <div className="absolute inset-0 bg-black/40" onClick={() => setFilterOpen(false)} />
-      </div>
-      <aside
-        className={`fixed left-0 top-0 bottom-0 w-[88%] max-w-sm bg-white z-50 flex flex-col transition-transform duration-300 ease-out ${
-          filterOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-        aria-hidden={!filterOpen}
-        data-testid="filter-drawer"
-      >
-        {/* Başlık */}
-        <div className="flex items-center justify-between px-5 h-14 border-b shrink-0">
-          <h3 className="text-sm font-medium tracking-wide">Filtrele</h3>
-          <button onClick={() => setFilterOpen(false)} aria-label="Kapat">
-            <X size={20} strokeWidth={1.5} />
-          </button>
-        </div>
-
-        {/* İçerik */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-8">
-          {/* Sıralama */}
-          <section>
-            <h4 className="text-[11px] uppercase tracking-[0.18em] text-gray-500 mb-3">Sırala</h4>
-            <div className="flex flex-wrap gap-2">
-              {sortOptions.map((o) => (
-                <button
-                  key={o.value}
-                  onClick={() => setStSort(o.value)}
-                  className={`px-3 h-9 text-xs border transition-colors ${
-                    stSort === o.value ? "border-black bg-black text-white" : "border-gray-300 hover:border-black"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* Beden */}
-          {facetSizes.length > 0 && (
-            <section>
-              <h4 className="text-[11px] uppercase tracking-[0.18em] text-gray-500 mb-3">Beden</h4>
-              <div className="flex flex-wrap gap-2">
-                {facetSizes.map((s) => {
-                  const on = stSizes.includes(s);
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => toggleSize(s)}
-                      className={`min-w-[44px] h-9 px-3 text-xs border transition-colors ${
-                        on ? "border-black bg-black text-white" : "border-gray-300 hover:border-black"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Renk */}
-          {facetColors.length > 0 && (
-            <section>
-              <h4 className="text-[11px] uppercase tracking-[0.18em] text-gray-500 mb-3">Renk</h4>
-              <div className="flex flex-wrap gap-3">
-                {facetColors.map((c) => {
-                  const on = stColors.includes(c);
-                  const col = resolveColor(c);
-                  let style, fb = false;
-                  if (col?.type === "solid") style = { backgroundColor: col.value };
-                  else if (col?.type === "multi") style = { background: MULTI_GRADIENT };
-                  else { fb = true; style = { background: "#e5e5e5" }; }
-                  const light = col?.type === "solid" && needsBorder(col.value);
-                  return (
-                    <button
-                      key={c}
-                      onClick={() => toggleColor(c)}
-                      className="flex flex-col items-center gap-1.5 w-14"
-                      title={c}
-                    >
-                      <span
-                        className={`w-8 h-8 rounded-full transition-all ${
-                          on ? "ring-2 ring-offset-2 ring-black" : light ? "border border-gray-300" : "border border-black/10"
-                        }`}
-                        style={style}
-                      >
-                        {fb && <span className="block w-full h-full" />}
-                      </span>
-                      <span className={`text-[10px] leading-tight text-center line-clamp-1 ${on ? "text-black font-medium" : "text-gray-500"}`}>
-                        {c}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Fiyat */}
-          <section>
-            <h4 className="text-[11px] uppercase tracking-[0.18em] text-gray-500 mb-3">Fiyat Aralığı</h4>
-            <div className="flex items-center gap-2">
-              <input
-                type="number" inputMode="numeric" placeholder="Min ₺"
-                value={stMin}
-                onChange={(e) => setStMin(e.target.value)}
-                className="w-1/2 border border-gray-300 px-3 h-10 text-sm focus:border-black outline-none"
-              />
-              <span className="text-gray-400">–</span>
-              <input
-                type="number" inputMode="numeric" placeholder="Max ₺"
-                value={stMax}
-                onChange={(e) => setStMax(e.target.value)}
-                className="w-1/2 border border-gray-300 px-3 h-10 text-sm focus:border-black outline-none"
-              />
-            </div>
-          </section>
-
-          {/* Kategoriler */}
-          {categories.length > 0 && (
-            <section>
-              <h4 className="text-[11px] uppercase tracking-[0.18em] text-gray-500 mb-3">Kategoriler</h4>
-              <div className="space-y-1">
-                {categories.map((cat) => (
-                  <a
-                    key={cat.id}
-                    href={`/${slugify(cat.name || cat.slug || "")}`}
-                    className={`block text-sm py-2 px-3 transition-colors ${
-                      slug === cat.slug ? "bg-black text-white" : "hover:bg-gray-100"
-                    }`}
-                  >
-                    {cat.name}
-                  </a>
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-
-        {/* Alt çubuk — Temizle + Ürünleri Göster */}
-        <div className="border-t px-5 py-3 flex items-center gap-3 shrink-0">
-          <button
-            onClick={clearFilters}
-            className="text-sm text-gray-600 hover:text-black underline underline-offset-2"
-          >
-            Temizle
-          </button>
-          <button
-            onClick={applyFilters}
-            className="flex-1 h-11 bg-black text-white text-sm tracking-wide hover:bg-gray-900 transition-colors inline-flex items-center justify-center gap-2"
-            data-testid="apply-filters-btn"
-          >
-            <Check size={16} strokeWidth={2} /> Ürünleri Göster
-          </button>
-        </div>
-      </aside>
-
+      </main>
       <Footer />
     </div>
   );

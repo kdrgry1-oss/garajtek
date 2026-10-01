@@ -170,3 +170,12 @@
 /* Karşılaştırma tablosu */
 .electro .el-compare-img { width: 150px; height: 140px; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
 .electro .el-compare-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* Yazı logosu (Electro logosunun stiline yakın: kalın, sıkı harf aralığı + sarı nokta) */
+.electro .el-logo {
+  display: inline-flex; align-items: baseline; font-family: "Open Sans", Arial, Helvetica, sans-serif;
+  font-weight: 800; letter-spacing: -0.06em; line-height: 1; color: #333e48; white-space: nowrap;
+}
+.electro .el-logo__dot { display: inline-block; width: .27em; height: .27em; margin-left: .06em; border-radius: 50%; background: var(--electro-primary); }
+.electro .bg-primary-down-lg .el-logo__dot { background: #333e48; }
+@media (min-width: 1200px) { .electro .bg-primary-down-lg .el-logo__dot { background: var(--electro-primary); } }

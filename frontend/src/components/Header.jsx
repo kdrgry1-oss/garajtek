@@ -363,7 +363,7 @@ function HeaderIcons({ variant, onMobileSearch, mobileSearchOpen }) {
         <button type="button" onClick={() => setMiniOpen((v) => !v)} className="btn btn-link p-0 text-gray-90 position-relative d-flex align-items-center" title="Sepet" aria-haspopup="true" aria-expanded={miniOpen} data-testid="cart-btn">
           <i className="font-size-22 ec ec-shopping-bag" />
           <span className={badgeCls}>{itemCount}</span>
-          <span className="d-none d-xl-block font-weight-bold font-size-16 text-gray-90 ml-3" data-testid="header-cart-total">{fmtPrice(sum)}</span>
+          <span className="d-none d-xl-block font-weight-bold font-size-16 text-gray-90 ml-3 text-nowrap" data-testid="header-cart-total">{fmtPrice(sum)}</span>
         </button>
         {miniOpen && (
           <div className="cart-dropdown dropdown-menu dropdown-unfold show border-top border-top-primary mt-3 border-width-2 border-left-0 border-right-0 border-bottom-0 left-auto right-0 el-anim-up" data-testid="mini-cart">

@@ -96,3 +96,11 @@ export function findBySlug(tree, slug) {
   }
   return null;
 }
+
+/** Bir düğümün kendisi + tüm alt kategori id'leri (string). */
+export function descendantIds(node) {
+  const out = new Set();
+  const walk = (n) => { if (!n) return; out.add(String(n.id)); (n.children || []).forEach(walk); };
+  walk(node);
+  return out;
+}

@@ -1,0 +1,17 @@
+# GarajTek mail sunucusu — yedeklenmesi gereken yollar (garajtek-mail backup bunları arşivler).
+# deploy/backup.sh bu dosyayı okuyup tar ile R2'ye de yükleyebilir (bkz. deploy/mail/README.md › Yedekleme).
+/var/mail/vhosts
+/etc/dovecot/users
+/etc/dovecot/local.conf
+/etc/postfix/vmailbox
+/etc/postfix/virtual
+/etc/postfix/main.cf
+/etc/postfix/master.cf
+/etc/postfix/sasl_passwd
+/etc/postfix/sender_login_maps.pcre
+/etc/opendkim
+/etc/opendkim.conf
+/etc/garajtek-mail
+/var/lib/garajtek-mail
+/var/www/roundcube/config/config.inc.php
+/var/www/roundcube/db

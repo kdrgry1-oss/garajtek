@@ -68,6 +68,7 @@ import AutomationStatus from "./pages/admin/AutomationStatus";
 import SecurityDashboard from "./pages/admin/SecurityDashboard";
 import SystemHealth from "./pages/admin/SystemHealth";
 import SecretsVault from "./pages/admin/SecretsVault";
+import MailServer from "./pages/admin/MailServer";
 import IysAdmin from "./pages/admin/IysAdmin";
 import ReportsExtended from "./pages/admin/ReportsExtended";
 import MobileApp from "./pages/admin/MobileApp";
@@ -150,6 +151,7 @@ export default function AdminApp() {
         <Route path="islem-gecmisi" element={<ActivityHistory />} />
         <Route path="sistem-sagligi" element={<SystemHealth />} />
         <Route path="secrets-vault" element={<SecretsVault />} />
+        <Route path="mail-yonetimi" element={<MailServer />} />
         <Route path="iys" element={<IysAdmin />} />
         <Route path="mobil-uygulama" element={<MobileApp />} />
         <Route path="ai-asistan" element={<AIAssistant />} />

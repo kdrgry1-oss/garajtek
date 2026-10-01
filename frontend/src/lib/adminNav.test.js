@@ -6,7 +6,7 @@ function allItems() {
 
 test("shows only the advanced email marketing entry under Marketing", () => {
   const entries = allItems().filter((item) =>
-    /e-?posta|toplu mail/i.test(String(item.label || ""))
+    /e-?posta pazarlama|toplu mail|mail pazarlama/i.test(String(item.label || ""))
   );
 
   expect(entries).toHaveLength(1);

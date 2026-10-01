@@ -58,7 +58,7 @@ DEFAULTS = {
     "DKIM_DIR": "/etc/opendkim/keys",
     "DEFAULT_QUOTA": "1G",
     "BACKUP_DIR": "/var/backups/garajtek",
-    "BACKUP_KEEP": "3",
+    "BACKUP_KEEP": "2",
     "DNS_RESOLVER": "1.1.1.1",
     "WEBMAIL_URL": "",
 }
@@ -896,6 +896,11 @@ def cmd_backup(args):
                          "/var/www/roundcube/config/config.inc.php", "/var/www/roundcube/db"]
              if os.path.exists(p)]
     os.makedirs(CONF["BACKUP_DIR"], mode=0o700, exist_ok=True)
+    # Küçük disk koruması: tahmini boyutun 2 katı boş yer yoksa yedek alma (diski doldurmasın)
+    est = sum(du_bytes(p) if os.path.isdir(p) else os.path.getsize(p) for p in paths)
+    free = shutil.disk_usage(CONF["BACKUP_DIR"]).free
+    if free < est * 2 + 200 * 1024 * 1024:
+        raise CliError("Yedek için yetersiz disk: gerekli ~%d MB, boş %d MB" % (est * 2 // 2**20, free // 2**20))
     stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M")
     out = os.path.join(CONF["BACKUP_DIR"], "mail-%s.tar.gz" % stamp)
     run(["tar", "--warning=no-file-changed", "-czpf", out, "--absolute-names", "--"] + paths,

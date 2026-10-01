@@ -17,7 +17,7 @@ import Footer from "../components/Footer";
 import ProductCard, { CardPrice, useProductActions } from "../components/ProductCard";
 import Carousel from "../components/electro/Carousel";
 import Countdown from "../components/electro/Countdown";
-import useCategoryTree from "../components/electro/useCategoryTree";
+import useCategoryTree, { descendantIds } from "../components/electro/useCategoryTree";
 import { optimizeImg, firstImage, galleryImages } from "../lib/img";
 import { trackSelectPromotion } from "../lib/dataLayer";
 import { dedupeColorGroups } from "../lib/colorGroups";
@@ -245,8 +245,8 @@ function Products414({ roots }) {
   const left = list.slice(1, 5);
   const right = list.slice(5, 9);
   const tabsList = [{ label: "En İyi Fırsatlar" }, ...cats.map((c) => ({ label: c.name }))];
-  const cell = (p) => (
-    <ProductCard key={p.id} product={p} as="li" className="col-xl-6 col-wd-6 product-item max-width-xl-100 remove-divider"
+  const cell = (p, i) => (
+    <ProductCard key={p.id} product={p} as="li" className={`col-xl-6 max-width-xl-100 remove-divider${i >= 2 ? " d-md-none d-wd-block" : ""}`}
       innerClassName="product-item__inner bg-white p-3" />
   );
   return (
@@ -656,8 +656,9 @@ export default function Home() {
     banner4 = smallBanners.map((b) => ({ image: b.image_url || b.image, link: b.link_url || b.link || "/", full: true, title: b.title }));
   } else if (roots.length) {
     banner4 = roots.slice(0, 4).map((c) => {
-      const sample = newest.find((p) => String(p.category_id) === String(c.id)) || null;
-      return { image: c.image_url || c.image || (sample ? firstImage(sample) : ""), link: `/${c.slug}`, pre: "EN İYİ", strong: "FIRSATLAR", post: c.name.toLocaleUpperCase("tr") };
+      const ids = descendantIds(c);
+      const sample = newest.find((p) => ids.has(String(p.category_id))) || null;
+      return { image: c.image_url || c.image || (sample ? firstImage(sample) : ""), link: `/${c.slug}`, pre: "", strong: c.name.toLocaleUpperCase("tr"), post: "FIRSATLARI" };
     });
   }
 

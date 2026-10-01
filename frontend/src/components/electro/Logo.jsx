@@ -3,25 +3,23 @@ import { Link } from "react-router-dom";
 import { useStoreInfo } from "../../lib/storeInfo";
 import { SITE_NAME } from "../../lib/brand";
 
-export function LogoMark({ name, width = 175, height = 42 }) {
+export function LogoMark({ name, size = 40 }) {
   const text = String(name || SITE_NAME || "garajtek").toLocaleLowerCase("tr").replace(/\s+/g, "");
-  // Uzun adlarda viewBox genişler, görünür boyut sabit kalır.
-  const vbW = Math.max(120, text.length * 21 + 14);
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${vbW} 42`} role="img" aria-label={name || SITE_NAME} style={{ marginBottom: 0 }}>
-      <text x="0" y="33" fontFamily="'Open Sans', Arial, Helvetica, sans-serif" fontSize="38" fontWeight="800" letterSpacing="-1.5" fill="#333E48">{text}</text>
-      <circle className="ellipse-bg" cx={vbW - 8} cy="30" r="5.3" fill="var(--electro-primary, #FDD700)" />
-    </svg>
+    <span className="el-logo" style={{ fontSize: size }} aria-hidden="true">
+      {text}<span className="el-logo__dot" />
+    </span>
   );
 }
 
 export default function Logo({ className = "", onClick, width, height }) {
   const info = useStoreInfo();
+  const name = info.name && info.name !== "Mağaza" ? info.name : (SITE_NAME !== "Mağaza" ? SITE_NAME : "GarajTek");
   return (
-    <Link to="/" className={className} aria-label={info.name || SITE_NAME} onClick={onClick} data-testid="header-logo">
+    <Link to="/" className={className} aria-label={name} onClick={onClick} data-testid="header-logo">
       {info.logo
-        ? <img src={info.logo} alt={info.name || SITE_NAME} style={{ maxHeight: height || 42, maxWidth: width || 175, width: "auto" }} />
-        : <LogoMark name={info.name && info.name !== "Mağaza" ? info.name : "garajtek"} width={width} height={height} />}
+        ? <img src={info.logo} alt={name} style={{ maxHeight: height || 42, maxWidth: width || 175, width: "auto" }} />
+        : <LogoMark name={name} size={height ? Math.round(height * 0.95) : 40} />}
     </Link>
   );
 }

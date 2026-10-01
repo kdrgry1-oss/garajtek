@@ -68,7 +68,7 @@ export default function Carousel({
   const items = Children.toArray(children).filter(Boolean);
 
   return (
-    <div className={`js-slick-carousel u-slick el-carousel position-relative ${className}`} style={style} aria-roledescription="carousel" aria-label={ariaLabel} data-testid={testId}>
+    <div className={`js-slick-carousel u-slick slick-initialized el-carousel position-relative ${className}`} style={style} aria-roledescription="carousel" aria-label={ariaLabel} data-testid={testId}>
       <div className="el-carousel__viewport" ref={emblaRef}>
         <div className={`el-carousel__track ${trackClassName}`}>
           {items.map((child, i) => (

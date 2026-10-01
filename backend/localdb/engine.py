@@ -418,6 +418,15 @@ def _expand_update(doc, update, idents):
     return out
 
 
+def _uses_all_positional(update) -> bool:
+    if not isinstance(update, dict):
+        return False
+    for fields in update.values():
+        if isinstance(fields, dict) and any("$[" in p for p in fields):
+            return True
+    return False
+
+
 def _normalize_sort(sort):
     if not sort:
         return None
@@ -661,7 +670,7 @@ class LCollection(_MMCollection):
         validate_is_mapping("filter", filter)
         update = _roundtrip_value(update)
         with self._writing():
-            if array_filters and not replace:
+            if not replace and (array_filters or _uses_all_positional(update)):
                 raw = self._update_with_array_filters(filter, update, upsert, multi,
                                                       array_filters)
             else:
@@ -673,7 +682,7 @@ class LCollection(_MMCollection):
             raise OperationFailure("arrayFilters may not be specified for pipeline-style updates")
         filter = helpers.patch_datetime_awareness_in_document(filter)
         idents: Dict[str, dict] = {}
-        for f in _roundtrip_value(list(array_filters)):
+        for f in _roundtrip_value(list(array_filters or [])):
             for k, v in f.items():
                 idents.setdefault(k.split(".", 1)[0], {})[k] = v
         gen = self._iter_documents(filter)
@@ -1033,7 +1042,10 @@ class Engine:
                 if doc is None:
                     dels.append(key)
                 else:
-                    ups.append((key, bson.encode(doc)))
+                    blob = bson.encode(doc)
+                    ups.append((key, blob))
+                    # Keep memory byte-identical to disk (ms datetimes, Int64, lists...).
+                    docs[k] = bson.decode(blob, DECODE_OPTS)
             self.storage.write(dbname, st.name, ups, dels)
         except Exception:
             logger.critical("localdb: failed to persist %d change(s) in %s.%s — in-memory "

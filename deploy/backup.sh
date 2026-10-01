@@ -5,6 +5,7 @@
 #   store.db  — SQLite ÇEVRİMİÇİ yedeği (servis durmadan; `python -m localdb.backup`)
 #   dotenv    — backend/.env (SECRETS_MASTER_KEY olmadan panel şifreleri çözülemez!)
 #   media/    — yüklenen görseller/videolar (MEDIA_DIR)
+#   mail.tar.gz — posta sunucusu kuruluysa (deploy/mail): kutular, kullanıcılar, DKIM anahtarları
 # Yerelde son BACKUP_KEEP (varsayılan 7) yedek tutulur. BACKUP_R2_BUCKET tanımlıysa sunucu
 # DIŞINA (Cloudflare R2, özel bucket) da yüklenir; BACKUP_PASSPHRASE varsa AES-256 ile şifrelenir.
 set -euo pipefail
@@ -62,6 +63,17 @@ fi
 cp "$ENVF" "$WORK/dotenv"
 members=(dotenv)
 [ -f "$WORK/store.db" ] && members+=(store.db)
+# Posta sunucusu (deploy/mail) kuruluysa onun yedeği de aynı arşive (ve R2'ye) girer
+if [ -x /usr/local/sbin/garajtek-mail ]; then
+  MAILBK=$(/usr/local/sbin/garajtek-mail backup --json 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("file",""))' 2>/dev/null || true)
+  if [ -n "$MAILBK" ] && [ -f "$MAILBK" ]; then
+    cp "$MAILBK" "$WORK/mail.tar.gz"
+    members+=(mail.tar.gz)
+  else
+    echo "uyarı: posta yedeği alınamadı (garajtek-mail backup)" >&2
+  fi
+fi
 TAR_ARGS=(-C "$WORK" "${members[@]}")
 if [ -n "$MEDIA_DIR" ] && [ -d "$MEDIA_DIR" ]; then
   TAR_ARGS+=(-C "$MEDIA_DIR" --transform 's,^\.,media,' .)

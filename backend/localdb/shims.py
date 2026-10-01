@@ -572,6 +572,185 @@ def _unary_math(fn):
     return handler
 
 
+def _bson_key(v):
+    from mongomock import filtering
+    return filtering.BsonComparable(v)
+
+
+def _numeric(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, bson.decimal128.Decimal128):
+        return float(v.to_decimal())
+    if isinstance(v, decimal.Decimal):
+        return float(v)
+    return None
+
+
+def _acc_sum(vals):
+    total = 0
+    for v in vals:
+        n = _numeric(v)
+        if n is not None:
+            total += n
+    return total
+
+
+def _acc_avg(vals):
+    nums = [n for n in (_numeric(v) for v in vals) if n is not None]
+    return (sum(nums) / len(nums)) if nums else None
+
+
+def _acc_max(vals):
+    vals = [v for v in vals if v is not None]
+    return max(vals, key=_bson_key) if vals else None
+
+
+def _acc_min(vals):
+    vals = [v for v in vals if v is not None]
+    return min(vals, key=_bson_key) if vals else None
+
+
+def _expr_accumulator(fn):
+    def handler(parser, args):
+        if isinstance(args, list) and len(args) != 1:
+            vals = [_p(parser, a) for a in args]
+        else:
+            if isinstance(args, list):
+                args = args[0]
+            v = _p(parser, args)
+            vals = v if isinstance(v, list) else [v]
+        return fn(vals)
+    return handler
+
+
+def _expr_first_last(index):
+    def handler(parser, args):
+        if isinstance(args, list) and len(args) == 1:
+            args = args[0]
+        v = _p(parser, args)
+        if not isinstance(v, list) or not v:
+            return None
+        return v[index]
+    return handler
+
+
+def _accumulate_group(output_fields, group_list):
+    """Mongo-faithful $group accumulators (mongomock turns falsy $addToSet values into None,
+    lacks $count and compares mixed types with Python ordering)."""
+    doc_dict = {}
+    for field, value in output_fields.items():
+        if field == "_id":
+            continue
+        for operator, key in value.items():
+            if operator == "$count":
+                doc_dict[field] = len(group_list)
+                continue
+            values = []
+            missing = []
+            for doc in group_list:
+                try:
+                    values.append(aggregate._parse_expression(key, doc))
+                    missing.append(False)
+                except KeyError:
+                    missing.append(True)
+            if operator == "$sum":
+                doc_dict[field] = _acc_sum(values)
+            elif operator == "$avg":
+                doc_dict[field] = _acc_avg(values)
+            elif operator == "$max":
+                doc_dict[field] = _acc_max(values)
+            elif operator == "$min":
+                doc_dict[field] = _acc_min(values)
+            elif operator in ("$first", "$last"):
+                if not group_list:
+                    doc_dict[field] = None
+                    continue
+                i = 0 if operator == "$first" else -1
+                # missing value in the first/last document -> null (MongoDB semantics)
+                if missing[i]:
+                    doc_dict[field] = None
+                else:
+                    doc_dict[field] = values[0] if i == 0 else values[-1]
+            elif operator == "$push":
+                doc_dict.setdefault(field, [])
+                doc_dict[field].extend(values)
+            elif operator == "$addToSet":
+                out = []
+                for v in values:
+                    if v not in out:
+                        out.append(v)
+                doc_dict[field] = out
+            elif operator == "$mergeObjects":
+                merged = {}
+                for v in values:
+                    if isinstance(v, dict):
+                        merged.update(v)
+                doc_dict[field] = merged
+            else:
+                raise NotImplementedError("Group operator %s is not supported by localdb"
+                                          % operator)
+    return doc_dict
+
+
+_MISSING = object()
+
+
+def _cmp_key(v):
+    from mongomock import filtering
+    if v is _MISSING:
+        return (0, 0)
+    return (1, filtering.BsonComparable(v))
+
+
+def _bson_cmp(a, b):
+    ka, kb = _cmp_key(a), _cmp_key(b)
+    if ka[0] != kb[0]:
+        return -1 if ka[0] < kb[0] else 1
+    if ka[0] == 0:
+        return 0
+    if ka[1] < kb[1]:
+        return -1
+    if kb[1] < ka[1]:
+        return 1
+    return 0
+
+
+def _comparison(test):
+    def handler(parser, args):
+        if not isinstance(args, list) or len(args) != 2:
+            raise OperationFailure("comparison operators take exactly 2 arguments")
+        a = _p(parser, args[0], missing=_MISSING)
+        b = _p(parser, args[1], missing=_MISSING)
+        return test(_bson_cmp(a, b))
+    return handler
+
+
+def _op_filter(parser, args):
+    arr = _p(parser, args.get("input"))
+    if arr is None:
+        return None
+    if not isinstance(arr, list):
+        raise OperationFailure("input to $filter must be an array")
+    name = args.get("as", "this")
+    out = []
+    for item in arr:
+        sub = aggregate._Parser(parser._doc_dict, dict(parser._user_vars, **{name: item}),
+                                ignore_missing_keys=parser._ignore_missing_keys)
+        try:
+            ok = helpers.mongodb_to_bool(sub.parse(args["cond"]))
+        except KeyError:
+            ok = False
+        if ok:
+            out.append(item)
+    limit = args.get("limit")
+    if limit is not None:
+        out = out[:int(_p(parser, limit))]
+    return out
+
+
 _EXTRA_OPERATORS = {
     "$convert": _op_convert,
     "$toString": _simple(_to_string),
@@ -605,6 +784,20 @@ _EXTRA_OPERATORS = {
     "$round": _op_round,
     "$mod": _op_mod,
     "$abs": _unary_math(abs),
+    "$sum": _expr_accumulator(_acc_sum),
+    "$avg": _expr_accumulator(_acc_avg),
+    "$max": _expr_accumulator(_acc_max),
+    "$min": _expr_accumulator(_acc_min),
+    "$eq": _comparison(lambda c: c == 0),
+    "$ne": _comparison(lambda c: c != 0),
+    "$gt": _comparison(lambda c: c > 0),
+    "$gte": _comparison(lambda c: c >= 0),
+    "$lt": _comparison(lambda c: c < 0),
+    "$lte": _comparison(lambda c: c <= 0),
+    "$cmp": _comparison(lambda c: c),
+    "$filter": _op_filter,
+    "$first": _expr_first_last(0),
+    "$last": _expr_first_last(-1),
 }
 
 
@@ -781,6 +974,7 @@ def apply():
     _APPLIED = True
     _patch_type_conversions()
     _patch_parser()
+    aggregate._accumulate_group = _accumulate_group
     aggregate._PIPELINE_HANDLERS["$lookup"] = _handle_lookup_stage
     aggregate._PIPELINE_HANDLERS["$replaceWith"] = _handle_replace_with
     aggregate._PIPELINE_HANDLERS["$unset"] = _handle_unset_stage
