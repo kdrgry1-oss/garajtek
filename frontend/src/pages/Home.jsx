@@ -1,1064 +1,769 @@
-import { useState, useEffect, useRef } from "react";
+// Ana sayfa — Electro "Home v1" düzeni.
+// Veri kaynakları korunur: Admin › Tasarım › Sayfa Blokları (/page-blocks?page=home) + Admin ›
+// Bannerlar (/banners) + ürün/kategori API'leri. Admin verisi olmayan bölümler ürün/kategori
+// verisinden otomatik doldurulur (öne çıkanlar, indirimdekiler, çok satanlar, yeni ürünler).
+//   hero_slider   → Electro hero slider (sol tarafta "Tüm Kategoriler" menüsüne yer bırakır)
+//   half_banners  → 4'lü "fırsat" banner şeridi
+//   product_slider→ Electro ürün karuseli (başlık + sekme çizgisi)
+//   full_banner   → tam genişlik banner
+//   text_block / video_banner / instashop → Electro bölüm başlığıyla
+//   rotating_text / countdown_bar → header üst barları
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Play, ArrowRight, Instagram, ShoppingBag, X } from "lucide-react";
 import axios from "axios";
-import { toast } from "sonner";
 import Header from "../components/Header";
 import RotatingText from "../components/RotatingText";
 import Footer from "../components/Footer";
-import ProductCard from "../components/ProductCard";
-import { useCart } from "../context/CartContext";
-import { optimizeImg, aspectFromDims, firstImage } from "../lib/img";
+import ProductCard, { CardPrice, useProductActions } from "../components/ProductCard";
+import Carousel from "../components/electro/Carousel";
+import Countdown from "../components/electro/Countdown";
+import useCategoryTree from "../components/electro/useCategoryTree";
+import { optimizeImg, firstImage, galleryImages } from "../lib/img";
 import { trackSelectPromotion } from "../lib/dataLayer";
 import { dedupeColorGroups } from "../lib/colorGroups";
+import { fmtPrice, priceOf, productHref } from "../components/electro/format";
 import { useStoreInfo } from "../lib/storeInfo";
 import { socialUrl } from "../lib/brand";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-
-// Default/Fallback content — mağazaya özel görsel/link koda GÖMÜLMEZ. Vitrin içeriği
-// Admin › Tasarım › Sayfa Blokları'ndan (page-blocks) gelir; yoksa sade ürün ızgarası.
-const DEFAULT_HERO_BANNERS = []; // { image, link } — boş: slayt görselleri panelden
-const DEFAULT_INSTASHOP = [];
-
-// Bir slayt görsel mi video mu — uzantıdan belirlenir (aynı images[] dizisi ikisini de taşır).
 const isVideoUrl = (u) => typeof u === "string" && /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(u);
+const promo = (id, name) => { try { trackSelectPromotion({ promotionId: id, promotionName: name }); } catch (_) { /* silent */ } };
 
-// Block Components
-function HeroSlider({ block }) {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const images = block?.images?.length > 0 ? block.images : DEFAULT_HERO_BANNERS.map(b => b.image);
-  const links = block?.links || DEFAULT_HERO_BANNERS.map(b => b.link);
-  const videoRefs = useRef({});
-
-  useEffect(() => {
-    if (images.length > 1) {
-      const interval = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % images.length);
-      }, 6000);
-      return () => clearInterval(interval);
-    }
-  }, [images.length]);
-
-  // PERFORMANS: yalnızca AKTİF slaytın videosu oynatılır; diğerleri duraklatılır.
-  // Böylece birden çok video aynı anda decode edilip sistemi/anasayfayı yormaz.
-  useEffect(() => {
-    Object.entries(videoRefs.current).forEach(([i, v]) => {
-      if (!v) return;
-      if (Number(i) === currentSlide) { const p = v.play?.(); if (p?.catch) p.catch(() => {}); }
-      else { try { v.pause?.(); } catch (_) { /* noop */ } }
-    });
-  }, [currentSlide, images.length]);
-
-  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % images.length);
-  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + images.length) % images.length);
-
-  // Görselin gerçek en-boy oranı: admin panelinde kaydedilmiş img_dims varsa onu
-  // kullan; yoksa tarayıcıda <img> yüklenince gerçek pikseli oku (loadedDims) —
-  // hangi ölçüde görsel yüklendiyse container o orana göre şekillenir, kırpma olmaz.
-  const [loadedDims, setLoadedDims] = useState({}); // { [index]: [w, h] }
-  const handleImgLoad = (index) => (e) => {
-    const { naturalWidth: w, naturalHeight: h } = e.target;
-    if (w && h) {
-      setLoadedDims((prev) => (prev[index] ? prev : { ...prev, [index]: [w, h] }));
-    }
-  };
-
-  const savedDims = block?.settings?.img_dims;
-  const dimsFor = (index) => (savedDims && savedDims[index]) || loadedDims[index] || null;
-  const fallbackDims = (block?.settings?.img_width ? [block.settings.img_width, block.settings.img_height] : null);
-  const activeDims = dimsFor(currentSlide) || fallbackDims;
-  const aspect = aspectFromDims(activeDims, "16 / 9");
-
-  return (
-    <section className="relative" data-testid="hero-slider">
-      <div className="relative overflow-hidden w-full bg-stone-100 transition-[aspect-ratio] duration-300" style={{ aspectRatio: aspect }}>
-        {images.map((img, index) => (
-          <Link
-            key={index}
-            to={links[index] || "/"}
-            onClick={() => {
-              try {
-                trackSelectPromotion({
-                  promotionId: `hero_${index + 1}`,
-                  promotionName: block?.title || links[index] || `Hero ${index + 1}`,
-                });
-              } catch (_) { /* silent */ }
-            }}
-            className={`absolute inset-0 block transition-opacity duration-700 ${index === currentSlide ? "opacity-100 z-10" : "opacity-0"}`}
-          >
-            {isVideoUrl(img) ? (
-              <video
-                ref={(el) => { videoRefs.current[index] = el; }}
-                src={img}
-                className="w-full h-full object-cover block"
-                muted
-                loop
-                playsInline
-                autoPlay={index === 0}
-                // İlk slayt hazır olsun; diğer videolar yalnızca sıraları gelince yüklenir (bant genişliği + hız).
-                preload={index === 0 ? "auto" : "none"}
-                width={dimsFor(index)?.[0]}
-                height={dimsFor(index)?.[1]}
-                onLoadedMetadata={(e) => {
-                  const w = e.target.videoWidth, h = e.target.videoHeight;
-                  if (w && h) setLoadedDims((prev) => (prev[index] ? prev : { ...prev, [index]: [w, h] }));
-                }}
-              />
-            ) : (
-              <img
-                src={optimizeImg(img, 1920, 78)}
-                alt={block?.title || ""}
-                className="w-full h-full object-cover block"
-                fetchPriority={index === 0 ? "high" : "auto"}
-                loading={index === 0 ? "eager" : "lazy"}
-                decoding="async"
-                width={dimsFor(index)?.[0]}
-                height={dimsFor(index)?.[1]}
-                onLoad={handleImgLoad(index)}
-              />
-            )}
-          </Link>
-        ))}
-      </div>
-      {images.length > 1 && (
-        <>
-          <button onClick={prevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white/80 flex items-center justify-center hover:bg-white">
-            <ChevronLeft size={20} />
-          </button>
-          <button onClick={nextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white/80 flex items-center justify-center hover:bg-white">
-            <ChevronRight size={20} />
-          </button>
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-            {images.map((_, i) => (
-              <button key={i} onClick={() => setCurrentSlide(i)} className={`w-2 h-2 rounded-full ${i === currentSlide ? 'bg-black' : 'bg-white/70'}`} />
-            ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
+function splitPrice(n) {
+  const v = Number(n) || 0;
+  const int = Math.floor(v);
+  const dec = Math.round((v - int) * 100);
+  return { int: int.toLocaleString("tr-TR"), dec: String(dec).padStart(2, "0") };
 }
 
-// Dikey Editorial Akış (Zara/OYSHO mobil stili) — her slayt TAM EKRAN (100svh), NORMAL akışta
-// alt alta. OTOMATİK KAYMA YOK: parmakla/scroll ile bir sonraki slayta geçilir; son slayttan
-// sonra sayfa (ürünler) doğal olarak devam eder. Video slaytlar yalnızca EKRANDAYKEN oynar
-// (IntersectionObserver, performans). İlk slaytta ince "aşağı kaydır" ipucu.
-// Tek slaytın medyası + yazısı (hem tekli hem sticky slider için ortak).
-function HeroSlide({ img, cap, title, vidRef, eager, onDims }) {
+/* ---------------------------------------------------------------- Hero */
+function HeroSlider({ slides }) {
+  if (!slides.length) return null;
   return (
-    <>
-      {isVideoUrl(img) ? (
-        <video
-          ref={vidRef}
-          src={img}
-          className="absolute inset-0 w-full h-full object-cover"
-          muted loop playsInline
-          preload={eager ? "auto" : "none"}
-          onLoadedMetadata={(e) => { const w = e.target.videoWidth, h = e.target.videoHeight; if (w && h) onDims?.(w, h); }}
-        />
-      ) : (
-        <img
-          src={optimizeImg(img, 1920, 80)}
-          alt={cap.title || title || ""}
-          className="absolute inset-0 w-full h-full object-cover"
-          loading={eager ? "eager" : "lazy"}
-          fetchPriority={eager ? "high" : "auto"}
-          decoding="async"
-          onLoad={(e) => { const w = e.target.naturalWidth, h = e.target.naturalHeight; if (w && h) onDims?.(w, h); }}
-        />
-      )}
-      {/* Yazılar YALNIZCA admin girmişse çıkar (görselde zaten yazı varsa çift olmaz). */}
-      {(cap.eyebrow || cap.title || cap.cta) && (
-        <>
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,.42), rgba(0,0,0,0) 45%)" }} />
-          <div className="absolute left-5 md:left-10 bottom-16 md:bottom-24 z-10 text-white max-w-[82%]">
-            {cap.eyebrow ? <div className="text-[11px] tracking-[0.32em] uppercase opacity-90 mb-2">{cap.eyebrow}</div> : null}
-            {cap.title ? <div className="text-3xl md:text-5xl font-light tracking-wide leading-tight">{cap.title}</div> : null}
-            {cap.cta ? <div className="mt-3 text-[11px] tracking-[0.24em] uppercase inline-block border-b border-white/70 pb-1">{cap.cta}</div> : null}
-          </div>
-        </>
-      )}
-    </>
-  );
-}
-
-/**
- * HeroEditorial — Zara Home tarzı DİKEY TAM-EKRAN slider (fullpage / jest tabanlı).
- * Yalnızca 1. slayt görünür; 2/3/4 ekran DIŞINDA gizli. TEK bir kaydırma/swipe = TEK slayt
- * (parmağı takip etmez, uzun kaydırma beklemez). Slaytlar arasında SAYFA KAYMAZ → scrollY 0'da
- * kalır → header tüm slider boyunca ŞEFFAF/BEYAZ (logo+ikonlar slider üzerine biner). Son slayttan
- * sonra bir kaydırma daha yapınca hero serbest kalır ve sayfa normal aşağı iner.
- */
-function HeroEditorial({ block, isFirst = false }) {
-  const images = block?.images?.length > 0 ? block.images : DEFAULT_HERO_BANNERS.map(b => b.image);
-  const links = block?.links || DEFAULT_HERO_BANNERS.map(b => b.link);
-  const captions = block?.settings?.captions || [];
-  const n = images.length;
-  const vids = useRef({});
-  const sectionRef = useRef(null);
-  const [active, setActive] = useState(0);
-  const activeRef = useRef(0);
-  const lockRef = useRef(false);
-  const touchStart = useRef(null);
-  const safeActive = Math.min(active, Math.max(0, n - 1));
-  useEffect(() => { activeRef.current = safeActive; }, [safeActive]);
-
-  // Görsel KENDİ oranında görünsün — container'ı doldurmak için 100vh'ye ZORLAMA (kırpma yok).
-  // Aktif slaytın gerçek en-boy oranı: yüklenen doğal piksel (öncelik) → kayıtlı img_dims → yedek.
-  const [loadedDims, setLoadedDims] = useState({});
-  const savedDims = block?.settings?.img_dims;
-  const dimsFor = (i) => loadedDims[i] || (savedDims && savedDims[i]) || null;
-  const heroAspect = aspectFromDims(dimsFor(safeActive), "4 / 5");
-
-  // Şeffaf-overlay KALDIRILDI (Option A): header home'da da SOLID → data-hero-overlay artık
-  // yazılmaz. Kalıntı bırakmamak için bir kez temizle (header rengini bozmaz).
-  useEffect(() => {
-    try { document.documentElement.removeAttribute("data-hero-overlay"); } catch (_) { /* noop */ }
-  }, []);
-
-  // Jest yakalama: hero ekranı tam kapladığında ve sınır slaytta değilken tek kaydırma = tek slayt.
-  useEffect(() => {
-    if (n <= 1) return;
-    const el = sectionRef.current;
-    if (!el) return;
-
-    const covering = () => {
-      const r = el.getBoundingClientRect();
-      const vh = window.innerHeight || 1;
-      // Header/duyuru barı ofsetine toleranslı: hero ekranın çoğunu kaplıyorsa jest aktif.
-      return r.top < vh * 0.4 && r.bottom > vh * 0.5;
-    };
-    // dir +1 = sonraki slayt (yukarı kaydır), -1 = önceki (aşağı kaydır)
-    const canHijack = (dir) => {
-      if (!covering()) return false;
-      const a = activeRef.current;
-      if (dir > 0 && a >= n - 1) return false; // son slayttan sonra → sayfa aksın
-      if (dir < 0 && a <= 0) return false;      // ilk slayttan önce → sayfa aksın
-      return true;
-    };
-    const go = (dir) => {
-      if (lockRef.current) return;
-      if (!canHijack(dir)) return;
-      lockRef.current = true;
-      setActive((cur) => Math.min(n - 1, Math.max(0, cur + dir)));
-      setTimeout(() => { lockRef.current = false; }, 620);
-    };
-
-    const onWheel = (e) => {
-      const dir = e.deltaY > 0 ? 1 : -1;
-      if (!canHijack(dir)) return;   // sınırda → tarayıcı normal kaydırsın
-      e.preventDefault();            // hero içindeyken sayfayı kaydırma, slayt değiştir
-      go(dir);
-    };
-    const onTouchStart = (e) => { touchStart.current = e.touches[0].clientY; };
-    const onTouchMove = (e) => {
-      if (touchStart.current == null) return;
-      const dy = touchStart.current - e.touches[0].clientY; // + yukarı
-      const dir = dy > 0 ? 1 : -1;
-      if (Math.abs(dy) > 6 && canHijack(dir)) e.preventDefault(); // sayfa kaymasın
-    };
-    const onTouchEnd = (e) => {
-      if (touchStart.current == null) return;
-      const endY = (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : touchStart.current);
-      const dy = touchStart.current - endY;
-      touchStart.current = null;
-      if (Math.abs(dy) < 30) return;          // küçük dokunuş → yok say
-      go(dy > 0 ? 1 : -1);                     // tek swipe = tek slayt
-    };
-
-    window.addEventListener("wheel", onWheel, { passive: false });
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", onTouchEnd, { passive: true });
-    return () => {
-      window.removeEventListener("wheel", onWheel);
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
-    };
-  }, [n]);
-
-  // Video: yalnızca aktif slayt oynar
-  useEffect(() => {
-    Object.entries(vids.current).forEach(([i, v]) => {
-      if (!v) return;
-      if (Number(i) === safeActive) { const p = v.play?.(); if (p?.catch) p.catch(() => {}); }
-      else { try { v.pause?.(); } catch (_) { /* noop */ } }
-    });
-  }, [safeActive, n]);
-
-  return (
-    <section
-      ref={sectionRef}
-      data-testid="hero-editorial"
-      className="relative w-full overflow-hidden bg-stone-100"
-      // Şeffaf-overlay KALDIRILDI (Option A): header artık home'da da SOLID + normal akış/sticky.
-      // Hero, üstteki solid şeridin (barlar + header) ALTINDA doğal akışta başlar → marginTop
-      // offset'e GEREK YOK (örtme/zıplama yok, üstü kesilmez). 100vh + jest + slaytlar korunur.
-      style={{ aspectRatio: heroAspect, marginTop: 0 }}
-    >
-      {images.map((img, i) => {
-        const cap = captions[i] || {};
-        const isActive = i === safeActive;
-        // GEÇİŞ EFEKTİ: varsayılan "stack/creative" (Swiper 'creative' benzeri, Swiper'sız/saf CSS).
-        // Admin settings.hero_transition = "kaydir" derse eski klasik dikey kayma kullanılır.
-        //  - STACK: geçmiş+aktif slaytlar YERİNDE durur (translateY 0), üzerine gelen slayt ALTTAN
-        //    biner (100%→0); zIndex=i → sonraki slayt öncekinin ÜSTÜNE örtülür; giden slayt SABİT
-        //    kalıp GÖLGELENİR (covered → koyu overlay). Geri kaydırınca üstteki slayt aşağı iner.
-        //  - KAYDIR: aktif 0, diğerleri (i-active)*100 → ikisi birlikte hareket eder (klasik).
-        const _stack = (block?.settings?.hero_transition || "stack") !== "kaydir";
-        const offset = _stack ? (i <= safeActive ? 0 : 100) : (i - safeActive) * 100;
-        const passed = _stack && i < safeActive;   // üstü örtülen (arkada, gölgeli) slayt
-        const zi = _stack ? i + 1 : (isActive ? 2 : 1);
-        return (
-          <div
-            key={i}
-            className="absolute inset-0 will-change-transform"
-            style={{
-              transform: `translateY(${offset}%)`,
-              transition: "transform .62s cubic-bezier(0.22,1,0.36,1)",
-              zIndex: zi,
-            }}
-            aria-hidden={!isActive}
-          >
-            <Link
-              to={links[i] || "/"}
-              onClick={() => { try { trackSelectPromotion({ promotionId: `hero_${i + 1}`, promotionName: cap.title || links[i] || `Hero ${i + 1}` }); } catch (_) { /* silent */ } }}
-              className="block w-full h-full"
-              tabIndex={isActive ? 0 : -1}
-            >
-              <HeroSlide img={img} cap={cap} title={block?.title} vidRef={(el) => { vids.current[i] = el; }} eager={i === 0}
-                onDims={(w, h) => setLoadedDims((prev) => (prev[i] ? prev : { ...prev, [i]: [w, h] }))} />
-            </Link>
-            {/* Giden slaytın 'gölge' hissi (Swiper creativeEffect.prev.shadow karşılığı) — yalnız stack modunda */}
-            <div
-              className="pointer-events-none absolute inset-0 bg-black"
-              style={{ opacity: passed ? 0.4 : 0, transition: "opacity .62s cubic-bezier(0.22,1,0.36,1)" }}
-              aria-hidden="true"
-            />
-          </div>
-        );
-      })}
-
-      {/* Sağ dikey ilerleme göstergesi (tıklanabilir) */}
-      {n > 1 && (
-        <div className="absolute right-4 md:right-6 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2">
-          {images.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`Slayt ${i + 1}`}
-              onClick={() => { if (!lockRef.current) { lockRef.current = true; setActive(i); setTimeout(() => { lockRef.current = false; }, 620); } }}
-              className={`w-[3px] rounded-full transition-all duration-300 ${i === safeActive ? "h-7 bg-white" : "h-2 bg-white/45 hover:bg-white/70"}`}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-// Görseli YÜKLENDİĞİ en-boy oranında, KIRPMADAN gösterir. Container oranı = görsel oranı
-// olduğundan object-cover kırpmaz (tam oturur). Kayıtlı boyut (dims) varsa onu kullanır;
-// yoksa görsel yüklenince gerçek pikselinden okur → hangi boyutta yüklersen o oranda görünür.
-function NaturalImg({ src, dims, alt = "", w = 1920, fallback = "16 / 9", imgClass = "" }) {
-  const [d, setD] = useState(dims && dims.length === 2 ? dims : null);
-  const aspect = aspectFromDims(d, fallback);
-  return (
-    <div className="w-full bg-stone-100" style={{ aspectRatio: aspect }}>
-      <img
-        src={optimizeImg(src, w)}
-        alt={alt}
-        className={`w-full h-full object-cover block ${imgClass}`}
-        loading="lazy"
-        decoding="async"
-        onLoad={(e) => {
-          const nw = e.target.naturalWidth, nh = e.target.naturalHeight;
-          if (!d && nw && nh) setD([nw, nh]);
-        }}
-      />
-    </div>
-  );
-}
-
-function FullBanner({ block }) {
-  if (!block?.images?.[0]) return null;
-  return (
-    <Link to={block.links?.[0] || "/"} className="block w-full" data-testid="full-banner">
-      <NaturalImg src={block.images[0]} dims={block?.settings?.img_dims?.[0]} alt={block.title || ""} w={1920} fallback="16 / 6" />
-    </Link>
-  );
-}
-
-function HalfBanners({ block }) {
-  if (!block?.images || block.images.length < 2) return null;
-  // Her görsel KENDİ yüklendiği oranda, kırpılmadan gösterilir. Farklı oranlar olabileceğinden
-  // sütunlar üstten hizalanır (items-start). Admin block.settings.aspect verirse o zorlanır.
-  const forced = block?.settings?.aspect || null;
-  return (
-    <div className="grid grid-cols-2 items-start" data-testid="half-banners">
-      {block.images.slice(0, 2).map((img, index) => (
-        <Link key={index} to={block.links?.[index] || "/"} className="block overflow-hidden">
-          {forced ? (
-            <div className="w-full bg-stone-100" style={{ aspectRatio: forced }}>
-              <img src={optimizeImg(img, 1000)} alt="" className="w-full h-full object-cover block" loading="lazy" decoding="async" />
-            </div>
-          ) : (
-            <NaturalImg src={img} dims={block?.settings?.img_dims?.[index]} w={1000} fallback="4 / 5" />
-          )}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function ProductSlider({ block, products }) {
-  const selectedIds = block?.settings?.product_ids;
-  const source = block?.settings?.source || (selectedIds?.length > 0 ? "manual" : "newest");
-  const limit = block?.settings?.limit || 8;
-  const [feed, setFeed] = useState(null); // kaynak bazlı çekilen ürünler
-
-  // Favoriler / indirim / kategori kaynakları ana sayfa listesinde olmayabilir —
-  // backend slider-feed ucundan kendi verisini çeker. manual/newest eski davranış.
-  useEffect(() => {
-    if (source === "manual" || source === "newest") { setFeed(null); return; }
-    let alive = true;
-    const cids = (block?.settings?.category_ids || []).join(",");
-    axios
-      .get(`${API}/products/slider-feed?source=${source}&limit=${limit}${cids ? `&category_ids=${encodeURIComponent(cids)}` : ""}`)
-      .then((r) => { if (alive) setFeed(r.data?.products || []); })
-      .catch(() => { if (alive) setFeed([]); });
-    return () => { alive = false; };
-  }, [source, limit, JSON.stringify(block?.settings?.category_ids || [])]);
-
-  // TÜM hook'lar erken return'den ÖNCE çağrılmalı (React kuralı — #310).
-  const scrollRef = useRef(null);
-
-  let displayProducts;
-  if (source !== "manual" && source !== "newest") {
-    displayProducts = feed || [];
-  } else if (selectedIds && selectedIds.length > 0) {
-    // Show only the selected products in the configured order
-    displayProducts = selectedIds
-      .map(id => products?.find(p => p._id === id || p.id === id))
-      .filter(Boolean);
-  } else {
-    displayProducts = dedupeColorGroups(products?.slice(0, limit * 2) || [])
-      .slice(0, limit);
-  }
-
-  if (displayProducts.length === 0) return null;
-
-  const defaultCtaLink = source === "discounted" ? "/sale" : "/en-yeniler";
-  const title = block?.title;
-  const subtitle = block?.settings?.subtitle;
-  const ctaLabel = block?.settings?.cta_label || "Tümünü Gör";
-  const ctaHref = block?.settings?.cta_link || defaultCtaLink;
-  // Kaç satır alt alta (yatay kayan slider içinde 1–3)
-  const rows = Math.max(1, Math.min(Number(block?.settings?.rows) || 1, 3));
-  const scrollByDir = (dir) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * Math.round(el.clientWidth * 0.85), behavior: "smooth" });
-  };
-
-  // Blok yönetiminden ayarlanabilir arka plan (ör. krem #EFECE6) — boşsa şeffaf kalır
-  const sectionBg = block?.settings?.bg_color || "";
-  return (
-    <section className="w-full py-10 md:py-14" style={sectionBg ? { backgroundColor: sectionBg } : undefined} data-testid="product-slider">
-      {/* Başlık bloğu — girildiyse: sol büyük başlık (site fontu) + alt yazı, sağda "Tümünü Gör →"
-          (2. görsel tarzı). Standalone alt "Tümünü Gör" butonu kaldırıldı. */}
-      {(title || subtitle) && (
-        <div className="max-w-screen-2xl mx-auto px-4 md:px-6 mb-6 md:mb-9">
-          {/* Masaüstü: [boşluk | başlık+altyazı ortada | CTA sağda]; ALT HİZALARI aynı
-              (items-end → 'Tümünü Gör' alt çizgisi, alt-yazı 'Koleksiyonumuzdan...' satırıyla hizalı) */}
-          <div className="hidden md:flex items-end justify-between gap-4">
-            <div className="flex-1" />
-            <div className="text-center">
-              {title && <h2 className="text-5xl font-light tracking-tight text-black leading-none">{title}</h2>}
-              {subtitle && <p className="mt-3 text-[15px] text-gray-500 font-light max-w-md mx-auto leading-relaxed">{subtitle}</p>}
-            </div>
-            <div className="flex-1 flex justify-end">
-              <Link to={ctaHref} className="inline-flex items-center gap-2 text-[11px] tracking-[0.24em] uppercase text-gray-600 hover:text-black border-b border-gray-600 hover:border-black pb-1 transition-colors whitespace-nowrap">
-                {ctaLabel} <ArrowRight size={13} />
-              </Link>
-            </div>
-          </div>
-          {/* Mobil: ortalı başlık + altyazı + CTA */}
-          <div className="md:hidden text-center">
-            {title && <h2 className="text-3xl font-light tracking-tight text-black leading-none">{title}</h2>}
-            {subtitle && <p className="mt-3 text-sm text-gray-500 font-light max-w-md mx-auto leading-relaxed">{subtitle}</p>}
-            <Link to={ctaHref} className="mt-4 mx-auto w-fit flex items-center gap-1.5 text-[10px] tracking-[0.18em] uppercase text-gray-600 hover:text-black border-b border-gray-600 hover:border-black pb-1 transition-colors whitespace-nowrap">
-              {ctaLabel} <ArrowRight size={13} />
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Yatay kayan ürün slider'ı — N satır. Kartlar yan yana, kaydırılır (mobilde peek).
-          Masaüstünde sol/sağ oklarla da kaydırılır (ana slider gibi). */}
-      <div className="relative">
-        <div ref={scrollRef} className="overflow-x-auto scrollbar-hide snap-x px-4 md:px-6 scroll-smooth">
-          <div
-            className="grid grid-flow-col auto-cols-[46%] sm:auto-cols-[31%] md:auto-cols-[23%] lg:auto-cols-[19%] gap-x-2 gap-y-6"
-            style={{ gridTemplateRows: `repeat(${rows}, auto)` }}
-          >
-            {displayProducts.map((product) => (
-              <div key={product.id} className="snap-start">
-                <ProductCard product={product} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Oklar — yalnızca masaüstü (mobilde parmakla kaydırma yeterli). */}
-        {displayProducts.length > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={() => scrollByDir(-1)}
-              aria-label="Önceki ürünler"
-              className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/95 shadow-md ring-1 ring-black/5 items-center justify-center text-black hover:bg-black hover:text-white transition-colors"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollByDir(1)}
-              aria-label="Sonraki ürünler"
-              className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/95 shadow-md ring-1 ring-black/5 items-center justify-center text-black hover:bg-black hover:text-white transition-colors"
-            >
-              <ChevronRight size={20} />
-            </button>
-          </>
-        )}
-      </div>
-
-    </section>
-  );
-}
-
-// "Shop the Look" modalı — kombindeki ürünleri getirir, beden seçtirir, DOĞRUDAN sepete ekler.
-function ShopLookModal({ post, onClose }) {
-  const { addItem } = useCart();
-  const [products, setProducts] = useState(post.products || []);
-  const [loading, setLoading] = useState(true);
-  const [justAdded, setJustAdded] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const base = post.products || [];
-      const full = await Promise.all(base.map(async (pr) => {
-        try {
-          const slug = String(pr.url || "").replace(/^\//, "") || pr.id;
-          const r = await axios.get(`${API}/products/${slug}`);
-          return { ...pr, ...r.data };
-        } catch { return { ...pr }; }
-      }));
-      if (alive) { setProducts(full); setLoading(false); }
-    })();
-    return () => { alive = false; };
-  }, [post]);
-
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
-  }, [onClose]);
-
-  const sizesOf = (p) => {
-    const vs = Array.isArray(p.variants) ? p.variants : [];
-    const map = new Map();
-    vs.forEach((v) => {
-      const s = v.size || v.name || "";
-      if (!s) return;
-      const cur = map.get(s) || { size: s, stock: 0, variant: v };
-      cur.stock += Number(v.stock) || 0;
-      map.set(s, cur);
-    });
-    return [...map.values()];
-  };
-  // Site mantığı (ProductCard ile aynı): beden pill'ine TIKLAYINCA doğrudan sepete ekler.
-  const addSize = (p, s) => {
-    if (s.stock <= 0) { toast.error("Bu beden tükendi"); return; }
-    addItem(p, s.variant, 1);
-    toast.success(`Sepete eklendi · Beden ${s.size}`);
-    setJustAdded(true);
-  };
-  const addNoSize = (p) => { addItem(p, null, 1); toast.success("Sepete eklendi"); setJustAdded(true); };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full sm:max-w-3xl bg-white sm:rounded-2xl rounded-t-2xl max-h-[92vh] sm:max-h-[86vh] overflow-hidden flex flex-col sm:flex-row shadow-2xl"
-        onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} aria-label="Kapat"
-          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white">
-          <X size={16} />
-        </button>
-        {/* Look görseli yalnız masaüstünde — TAM görünsün (kırpma yok) */}
-        <div className="hidden sm:flex sm:w-[45%] shrink-0 bg-gray-50 items-center justify-center">
-          <img src={optimizeImg(post.image, 900)} alt="" className="max-w-full max-h-full w-auto h-auto object-contain" />
-        </div>
-        <div className="w-full sm:w-[55%] flex flex-col min-h-0">
-          <div className="px-4 pt-4 pb-3 border-b">
-            <h3 className="text-lg font-light tracking-wide text-black">Bu Kombindeki Ürünler</h3>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {loading && <p className="text-sm text-gray-400 text-center py-10">Yükleniyor…</p>}
-            {!loading && products.length === 0 && <p className="text-sm text-gray-400 text-center py-10">Ürün bulunamadı.</p>}
-            {!loading && products.map((p) => {
-              const sizes = sizesOf(p);
-              const listP = Number(p.price) || 0;
-              const price = p.sale_price && p.sale_price < listP ? p.sale_price : listP;
-              const href = p.url || `/${p.slug || p.id}`;
-              return (
-                <div key={p.id} className="flex gap-3 border rounded-xl p-2.5">
-                  <Link to={href} onClick={onClose} className="shrink-0">
-                    <img src={optimizeImg(firstImage(p), 200)} alt={p.name || p.title || ""}
-                      className="w-20 h-24 object-cover rounded-lg bg-gray-100" loading="lazy" />
-                  </Link>
-                  <div className="flex-1 min-w-0 flex flex-col">
-                    <Link to={href} onClick={onClose} className="text-sm leading-snug line-clamp-2 hover:underline text-black">
-                      {p.name || p.title}
-                    </Link>
-                    <div className="mt-0.5 flex items-baseline gap-1.5">
-                      <span className="text-sm font-semibold text-black">{Number(price).toLocaleString("tr-TR")} TL</span>
-                      {listP > 0 && price < listP && (
-                        <span className="text-xs text-gray-400 line-through">{listP.toLocaleString("tr-TR")} TL</span>
-                      )}
+    <div className="mb-5" data-testid="hero-slider">
+      <div className="bg-img-hero bg-gray-1 el-hero-bg">
+        <div className="container min-height-420 overflow-hidden">
+          <Carousel perView={{ base: 1 }} loop autoplay={6000} ariaLabel="Kampanyalar"
+            dotsClassName="text-center position-absolute right-0 bottom-0 left-0 u-slick__pagination u-slick__pagination--long justify-content-start mb-3 mb-md-4 offset-xl-3 pl-2 pb-1">
+            {slides.map((s, i) => (s.image && !s.product ? (
+              <Link key={i} to={s.link || "/"} className="d-block position-relative min-height-420 el-hero-slide"
+                onClick={() => promo(`hero_${i + 1}`, s.title || s.link || `Hero ${i + 1}`)}>
+                {isVideoUrl(s.image) ? (
+                  <video className="el-hero-img" src={s.image} muted loop playsInline autoPlay={i === 0} preload={i === 0 ? "auto" : "none"} />
+                ) : (
+                  <picture>
+                    {s.mobileImage && <source media="(max-width: 767px)" srcSet={optimizeImg(s.mobileImage, 800)} />}
+                    <img className="el-hero-img" src={optimizeImg(s.image, 1920, 78)} alt={s.title || ""} fetchPriority={i === 0 ? "high" : "auto"} loading={i === 0 ? "eager" : "lazy"} decoding="async" />
+                  </picture>
+                )}
+                {(s.title || s.eyebrow || s.cta) && (
+                  <div className="row min-height-420 py-7 py-md-0 position-relative">
+                    <div className="offset-xl-3 col-xl-4 col-8 mt-md-8">
+                      {s.title && <h1 className="font-size-46 text-lh-57 font-weight-light">{s.title}</h1>}
+                      {s.eyebrow && <h6 className="font-size-15 font-weight-bold mb-3">{s.eyebrow}</h6>}
+                      {s.cta && <span className="btn btn-primary transition-3d-hover rounded-lg font-weight-normal py-2 px-md-7 px-3 font-size-16">{s.cta}</span>}
                     </div>
-                    {sizes.length > 0 ? (
-                      <>
-                        <p className="text-[10px] text-gray-400 mt-1.5 mb-1">Beden seç · sepete ekle</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {sizes.map((s) => {
-                            const oos = s.stock <= 0;
-                            return (
-                              <button key={s.size} disabled={oos} onClick={() => addSize(p, s)}
-                                title={oos ? `${s.size} · Tükendi` : `${s.size} · Sepete ekle`}
-                                className={`min-w-[36px] px-2 h-8 text-[12px] border transition-colors ${oos ? "text-gray-300 border-gray-100 line-through cursor-not-allowed" : "border-gray-300 text-gray-800 hover:bg-black hover:text-white hover:border-black"}`}>
-                                {s.size}
-                              </button>
-                            );
-                          })}
+                  </div>
+                )}
+              </Link>
+            ) : (
+              <div key={i} className="js-slide bg-img-hero-center">
+                <div className="row min-height-420 py-7 py-md-0">
+                  <div className="offset-xl-3 col-xl-4 col-6 mt-md-8">
+                    <h1 className="font-size-64 text-lh-57 font-weight-light">
+                      {s.line1}<span className="d-block font-size-55">{s.line2}</span>
+                    </h1>
+                    <h6 className="font-size-15 font-weight-bold mb-3 el-line-2">{s.subtitle}</h6>
+                    {s.price != null && (
+                      <div className="mb-4">
+                        <span className="font-size-13">BAŞLAYAN FİYATLARLA</span>
+                        <div className="font-size-50 font-weight-bold text-lh-45">
+                          {splitPrice(s.price).int}<sup>,{splitPrice(s.price).dec}</sup><sup className="font-size-25 ml-1">₺</sup>
                         </div>
-                      </>
-                    ) : (
-                      <button onClick={() => addNoSize(p)}
-                        className="mt-2 self-start inline-flex items-center gap-1.5 bg-black text-white text-xs px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                        <ShoppingBag size={13} /> Sepete Ekle
-                      </button>
+                      </div>
                     )}
+                    <Link to={s.link} onClick={() => promo(`hero_${i + 1}`, s.subtitle)} className="btn btn-primary transition-3d-hover rounded-lg font-weight-normal py-2 px-md-7 px-3 font-size-16">
+                      Hemen İncele
+                    </Link>
+                  </div>
+                  <div className="col-xl-5 col-6 d-flex align-items-center el-hero-media">
+                    {s.productImage && <img className="img-fluid" src={optimizeImg(s.productImage, 840)} alt={s.subtitle} width="416" height="420" fetchPriority={i === 0 ? "high" : "auto"} loading={i === 0 ? "eager" : "lazy"} />}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-          {/* Sepete eklendi onay çubuğu — Sepete Git / Alışverişe Devam Et */}
-          {justAdded && (
-            <div className="border-t bg-white p-3 flex items-center gap-2">
-              <Link to="/sepet" onClick={onClose}
-                className="flex-1 text-center bg-black text-white text-sm py-2.5 hover:bg-gray-800 transition-colors">
-                Sepete Git
-              </Link>
-              <button onClick={() => setJustAdded(false)}
-                className="flex-1 text-center border border-gray-300 text-sm py-2.5 hover:border-black transition-colors">
-                Alışverişe Devam Et
-              </button>
-            </div>
-          )}
+              </div>
+            )))}
+          </Carousel>
         </div>
       </div>
     </div>
   );
 }
 
-// Carousel karesi (dikey) — ürün bağlıysa "Shop The Look +" ile modal açar; değilse IG'ye gider.
-function ShopTile({ post, onShop }) {
-  const products = Array.isArray(post.products) ? post.products : [];
-  const hasProducts = products.length > 0;
-  const img = optimizeImg(post.image, 700);
-  const cls = "relative block h-full w-full overflow-hidden group";
-  if (!hasProducts) {
-    const href = post.product_link || post.permalink || null;
-    const external = !post.product_link && !!post.permalink;
-    const inner = (
-      <>
-        <img src={img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" loading="lazy" decoding="async" />
-        <span className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors flex items-center justify-center">
-          <Instagram size={22} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
-        </span>
-      </>
-    );
-    if (!href) return <div className={cls}>{inner}</div>;
-    return external
-      ? <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>{inner}</a>
-      : <Link to={href} className={cls}>{inner}</Link>;
-  }
+/* ------------------------------------------------- 4'lü fırsat banner'ı */
+function SmallBanners({ items }) {
+  if (!items.length) return null;
   return (
-    <button onClick={() => onShop(post)} className={`${cls} text-left`}>
-      <img src={img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" loading="lazy" decoding="async" />
-      <span className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-      <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 text-white text-xs sm:text-sm font-light tracking-wide drop-shadow-md">
-        <ShoppingBag size={14} strokeWidth={1.75} /> GET THE LOOK
-      </span>
-    </button>
+    <div className="mb-5" data-testid="half-banners">
+      <div className="row">
+        {items.slice(0, 4).map((b, i) => (
+          <div className="col-md-6 mb-4 mb-xl-0 col-xl-3" key={i}>
+            <Link to={b.link || "/"} className="d-black text-gray-90" onClick={() => promo(`banner_${i + 1}`, b.title || b.link)}>
+              {b.full ? (
+                <img className="img-fluid w-100" src={optimizeImg(b.image, 600)} alt={b.title || ""} loading="lazy" />
+              ) : (
+                <div className="min-height-132 py-1 d-flex bg-gray-1 align-items-center">
+                  <div className="col-6 col-xl-5 col-wd-6 pr-0">
+                    {b.image ? <img className="img-fluid el-banner-img" src={optimizeImg(b.image, 380)} alt="" loading="lazy" width="190" height="150" /> : null}
+                  </div>
+                  <div className="col-6 col-xl-7 col-wd-6">
+                    <div className="mb-2 pb-1 font-size-18 font-weight-light text-ls-n1 text-lh-23">
+                      {b.pre} <strong>{b.strong}</strong> {b.post}
+                    </div>
+                    <div className="link text-gray-90 font-weight-bold font-size-15">
+                      Hemen İncele
+                      <span className="link__icon ml-1"><span className="link__icon-inner"><i className="ec ec-arrow-right-categproes" /></span></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Link>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
-function InstaShop({ block }) {
-  // Mağazanın Instagram akışı: backend /instagram/feed. Boşsa bloktaki elle görsellere düşer.
-  const store = useStoreInfo();
-  const igUrl = socialUrl("instagram", store.instagram);
-  const igHandle = igUrl ? "@" + igUrl.replace(/\/+$/, "").split("/").pop().replace(/^@/, "") : "";
-  const [feed, setFeed] = useState(null);
-  const [modalPost, setModalPost] = useState(null);
-  const scrollerRef = useRef(null);
-  useEffect(() => {
-    let alive = true;
-    axios.get(`${API}/instagram/feed?limit=12`)
-      .then((r) => { if (alive) setFeed(r.data?.posts || []); })
-      .catch(() => { if (alive) setFeed([]); });
-    return () => { alive = false; };
-  }, []);
-
-  const blockImages = block?.images?.length > 0 ? block.images : DEFAULT_INSTASHOP.map(i => i.image);
-  const blockLinks = block?.links?.length > 0 ? block.links : DEFAULT_INSTASHOP.map(i => i.link);
-  const usingFeed = Array.isArray(feed) && feed.length > 0;
-  const posts = usingFeed
-    ? feed.slice(0, 12)
-    : blockImages.slice(0, 8).map((img, i) => ({ image: img, product_link: blockLinks[i] || "/", products: [] }));
-
-  const scrollBy = (dir) => {
-    const el = scrollerRef.current;
-    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
-  };
-
-  if (!posts.length) return null; // ne akış ne elle görsel var → bölümü gösterme
-
+/* --------------------------------------------- Günün fırsatı + sekmeler */
+function SpecialOffer({ product }) {
+  const a = useProductActions(product, { listName: "special_offer" });
+  const pv = priceOf(product);
+  const save = Math.max(0, pv.list - pv.display);
+  const stock = (product.variants || []).length
+    ? product.variants.reduce((s, v) => s + (Number(v.stock) || 0), 0)
+    : Number(product.stock) || 0;
+  const sold = Number(product.sold_count || product.sales_count || 0);
+  const pct = stock + sold > 0 ? Math.round((sold / (stock + sold)) * 100) : 30;
+  const end = useMemo(() => {
+    const e = product.campaign_end || product.sale_end_date;
+    if (e && new Date(e).getTime() > Date.now()) return e;
+    const d = new Date(); d.setHours(23, 59, 59, 0); return d.toISOString();
+  }, [product]);
   return (
-    <section className="pt-7 md:pt-10 pb-14 md:pb-20 bg-white" data-testid="instashop">
-      {/* Başlık + hemen altında Instagram daveti — ortalı */}
-      <div className="text-center mb-8 md:mb-10 px-4">
-        <h2 className="text-3xl md:text-5xl font-light tracking-tight text-black leading-none">Get The Look</h2>
-        {igUrl && (
-          <a href={igUrl} target="_blank" rel="noopener noreferrer"
-            className="mt-3.5 inline-flex items-center gap-2 text-sm md:text-[15px] font-light text-gray-500 hover:text-black border-b border-gray-300 hover:border-black pb-1 transition-colors">
-            <Instagram size={16} /> Instagram'da bize katılın {igHandle}
-          </a>
+    <div className="p-3 border border-width-2 border-primary borders-radius-20 bg-white min-width-370" data-testid="special-offer">
+      <div className="d-flex justify-content-between align-items-center m-1 ml-2">
+        <h3 className="font-size-22 mb-0 font-weight-normal text-lh-28 max-width-120">Günün Fırsatı</h3>
+        {save > 0 && (
+          <div className="d-flex align-items-center flex-column justify-content-center bg-primary rounded-pill height-75 width-75 text-lh-1">
+            <span className="font-size-12">Kazanç</span>
+            <div className="font-size-16 font-weight-bold">{Math.round(save).toLocaleString("tr-TR")} ₺</div>
+          </div>
         )}
       </div>
-      {/* Carousel — TAM GENİŞLİK (sağdan sola tüm alan) */}
-      <div className="relative group/car">
-        <button onClick={() => scrollBy(-1)} aria-label="Geri"
-          className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/95 shadow-lg items-center justify-center opacity-0 group-hover/car:opacity-100 transition hover:bg-white">
-          <ChevronLeft size={20} />
-        </button>
-        <button onClick={() => scrollBy(1)} aria-label="İleri"
-          className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/95 shadow-lg items-center justify-center opacity-0 group-hover/car:opacity-100 transition hover:bg-white">
-          <ChevronRight size={20} />
-        </button>
-        <div ref={scrollerRef}
-          className="flex gap-2 sm:gap-3 overflow-x-auto snap-x snap-mandatory px-3 md:px-4 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {posts.map((p, index) => (
-            <div key={p.id || index}
-              className="snap-start shrink-0 w-[72vw] sm:w-[46%] lg:w-[23.5%] aspect-[3/4] rounded-lg overflow-hidden bg-gray-100">
-              <ShopTile post={p} onShop={setModalPost} />
-            </div>
-          ))}
+      <div className="mb-4">
+        <Link to={a.href} onClick={a.select} className="d-block text-center">
+          <span className="el-img-box" style={{ aspectRatio: "320 / 300" }}>
+            <img className="img-fluid" src={optimizeImg(firstImage(product), 640)} alt={product.name} loading="lazy" width="320" height="300" />
+          </span>
+        </Link>
+      </div>
+      <h5 className="mb-2 font-size-14 text-center mx-auto max-width-180 text-lh-18">
+        <Link to={a.href} onClick={a.select} className="text-blue font-weight-bold">{product.name}</Link>
+      </h5>
+      <div className="d-flex align-items-center justify-content-center mb-3">
+        {pv.hasDiscount && <del className="font-size-18 mr-2 text-gray-2">{fmtPrice(pv.list)}</del>}
+        <ins className="font-size-30 text-red text-decoration-none">{fmtPrice(pv.display)}</ins>
+      </div>
+      <div className="mb-3 mx-2">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <span>Stokta: <strong>{stock}</strong></span>
+          {sold > 0 && <span>Satılan: <strong>{sold}</strong></span>}
+        </div>
+        <div className="rounded-pill bg-gray-3 height-20 position-relative">
+          <span className="position-absolute left-0 top-0 bottom-0 rounded-pill bg-primary" style={{ width: `${Math.min(100, Math.max(8, pct))}%` }} />
         </div>
       </div>
-      {modalPost && <ShopLookModal post={modalPost} onClose={() => setModalPost(null)} />}
-    </section>
+      <div className="mb-2">
+        <h6 className="font-size-15 text-gray-2 text-center mb-3">Acele edin! Fırsatın bitmesine:</h6>
+        <Countdown endDate={end} />
+      </div>
+    </div>
+  );
+}
+
+function TabbedGrid({ tabs, testId = "home-tabs" }) {
+  const avail = tabs.filter((t) => t.items.length);
+  const [active, setActive] = useState(0);
+  if (!avail.length) return null;
+  const cur = avail[Math.min(active, avail.length - 1)];
+  return (
+    <div data-testid={testId}>
+      <div className="position-relative bg-white text-center z-index-2">
+        <ul className="nav nav-classic nav-tab justify-content-center" role="tablist">
+          {avail.map((t, i) => (
+            <li className="nav-item" key={t.key}>
+              <a href={`#${t.key}`} role="tab" aria-selected={cur.key === t.key} className={`nav-link${cur.key === t.key ? " active" : ""}`}
+                onClick={(e) => { e.preventDefault(); setActive(i); }}>
+                <div className="d-md-flex justify-content-md-center align-items-md-center">{t.label}</div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="tab-content">
+        <div className="tab-pane fade pt-2 show active" role="tabpanel">
+          <ul className="row list-unstyled products-group no-gutters">
+            {cur.items.slice(0, 6).map((p, i) => (
+              <ProductCard key={p.id} product={p} as="li" listName={cur.key} index={i}
+                className={`col-6 col-wd-3 col-md-4${i === 2 ? " remove-divider-xl" : ""}${i === 3 ? " remove-divider-wd" : ""}${i >= 4 ? " d-wd-none" : ""}`} />
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------- 4-1-4 kategori sekmeli ürün grubu */
+function Products414({ roots }) {
+  const cats = roots.slice(0, 8);
+  const [active, setActive] = useState(0);
+  const [items, setItems] = useState({});
+  const key = active === 0 ? "__best" : cats[active - 1]?.slug;
+  useEffect(() => {
+    if (!key || items[key]) return undefined;
+    let alive = true;
+    const url = key === "__best" ? `${API}/products?limit=9&sort=popular` : `${API}/products?limit=9&sort=popular&category=${encodeURIComponent(key)}`;
+    axios.get(url).then((r) => { if (alive) setItems((m) => ({ ...m, [key]: r.data?.products || [] })); })
+      .catch(() => { if (alive) setItems((m) => ({ ...m, [key]: [] })); });
+    return () => { alive = false; };
+  }, [key, items]);
+  const list = items[key] || [];
+  const all = items.__best || [];
+  if (!all.length && key === "__best" && items.__best) return null;
+  const big = list[0];
+  const left = list.slice(1, 5);
+  const right = list.slice(5, 9);
+  const tabsList = [{ label: "En İyi Fırsatlar" }, ...cats.map((c) => ({ label: c.name }))];
+  const cell = (p) => (
+    <ProductCard key={p.id} product={p} as="li" className="col-xl-6 col-wd-6 product-item max-width-xl-100 remove-divider"
+      innerClassName="product-item__inner bg-white p-3" />
+  );
+  return (
+    <div className="products-group-4-1-4 space-1 bg-gray-7 mb-6" data-testid="products-414">
+      <h2 className="sr-only">Kategori ürünleri</h2>
+      <div className="container">
+        <div className="position-relative text-center z-index-2 mb-3">
+          <ul className="nav nav-classic nav-tab nav-tab-sm px-md-3 justify-content-start justify-content-lg-center flex-nowrap flex-lg-wrap overflow-auto overflow-lg-visble border-md-down-bottom-0 pb-1 pb-lg-0 mb-n1 mb-lg-0" role="tablist">
+            {tabsList.map((t, i) => (
+              <li className="nav-item flex-shrink-0 flex-lg-shrink-1" key={t.label}>
+                <a href="#urunler" role="tab" aria-selected={i === active} className={`nav-link${i === active ? " active" : ""}`} onClick={(e) => { e.preventDefault(); setActive(i); }}>
+                  <div className="d-md-flex justify-content-md-center align-items-md-center">{t.label}</div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="tab-content">
+          <div className="tab-pane fade pt-2 show active" role="tabpanel">
+            {!items[key] ? (
+              <div className="row no-gutters">{[0, 1, 2].map((i) => <div key={i} className="col-md-4 p-2"><div className="el-skel" style={{ height: 420 }} /></div>)}</div>
+            ) : !list.length ? (
+              <div className="text-center py-6 text-gray-90">Bu kategoride henüz ürün bulunmuyor.</div>
+            ) : (
+              <div className="row no-gutters">
+                <div className="col-md-3 col-wd-4 d-md-flex d-wd-block">
+                  <ul className="row list-unstyled products-group no-gutters mb-0 flex-xl-column flex-wd-row">{left.map(cell)}</ul>
+                </div>
+                <div className="col-md-6 col-wd-4 products-group-1">
+                  <ul className="row list-unstyled products-group no-gutters bg-white h-100 mb-0">
+                    {big && <BigProduct product={big} />}
+                  </ul>
+                </div>
+                <div className="col-md-3 col-wd-4 d-md-flex d-wd-block">
+                  <ul className="row list-unstyled products-group no-gutters mb-0 flex-xl-column flex-wd-row">{right.map(cell)}</ul>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BigProduct({ product }) {
+  const a = useProductActions(product, { listName: "products_414" });
+  const imgs = galleryImages(product);
+  const [cur, setCur] = useState(0);
+  const cat = product.category_name;
+  return (
+    <li className="col product-item remove-divider" data-testid={`product-card-${product.id}`}>
+      <div className="product-item__outer h-100 w-100 prodcut-box-shadow">
+        <div className="product-item__inner bg-white p-3">
+          <div className="product-item__body d-flex flex-column">
+            <div className="mb-1">
+              {cat && <div className="mb-2"><span className="font-size-12 text-gray-5">{cat}</span></div>}
+              <h5 className="mb-0 product-item__title"><Link to={a.href} onClick={a.select} className="text-blue font-weight-bold">{product.name}</Link></h5>
+            </div>
+            <div className="mb-1 min-height-4-1-4">
+              <Link to={a.href} onClick={a.select} className="d-block text-center my-4 mt-lg-6 mb-lg-5 mt-xl-0 mb-xl-0 mt-wd-6 mb-wd-5">
+                <span className="el-img-box" style={{ aspectRatio: "564 / 520" }}>
+                  <img className="img-fluid" src={optimizeImg(imgs[cur] || "/placeholder.jpg", 800)} alt={product.name} loading="lazy" />
+                </span>
+              </Link>
+              {imgs.length > 1 && (
+                <div className="row mx-gutters-2 mb-3">
+                  {imgs.slice(0, 3).map((im, i) => (
+                    <div className="col-auto" key={im}>
+                      <button type="button" className={`max-width-60 u-media-viewer btn p-0 border-0${cur === i ? " opacity-1" : ""}`} onClick={() => setCur(i)} aria-label={`Görsel ${i + 1}`}>
+                        <img className="img-fluid border" src={optimizeImg(im, 120)} alt="" loading="lazy" width="60" height="60" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex-center-between mb-3">
+              <CardPrice product={product} />
+              <div className="prodcut-add-cart">
+                <a href={a.href} onClick={a.add} className="btn-add-cart btn-primary transition-3d-hover" data-testid={`quick-add-${product.id}`} aria-label="Sepete ekle"><i className="ec ec-add-to-cart" /></a>
+              </div>
+            </div>
+          </div>
+          <div className="product-item__footer">
+            <div className="border-top pt-2 flex-center-between flex-wrap">
+              <a href="#karsilastir" onClick={a.cmp} className="text-gray-6 font-size-13"><i className="ec ec-compare mr-1 font-size-15" /> Karşılaştır</a>
+              <a href="#favori" onClick={a.fav} className={`text-gray-6 font-size-13${a.isFav ? " text-red" : ""}`} data-testid={`favorite-${product.id}`}><i className="ec ec-favorites mr-1 font-size-15" /> Favorilere Ekle</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/* ------------------------------------------------ Çok satanlar karuseli */
+function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
+
+function Bestsellers({ products, roots, title = "Çok Satanlar" }) {
+  const [tab, setTab] = useState(null);
+  const [byCat, setByCat] = useState({});
+  useEffect(() => {
+    if (!tab || byCat[tab]) return undefined;
+    let alive = true;
+    axios.get(`${API}/products?limit=12&sort=popular&category=${encodeURIComponent(tab)}`)
+      .then((r) => { if (alive) setByCat((m) => ({ ...m, [tab]: r.data?.products || [] })); })
+      .catch(() => { if (alive) setByCat((m) => ({ ...m, [tab]: [] })); });
+    return () => { alive = false; };
+  }, [tab, byCat]);
+  const list = tab ? (byCat[tab] || []) : products;
+  if (!products.length) return null;
+  return (
+    <div className="space-top-2 mb-6" data-testid="bestsellers">
+      <div className="d-flex justify-content-between border-bottom border-color-1 flex-md-nowrap flex-wrap border-sm-bottom-0">
+        <h3 className="section-title mb-0 pb-2 font-size-22">{title}</h3>
+        <ul className="nav nav-pills mb-2 pt-3 pt-md-0 mb-0 border-top border-color-1 border-md-top-0 align-items-center font-size-15 font-size-15-md flex-nowrap flex-md-wrap overflow-auto overflow-md-visble">
+          <li className="nav-item flex-shrink-0 flex-md-shrink-1">
+            <a href="#top" onClick={(e) => { e.preventDefault(); setTab(null); }} className={tab ? "nav-link text-gray-8" : "text-gray-90 btn btn-outline-primary border-width-2 rounded-pill py-1 px-4 font-size-15 text-lh-19 font-size-15-md"}>İlk 20</a>
+          </li>
+          {roots.slice(0, 3).map((c) => (
+            <li className="nav-item flex-shrink-0 flex-md-shrink-1" key={c.id}>
+              <a href={`#${c.slug}`} onClick={(e) => { e.preventDefault(); setTab(c.slug); }} className={tab === c.slug ? "text-gray-90 btn btn-outline-primary border-width-2 rounded-pill py-1 px-4 font-size-15 text-lh-19 font-size-15-md" : "nav-link text-gray-8"}>{c.name}</a>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {list.length === 0 ? (
+        <div className="py-6 text-center text-gray-90">{tab && !byCat[tab] ? "Yükleniyor…" : "Bu kategoride ürün bulunamadı."}</div>
+      ) : (
+        <Carousel key={tab || "top"} perView={{ base: 1 }} className="u-slick--gutters-2 overflow-hidden u-slick-overflow-visble pt-3 pb-6"
+          dotsClassName="text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-4">
+          {chunk(list.slice(0, 18), 6).map((group, gi) => (
+            <ul className="row list-unstyled products-group no-gutters mb-0 overflow-visible" key={gi}>
+              {group.map((p, i) => (
+                <ProductCard key={p.id} product={p} as="li" variant="card" listName="bestsellers" index={gi * 6 + i}
+                  className={`col-wd-3 col-md-4 border-bottom border-md-bottom-0${i % 3 === 2 ? " remove-divider-xl" : ""}${i >= 6 ? "" : ""}`} />
+              ))}
+            </ul>
+          ))}
+        </Carousel>
+      )}
+    </div>
+  );
+}
+
+/* ----------------------------------------------- Ürün karuseli (bölüm) */
+function ProductCarouselSection({ title, products, ctaLink, ctaLabel, testId = "product-slider", bg }) {
+  if (!products.length) return null;
+  return (
+    <div className="mb-6" data-testid={testId} style={bg ? { backgroundColor: bg } : undefined}>
+      <div className="position-relative">
+        <div className="border-bottom border-color-1 mb-2 d-flex justify-content-between align-items-end">
+          <h3 className="section-title mb-0 pb-2 font-size-22">{title}</h3>
+          {ctaLink && <Link to={ctaLink} className="font-size-14 text-gray-90 pb-2 mr-8">{ctaLabel || "Tümünü Gör"} <i className="ec ec-arrow-right-categproes font-size-12" /></Link>}
+        </div>
+        <Carousel perView={{ base: 2, md: 3, lg: 4, xl: 5, wd: 7 }} className="position-static overflow-hidden u-slick-overflow-visble pb-7 pt-2 px-1"
+          arrows arrowsClassName="position-absolute top-0 font-size-17 u-slick__arrow-normal top-10"
+          arrowLeftClassName="fa fa-angle-left right-1" arrowRightClassName="fa fa-angle-right right-0"
+          dotsClassName="text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-3 mt-md-0">
+          {products.map((p, i) => (
+            <div className="js-slide products-group" key={p.id}>
+              <ProductCard product={p} listName={testId} index={i} innerClassName="product-item__inner px-wd-4 p-2 p-md-3" wishlistLabel="Favori" />
+            </div>
+          ))}
+        </Carousel>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------- Tam banner */
+function FullBanner({ banner, cheapest }) {
+  if (banner && banner.image) {
+    return (
+      <div className="mb-6" data-testid="full-banner">
+        <Link to={banner.link || "/"} className="d-block" onClick={() => promo("full_banner", banner.title || banner.link)}>
+          <img className="img-fluid w-100" src={optimizeImg(banner.image, 1400)} alt={banner.title || ""} loading="lazy" style={{ aspectRatio: banner.dims ? `${banner.dims[0]} / ${banner.dims[1]}` : undefined }} />
+        </Link>
+      </div>
+    );
+  }
+  if (!cheapest) return null;
+  const sp = splitPrice(priceOf(cheapest).display);
+  return (
+    <div className="mb-6" data-testid="full-banner">
+      <Link to="/sale" className="d-block text-gray-90">
+        <div className="bg-gray-1">
+          <div className="space-top-2-md p-4 pt-6 pt-md-8 pt-lg-6 pt-xl-8 pb-lg-4 px-xl-8 px-lg-6">
+            <div className="flex-horizontal-center mt-lg-3 mt-xl-0 overflow-auto overflow-md-visble">
+              <h1 className="text-lh-38 font-size-32 font-weight-light mb-0 flex-shrink-0 flex-md-shrink-1">
+                ATÖLYENİZİ <strong>KAZANÇLA</strong> DONATIN — SERVİS EKİPMANLARINDA FIRSATLAR
+              </h1>
+              <div className="ml-5 flex-content-center flex-shrink-0">
+                <div className="bg-primary rounded-lg px-6 py-2">
+                  <em className="font-size-14 font-weight-light">BAŞLAYAN FİYATLARLA</em>
+                  <div className="font-size-30 font-weight-bold text-lh-1">{sp.int}<sup>,{sp.dec}</sup><sup className="ml-1">₺</sup></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    </div>
   );
 }
 
 function TextBlock({ block }) {
   const img = block?.images?.[0];
   if (!block?.title && !block?.settings?.text && !img) return null;
-
   return (
-    <section className="py-16 text-center" data-testid="text-block">
-      <div className="max-w-2xl mx-auto px-4">
+    <div className="mb-6" data-testid="text-block">
+      {block.title && (
+        <div className="border-bottom border-color-1 mb-4"><h3 className="section-title mb-0 pb-2 font-size-22">{block.title}</h3></div>
+      )}
+      <div className="row align-items-center">
         {img && (
-          block.links?.[0] ? (
-            <Link to={block.links[0]} className="block mb-8">
-              <img src={optimizeImg(img, 1200)} alt={block.title || ""} className="w-full object-cover" loading="lazy" decoding="async" />
-            </Link>
-          ) : (
-            <img src={optimizeImg(img, 1200)} alt={block.title || ""} className="w-full object-cover mb-8" loading="lazy" decoding="async" />
-          )
+          <div className="col-md-6 mb-4 mb-md-0">
+            {block.links?.[0] ? <Link to={block.links[0]}><img className="img-fluid" src={optimizeImg(img, 1200)} alt={block.title || ""} loading="lazy" /></Link>
+              : <img className="img-fluid" src={optimizeImg(img, 1200)} alt={block.title || ""} loading="lazy" />}
+          </div>
         )}
-        {block.title && (
-          <h2 className="text-2xl md:text-3xl font-light tracking-wide mb-4">{block.title}</h2>
-        )}
-        {block.settings?.text && (
-          <p className="text-gray-600">{block.settings.text}</p>
-        )}
-        {block.links?.[0] && (
-          <Link to={block.links[0]} className="inline-block mt-6 border border-black px-8 py-2 text-xs tracking-wider uppercase hover:bg-black hover:text-white transition-colors">
-            Keşfet
-          </Link>
-        )}
+        <div className={img ? "col-md-6" : "col-12"}>
+          {block.settings?.text && <p className="font-size-16 text-gray-90">{block.settings.text}</p>}
+          {block.links?.[0] && <Link to={block.links[0]} className="btn btn-primary-dark-w px-5 rounded-pill">Keşfet</Link>}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
 function VideoBanner({ block }) {
   const [playing, setPlaying] = useState(false);
-  
   if (!block?.settings?.video_url && !block?.images?.[0]) return null;
-
   return (
-    <section className="relative" data-testid="video-banner">
+    <div className="mb-6" data-testid="video-banner">
       {block.settings?.video_url ? (
-        <div className="relative aspect-video bg-black">
+        <div className="position-relative bg-dark rounded" style={{ aspectRatio: "16 / 9", overflow: "hidden" }}>
           {playing ? (
-            <video 
-              src={block.settings.video_url} 
-              autoPlay 
-              loop 
-              muted 
-              playsInline
-              className="w-full h-full object-cover"
-            />
+            <video src={block.settings.video_url} autoPlay loop muted playsInline className="w-100 h-100" style={{ objectFit: "cover" }} />
           ) : (
             <>
-              <img 
-                src={block.images?.[0] || ""} 
-                alt={block.title || ""} 
-                className="w-full h-full object-cover"
-              />
-              <button 
-                onClick={() => setPlaying(true)}
-                className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors"
-              >
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                  <Play size={24} className="ml-1" />
-                </div>
+              {block.images?.[0] && <img src={optimizeImg(block.images[0], 1400)} alt={block.title || ""} className="w-100 h-100" style={{ objectFit: "cover" }} loading="lazy" />}
+              <button type="button" onClick={() => setPlaying(true)} className="btn btn-primary rounded-circle position-absolute" style={{ left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: 72, height: 72 }} aria-label="Oynat">
+                <i className="fas fa-play" />
               </button>
             </>
           )}
         </div>
       ) : (
-        <Link to={block.links?.[0] || "/"} className="block">
-          <img src={optimizeImg(block.images[0], 1920)} alt={block.title || ""} className="w-full h-auto" loading="lazy" decoding="async" />
-        </Link>
+        <Link to={block.links?.[0] || "/"} className="d-block"><img src={optimizeImg(block.images[0], 1400)} alt={block.title || ""} className="img-fluid w-100" loading="lazy" /></Link>
       )}
-    </section>
-  );
-}
-
-// İlk yükleme skeleton'u — page-blocks fetch tamamlanana kadar gösterilir.
-// Böylece varsayılan (boş) hero bir an flash etmez.
-function HomeSkeleton() {
-  return (
-    <div data-testid="home-skeleton">
-      <div className="w-full aspect-[16/7] bg-stone-100 animate-pulse" />
-      <section className="w-full px-2 md:px-4 py-10">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-[2px] gap-y-3 md:gap-y-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="aspect-[2/3] bg-stone-100 mb-3" />
-              <div className="h-3 bg-stone-100 w-3/4 mb-2" />
-              <div className="h-3 bg-stone-100 w-1/3" />
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
 
-// Block Renderer
-function BlockRenderer({ block, products, index }) {
-  let component = null;
-  switch (block.type) {
-    case "hero_slider": {
-      // İlk hero bloğu, AKSİ (klasik) belirtilmedikçe otomatik fullpage/editorial olur —
-      // böylece "Dikey Editorial" seçilmese de mobilde tek-swipe slider + şeffaf header çalışır.
-      const _style = block?.settings?.hero_style;
-      const _useEditorial = _style === "dikey" || (index === 0 && _style !== "klasik");
-      component = _useEditorial
-        ? <HeroEditorial block={block} isFirst={index === 0} />
-        : <HeroSlider block={block} />;
-      break;
-    }
-    case "full_banner":   component = <FullBanner block={block} />; break;
-    case "half_banners":  component = <HalfBanners block={block} />; break;
-    case "product_slider":component = <ProductSlider block={block} products={products} />; break;
-    case "instashop":     component = <InstaShop block={block} />; break;
-    case "text_block":    component = <TextBlock block={block} />; break;
-    case "video_banner":  component = <VideoBanner block={block} />; break;
-    case "rotating_text": component = <RotatingText block={block} />; break;
-    case "countdown_bar": return null; // Header'da render ediliyor — burada gösterme
-    default: return null;
-  }
-  // Cihaz görünürlüğü — show_desktop / show_mobile false ise tailwind ile gizle
-  const showDesktop = block.show_desktop !== false;
-  const showMobile  = block.show_mobile  !== false;
-  if (!showDesktop && !showMobile) return null;
-  let visClass = "";
-  if (!showDesktop) visClass = "md:hidden";       // sadece mobil
-  else if (!showMobile) visClass = "hidden md:block"; // sadece masaüstü
-  return visClass ? <div className={visClass}>{component}</div> : component;
+function InstaShop({ block }) {
+  const store = useStoreInfo();
+  const igUrl = socialUrl("instagram", store.instagram);
+  const [feed, setFeed] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    axios.get(`${API}/instagram/feed?limit=12`).then((r) => { if (alive) setFeed(r.data?.posts || []); }).catch(() => { if (alive) setFeed([]); });
+    return () => { alive = false; };
+  }, []);
+  const posts = (Array.isArray(feed) && feed.length ? feed : (block?.images || []).map((img, i) => ({ image: img, product_link: block.links?.[i] || "/" }))).slice(0, 12);
+  if (!posts.length) return null;
+  return (
+    <div className="mb-6" data-testid="instashop">
+      <div className="border-bottom border-color-1 mb-3 d-flex justify-content-between align-items-end">
+        <h3 className="section-title mb-0 pb-2 font-size-22">{block?.title || "Instagram'da Biz"}</h3>
+        {igUrl && <a href={igUrl} target="_blank" rel="noopener noreferrer" className="font-size-14 text-gray-90 pb-2"><i className="fab fa-instagram mr-1" />Takip Edin</a>}
+      </div>
+      <Carousel perView={{ base: 2, md: 4, xl: 6 }} gutter={10} dotsClassName="text-center u-slick__pagination u-slick__pagination--long mb-0 mt-3">
+        {posts.map((p, i) => {
+          const href = p.product_link || p.permalink || "/";
+          const img = <img src={optimizeImg(p.image, 500)} alt="" className="img-fluid w-100" style={{ aspectRatio: "1 / 1", objectFit: "cover" }} loading="lazy" />;
+          return /^https?:/.test(href)
+            ? <a key={p.id || i} href={href} target="_blank" rel="noopener noreferrer" className="d-block rounded overflow-hidden">{img}</a>
+            : <Link key={p.id || i} to={href} className="d-block rounded overflow-hidden">{img}</Link>;
+        })}
+      </Carousel>
+    </div>
+  );
 }
 
+function HomeSkeleton() {
+  return (
+    <div data-testid="home-skeleton">
+      <div className="bg-gray-1 mb-5"><div className="container min-height-420" /></div>
+      <div className="container">
+        <div className="row mb-5">{[0, 1, 2, 3].map((i) => <div key={i} className="col-md-6 col-xl-3 mb-4"><div className="el-skel" style={{ height: 132 }} /></div>)}</div>
+        <div className="row mb-5">{[0, 1, 2, 3].map((i) => <div key={i} className="col-6 col-md-3 mb-4"><div className="el-skel" style={{ height: 320 }} /></div>)}</div>
+      </div>
+    </div>
+  );
+}
+
+const visibleOn = (b) => {
+  const d = b.show_desktop !== false; const m = b.show_mobile !== false;
+  if (!d && !m) return null;
+  if (!d) return "d-md-none";
+  if (!m) return "d-none d-md-block";
+  return "";
+};
+
+/* ================================================================ Home */
 export default function Home() {
   const [products, setProducts] = useState([]);
   const [blocks, setBlocks] = useState([]);
+  const [banners, setBanners] = useState([]);
+  const [popular, setPopular] = useState([]);
+  const [discounted, setDiscounted] = useState([]);
+  const [featured, setFeatured] = useState([]);
   const [loading, setLoading] = useState(true);
+  const tree = useCategoryTree();
+  const roots = tree.roots;
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [productsRes, blocksRes] = await Promise.all([
+        const [productsRes, blocksRes, bannersRes] = await Promise.all([
           axios.get(`${API}/products?limit=100&sort=created_at&order=desc`),
-          axios.get(`${API}/page-blocks?page=home`).catch(() => ({ data: [] }))
+          axios.get(`${API}/page-blocks?page=home`).catch(() => ({ data: [] })),
+          axios.get(`${API}/banners?is_active=true`).catch(() => ({ data: [] })),
         ]);
         if (!active) return;
         setProducts(productsRes.data?.products || []);
-
-        const isPreview = new URLSearchParams(window.location.search).get('preview') === 'true';
-        // Sort blocks by sort_order and filter active ones (non-mutating)
-        const activeBlocks = (blocksRes.data || [])
-          .filter(b => isPreview || b.is_active)
-          .toSorted((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        setBlocks(activeBlocks);
+        const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
+        setBlocks((blocksRes.data || []).filter((b) => isPreview || b.is_active).toSorted((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+        setBanners(Array.isArray(bannersRes.data) ? bannersRes.data : []);
       } catch (err) {
         console.error(err);
       } finally {
         if (active) setLoading(false);
       }
     })();
+    Promise.all([
+      axios.get(`${API}/products?limit=18&sort=popular`).catch(() => null),
+      axios.get(`${API}/products/slider-feed?source=discounted&limit=12`).catch(() => null),
+      axios.get(`${API}/products?limit=12&is_featured=true`).catch(() => null),
+    ]).then(([p, d, f]) => {
+      if (!active) return;
+      setPopular(p?.data?.products || []);
+      setDiscounted(d?.data?.products || []);
+      setFeatured(f?.data?.products || []);
+    });
     return () => { active = false; };
   }, []);
 
-  // ZAMANLI BANNER: sekme yeniden öne gelince blokları tazele. Yayın aralığı BİTEN
-  // banner açık sekmede takılı kalmasın, BAŞLAYAN da yenilemeden görünsün. Süzmeyi
-  // sunucu yapıyor (routes/cms.py) — burada tek yaptığımız yeniden sormak.
+  // ZAMANLI BANNER: sekme öne gelince blokları tazele (yayın aralığı sunucuda süzülür).
   useEffect(() => {
     let lastAt = Date.now();
     const onVisible = async () => {
-      if (document.visibilityState !== "visible") return;
-      if (Date.now() - lastAt < 60000) return;      // gereksiz istek yok
+      if (document.visibilityState !== "visible" || Date.now() - lastAt < 60000) return;
       lastAt = Date.now();
       const res = await axios.get(`${API}/page-blocks?page=home`).catch(() => null);
-      if (!res) return;                              // hata: mevcut içerik korunur
-      const isPreview = new URLSearchParams(window.location.search).get('preview') === 'true';
-      setBlocks((res.data || [])
-        .filter(b => isPreview || b.is_active)
-        .toSorted((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+      if (!res) return;
+      const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
+      setBlocks((res.data || []).filter((b) => isPreview || b.is_active).toSorted((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
-  // Check if we have CMS blocks to render
-  const hasCMSBlocks = blocks.length > 0;
-  
-  // Check if specific block types exist
-  const hasHeroSlider = blocks.some(b => b.type === "hero_slider");
-  const hasProductSlider = blocks.some(b => b.type === "product_slider");
-  const hasInstaShop = blocks.some(b => b.type === "instashop");
+  const newest = useMemo(() => dedupeColorGroups(products), [products]);
+  const onSale = discounted.length ? discounted : newest.filter((p) => priceOf(p).hasDiscount);
+  const feat = featured.length ? featured : newest.slice(0, 6);
+  const best = popular.length ? popular : newest.slice(0, 18);
 
-  // Üst duyuru barı (rotating_text) — orijinaldeki gibi en üstte (header üstü) gösterilir,
-  // blok akışında tekrar render edilmemesi için ayrılır.
-  const rotatingBlock = blocks.find(b => b.type === "rotating_text");
-  const countdownBlock = blocks.find(b => b.type === "countdown_bar");
-  // Üst bar SIRASI: Sayfa Tasarımı'ndaki blok sırasına (sort_order) göre — koda gömülü değil.
-  // Duyuru barı sayaçtan ÖNCE tasarlandıysa üstte gösterilir.
-  const announcementFirst = !!(rotatingBlock && countdownBlock)
-    && (Number(rotatingBlock.sort_order ?? 0) < Number(countdownBlock.sort_order ?? 0));
-  const flowBlocks = blocks.filter(b => b.type !== "rotating_text");
+  const rotatingBlock = blocks.find((b) => b.type === "rotating_text");
+  const countdownBlock = blocks.find((b) => b.type === "countdown_bar");
+  const announcementFirst = !!(rotatingBlock && countdownBlock) && (Number(rotatingBlock.sort_order ?? 0) < Number(countdownBlock.sort_order ?? 0));
 
-  // Şeffaf-overlay KALDIRILDI (Option A): header home'da da SOLID; editorial hero olsa bile
-  // data-hero-overlay bayrağı YAZILMAZ (header akıştan çıkmaz, hero solid şeridin altında akar).
+  // --- Hero slaytları: page-block hero_slider → Admin Bannerlar (home/hero) → ürünlerden
+  const heroBlock = blocks.find((b) => b.type === "hero_slider");
+  const deviceOk = (b) => !b.device || b.device === "all" || b.device === (typeof window !== "undefined" && window.innerWidth < 768 ? "mobile" : "desktop");
+  const homeBanners = banners.filter((b) => deviceOk(b) && ["home", "hero", "home_slider", "slider"].includes(String(b.position || "home")));
+  let heroSlides = [];
+  if (heroBlock && heroBlock.images?.length) {
+    const caps = heroBlock.settings?.captions || [];
+    heroSlides = heroBlock.images.map((img, i) => ({ image: img, link: heroBlock.links?.[i] || "/", title: caps[i]?.title, eyebrow: caps[i]?.eyebrow, cta: caps[i]?.cta }));
+  } else if (homeBanners.length) {
+    heroSlides = homeBanners.map((b) => ({ image: b.image_url || b.image || b.video_url, mobileImage: b.mobile_image, link: b.link_url || b.link || "/", title: b.title, eyebrow: b.subtitle }));
+  } else {
+    heroSlides = (feat.length ? feat : newest).slice(0, 3).map((p) => {
+      return {
+        product: true,
+        line1: "ATÖLYENİZ",
+        line2: "İÇİN EN İYİSİ",
+        subtitle: p.name,
+        price: priceOf(p).display,
+        productImage: firstImage(p),
+        link: productHref(p),
+      };
+    });
+  }
+
+  // --- 4'lü banner: half_banners bloğu → Admin Bannerlar (home_small/category) → kategoriler
+  const halfBlock = blocks.find((b) => b.type === "half_banners");
+  const smallBanners = banners.filter((b) => deviceOk(b) && ["home_small", "home_banner", "category", "small"].includes(String(b.position || "")));
+  let banner4 = [];
+  if (halfBlock && halfBlock.images?.length) {
+    banner4 = halfBlock.images.map((img, i) => ({ image: img, link: halfBlock.links?.[i] || "/", full: true, title: halfBlock.title }));
+  } else if (smallBanners.length) {
+    banner4 = smallBanners.map((b) => ({ image: b.image_url || b.image, link: b.link_url || b.link || "/", full: true, title: b.title }));
+  } else if (roots.length) {
+    banner4 = roots.slice(0, 4).map((c) => {
+      const sample = newest.find((p) => String(p.category_id) === String(c.id)) || null;
+      return { image: c.image_url || c.image || (sample ? firstImage(sample) : ""), link: `/${c.slug}`, pre: "EN İYİ", strong: "FIRSATLAR", post: c.name.toLocaleUpperCase("tr") };
+    });
+  }
+
+  const special = useMemo(() => {
+    const pool = [...onSale, ...newest];
+    let bestP = null; let bestPct = -1;
+    for (const p of pool) { const pv = priceOf(p); if (pv.discountPct > bestPct) { bestPct = pv.discountPct; bestP = p; } }
+    return bestP;
+  }, [onSale, newest]);
+
+  const fullBannerBlock = blocks.find((b) => b.type === "full_banner" && b.images?.[0]);
+  const wideBanner = banners.find((b) => deviceOk(b) && ["home_wide", "wide", "full"].includes(String(b.position || "")));
+  const fullBanner = fullBannerBlock
+    ? { image: fullBannerBlock.images[0], link: fullBannerBlock.links?.[0], title: fullBannerBlock.title, dims: fullBannerBlock.settings?.img_dims?.[0] }
+    : wideBanner ? { image: wideBanner.image_url || wideBanner.image, link: wideBanner.link_url || wideBanner.link, title: wideBanner.title } : null;
+  const cheapest = useMemo(() => [...onSale].sort((a, b) => priceOf(a).display - priceOf(b).display)[0] || null, [onSale]);
+
+  // Son gezilenler (ürün detay sayfası localStorage'a yazar)
+  const [recent, setRecent] = useState([]);
   useEffect(() => {
-    try { document.documentElement.removeAttribute("data-hero-overlay"); } catch (_) { /* noop */ }
-    return () => { try { document.documentElement.removeAttribute("data-hero-overlay"); } catch (_) { /* noop */ } };
+    try { const r = JSON.parse(localStorage.getItem("store_recently_viewed") || "[]"); if (Array.isArray(r)) setRecent(r.filter((x) => x && x.id)); } catch { /* yoksay */ }
   }, []);
 
+  // Admin akış blokları (hero/half/full dışındakiler) — sıralı
+  const flowBlocks = blocks.filter((b) => ["product_slider", "text_block", "video_banner", "instashop"].includes(b.type) || (b.type === "full_banner" && b !== fullBannerBlock));
+  const hasProductSlider = flowBlocks.some((b) => b.type === "product_slider");
+
   return (
-    <div className="sf-page min-h-screen bg-white" data-testid="home-page">
-      {/* Üst Duyuru Barı (rotating_text) artık Header'ın FIXED sarmalayıcısı İÇİNDE
-          (CountdownBar'ın hemen ALTINDA, bitişik) render edilir → editorial-hero overlay
-          header'ı onu ÖRTMEZ; sayaç + duyuru barı ikisi de görünür ve boşluksuz altlı-üstlü durur. */}
+    <div className="sf-page" data-testid="home-page">
       <Header announcement={rotatingBlock ? <RotatingText block={rotatingBlock} /> : null} announcementFirst={announcementFirst} />
-      
-      {/* İlk yüklemede eski görsellerin (hardcoded default) flash etmemesi için
-          page-blocks fetch tamamlanana kadar skeleton göster. */}
-      {loading ? (
-        <HomeSkeleton />
-      ) : hasCMSBlocks ? (
-        <>
-          {flowBlocks.map((block, idx) => (
-            <BlockRenderer key={block.id} block={block} products={products} index={idx} />
-          ))}
-          
-          {/* Add default product grid if no product_slider block */}
-          {!hasProductSlider && products.length > 0 && (
-            <section className="w-full px-2 md:px-4 py-10">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-[2px] gap-y-3 md:gap-y-4">
-                {dedupeColorGroups(products).slice(0, 8).map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-              <div className="text-center mt-12">
-                <Link to="/en-yeniler" className="inline-block border border-black px-10 py-2.5 text-xs tracking-wider uppercase hover:bg-black hover:text-white transition-colors">
-                  Kategoriye Git
-                </Link>
-              </div>
-            </section>
-          )}
-          
-          {/* Add default InstaShop if no instashop block */}
-          {!hasInstaShop && (
-            <InstaShop block={{}} />
-          )}
-        </>
-      ) : (
-        /* Default Layout when no CMS blocks */
-        <>
-          {/* Hero/banner görselleri panelden (page-blocks) eklenir; varsayılan düzende yalnız ürünler. */}
-          {/* Products Grid */}
-          <section className="w-full px-2 md:px-4 py-10">
-            {loading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 gap-y-8">
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="aspect-[2/3] bg-gray-100 mb-3" />
-                    <div className="h-4 bg-gray-100 w-3/4 mb-2" />
-                    <div className="h-4 bg-gray-100 w-1/3" />
+      <main id="content" role="main" className="electro el-page">
+        {loading ? <HomeSkeleton /> : (
+          <>
+            <HeroSlider slides={heroSlides} />
+            <div className="container">
+              <SmallBanners items={banner4} />
+              {(special || feat.length) && (
+                <div className="mb-5">
+                  <div className="row">
+                    {special && priceOf(special).hasDiscount && (
+                      <div className="col-md-auto mb-6 mb-md-0"><SpecialOffer product={special} /></div>
+                    )}
+                    <div className="col">
+                      <TabbedGrid tabs={[
+                        { key: "featured", label: "Öne Çıkanlar", items: feat },
+                        { key: "onsale", label: "İndirimdekiler", items: onSale },
+                        { key: "toprated", label: "Çok Satanlar", items: best },
+                      ]} />
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-[2px] gap-y-3 md:gap-y-4">
-                {dedupeColorGroups(products).map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-            )}
-            <div className="text-center mt-12">
-              <Link to="/en-yeniler" className="inline-block border border-black px-10 py-2.5 text-xs tracking-wider uppercase hover:bg-black hover:text-white transition-colors">
-                Kategoriye Git
-              </Link>
+                </div>
+              )}
             </div>
-          </section>
-
-          {/* InstaShop */}
-          <InstaShop block={{}} />
-        </>
-      )}
-
+            {roots.length > 0 && <Products414 roots={roots} />}
+            <div className="container">
+              {!hasProductSlider && <Bestsellers products={best} roots={roots} />}
+              {flowBlocks.map((block) => {
+                const vis = visibleOn(block);
+                if (vis === null) return null;
+                let el = null;
+                if (block.type === "product_slider") el = <AdminProductSlider block={block} products={newest} />;
+                else if (block.type === "text_block") el = <TextBlock block={block} />;
+                else if (block.type === "video_banner") el = <VideoBanner block={block} />;
+                else if (block.type === "instashop") el = <InstaShop block={block} />;
+                else if (block.type === "full_banner") el = <FullBanner banner={{ image: block.images?.[0], link: block.links?.[0], title: block.title }} />;
+                return el ? <div key={block.id} className={vis}>{el}</div> : null;
+              })}
+              <FullBanner banner={fullBanner} cheapest={cheapest} />
+              {recent.length > 0 ? (
+                <ProductCarouselSection title="Son Gezdikleriniz" products={recent} testId="recently-viewed" />
+              ) : (
+                <ProductCarouselSection title="Yeni Ürünler" products={newest.slice(0, 14)} ctaLink="/en-yeniler" testId="new-arrivals" />
+              )}
+            </div>
+          </>
+        )}
+      </main>
       <Footer />
     </div>
+  );
+}
+
+/** Admin "Ürün Slider" bloğu — kaynak: manual / newest / discounted / favorites / category (slider-feed). */
+function AdminProductSlider({ block, products }) {
+  const selectedIds = block?.settings?.product_ids;
+  const source = block?.settings?.source || (selectedIds?.length > 0 ? "manual" : "newest");
+  const limit = block?.settings?.limit || 12;
+  const [feed, setFeed] = useState(null);
+  const catKey = JSON.stringify(block?.settings?.category_ids || []);
+  useEffect(() => {
+    if (source === "manual" || source === "newest") { setFeed(null); return undefined; }
+    let alive = true;
+    const cids = JSON.parse(catKey).join(",");
+    axios.get(`${API}/products/slider-feed?source=${source}&limit=${limit}${cids ? `&category_ids=${encodeURIComponent(cids)}` : ""}`)
+      .then((r) => { if (alive) setFeed(r.data?.products || []); })
+      .catch(() => { if (alive) setFeed([]); });
+    return () => { alive = false; };
+  }, [source, limit, catKey]);
+  let list;
+  if (source !== "manual" && source !== "newest") list = feed || [];
+  else if (selectedIds && selectedIds.length) list = selectedIds.map((id) => products.find((p) => p._id === id || p.id === id)).filter(Boolean);
+  else list = products.slice(0, limit);
+  const defaultCta = source === "discounted" ? "/sale" : "/en-yeniler";
+  return (
+    <ProductCarouselSection title={block?.title || (source === "discounted" ? "İndirimdeki Ürünler" : "Yeni Ürünler")}
+      products={list} ctaLink={block?.settings?.cta_link || defaultCta} ctaLabel={block?.settings?.cta_label}
+      testId="product-slider" bg={block?.settings?.bg_color} />
   );
 }
