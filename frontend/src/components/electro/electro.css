@@ -191,3 +191,13 @@
 .electro .el-prose a { color: #0062bd; text-decoration: underline; }
 .electro .el-prose blockquote { border-left: 3px solid var(--electro-primary); padding-left: 1rem; font-style: italic; }
 .electro .el-prose hr { margin: 1.5rem 0; }
+
+/* Fiyatlar tek satırda (₺ alt satıra düşmesin) + dar ekranda biraz küçült */
+.electro .prodcut-price ins, .electro .prodcut-price .text-gray-100, .electro .prodcut-price del { white-space: nowrap; }
+@media (max-width: 575.98px) {
+  .electro .product-item .prodcut-price ins, .electro .product-item .prodcut-price .text-gray-100 { font-size: 1rem; }
+  .electro .product-item .btn-add-cart { width: 1.9rem; height: 1.9rem; font-size: 1rem; }
+}
+@media (max-width: 1199.98px) {
+  .electro .u-header .el-logo { font-size: 30px !important; }
+}

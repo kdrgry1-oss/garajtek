@@ -23,7 +23,7 @@ import { trackSelectPromotion } from "../lib/dataLayer";
 import { dedupeColorGroups } from "../lib/colorGroups";
 import { fmtPrice, priceOf, productHref } from "../components/electro/format";
 import { useStoreInfo } from "../lib/storeInfo";
-import { socialUrl } from "../lib/brand";
+import { socialUrl, SITE_NAME } from "../lib/brand";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const isVideoUrl = (u) => typeof u === "string" && /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(u);
@@ -59,7 +59,7 @@ function HeroSlider({ slides }) {
                 {(s.title || s.eyebrow || s.cta) && (
                   <div className="row min-height-420 py-7 py-md-0 position-relative">
                     <div className="offset-xl-3 col-xl-4 col-8 mt-md-8">
-                      {s.title && <h1 className="font-size-46 text-lh-57 font-weight-light">{s.title}</h1>}
+                      {s.title && <h2 className="font-size-46 text-lh-57 font-weight-light">{s.title}</h2>}
                       {s.eyebrow && <h6 className="font-size-15 font-weight-bold mb-3">{s.eyebrow}</h6>}
                       {s.cta && <span className="btn btn-primary transition-3d-hover rounded-lg font-weight-normal py-2 px-md-7 px-3 font-size-16">{s.cta}</span>}
                     </div>
@@ -70,9 +70,9 @@ function HeroSlider({ slides }) {
               <div key={i} className="js-slide bg-img-hero-center">
                 <div className="row min-height-420 py-7 py-md-0">
                   <div className="offset-xl-3 col-xl-4 col-6 mt-md-8">
-                    <h1 className="font-size-64 text-lh-57 font-weight-light">
+                    <h2 className="font-size-64 text-lh-57 font-weight-light">
                       {s.line1}<span className="d-block font-size-55">{s.line2}</span>
-                    </h1>
+                    </h2>
                     <h6 className="font-size-15 font-weight-bold mb-3 el-line-2">{s.subtitle}</h6>
                     {s.price != null && (
                       <div className="mb-4">
@@ -437,9 +437,9 @@ function FullBanner({ banner, cheapest }) {
         <div className="bg-gray-1">
           <div className="space-top-2-md p-4 pt-6 pt-md-8 pt-lg-6 pt-xl-8 pb-lg-4 px-xl-8 px-lg-6">
             <div className="flex-horizontal-center mt-lg-3 mt-xl-0 overflow-auto overflow-md-visble">
-              <h1 className="text-lh-38 font-size-32 font-weight-light mb-0 flex-shrink-0 flex-md-shrink-1">
+              <h2 className="text-lh-38 font-size-32 font-weight-light mb-0 flex-shrink-0 flex-md-shrink-1">
                 ATÖLYENİZİ <strong>KAZANÇLA</strong> DONATIN — SERVİS EKİPMANLARINDA FIRSATLAR
-              </h1>
+              </h2>
               <div className="ml-5 flex-content-center flex-shrink-0">
                 <div className="bg-primary rounded-lg px-6 py-2">
                   <em className="font-size-14 font-weight-light">BAŞLAYAN FİYATLARLA</em>
@@ -690,6 +690,7 @@ export default function Home() {
     <div className="sf-page" data-testid="home-page">
       <Header announcement={rotatingBlock ? <RotatingText block={rotatingBlock} /> : null} announcementFirst={announcementFirst} />
       <main id="content" role="main" className="electro el-page">
+        <h1 className="sr-only">{SITE_NAME} — Oto Servis ve Garaj Ekipmanları</h1>
         {loading ? <HomeSkeleton /> : (
           <>
             <HeroSlider slides={heroSlides} />
