@@ -49,7 +49,6 @@ from routes.pages import router as pages_router
 from routes.admin_rbac import router as admin_rbac_router
 from routes.seo import router as seo_router
 from routes.size_tables import router as size_tables_router, public_router as size_tables_public_router
-from routes.manufacturing import router as manufacturing_router, suppliers_router as manufacturing_suppliers_router
 from routes.decision_board import router as decision_board_router
 from routes.ai_chatbot import router as ai_chatbot_router
 from routes.whatsapp_webhook import router as whatsapp_webhook_router
@@ -84,7 +83,6 @@ from routes.catalog_extras import (
 )
 from routes.admin_tasks import router as admin_tasks_router
 from routes.business_rules_api import admin_router as business_rules_admin_router, public_router as business_rules_public_router
-from routes.custom_theme import admin_router as custom_theme_admin_router, public_router as custom_theme_public_router
 from routes.help_center import admin_router as help_center_admin_router, public_router as help_center_public_router
 from routes.referrals import public_router as referrals_public_router, admin_router as referrals_admin_router
 from routes.shared_carts import router as shared_carts_router
@@ -114,7 +112,6 @@ from routes.trendyol_retry_queue import router as trendyol_retry_queue_router, b
 from routes.capi import router as capi_router
 from services.capi.orchestrator import background_retry_loop as capi_retry_bg_loop
 from routes.customer_risk import router as customer_risk_router
-from routes.production_plan import router as production_plan_router
 from routes.marketing_pixels import router as marketing_pixels_router
 from routes.social_auth import router as social_auth_router
 from routes.security_dashboard import router as security_dashboard_router
@@ -124,7 +121,6 @@ from routes.secrets_vault import router as secrets_vault_router
 from routes.system_health import router as system_health_router
 from routes.mail_admin import router as mail_admin_router  # kendi mail sunucusu (deploy/mail)
 from routes.reports_v2 import router as reports_v2_router, costs_router as product_costs_router
-from routes.production_hooks import router as production_hooks_router
 from routes.size_recommender import router as size_rec_router
 from routes.iys_integration import router as iys_router
 
@@ -887,8 +883,6 @@ api_router.include_router(dogan_router, prefix="/integrations")
 # Trendyol Q&A + Reviews — Iter37 refactor: catch-all'dan ÖNCE
 api_router.include_router(trendyol_qna_router, prefix="/integrations")
 # Amazon entegrasyon uçları (amazon-tr/products/*) — catch-all /{marketplace}'den ÖNCE
-from routes.integrations_amazon import router as integrations_amazon_router
-api_router.include_router(integrations_amazon_router, prefix="/integrations")
 api_router.include_router(integrations_router, prefix="/integrations")
 api_router.include_router(integrations_temu_router, prefix="/integrations")
 api_router.include_router(trendyol_retry_queue_router)
@@ -910,9 +904,7 @@ api_router.include_router(vendors_router, prefix="/vendors")
 api_router.include_router(admin_rbac_router)
 api_router.include_router(size_tables_router)
 api_router.include_router(size_tables_public_router)
-api_router.include_router(manufacturing_router)
 api_router.include_router(decision_board_router)
-api_router.include_router(manufacturing_suppliers_router)
 api_router.include_router(ai_chatbot_router)
 api_router.include_router(whatsapp_webhook_router)
 api_router.include_router(meta_messaging_webhook_router)
@@ -957,8 +949,6 @@ for _r in (
 api_router.include_router(admin_tasks_router)
 api_router.include_router(business_rules_admin_router)
 api_router.include_router(business_rules_public_router)
-api_router.include_router(custom_theme_admin_router)
-api_router.include_router(custom_theme_public_router)
 api_router.include_router(help_center_admin_router)
 api_router.include_router(help_center_public_router)
 api_router.include_router(referrals_public_router)
@@ -1012,7 +1002,6 @@ api_router.include_router(bulk_ops_router)
 api_router.include_router(analytics_extra_router)
 api_router.include_router(notifications_router)
 api_router.include_router(customer_risk_router)
-api_router.include_router(production_plan_router)
 api_router.include_router(marketing_pixels_router)
 api_router.include_router(social_auth_router)
 # Security dashboard — auth_audit_logs üzerinde admin görünürlüğü
@@ -1028,28 +1017,14 @@ api_router.include_router(mail_admin_router)
 api_router.include_router(reports_v2_router)
 api_router.include_router(product_costs_router)
 # Iteration 43 — production hooks + size recommender + IYS
-api_router.include_router(production_hooks_router)
 api_router.include_router(size_rec_router)
 api_router.include_router(iys_router)
 
 # Theme management (admin) + storefront theme reader (public)
-from routes.themes import admin_router as themes_admin_router, public_router as themes_public_router
-api_router.include_router(themes_admin_router)
-api_router.include_router(themes_public_router)
 
 # Influencer CRM & Seeding & ROI (Modül 3 + 4)
-from routes.influencers import router as influencers_router
-api_router.include_router(influencers_router)
 
 # Amazon Selling Partner API (SP-API) — LWA only, no SigV4
-from routes.amazon_spapi import router as amazon_spapi_router
-api_router.include_router(amazon_spapi_router)
-from routes.amazon_catalog import router as amazon_catalog_router
-api_router.include_router(amazon_catalog_router)
-from routes.amazon_autosetup import router as amazon_autosetup_router
-api_router.include_router(amazon_autosetup_router)
-from routes.amazon_claims import router as amazon_claims_router
-api_router.include_router(amazon_claims_router, prefix="/integrations")
 
 # Amazon DPP / Compliance (PII retention + checklist)
 from routes.compliance import router as compliance_router
