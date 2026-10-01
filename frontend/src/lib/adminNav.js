@@ -140,6 +140,7 @@ export const navigationGroups = [
     icon: Cable,
     children: [
       { label: "Ödeme Tipleri", path: "/admin/odeme-tipleri", icon: CreditCard },
+      { label: "BirFatura (e-Fatura)", path: "/admin/birfatura", icon: FileText },
       { label: "Pazaryerleri Hub", path: "/admin/pazaryerleri", icon: Store, superOnly: true },
       { label: "Amazon", path: "/admin/amazon", icon: Store },
       { label: "Detaylı Aktarım & Eşleştirme", path: "/admin/entegrasyonlar", icon: Cable },

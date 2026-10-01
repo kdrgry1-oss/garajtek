@@ -205,6 +205,8 @@ Panelde sırasıyla:
 6. **Katalog:** kategoriler → ürünler (Excel içe aktarma). Görseller sunucu diskine
    (`/opt/garajtek/media`) kaydedilir ve Cloudflare üzerinden hızlıca sunulur.
 7. **Kullanıcılar & Roller:** personel hesapları.
+8. **Entegrasyonlar › BirFatura (e-Fatura):** token oluşturun, BirFatura panelinde "Özel Entegrasyon"
+   mağazası açıp site adresini + token'ı girin, test edip açın. Ayrıntı: [`docs/BIRFATURA.md`](docs/BIRFATURA.md).
 
 Kullanılmayan entegrasyonlar (Trendyol, Hepsiburada, Amazon, Temu, NetGSM) boş bırakılır;
 anahtar girilmedikçe ilgili zamanlanmış işler çalışmaz.

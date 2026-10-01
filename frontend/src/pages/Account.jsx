@@ -823,6 +823,17 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
                 )}
               </div>
             )}
+            {/* Fatura — entegratörden (BirFatura vb.) gelen https fatura bağlantısı */}
+            {/^https:\/\//i.test(String(order.invoice_pdf_url || "")) && (
+              <div data-testid={`order-invoice-${order.id}`}>
+                <h4 className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-2">Fatura</h4>
+                {order.invoice_number && <p className="text-sm text-gray-700">No: <span className="font-medium">{order.invoice_number}</span></p>}
+                <a href={order.invoice_pdf_url} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.15em] mt-2 underline underline-offset-4 hover:no-underline">
+                  Faturayı Görüntüle <ChevronRight size={12} />
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Özet — ara toplam, indirimler (ayrı ayrı), kargo, toplam */}

@@ -883,6 +883,11 @@ api_router.include_router(dogan_router, prefix="/integrations")
 # Trendyol Q&A + Reviews — Iter37 refactor: catch-all'dan ÖNCE
 api_router.include_router(trendyol_qna_router, prefix="/integrations")
 # Amazon entegrasyon uçları (amazon-tr/products/*) — catch-all /{marketplace}'den ÖNCE
+# BirFatura e-Fatura/e-Arşiv: BirFatura'nın çağırdığı token'lı uçlar (/api/birfatura/api/...)
+# + panel ayarları (/api/integrations/birfatura/...) — catch-all /{provider}'dan ÖNCE.
+from routes.integrations_birfatura import public_router as birfatura_public_router, admin_router as birfatura_admin_router
+api_router.include_router(birfatura_public_router)
+api_router.include_router(birfatura_admin_router)
 api_router.include_router(integrations_router, prefix="/integrations")
 api_router.include_router(integrations_temu_router, prefix="/integrations")
 api_router.include_router(trendyol_retry_queue_router)
