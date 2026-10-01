@@ -1,0 +1,10 @@
+[Unit]
+Description=Cloudflare IP aralıkları — haftalık güncelleme
+
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

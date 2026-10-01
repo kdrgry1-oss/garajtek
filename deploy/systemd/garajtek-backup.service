@@ -1,0 +1,10 @@
+# Gece yedeği — garajtek-backup.timer tetikler. Elle: systemctl start garajtek-backup
+[Unit]
+Description=garajtek gece yedeği (SQLite + medya + .env)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/garajtek-backup
+Nice=10
+IOSchedulingClass=idle

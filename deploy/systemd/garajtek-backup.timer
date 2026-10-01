@@ -1,0 +1,10 @@
+[Unit]
+Description=garajtek gece yedeği — her gün 03:30 (Europe/Istanbul)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=Cloudflare IP aralıklarını nginx/ufw için güncelle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/garajtek-cloudflare-ips

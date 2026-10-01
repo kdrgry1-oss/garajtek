@@ -1,0 +1,40 @@
+# /etc/systemd/system/garajtek-api.service — install.sh kurar.
+[Unit]
+Description=garajtek API (FastAPI / uvicorn, tek işçi)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=garajtek
+Group=garajtek
+WorkingDirectory=/opt/garajtek/backend
+EnvironmentFile=/opt/garajtek/backend/.env
+# update.sh yazar: GIT_SHA=<commit> (/api/health "version" alanında görünür)
+EnvironmentFile=-/opt/garajtek/.deploy.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=MALLOC_ARENA_MAX=2
+# TEK işçi ŞART: gömülü SQLite katmanı + APScheduler + bellek içi önbellek tek süreç varsayar.
+# --proxy-headers: nginx'in X-Forwarded-For/Proto değerleri (yalnız 127.0.0.1'den) kabul edilir
+# → request.client.host = gerçek ziyaretçi IP'si, request.url.scheme = https.
+ExecStart=/opt/garajtek/venv/bin/uvicorn server:app --host 127.0.0.1 --port 8001 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1 --timeout-keep-alive 65 --no-server-header
+Restart=always
+RestartSec=5
+TimeoutStartSec=180
+TimeoutStopSec=30
+KillMode=mixed
+# 2 GB RAM'li sunucu: API ~300-500 MB kullanır; 900 MB'ta sert sınır (OOM'da yalnız bu servis
+# yeniden başlar, SSH/nginx ayakta kalır). 750 MB'tan sonra çekirdek belleği geri kazanmaya zorlar.
+MemoryHigh=750M
+MemoryMax=900M
+LimitNOFILE=65535
+# NOT: NoNewPrivileges / ProtectSystem / PrivateTmp BİLİNÇLİ OLARAK KULLANILMIYOR —
+# backend posta kutusu yönetimi için "sudo /usr/local/sbin/garajtek-mail ..." çağırır
+# (deploy/mail/, sudoers ile tek komuta kısıtlı). NoNewPrivileges sudo'yu, ProtectSystem
+# ise sudo ile çalışan betiğin /etc/postfix... yazmasını engellerdi.
+
+[Install]
+WantedBy=multi-user.target
