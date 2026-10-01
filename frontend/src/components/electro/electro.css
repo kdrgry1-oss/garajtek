@@ -5,6 +5,9 @@
    ========================================================================== */
 
 /* --- Tailwind preflight ↔ Bootstrap uyumu (yalnız .electro içinde) -------- */
+/* Tailwind preflight `* { border-style: solid }` Bootstrap'in yalnız border-width veren kurallarında
+   (ör. .nav-tab .nav-link) istenmeyen çerçeve çizdiriyordu → tarayıcı varsayılanına (none) dön. */
+.electro *, .electro *::before, .electro *::after { border-style: none; border-color: currentColor; }
 .electro img, .electro svg, .electro video, .electro canvas, .electro iframe, .electro embed, .electro object {
   display: inline-block;
   vertical-align: middle;

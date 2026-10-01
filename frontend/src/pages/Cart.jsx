@@ -1,6 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Trash2, Plus, Minus, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import { shareCart } from "../lib/shareCart";
@@ -10,8 +9,14 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
-import { optimizeImg, firstImage } from "../lib/img";
-import { priceView, cartLineView, cartSummary } from "../lib/price";
+import { optimizeImg } from "../lib/img";
+import ProductCard from "../components/ProductCard";
+import Breadcrumb from "../components/electro/Breadcrumb";
+import Carousel from "../components/electro/Carousel";
+import QuantityInput from "../components/electro/QuantityInput";
+import { fmtPrice } from "../components/electro/format";
+import { trackRemove } from "../components/CartDrawer";
+import { cartLineView, cartSummary } from "../lib/price";
 import { trackViewCart } from "../utils/pixelEvents";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -76,427 +81,160 @@ export default function Cart() {
   const [appliedPromotions, setAppliedPromotions] = useState([]);
 
   useEffect(() => {
-    if (items.length === 0) { setPromoDiscount(0); setAppliedPromotions([]); return; }
-    let cancel = false;
-    axios.post(`${API}/coupons/evaluate`, {
-      cart_total: total,
-      items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity })),
-      user_id: user?.id || null,
-      email: user?.email || "",
-      code: "",
-    }).then((res) => {
-      if (cancel) return;
-      const d = res.data || {};
-      setPromoDiscount(Number(d.total_discount || 0));
-      setAppliedPromotions(d.applied || []);
-    }).catch(() => {
-      if (!cancel) { setPromoDiscount(0); setAppliedPromotions([]); }
-    });
-    return () => { cancel = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, total, user?.id]);
-
-  // ÜCRETSİZ KARGO EŞİĞİ — sunucunun kararıyla AYNI taban: İNDİRİM SONRASI sepet tutarı
-  // (orders.create_order: (_subtotal - _server_discount) >= eşik). Eskiden indirimSİZ ara
-  // toplam baz alınıyordu → hem "X TL daha" yazısı yanlış çıkıyor hem de sepet ekranı
-  // "ücretsiz kargo" gösterip siparişte kargo ücreti ekleniyordu (tutarsızlık).
-  // Payment/points choices are not known in the cart: this is an estimate only.
-  const shipping = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee });
-  const netTotal = shipping.basis;
-  const remaining = freeShippingThreshold != null ? Math.max(0, freeShippingThreshold - netTotal) : 0;
-  const shippingCost = shipping.cost;
-
-  // Ürün-seviyesi indirim (sale_price + otomatik kampanya) — satırlarla birebir tutarlı özet.
-  const { listSum, productDisc, extraDisc, totalDisc, grand: _grandNoShip } = cartSummary(items, promoDiscount);
-  const grandTotal = _grandNoShip + shippingCost;
-  // Sepet-seviyesi kampanya adları (ör. "3 Al 2 Öde — Body"); kalemde zaten gösterilen
-  // otomatik yüzde kampanyaları hariç.
-  const extraTitles = (appliedPromotions || [])
-    .filter((p) => p && Number(p.discount) > 0 && p.type !== "percent")
-    .map((p) => p.title || p.code).filter(Boolean);
-
-  // Kombin / sale öneriler
-  const [suggestions, setSuggestions] = useState([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [deals, setDeals] = useState([]);
-
-  useEffect(() => {
-    if (items.length === 0) { setSuggestions([]); setDeals([]); return; }
-    let cancel = false;
-    setSuggestionsLoading(true);
-    const productIds = items.map((it) => it.productId).filter(Boolean);
-    Promise.all([
-      axios.post(`${API}/products/cart-suggestions`, { product_ids: productIds, limit: 8 }),
-      axios.post(`${API}/products/checkout-deals`, { product_ids: productIds, limit: 6 }),
-    ])
-      .then(([s, d]) => {
-        if (cancel) return;
-        setSuggestions(s.data?.items || []);
-        setDeals(d.data?.items || []);
-      })
-      .catch(() => { if (!cancel) { setSuggestions([]); setDeals([]); } })
-      .finally(() => { if (!cancel) setSuggestionsLoading(false); });
-    return () => { cancel = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length]);
-
-  // GA4: view_cart — sepet sayfası görüntüleme (mount'ta bir kez)
-  useEffect(() => {
-    if (items.length === 0) return;
-    try {
-      trackViewCart({ total, items });
-    } catch (_) { /* silent */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const carousel = (title, list, testId, cta) => (list.length > 0 && (
+    <div className="mb-6" data-testid={testId}>
+      <div className="position-relative">
+        <div className="border-bottom border-color-1 mb-2 d-flex justify-content-between align-items-end">
+          <h3 className="section-title mb-0 pb-2 font-size-22">{title}</h3>
+          {cta}
+        </div>
+        <Carousel perView={{ base: 2, md: 3, lg: 4, xl: 5, wd: 6 }} className="position-static overflow-hidden u-slick-overflow-visble pb-7 pt-2 px-1"
+          dotsClassName="text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-3 mt-md-0">
+          {list.map((p, i) => (
+            <div className="js-slide products-group" key={p.id} data-testid={`${testId === "checkout-deals-block" ? "checkout-deal" : "cart-suggestion"}-${p.id}`}>
+              <ProductCard product={p} listName={testId} index={i} innerClassName="product-item__inner px-wd-4 p-2 p-md-3" wishlistLabel="Favori" />
+            </div>
+          ))}
+        </Carousel>
+      </div>
+    </div>
+  ));
 
   if (items.length === 0) {
     return (
-      <div className="sf-page min-h-screen bg-white" data-testid="cart-page">
+      <div className="sf-page" data-testid="cart-page">
         <Header />
-        <div className="container-main py-24 text-center">
-          <p className="text-[10px] tracking-[0.3em] text-black/50 uppercase mb-6">SEPETİM</p>
-          <h1 className="text-3xl sm:text-4xl font-light tracking-tight mb-4">Sepetiniz boş</h1>
-          <p className="text-sm text-black/60 mb-10 max-w-md mx-auto">
-            Henüz sepetinize ürün eklemediniz. Yeni sezon parçaları keşfetmek için alışverişe başlayın.
-          </p>
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center h-12 px-10 bg-black text-white text-xs uppercase tracking-[0.25em] hover:bg-black/85 transition-colors"
-            data-testid="empty-cart-shop-btn"
-          >
-            Alışverişe başla
-          </Link>
-        </div>
+        <main id="content" role="main" className="electro el-page cart-page">
+          <Breadcrumb items={[{ label: "Sepetim" }]} />
+          <div className="container">
+            <div className="mb-4"><h1 className="text-center">Sepetim</h1></div>
+            <div className="text-center mb-10">
+              <i className="ec ec-shopping-bag font-size-50 text-gray-5 d-block mb-3" />
+              <p className="font-size-16 text-gray-90 mb-4">Sepetinizde ürün bulunmuyor.</p>
+              <Link to="/" className="btn btn-primary-dark-w px-5" data-testid="empty-cart-shop-btn">Alışverişe Başla</Link>
+            </div>
+          </div>
+        </main>
         <Footer />
       </div>
     );
   }
 
   return (
-    <div className="sf-page min-h-screen bg-white pb-32 md:pb-12" data-testid="cart-page">
+    <div className="sf-page" data-testid="cart-page">
       <Header />
+      <main id="content" role="main" className="electro el-page cart-page">
+        <Breadcrumb items={[{ label: "Sepetim" }]} />
+        <div className="container">
+          <div className="mb-4"><h1 className="text-center">Sepetim <span className="font-size-20 text-gray-90">({itemCount} ürün)</span></h1></div>
 
-      <div className="container-main py-6 md:py-12">
-        <div className="mb-8 md:mb-10 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-[10px] tracking-[0.3em] text-black/50 uppercase mb-2">SEPETİM</p>
-            <h1 className="text-2xl sm:text-3xl font-light tracking-tight">
-              {itemCount} ürün
-            </h1>
-          </div>
-          {/* Sepeti Paylaş — sepet linki oluşturup panoya kopyalar / paylaşım menüsü açar */}
-          <button
-            onClick={handleShareCart}
-            disabled={sharing}
-            data-testid="share-cart-btn"
-            className="inline-flex items-center gap-2 h-10 px-4 border border-black/15 text-[11px] uppercase tracking-[0.2em] hover:border-black transition-colors disabled:opacity-50"
-            title="Sepetini linkle paylaş"
-          >
-            <Share2 size={14} />
-            {sharing ? "Hazırlanıyor..." : "Sepeti Paylaş"}
-          </button>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-8 lg:gap-12">
-          {/* Cart Items */}
-          <div className="lg:col-span-2">
-            {/* Free Shipping Progress — eşik altı: kalan tutar; eşik üstü: kazandın kutlaması */}
-            {freeShippingThreshold != null && items.length > 0 && (
-              remaining > 0 ? (
-                <div className="mb-8 p-4 bg-stone-50 border border-black/5">
-                  <p className="text-xs text-center mb-2 text-black/70">
-                    Ücretsiz kargo için <span className="font-medium text-black">{remaining.toFixed(2)} TL</span> daha ekleyin
-                  </p>
-                  <div className="h-[2px] bg-black/10 overflow-hidden">
-                    <div
-                      className="h-full bg-black transition-all duration-700 ease-out"
-                      style={{ width: `${Math.min(100, (netTotal / freeShippingLimit) * 100)}%` }}
-                    />
+          {freeShippingThreshold != null && (
+            <div className="mb-5 mx-auto" style={{ maxWidth: 640 }} data-testid="cart-free-shipping">
+              {remaining > 0 ? (
+                <>
+                  <p className="text-center font-size-14 mb-2">Ücretsiz kargo için <strong>{fmtPrice(remaining)}</strong> daha ekleyin</p>
+                  <div className="rounded-pill bg-gray-3 height-6 position-relative">
+                    <span className="position-absolute left-0 top-0 bottom-0 rounded-pill bg-primary" style={{ width: `${Math.min(100, freeShippingLimit ? (netTotal / freeShippingLimit) * 100 : 0)}%` }} />
                   </div>
-                </div>
+                </>
               ) : (
-                <div className="mb-8 p-4 bg-emerald-50 border border-emerald-200">
-                  <p className="text-xs text-center mb-2 text-emerald-800 font-medium">
-                    Mevcut sepet ücretsiz kargo eşiğinde. Kargo, ödeme adımında tüm indirimlerden sonra kesinleşir.
-                  </p>
-                  <div className="h-[2px] bg-emerald-200 overflow-hidden">
-                    <div className="h-full bg-emerald-600 w-full" />
-                  </div>
-                </div>
-              )
-            )}
-
-            {/* Items */}
-            <div className="divide-y divide-black/10">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex gap-4 sm:gap-6 py-6"
-                  data-testid={`cart-item-${item.id}`}
-                >
-                  <Link to={`/${item.slug || item.productId || ""}`} className="shrink-0">
-                    <img
-                      src={item.image || PLACEHOLDER}
-                      alt={item.name}
-                      className="w-24 h-32 sm:w-32 sm:h-40 object-cover bg-stone-100"
-                    />
-                  </Link>
-                  <div className="flex-1 min-w-0 flex flex-col">
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="min-w-0">
-                        <Link
-                          to={`/${item.slug || item.productId || ""}`}
-                          className="block"
-                        >
-                          <h3 className="text-sm sm:text-base font-medium leading-tight line-clamp-2 hover:underline">
-                            {item.name}
-                          </h3>
-                        </Link>
-                        <div className="mt-2 space-y-0.5 text-xs text-black/60">
-                          {item.color && <p>Renk: {item.color}</p>}
-                          {item.size && <p>Beden: {item.size}</p>}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="text-black/40 hover:text-black transition-colors p-1 -m-1"
-                        data-testid={`remove-cart-${item.id}`}
-                        aria-label="Ürünü kaldır"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-auto pt-4">
-                      <div className="inline-flex items-center border border-black/15">
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="p-2 hover:bg-black/5 transition-colors disabled:opacity-30"
-                          disabled={item.quantity <= 1}
-                          aria-label="Azalt"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="px-3 sm:px-4 text-xs sm:text-sm tabular-nums">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="p-2 hover:bg-black/5 transition-colors"
-                          aria-label="Arttır"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                      {(() => {
-                        const lv = cartLineView(item);
-                        return lv.hasDiscount ? (
-                          <div className="text-right">
-                            <p className="text-[11px] text-black/40 line-through tabular-nums">{(lv.listUnit * item.quantity).toFixed(2)} TL</p>
-                            <p className="text-sm sm:text-base font-medium text-red-600 tabular-nums">{(lv.unit * item.quantity).toFixed(2)} TL</p>
-                            <span className="text-[9px] font-semibold text-emerald-700">%{lv.discountPct} indirim uygulandı</span>
-                          </div>
-                        ) : (
-                          <p className="text-sm sm:text-base font-medium tabular-nums">
-                            {(lv.unit * item.quantity).toFixed(2)} TL
-                          </p>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                <p className="text-center font-size-14 text-green mb-0"><i className="fas fa-truck mr-1" /> Tebrikler! Siparişiniz ücretsiz kargo kapsamında.</p>
+              )}
             </div>
-          </div>
+          )}
 
-          {/* Summary - desktop only sticky sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-stone-50 p-6 lg:sticky lg:top-32 border border-black/5">
-              <h2 className="text-[10px] tracking-[0.3em] uppercase text-black/60 mb-5">Sipariş Özeti</h2>
-
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-black/60">Ara toplam</span>
-                  <span className="tabular-nums">{listSum.toFixed(2)} TL</span>
-                </div>
-                {productDisc > 0.001 && (
-                  <div className="flex justify-between text-emerald-700" data-testid="cart-product-discount">
-                    <span>Ürün indirimleri</span>
-                    <span className="tabular-nums">-{productDisc.toFixed(2)} TL</span>
-                  </div>
-                )}
-                {extraDisc > 0.001 && (
-                  <div className="flex justify-between text-emerald-700" data-testid="cart-promo-discount">
-                    <span>{extraTitles.length ? extraTitles.join(" + ") : "Kampanya indirimi"}</span>
-                    <span className="tabular-nums">-{extraDisc.toFixed(2)} TL</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-black/60">Kargo</span>
-                  <span className={shippingCost === 0 ? "text-emerald-700" : "tabular-nums"}>
-                    {shippingCost === 0 ? "Ücretsiz" : `${shippingCost.toFixed(2)} TL`}
-                  </span>
-                </div>
-                <div className="border-t border-black/10 pt-3 flex justify-between text-base">
-                  <span className="font-medium">Toplam</span>
-                  <span className="font-medium tabular-nums">{grandTotal.toFixed(2)} TL</span>
-                </div>
-                {/* Taksit yazısı kaldırıldı (kullanıcı isteği) */}
-              </div>
-
-              <Link
-                to="/odeme"
-                className="hidden md:flex items-center justify-center w-full h-14 mt-6 bg-black text-white text-xs uppercase tracking-[0.25em] hover:bg-black/85 transition-colors"
-                data-testid="checkout-btn-desktop"
-              >
-                Ödemeye Geç
-              </Link>
-
-              <Link
-                to="/"
-                className="block text-center text-xs underline mt-4 text-black/60 hover:text-black transition-colors"
-              >
-                Alışverişe devam et
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Stilini Tamamla — mobile: yatay snap, desktop: 4-col grid */}
-        {(suggestions.length > 0 || suggestionsLoading) && (
-          <div className="mt-12 md:mt-16 pt-8 md:pt-12 border-t border-black/10" data-testid="cart-suggestions-block">
-            <h2 className="text-base md:text-xl font-light tracking-tight mb-5 md:mb-8 px-1">Stilini Tamamla</h2>
-            {/* Mobile snap-scroll */}
-            <div className="md:hidden -mx-4 px-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-              <div className="flex gap-3" style={{ minWidth: "max-content" }}>
-                {suggestions.map((p) => {
-                  const img = optimizeImg(firstImage(p), 500) || PLACEHOLDER;
-                  const pv = priceView(p);
+          <div className="mb-10 cart-table">
+            <table className="table" cellSpacing="0">
+              <thead>
+                <tr>
+                  <th className="product-remove">&nbsp;</th>
+                  <th className="product-thumbnail">&nbsp;</th>
+                  <th className="product-name">Ürün</th>
+                  <th className="product-price">Fiyat</th>
+                  <th className="product-quantity w-lg-15">Adet</th>
+                  <th className="product-subtotal">Toplam</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const lv = cartLineView(item);
+                  const href = `/${item.slug || item.productId || ""}`;
                   return (
-                    <div key={p.id} className="snap-start shrink-0 w-[44vw]" data-testid={`cart-suggestion-${p.id}`}>
-                      <Link to={`/${p.slug || p.id}`} className="block relative overflow-hidden bg-stone-100 aspect-[2/3]" aria-label={p.name}>
-                        <img src={img} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
-                      </Link>
-                      <div className="mt-2">
-                        <Link to={`/${p.slug || p.id}`} className="block text-[12px] font-light text-black/85 line-clamp-1">{p.name}</Link>
-                        <div className="flex items-baseline gap-1.5 mt-0.5">
-                          {pv.hasDiscount ? (
-                            <>
-                              <span className="text-[11px] text-black/40 line-through tabular-nums">{pv.list.toFixed(2)} TL</span>
-                              <span className="text-[12px] font-medium text-red-600 tabular-nums">{pv.display.toFixed(2)} TL</span>
-                            </>
-                          ) : (
-                            <span className="text-[12px] font-light tabular-nums">{pv.display.toFixed(2)} TL</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <tr key={item.id} data-testid={`cart-item-${item.id}`}>
+                      <td className="text-center">
+                        <button type="button" className="btn btn-link text-gray-32 font-size-26 p-0" onClick={() => { trackRemove(item); removeItem(item.id); }} data-testid={`remove-cart-${item.id}`} aria-label="Ürünü sepetten çıkar">×</button>
+                      </td>
+                      <td className="d-none d-md-table-cell">
+                        <Link to={href}><img className="img-fluid max-width-100 p-1 border border-color-1" src={optimizeImg(item.image, 200) || PLACEHOLDER} alt={item.name} width="100" height="100" loading="lazy" /></Link>
+                      </td>
+                      <td data-title="Ürün">
+                        <Link to={href} className="text-gray-90">{item.name}</Link>
+                        {(item.color || item.size) && <div className="font-size-12 text-gray-5">{[item.color, item.size].filter(Boolean).join(" / ")}</div>}
+                        {lv.campaignPct > 0 && <div className="font-size-12 text-green">%{lv.campaignPct} kampanya indirimi</div>}
+                      </td>
+                      <td data-title="Fiyat">
+                        {lv.hasDiscount && <del className="text-gray-9 font-size-13 mr-1 d-block d-md-inline">{fmtPrice(lv.listUnit)}</del>}
+                        <span className={lv.hasDiscount ? "text-red" : ""}>{fmtPrice(lv.unit)}</span>
+                      </td>
+                      <td data-title="Adet">
+                        <span className="sr-only">Adet</span>
+                        <QuantityInput value={item.quantity} onChange={(n) => updateQuantity(item.id, n)} max={item.stock || 9999} testId={`cart-qty-${item.id}`} />
+                      </td>
+                      <td data-title="Toplam"><span>{fmtPrice(lv.unit * item.quantity)}</span></td>
+                    </tr>
                   );
                 })}
-              </div>
-            </div>
-            {/* Desktop grid */}
-            <div className="hidden md:grid grid-cols-4 gap-5">
-              {suggestions.map((p) => {
-                const img = firstImage(p);
-                const pv = priceView(p);
-                return (
-                  <div key={p.id} className="group relative">
-                    <Link to={`/${p.slug || p.id}`} className="block relative overflow-hidden bg-stone-100 aspect-[2/3]" aria-label={p.name}>
-                      <img src={img} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]" loading="lazy" />
-                    </Link>
-                    <div className="mt-2.5">
-                      <Link to={`/${p.slug || p.id}`} className="block text-sm font-light text-black/85 line-clamp-1 hover:underline">{p.name}</Link>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        {pv.hasDiscount ? (
-                          <>
-                            <span className="text-sm text-black/40 line-through tabular-nums">{pv.list.toFixed(2)} TL</span>
-                            <span className="text-sm font-medium text-red-600 tabular-nums">{pv.display.toFixed(2)} TL</span>
-                          </>
-                        ) : (
-                          <span className="text-sm font-light tabular-nums">{pv.display.toFixed(2)} TL</span>
-                        )}
+                <tr>
+                  <td colSpan="6" className="border-top space-top-2 justify-content-center">
+                    <div className="pt-md-3">
+                      <div className="d-block d-md-flex flex-center-between">
+                        <div className="mb-3 mb-md-0 w-xl-40 font-size-14 text-gray-90">
+                          <i className="fas fa-tags mr-1" /> İndirim kuponunuzu ödeme adımında uygulayabilirsiniz.
+                        </div>
+                        <div className="d-md-flex">
+                          <button type="button" onClick={handleShareCart} disabled={sharing} className="btn btn-soft-secondary mb-3 mb-md-0 font-weight-normal px-5 px-md-4 px-lg-5 w-100 w-md-auto" data-testid="share-cart-btn">
+                            <i className="fas fa-share-alt mr-1" /> {sharing ? "Hazırlanıyor..." : "Sepeti Paylaş"}
+                          </button>
+                          <Link to="/odeme" className="btn btn-primary-dark-w ml-md-2 px-5 px-md-4 px-lg-5 w-100 w-md-auto d-none d-md-inline-block" data-testid="checkout-btn-desktop">Ödemeye Geç</Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        )}
 
-        {/* Kasa Önü Fırsatları — indirimdeki ürünler */}
-        {deals.length > 0 && (
-          <div className="mt-12 md:mt-16 pt-8 md:pt-12 border-t border-black/10" data-testid="checkout-deals-block">
-            <div className="mb-6 md:mb-8 flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[10px] tracking-[0.3em] text-red-700 uppercase mb-2">Sınırlı Süre</p>
-                <h2 className="text-xl sm:text-2xl font-light tracking-tight">Kasa önü fırsatları</h2>
+          <div className="mb-8 cart-total">
+            <div className="row">
+              <div className="col-xl-5 col-lg-6 offset-lg-6 offset-xl-7 col-md-8 offset-md-4">
+                <div className="border-bottom border-color-1 mb-3">
+                  <h3 className="d-inline-block section-title mb-0 pb-2 font-size-26">Sepet Toplamı</h3>
+                </div>
+                <table className="table mb-3 mb-md-0">
+                  <tbody>
+                    <tr className="cart-subtotal"><th>Ara Toplam</th><td data-title="Ara Toplam"><span className="amount">{fmtPrice(listSum)}</span></td></tr>
+                    {productDisc > 0.001 && (
+                      <tr data-testid="cart-product-discount"><th>Ürün İndirimleri</th><td data-title="Ürün İndirimleri"><span className="amount text-green">-{fmtPrice(productDisc)}</span></td></tr>
+                    )}
+                    {extraDisc > 0.001 && (
+                      <tr data-testid="cart-promo-discount"><th>{extraTitles.length ? extraTitles.join(" + ") : "Kampanya İndirimi"}</th><td data-title="Kampanya"><span className="amount text-green">-{fmtPrice(extraDisc)}</span></td></tr>
+                    )}
+                    <tr className="shipping"><th>Kargo</th><td data-title="Kargo">{shippingCost === 0 ? <span className="text-green">Ücretsiz</span> : <span className="amount">{fmtPrice(shippingCost)}</span>}<div className="font-size-12 text-gray-90">Kargo, ödeme adımında kesinleşir.</div></td></tr>
+                    <tr className="order-total"><th>Toplam</th><td data-title="Toplam"><strong><span className="amount" data-testid="cart-grand-total">{fmtPrice(grandTotal)}</span></strong></td></tr>
+                  </tbody>
+                </table>
+                {totalDisc > 0.001 && <p className="font-size-13 text-green mb-2">Bu siparişte toplam {fmtPrice(totalDisc)} tasarruf ediyorsunuz.</p>}
+                <Link to="/odeme" className="btn btn-primary-dark-w ml-md-2 px-5 px-md-4 px-lg-5 w-100 w-md-auto d-md-none" data-testid="checkout-btn">Ödemeye Geç</Link>
+                <div className="text-center text-md-right mt-2"><Link to="/" className="font-size-13 text-gray-90">Alışverişe devam et</Link></div>
               </div>
-              <Link to="/sale" className="hidden sm:inline-block text-[11px] tracking-[0.25em] uppercase border-b border-black pb-0.5 hover:opacity-70">
-                Tümü
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-              {deals.map((p) => {
-                const img = firstImage(p);
-                const pv = priceView(p);
-                const off = pv.discountPct;
-                return (
-                  <Link
-                    key={p.id}
-                    to={`/${p.slug || p.id}`}
-                    className="group block"
-                    data-testid={`checkout-deal-${p.id}`}
-                  >
-                    <div className="relative aspect-[2/3] bg-stone-100 overflow-hidden mb-2">
-                      <img
-                        src={img}
-                        alt={p.name}
-                        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                        loading="lazy"
-                      />
-                      {off > 0 && (
-                        <span className="absolute top-2 left-2 bg-red-700 text-white text-[10px] tracking-[0.15em] px-2 py-1 uppercase">
-                          %{off}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-[11px] sm:text-xs text-black/85 leading-tight line-clamp-1 group-hover:underline">{p.name}</h3>
-                    <div className="flex items-baseline gap-2 mt-0.5">
-                      {pv.hasDiscount ? (
-                        <>
-                          <span className="text-xs font-medium text-red-700 tabular-nums">{pv.display.toFixed(2)} TL</span>
-                          <span className="text-[10px] text-black/40 line-through tabular-nums">{pv.list.toFixed(2)} TL</span>
-                        </>
-                      ) : (
-                        <span className="text-xs text-black/85 tabular-nums">{pv.display.toFixed(2)} TL</span>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Sticky bottom mobile CTA */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-black/10 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)]"
-        data-testid="cart-mobile-sticky-cta"
-      >
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-black/60">Toplam</span>
-          <span className="text-sm font-medium tabular-nums">{grandTotal.toFixed(2)} TL</span>
+          {!suggestionsLoading && carousel("Bunları da Beğenebilirsiniz", suggestions, "cart-suggestions-block")}
+          {carousel("Kasa Önü Fırsatları", deals, "checkout-deals-block", <Link to="/sale" className="font-size-14 text-gray-90 pb-2">Tümünü Gör</Link>)}
         </div>
-        <Link
-          to="/odeme"
-          className="flex items-center justify-center w-full h-12 bg-black text-white text-xs uppercase tracking-[0.25em] hover:bg-black/85 active:bg-black/85 transition-colors"
-          data-testid="checkout-btn"
-        >
-          Ödemeye Geç
-        </Link>
-      </div>
-
+      </main>
       <Footer />
     </div>
   );

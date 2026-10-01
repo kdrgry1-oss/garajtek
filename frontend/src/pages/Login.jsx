@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import Breadcrumb from "../components/electro/Breadcrumb";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import {
@@ -271,18 +272,19 @@ export default function Login() {
     if (user) navigate(_redirectTo, { replace: true });
   }, [user, navigate, _redirectTo]);
 
-  if (user) return <div className="sf-page min-h-screen flex items-center justify-center text-sm">Yönlendiriliyorsunuz…</div>;
+  if (user) return <div className="sf-page electro"><div className="container py-10 text-center">Yönlendiriliyorsunuz…</div></div>;
 
-  const handleSubmit = async (e) => {
+  const submitAs = (mode) => async (e) => {
     e.preventDefault();
-    if (isRegister && (!formData.first_name.trim() || !formData.last_name.trim())) {
+    const reg = mode === "register";
+    if (reg && (!formData.first_name.trim() || !formData.last_name.trim())) {
       toast.error("Ad ve soyad zorunludur");
       return;
     }
+    setIsRegister(reg);
     setLoading(true);
-
     try {
-      if (isRegister) {
+      if (reg) {
         await register({ ...formData, first_name: formData.first_name.trim(), last_name: formData.last_name.trim() });
         toast.success("Kayıt başarılı!");
       } else {
@@ -296,183 +298,134 @@ export default function Login() {
       setLoading(false);
     }
   };
+  const set = (k) => (e) => setFormData({ ...formData, [k]: e.target.value });
 
-  return (
-    <div className="sf-page min-h-screen">
-      <Header />
-
-      <div className="max-w-screen-2xl mx-auto px-4 py-16">
-        <div className="max-w-sm mx-auto">
-          <h1 className="text-xl font-medium text-center mb-8">
-            {isRegister ? "Üye Ol" : "Giriş Yap"}
-          </h1>
-
-          {/* Sosyal giriş — ikon butonlar yan yana (Google + Facebook + Apple), eşit ölçü */}
-          <div className="flex items-center justify-center gap-3 mb-6">
-            {/* Google — resmi GIS ikon butonu (kırpma yok; kendi boyutunda render olur) */}
+  const social = (
+    <>
+      {(socialProviders.google || socialProviders.facebook || socialProviders.apple) && (
+        <div className="mb-4">
+          <div className="d-flex align-items-center flex-wrap">
             {!embeddedGoogle && socialProviders.google && (
-              <div ref={googleBtnRef} data-testid="google-login-btn" data-flow-version={GOOGLE_FLOW_VERSION} className="flex items-center justify-center" />
+              <div ref={googleBtnRef} data-testid="google-login-btn" data-flow-version={GOOGLE_FLOW_VERSION} className="mr-2 mb-2" />
             )}
-            {/* Facebook */}
             {socialProviders.facebook && (
-              <button type="button" onClick={handleFacebookLogin} disabled={loading}
-                title="Facebook ile giriş" aria-label="Facebook ile giriş"
-                className="w-10 h-10 flex items-center justify-center rounded border border-[#1877F2] bg-[#1877F2] text-white hover:bg-[#0f66d6] transition-colors disabled:opacity-60"
-                data-testid="facebook-login-btn">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12S0 5.446 0 12.073C0 18.062 4.388 23.027 10.125 23.927v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
+              <button type="button" onClick={handleFacebookLogin} disabled={loading} title="Facebook ile giriş" aria-label="Facebook ile giriş"
+                className="btn btn-icon btn-facebook rounded-circle mr-2 mb-2" style={{ background: "#1877F2", color: "#fff" }} data-testid="facebook-login-btn">
+                <span className="fab fa-facebook-f btn-icon__inner" />
               </button>
             )}
-            {/* Apple */}
             {socialProviders.apple && (
-              <button type="button"
-                onClick={handleAppleLogin}
-                disabled={loading} title="Apple ile giriş" aria-label="Apple ile giriş"
-                className="w-10 h-10 flex items-center justify-center rounded border border-black bg-black text-white hover:bg-gray-900 transition-colors disabled:opacity-60"
-                data-testid="apple-login-btn">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.05 12.54c.02 2.8 2.43 3.73 2.46 3.74-.02.07-.38 1.29-1.24 2.55-.75 1.1-1.53 2.19-2.76 2.22-1.21.02-1.59-.71-2.97-.71-1.38 0-1.8.69-2.94.73-1.18.04-2.08-1.18-2.83-2.28C5.2 16.53 4 12.93 5.61 10.54c.8-1.19 2.23-1.94 3.77-1.96 1.15-.02 2.23.78 2.93.78.7 0 2.02-.96 3.41-.82.58.02 2.21.23 3.26 1.77-.08.05-1.94 1.13-1.93 3.37zM14.51 7.34c.63-.76 1.05-1.82.94-2.88-.9.04-2 .6-2.65 1.36-.58.67-1.09 1.75-.95 2.78 1.01.08 2.03-.51 2.66-1.26z"/>
-                </svg>
+              <button type="button" onClick={handleAppleLogin} disabled={loading} title="Apple ile giriş" aria-label="Apple ile giriş"
+                className="btn btn-icon btn-dark rounded-circle mr-2 mb-2" data-testid="apple-login-btn">
+                <span className="fab fa-apple btn-icon__inner" />
               </button>
             )}
           </div>
-
           {socialProviders.google && ["error", "embedded"].includes(googleStatus.phase) && (
-            <div className="mb-6 border border-amber-200 bg-amber-50 px-3 py-3 text-center" role="alert" data-testid="google-login-status">
-              <p className="text-xs text-amber-900 mb-2">{googleStatus.message}</p>
-              <button
-                type="button"
-                onClick={handleGoogleRedirectFallback}
-                disabled={googleStatus.phase === "redirect"}
-                className="text-xs underline font-medium disabled:opacity-60"
-                data-testid="google-redirect-fallback"
-              >
+            <div className="alert alert-warning font-size-13 mt-2" role="alert" data-testid="google-login-status">
+              <div className="mb-1">{googleStatus.message}</div>
+              <button type="button" onClick={handleGoogleRedirectFallback} disabled={googleStatus.phase === "redirect"} className="btn btn-link p-0 font-size-13" data-testid="google-redirect-fallback">
                 Tam sayfa Google girişiyle devam et
               </button>
             </div>
           )}
-
           {["popup", "exchanging", "redirect", "success"].includes(googleStatus.phase) && googleStatus.message && (
-            <p className="mb-6 text-center text-xs text-gray-600" role="status">{googleStatus.message}</p>
+            <p className="font-size-13 text-gray-90" role="status">{googleStatus.message}</p>
           )}
+          <div className="font-size-13 text-gray-90">veya e-posta ile devam edin</div>
+        </div>
+      )}
+    </>
+  );
 
-          {!isRegister && <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-500">veya</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {isRegister && (
-              <>
-                <div>
-                  <label htmlFor="register-first-name" className="block text-xs mb-1">Ad *</label>
-                  <input
-                    type="text"
-                    id="register-first-name" name="given-name" autoComplete="given-name" required maxLength={100} pattern=".*\S.*"
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full border px-3 py-2.5 text-sm focus:outline-none focus:border-black"
-                  />
+  return (
+    <div className="sf-page" data-testid="login-page">
+      <Header />
+      <main id="content" role="main" className="electro el-page">
+        <Breadcrumb items={[{ label: "Hesabım" }]} />
+        <div className="container">
+          <div className="mb-4"><h1 className="text-center">Hesabım</h1></div>
+          <div className="my-4 my-xl-8">
+            <div className="row">
+              <div className={`col-md-5 ml-xl-auto mr-md-auto mr-xl-0 mb-8 mb-md-0${isRegister ? " d-none d-md-block" : ""}`}>
+                <div className="border-bottom border-color-1 mb-6">
+                  <h3 className="d-inline-block section-title mb-0 pb-2 font-size-26">Giriş Yap</h3>
                 </div>
-                <div>
-                  <label htmlFor="register-last-name" className="block text-xs mb-1">Soyad *</label>
-                  <input
-                    type="text"
-                    id="register-last-name" name="family-name" autoComplete="family-name" required maxLength={100} pattern=".*\S.*"
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full border px-3 py-2.5 text-sm focus:outline-none focus:border-black"
-                  />
-                </div>
-                {/* Boy & kilo — size en uygun bedeni önermek için (opsiyonel) */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs mb-1">Boy (cm)</label>
-                    <input
-                      type="number" min="100" max="230" inputMode="numeric"
-                      value={formData.height_cm || ""}
-                      onChange={(e) => setFormData({ ...formData, height_cm: e.target.value })}
-                      placeholder="örn. 168"
-                      className="w-full border px-3 py-2.5 text-sm focus:outline-none focus:border-black"
-                      data-testid="height-input"
-                    />
+                <p className="text-gray-90 mb-4">Tekrar hoş geldiniz! Hesabınıza giriş yapın.</p>
+                {social}
+                <form onSubmit={submitAs("login")} noValidate={false}>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="loginEmail">E-posta adresi <span className="text-danger">*</span></label>
+                    <input type="email" className="form-control" id="loginEmail" autoComplete="email" placeholder="E-posta adresi" value={formData.email} onChange={set("email")} required data-testid="email-input" />
                   </div>
-                  <div>
-                    <label className="block text-xs mb-1">Kilo (kg)</label>
-                    <input
-                      type="number" min="30" max="250" inputMode="numeric"
-                      value={formData.weight_kg || ""}
-                      onChange={(e) => setFormData({ ...formData, weight_kg: e.target.value })}
-                      placeholder="örn. 60"
-                      className="w-full border px-3 py-2.5 text-sm focus:outline-none focus:border-black"
-                      data-testid="weight-input"
-                    />
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="loginPassword">Şifre <span className="text-danger">*</span></label>
+                    <input type="password" className="form-control" id="loginPassword" autoComplete="current-password" placeholder="Şifre" value={formData.password} onChange={set("password")} required minLength={6} data-testid="password-input" />
                   </div>
-                </div>
-                <p className="text-[11px] text-gray-400 -mt-1">Boy/kilo ile ürün sayfasında size en uygun bedeni öneririz. (opsiyonel)</p>
-              </>
-            )}
-            
-            <div>
-              <label className="block text-xs mb-1">E-posta *</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                className="w-full border px-3 py-2.5 text-sm focus:outline-none focus:border-black"
-                data-testid="email-input"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-xs mb-1">Şifre *</label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                minLength={6}
-                className="w-full border px-3 py-2.5 text-sm focus:outline-none focus:border-black"
-                data-testid="password-input"
-              />
-            </div>
-
-            {!isRegister && (
-              <div className="text-right -mt-2 mb-1">
-                <button
-                  type="button"
-                  onClick={() => navigate("/sifremi-unuttum")}
-                  className="text-xs text-gray-500 hover:text-black underline"
-                >
-                  Şifremi unuttum?
-                </button>
+                  <div className="mb-1">
+                    <div className="mb-3">
+                      <button type="submit" disabled={loading} className="btn btn-primary-dark-w px-5" data-testid="submit-btn">{loading && !isRegister ? "İşleniyor..." : "Giriş Yap"}</button>
+                    </div>
+                    <div className="mb-2">
+                      <button type="button" className="btn btn-link p-0 text-blue" onClick={() => navigate("/sifremi-unuttum")}>Şifrenizi mi unuttunuz?</button>
+                    </div>
+                    <div className="d-md-none mt-3">
+                      <button type="button" className="btn btn-link p-0 text-gray-90" onClick={() => setIsRegister(true)}>Hesabınız yok mu? <strong>Üye olun</strong></button>
+                    </div>
+                  </div>
+                </form>
               </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-black text-white py-3 text-xs uppercase tracking-wider hover:bg-gray-900 disabled:opacity-50"
-              data-testid="submit-btn"
-            >
-              {loading ? "İşleniyor..." : isRegister ? "Üye Ol" : "Giriş Yap"}
-            </button>
-          </form>
-
-          <div className="text-center mt-6">
-            <button
-              onClick={() => setIsRegister(!isRegister)}
-              className="text-xs underline"
-            >
-              {isRegister ? "Zaten üye misiniz? Giriş yapın" : "Hesabınız yok mu? Üye olun"}
-            </button>
+              <div className="col-md-1 d-none d-md-block">
+                <div className="flex-content-center h-100">
+                  <div className="width-1 bg-1 h-100" />
+                  <div className="width-50 height-50 border border-color-1 rounded-circle flex-content-center font-italic bg-white position-absolute">veya</div>
+                </div>
+              </div>
+              <div className={`col-md-5 ml-md-auto ml-xl-0 mr-xl-auto${isRegister ? "" : " d-none d-md-block"}`}>
+                <div className="border-bottom border-color-1 mb-6">
+                  <h3 className="d-inline-block section-title mb-0 pb-2 font-size-26">Üye Ol</h3>
+                </div>
+                <p className="text-gray-90 mb-4">Size özel alışveriş deneyiminin avantajlarından yararlanmak için hemen hesap oluşturun.</p>
+                <form onSubmit={submitAs("register")}>
+                  <div className="row">
+                    <div className="col-sm-6 form-group">
+                      <label className="form-label" htmlFor="register-first-name">Ad <span className="text-danger">*</span></label>
+                      <input type="text" className="form-control" id="register-first-name" autoComplete="given-name" maxLength={100} value={formData.first_name} onChange={set("first_name")} data-testid="first-name-input" />
+                    </div>
+                    <div className="col-sm-6 form-group">
+                      <label className="form-label" htmlFor="register-last-name">Soyad <span className="text-danger">*</span></label>
+                      <input type="text" className="form-control" id="register-last-name" autoComplete="family-name" maxLength={100} value={formData.last_name} onChange={set("last_name")} data-testid="last-name-input" />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="registerEmail">E-posta adresi <span className="text-danger">*</span></label>
+                    <input type="email" className="form-control" id="registerEmail" autoComplete="email" placeholder="E-posta adresi" value={formData.email} onChange={set("email")} required />
+                  </div>
+                  <div className="form-group mb-4">
+                    <label className="form-label" htmlFor="registerPassword">Şifre <span className="text-danger">*</span></label>
+                    <input type="password" className="form-control" id="registerPassword" autoComplete="new-password" placeholder="En az 6 karakter" value={formData.password} onChange={set("password")} required minLength={6} />
+                  </div>
+                  <p className="text-gray-90 mb-4">Kişisel verileriniz siparişlerinizi yönetmek ve deneyiminizi geliştirmek amacıyla <a href="/sayfa/kvkk" className="text-blue">KVKK Aydınlatma Metni</a>'nde açıklandığı şekilde işlenir.</p>
+                  <div className="mb-6">
+                    <div className="mb-3">
+                      <button type="submit" disabled={loading} className="btn btn-primary-dark-w px-5" data-testid="register-submit-btn">{loading && isRegister ? "İşleniyor..." : "Üye Ol"}</button>
+                    </div>
+                    <div className="d-md-none">
+                      <button type="button" className="btn btn-link p-0 text-gray-90" onClick={() => setIsRegister(false)}>Zaten üye misiniz? <strong>Giriş yapın</strong></button>
+                    </div>
+                  </div>
+                </form>
+                <h3 className="font-size-18 mb-3">Üye olarak şunları yapabilirsiniz:</h3>
+                <ul className="list-group list-group-borderless">
+                  <li className="list-group-item px-0"><i className="fas fa-check mr-2 text-green font-size-16" /> Ödeme adımlarını hızla tamamlayın</li>
+                  <li className="list-group-item px-0"><i className="fas fa-check mr-2 text-green font-size-16" /> Siparişlerinizi kolayca takip edin</li>
+                  <li className="list-group-item px-0"><i className="fas fa-check mr-2 text-green font-size-16" /> Tüm alışveriş geçmişinize ulaşın</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
+      </main>
       <Footer />
     </div>
   );
