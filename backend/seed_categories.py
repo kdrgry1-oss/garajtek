@@ -8,7 +8,11 @@ Kurallar:
   * slug ile upsert: mevcut kategori (slug veya slug_aliases eşleşmesi) KORUNUR, id'si değişmez.
   * Asla silmez. Varsayılan modda yalnızca EKSİK alanları doldurur (panelden yapılan isim/sıra/
     açıklama düzenlemeleri ezilmez); --force ile seed alanları JSON'daki değerlere çekilir.
-  * Header mega menüsü (settings.header_menu) yalnızca kayıt yoksa yazılır (--menu-force ile ezilir).
+  * Header menüsü (settings.header_menu) yalnızca kayıt yoksa yazılır (--menu-force ile ezilir).
+    Kısa Electro tarzı set: Kampanyalar + Yeni Ürünler + 5 ana kategori (tam ağaç "Tüm
+    Kategoriler" dikey menüsünde). Açılışta, kayıt hâlâ ilk kurulumun otomatik UZUN menüsüyse
+    (updated_by == seed etiketi, sürüm < 2) kısa menüye yükseltilir; panelden kaydedilmiş menü
+    asla değişmez.
 
 Kullanım:
   python seed_categories.py               # kategoriler + (yoksa) header menü
@@ -16,7 +20,8 @@ Kullanım:
   python seed_categories.py --menu-force  # header menüyü ağaçtan yeniden üret
   python seed_categories.py --check       # yalnızca JSON doğrulaması (DB'ye dokunmaz)
 
-Sunucu açılışında `seed_if_empty()` çağrılır: categories koleksiyonu BOŞSA ağacı yükler.
+Sunucu açılışında `seed_if_empty()` çağrılır: categories koleksiyonu BOŞSA ağacı yükler; doluysa
+yalnızca `upgrade_seeded_header_menu()` çalışır (dokunulmamış otomatik menüyü kısaltır).
 """
 from __future__ import annotations
 
@@ -195,37 +200,71 @@ async def seed_categories(db, nodes: Optional[List[Dict[str, Any]]] = None, *, f
     return stats
 
 
-def build_header_menu(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """settings.header_menu 'tabs' yapısı (routes/cms.py save_header_menu şeması):
-    üst kategori → mega sekme, alt kategori → kolon, 3. seviye → kolon öğeleri."""
+# Header yatay menüsü: Electro home-v1 gibi KISA (≈7 sekme). Tam ağaç zaten "Tüm Kategoriler"
+# dikey menüsünden erişilebilir. Sürüm, otomatik üretilmiş eski menünün güvenle
+# yükseltilebilmesi için kayda yazılır (bkz. upgrade_seeded_header_menu).
+HEADER_MENU_VERSION = 2
+HEADER_MENU_CATEGORIES = [
+    "liftler", "kompresorler", "lastik-ekipmanlari", "el-aletleri", "lokma-takimlari",
+]
+
+
+def _children_map(nodes: List[Dict[str, Any]]) -> Dict[Optional[str], List[Dict[str, Any]]]:
     children: Dict[Optional[str], List[Dict[str, Any]]] = {}
     for n in nodes:
         children.setdefault(n.get("parent"), []).append(n)
     for lst in children.values():
         lst.sort(key=lambda x: x.get("sort_order", 0))
+    return children
 
-    tabs: List[Dict[str, Any]] = []
-    for top in children.get(None, []):
-        if top.get("show_in_menu") is False:
+
+def _category_tab(top: Dict[str, Any], children: Dict[Optional[str], List[Dict[str, Any]]]) -> Dict[str, Any]:
+    subs = children.get(top["slug"], [])
+    tab = {
+        "id": f"cat-{top['slug']}",
+        "label": top["name"][:60],
+        "type": "mega" if subs else "link",
+        "link": f"/{top['slug']}",
+        "style": "normal",
+        "active": True,
+    }
+    if subs:
+        tab["columns"] = [
+            {"title": s["name"][:60], "link": f"/{s['slug']}",
+             "items": [{"name": g["name"][:60], "link": f"/{g['slug']}"}
+                       for g in children.get(s["slug"], [])]}
+            for s in subs
+        ]
+    return tab
+
+
+def build_header_menu(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """settings.header_menu 'tabs' yapısı (routes/cms.py save_header_menu şeması), KISA set:
+    Kampanyalar (SALE) + Yeni Ürünler + en önemli 5 ana kategori (mega: alt kategori → kolon,
+    3. seviye → kolon öğeleri). Ağaçta olmayan/menüden gizli kategori atlanır."""
+    children = _children_map(nodes)
+    by_slug = {n["slug"]: n for n in nodes}
+    # Sanal slug'lar: "/sale" indirimli ürünleri, "/en-yeniler" en yeni ürünleri listeler.
+    tabs: List[Dict[str, Any]] = [
+        {"id": "sale", "label": "Kampanyalar", "type": "link", "link": "/sale",
+         "style": "sale", "active": True},
+        {"id": "yeni", "label": "Yeni Ürünler", "type": "link", "link": "/en-yeniler",
+         "style": "normal", "active": True},
+    ]
+    for slug in HEADER_MENU_CATEGORIES:
+        top = by_slug.get(slug)
+        if not top or top.get("parent") or top.get("show_in_menu") is False:
             continue
-        subs = children.get(top["slug"], [])
-        tab = {
-            "id": f"cat-{top['slug']}",
-            "label": top["name"][:60],
-            "type": "mega" if subs else "link",
-            "link": f"/{top['slug']}",
-            "style": "normal",
-            "active": True,
-        }
-        if subs:
-            tab["columns"] = [
-                {"title": s["name"][:60], "link": f"/{s['slug']}",
-                 "items": [{"name": g["name"][:60], "link": f"/{g['slug']}"}
-                           for g in children.get(s["slug"], [])]}
-                for s in subs
-            ]
-        tabs.append(tab)
-    # Sanal "/sale" slug'ı backend'de indirimli ürünleri listeler.
+        tabs.append(_category_tab(top, children))
+    return tabs
+
+
+def build_legacy_header_menu(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """v1 (ilk canlı kurulum) otomatik menüsü: HER üst kategori bir sekme + "İndirimli Ürünler".
+    Yalnız upgrade_seeded_header_menu'nün eski kaydı tanıması için tutulur."""
+    children = _children_map(nodes)
+    tabs = [_category_tab(top, children) for top in children.get(None, [])
+            if top.get("show_in_menu") is not False]
     tabs.append({"id": "sale", "label": "İndirimli Ürünler", "type": "link", "link": "/sale",
                  "style": "sale", "active": True})
     return tabs
@@ -242,10 +281,50 @@ async def seed_header_menu(db, nodes: Optional[List[Dict[str, Any]]] = None, *,
         {"id": "header_menu"},
         {"$set": {"tabs": build_header_menu(nodes),
                   "updated_at": datetime.now(timezone.utc).isoformat(),
-                  "updated_by": SEED_TAG}},
+                  "updated_by": SEED_TAG,
+                  "seed_menu_version": HEADER_MENU_VERSION}},
         upsert=True,
     )
     return True
+
+
+def _is_untouched_seed_menu(doc: Optional[Dict[str, Any]], nodes: List[Dict[str, Any]]) -> bool:
+    """Kayıt hâlâ seeder'ın yazdığı ESKİ menü mü? Panelden kaydedilen menüde updated_by yönetici
+    e-postası/id'sidir → asla eşleşmez. Ek güvenlik: sekme bağlantıları v1 menüsüyle birebir aynı
+    olmalı (elle DB'de oynanmış bir kayıt da korunur)."""
+    if not doc or doc.get("updated_by") != SEED_TAG:
+        return False
+    if int(doc.get("seed_menu_version") or 1) >= HEADER_MENU_VERSION:
+        return False
+    tabs = doc.get("tabs") or []
+    legacy = build_legacy_header_menu(nodes)
+    return [(t.get("id"), t.get("link")) for t in tabs if isinstance(t, dict)] == \
+        [(t["id"], t["link"]) for t in legacy]
+
+
+async def upgrade_seeded_header_menu(db=None, nodes: Optional[List[Dict[str, Any]]] = None) -> bool:
+    """Açılış kancası (idempotent): header menü hâlâ ilk kurulumda otomatik üretilen UZUN v1
+    menüsüyse kısa v2 menüyle değiştirir. Yönetici tarafından kaydedilmiş menüye DOKUNMAZ."""
+    try:
+        if db is None:
+            from routes.deps import db as _db
+            db = _db
+        nodes = nodes if nodes is not None else load_tree()
+        doc = await db.settings.find_one({"id": "header_menu"}, {"_id": 0})
+        if not _is_untouched_seed_menu(doc, nodes):
+            return False
+        await db.settings.update_one(
+            {"id": "header_menu", "updated_by": SEED_TAG},
+            {"$set": {"tabs": build_header_menu(nodes),
+                      "updated_at": datetime.now(timezone.utc).isoformat(),
+                      "updated_by": SEED_TAG,
+                      "seed_menu_version": HEADER_MENU_VERSION}},
+        )
+        logger.info("[kategori seed] otomatik header menü kısa v2 menüye yükseltildi")
+        return True
+    except Exception as e:  # açılışı asla düşürme
+        logger.error(f"[kategori seed] header menü yükseltme hatası: {e}")
+        return False
 
 
 async def seed_if_empty(db=None) -> Optional[Dict[str, int]]:
@@ -255,6 +334,7 @@ async def seed_if_empty(db=None) -> Optional[Dict[str, int]]:
             from routes.deps import db as _db
             db = _db
         if await db.categories.find_one({}, {"_id": 1}):
+            await upgrade_seeded_header_menu(db)
             return None
         nodes = load_tree()
         stats = await seed_categories(db, nodes)

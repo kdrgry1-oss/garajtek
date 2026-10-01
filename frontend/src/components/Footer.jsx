@@ -209,7 +209,7 @@ export default function Footer() {
     ["tiktok", "fab fa-tiktok", s.tiktok || socialUrl("tiktok", info.tiktok)],
   ].filter(([, , url]) => url);
   const copyright = tpl?.copyright || null;
-  const roots = tree.roots.slice(0, 12);
+  const roots = (tree.menuRoots || tree.roots).slice(0, 12);
   const half = Math.ceil(roots.length / 2);
 
   return (

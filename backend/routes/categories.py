@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends, Request
 from typing import Optional
 from datetime import datetime, timezone
 import re
+from utils.category_visibility import hide_test_placeholders
 
 from .deps import db, logger, require_admin, generate_id, generate_short_id, require_permission
 
@@ -106,7 +107,7 @@ async def get_categories(
     if visible_only and "is_active" not in query:
         query["is_active"] = {"$ne": False}
 
-    categories = await db.categories.find(query, {"_id": 0}).to_list(500)
+    categories = await db.categories.find(query, {"_id": 0}).to_list(5000)
 
     # Misafir + storefront görünümü: üyelere-özel kategorileri menü/nav'dan çıkar.
     if not _req_is_member(request):
@@ -118,12 +119,9 @@ async def get_categories(
                       if not c.get("members_only") and str(c.get("id")) not in _mo]
 
     if visible_only:
-        # Sızan test/placeholder kategorileri (ör. HB_CAT_TEST_123) storefront'tan gizle.
-        _test_pat = re.compile(r"hb_cat_test|cat_test|_test_|test_\d|^test[_\-]|[_\-]test$", re.I)
-        categories = [
-            c for c in categories
-            if not any(_test_pat.search(str(c.get(f) or "")) for f in ("id", "slug", "name"))
-        ]
+        # Sızan test/placeholder kategorileri (ör. HB_CAT_TEST_123) + alt ağaçları gizlenir.
+        # ("Test ve Arıza Tespit Cihazları" gibi gerçek kategoriler artık gizlenmez.)
+        categories = hide_test_placeholders(categories)
 
     # Build hierarchical full_name
     cat_dict = {c["id"]: c for c in categories}

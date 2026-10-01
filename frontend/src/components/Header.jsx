@@ -8,7 +8,7 @@
 //   • Masaüstünde aşağı kaydırınca yapışkan (sticky) sarı şerit
 // Veri kaynakları korunur: kategori ağacı (/categories), admin header menüsü (page-blocks/header-menu),
 // SALE menüsü (/sale-menu), duyuru + sayaç barları (ana sayfa blokları), canlı arama (/products?search).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useCart } from "../context/CartContext";
@@ -29,7 +29,7 @@ import { fmtPrice, priceOf } from "./electro/format";
 import { useCompare } from "./electro/compare";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-const MAX_VERTICAL = 11; // dikey menüde gösterilecek en fazla kök kategori
+const MAX_VERTICAL = 14; // dikey menüde gösterilecek en fazla kök kategori (fazlası "Tüm Kategoriler" bağlantısında)
 
 /* ------------------------------------------------------------------ */
 /* Dikey "Tüm Kategoriler" menüsü (hs-mega-menu, 3 seviye)              */
@@ -58,7 +58,7 @@ function VerticalMenu({ roots, open, variant, onNavigate }) {
                   return (
                     <li key={cat.id} className="nav-item u-header__nav-item" data-event="hover">
                       <Link to={`/${cat.slug}`} className="nav-link u-header__nav-link" onClick={onNavigate}>
-                        <span><CategoryIcon cat={cat} className="el-cat-icon mr-2" />{cat.name}</span>
+                        <span title={cat.name}><CategoryIcon cat={cat} className="el-cat-icon mr-2" /><span className="el-vm-label">{cat.name}</span></span>
                       </Link>
                     </li>
                   );
@@ -76,7 +76,7 @@ function VerticalMenu({ roots, open, variant, onNavigate }) {
                   <li key={cat.id} className={`nav-item hs-has-mega-menu u-header__nav-item${opened ? " hs-mega-menu-opened" : ""}`}
                     data-event="hover" onMouseEnter={() => enter(cat.id)} onMouseLeave={leave}>
                     <Link to={`/${cat.slug}`} className="nav-link u-header__nav-link u-header__nav-link-toggle" onClick={onNavigate} aria-haspopup="true" aria-expanded={opened}>
-                      <span><CategoryIcon cat={cat} className="el-cat-icon mr-2" />{cat.name}</span>
+                      <span title={cat.name}><CategoryIcon cat={cat} className="el-cat-icon mr-2" /><span className="el-vm-label">{cat.name}</span></span>
                     </Link>
                     <div className="hs-mega-menu vmm-tfw u-header__sub-menu el-anim-up" data-testid={`vmenu-panel-${cat.slug}`}>
                       {(cat.image_url || cat.image) && (
@@ -136,67 +136,185 @@ function megaColumnsOf(tab) {
   }));
 }
 
-function HorizontalNav({ tabs, saleMenu, freeShippingText, showLast }) {
+// Yatay menüde aynı anda gösterilecek en fazla sekme (Electro home-v1 ≈ 5–7 kısa sekme).
+// Fazlası — ve genişliğe sığmayanlar — "Daha Fazla" açılır menüsüne taşınır; etiketler asla
+// alt satıra kırılmaz (nowrap). Panelde uzun menü kaydedilse bile başlık bozulmaz.
+export const NAV_MAX_HOME = 7;
+export const NAV_MAX_SHOP = 6;
+
+/** Sığdırma: öncelik sırası = önce SALE stilli sekme (her zaman öne alınır), sonra menü sırası.
+ * widths[i]: i. sekmenin genişliği; budget: kullanılabilir genişlik; moreW: "Daha Fazla" genişliği.
+ * Dönüş: görünür sekme indeksleri (Set). Genişlik bilinmiyorsa (0) yalnız max uygulanır. */
+export function fitTabs(tabs, widths, budget, moreW, max) {
+  const order = tabs.map((t, i) => i);
+  const saleIdx = tabs.findIndex((t) => t && t.style === "sale");
+  if (saleIdx > 0) { order.splice(saleIdx, 1); order.unshift(saleIdx); }
+  const chosen = new Set();
+  let used = 0;
+  for (const i of order) {
+    if (chosen.size >= max) break;
+    const w = widths[i] || 0;
+    const needMore = chosen.size + 1 < tabs.length;
+    if (budget > 0 && used + w + (needMore ? moreW : 0) > budget) break;
+    chosen.add(i);
+    used += w;
+  }
+  return chosen;
+}
+
+function HorizontalNav({ tabs, saleMenu, freeShippingText, showLast, maxVisible = NAV_MAX_HOME }) {
   const [open, setOpen] = useState(null);
   const timer = useRef(null);
   const enter = (id) => { clearTimeout(timer.current); setOpen(id); };
   const leave = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setOpen(null), 150); };
   const close = () => setOpen(null);
+
+  const promoText = showLast && freeShippingText ? freeShippingText : "";
+  const sig = tabs.map((t) => `${t.id}|${t.label}|${t.style || ""}|${t.type || ""}`).join("§");
+  const initial = () => ({ sig, visible: fitTabs(tabs, [], 0, 0, maxVisible), promo: !!promoText });
+  const [layout, setLayout] = useState(initial);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const boxRef = useRef(null);
+  const measureRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    const meas = measureRef.current;
+    if (!box || !meas) return undefined;
+    const compute = () => {
+      const list = tabsRef.current;
+      const avail = box.clientWidth;
+      const items = Array.from(meas.children);
+      if (!avail || !items.length) {
+        setLayout((prev) => (prev.sig === sig ? prev : initial()));
+        return;
+      }
+      const widths = items.slice(0, list.length).map((el) => el.getBoundingClientRect().width);
+      const moreW = items[list.length] ? items[list.length].getBoundingClientRect().width : 0;
+      const promoW = promoText && items[list.length + 1] ? items[list.length + 1].getBoundingClientRect().width : 0;
+      let visible = fitTabs(list, widths, avail - promoW - 12, moreW, maxVisible);
+      let promo = !!promoText;
+      // Yer darsa önce kampanya metni (sağdaki "Ücretsiz Kargo…") gizlenir, sekmeler kalır.
+      if (promo && visible.size < Math.min(list.length, maxVisible)) {
+        const without = fitTabs(list, widths, avail - 12, moreW, maxVisible);
+        if (without.size > visible.size) { visible = without; promo = false; }
+      }
+      setLayout((prev) => {
+        const same = prev.sig === sig && prev.promo === promo && prev.visible.size === visible.size
+          && [...visible].every((i) => prev.visible.has(i));
+        return same ? prev : { sig, visible, promo };
+      });
+    };
+    compute();
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined") { ro = new ResizeObserver(() => compute()); ro.observe(box); }
+    else window.addEventListener("resize", compute);
+    let alive = true;
+    try { document.fonts && document.fonts.ready.then(() => { if (alive) compute(); }); } catch { /* yoksay */ }
+    return () => { alive = false; if (ro) ro.disconnect(); else window.removeEventListener("resize", compute); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig, maxVisible, promoText]);
+
+  const visible = layout.sig === sig ? layout.visible : initial().visible;
+  const showPromo = !!promoText && (layout.sig === sig ? layout.promo : true);
+  const overflow = tabs.filter((t, i) => !visible.has(i));
+
+  const renderTab = (tab) => {
+    const cls = `nav-link u-header__nav-link${tab.style === "sale" ? " text-sale" : ""}`;
+    const cols = tab.type === "mega" ? megaColumnsOf(tab) : [];
+    const hasSale = tab.style === "sale" && tab.type !== "mega" && saleMenu.length > 0;
+    if (cols.length) {
+      return (
+        <li key={tab.id} className={`nav-item hs-has-mega-menu u-header__nav-item${open === tab.id ? " hs-mega-menu-opened" : ""}`}
+          onMouseEnter={() => enter(tab.id)} onMouseLeave={leave}>
+          <Link to={tab.link || "#"} className={`${cls} u-header__nav-link-toggle`} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
+          <div className="hs-mega-menu w-100 u-header__sub-menu el-anim-up">
+            <div className="row u-header__mega-menu-wrapper">
+              {cols.map((col) => (
+                <div className="col-md-3" key={col.title}>
+                  <Link to={col.link} className="u-header__sub-menu-title d-block" onClick={close}>{col.title}</Link>
+                  <ul className="u-header__sub-menu-nav-group mb-3">
+                    {col.items.map((it) => (
+                      <li key={it.name}><Link to={it.link} className="nav-link u-header__sub-menu-nav-link" onClick={close}>{it.name}</Link></li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </li>
+      );
+    }
+    if (hasSale) {
+      return (
+        <li key={tab.id} className={`nav-item hs-has-sub-menu u-header__nav-item${open === tab.id ? " hs-sub-menu-opened" : ""}`}
+          onMouseEnter={() => enter(tab.id)} onMouseLeave={leave} data-testid="sale-menu">
+          <Link to={tab.link || "/sale"} className={`${cls} u-header__nav-link-toggle`} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
+          <ul className="hs-sub-menu u-header__sub-menu el-anim-up" style={{ minWidth: 230 }}>
+            {saleMenu.map((it) => (
+              <li key={`${it.url}-${it.label}`}><Link className="nav-link u-header__sub-menu-nav-link" to={it.url} onClick={close}>{it.label}</Link></li>
+            ))}
+            <li><Link className="nav-link u-header__sub-menu-nav-link font-weight-bold" to={tab.link || "/sale"} onClick={close}>Tümünü Gör</Link></li>
+          </ul>
+        </li>
+      );
+    }
+    return (
+      <li key={tab.id} className="nav-item u-header__nav-item">
+        <Link to={tab.link || "#"} className={cls} data-testid={`nav-tab-${tab.id}`}>{tab.label}</Link>
+      </li>
+    );
+  };
+
   return (
-    <nav className="js-mega-menu navbar navbar-expand-md u-header__navbar u-header__navbar--no-space hs-menu-initialized hs-menu-horizontal">
-      <div className="collapse navbar-collapse u-header__navbar-collapse show">
-        <ul className="navbar-nav u-header__navbar-nav">
-          {tabs.map((tab) => {
-            const cls = `nav-link u-header__nav-link${tab.style === "sale" ? " text-sale" : ""}`;
-            const cols = tab.type === "mega" ? megaColumnsOf(tab) : [];
-            const hasSale = tab.style === "sale" && tab.type !== "mega" && saleMenu.length > 0;
-            if (cols.length) {
-              return (
-                <li key={tab.id} className={`nav-item hs-has-mega-menu u-header__nav-item${open === tab.id ? " hs-mega-menu-opened" : ""}`}
-                  onMouseEnter={() => enter(tab.id)} onMouseLeave={leave}>
-                  <Link to={tab.link || "#"} className={`${cls} u-header__nav-link-toggle`} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
-                  <div className="hs-mega-menu w-100 u-header__sub-menu el-anim-up">
-                    <div className="row u-header__mega-menu-wrapper">
-                      {cols.map((col) => (
-                        <div className="col-md-3" key={col.title}>
-                          <Link to={col.link} className="u-header__sub-menu-title d-block" onClick={close}>{col.title}</Link>
+    <nav className="js-mega-menu navbar navbar-expand-md u-header__navbar u-header__navbar--no-space hs-menu-initialized hs-menu-horizontal el-hnav" data-testid="horizontal-nav">
+      <div className="collapse navbar-collapse u-header__navbar-collapse show" ref={boxRef}>
+        <ul className="navbar-nav u-header__navbar-nav el-hnav__list">
+          {tabs.map((tab, i) => (visible.has(i) ? renderTab(tab) : null))}
+          {overflow.length > 0 && (
+            <li className={`nav-item hs-has-mega-menu u-header__nav-item${open === "__more" ? " hs-mega-menu-opened" : ""}`}
+              onMouseEnter={() => enter("__more")} onMouseLeave={leave} data-testid="nav-more">
+              <button type="button" className="nav-link u-header__nav-link u-header__nav-link-toggle btn-link border-0 bg-transparent"
+                aria-haspopup="true" aria-expanded={open === "__more"} onClick={() => setOpen((o) => (o === "__more" ? null : "__more"))}>
+                Daha Fazla
+              </button>
+              <div className="hs-mega-menu w-100 u-header__sub-menu el-anim-up" data-testid="nav-more-panel">
+                <div className="row u-header__mega-menu-wrapper">
+                  {overflow.map((tab) => {
+                    const cols = tab.type === "mega" ? megaColumnsOf(tab) : [];
+                    return (
+                      <div className="col-md-3" key={tab.id}>
+                        <Link to={tab.link || "/"} className={`u-header__sub-menu-title d-block${tab.style === "sale" ? " text-sale" : ""}`} onClick={close}>{tab.label}</Link>
+                        {cols.length > 0 && (
                           <ul className="u-header__sub-menu-nav-group mb-3">
-                            {col.items.map((it) => (
-                              <li key={it.name}><Link to={it.link} className="nav-link u-header__sub-menu-nav-link" onClick={close}>{it.name}</Link></li>
+                            {cols.slice(0, 8).map((c) => (
+                              <li key={c.title}><Link to={c.link} className="nav-link u-header__sub-menu-nav-link" onClick={close}>{c.title}</Link></li>
                             ))}
                           </ul>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </li>
-              );
-            }
-            if (hasSale) {
-              return (
-                <li key={tab.id} className={`nav-item hs-has-sub-menu u-header__nav-item${open === tab.id ? " hs-sub-menu-opened" : ""}`}
-                  onMouseEnter={() => enter(tab.id)} onMouseLeave={leave} data-testid="sale-menu">
-                  <Link to={tab.link || "/sale"} className={`${cls} u-header__nav-link-toggle`} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
-                  <ul className="hs-sub-menu u-header__sub-menu el-anim-up" style={{ minWidth: 230 }}>
-                    {saleMenu.map((it) => (
-                      <li key={`${it.url}-${it.label}`}><Link className="nav-link u-header__sub-menu-nav-link" to={it.url} onClick={close}>{it.label}</Link></li>
-                    ))}
-                    <li><Link className="nav-link u-header__sub-menu-nav-link font-weight-bold" to={tab.link || "/sale"} onClick={close}>Tümünü Gör</Link></li>
-                  </ul>
-                </li>
-              );
-            }
-            return (
-              <li key={tab.id} className="nav-item u-header__nav-item">
-                <Link to={tab.link || "#"} className={cls} data-testid={`nav-tab-${tab.id}`}>{tab.label}</Link>
-              </li>
-            );
-          })}
-          {showLast && freeShippingText && (
-            <li className="nav-item u-header__nav-last-item">
-              <Link className="text-gray-90" to="/sayfa/kargo-ve-teslimat">{freeShippingText}</Link>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </li>
           )}
+          {showPromo && (
+            <li className="nav-item u-header__nav-last-item">
+              <Link className="text-gray-90" to="/sayfa/kargo-ve-teslimat">{promoText}</Link>
+            </li>
+          )}
+        </ul>
+        {/* Ölçüm kopyası (görünmez): her sekmenin, "Daha Fazla"nın ve kampanya metninin gerçek genişliği */}
+        <ul className="navbar-nav u-header__navbar-nav el-hnav__measure" ref={measureRef} aria-hidden="true">
+          {tabs.map((tab) => (
+            <li key={tab.id} className="nav-item u-header__nav-item">
+              <span className={`nav-link u-header__nav-link${tab.type === "mega" || (tab.style === "sale" && saleMenu.length) ? " u-header__nav-link-toggle" : ""}`}>{tab.label}</span>
+            </li>
+          ))}
+          <li className="nav-item u-header__nav-item"><span className="nav-link u-header__nav-link u-header__nav-link-toggle">Daha Fazla</span></li>
+          {promoText && <li className="nav-item u-header__nav-last-item"><span className="text-gray-90">{promoText}</span></li>}
         </ul>
       </div>
     </nav>
@@ -482,7 +600,7 @@ export default function Header({ announcement, announcementFirst = false, varian
   const { user } = useAuth();
   const info = useStoreInfo();
   const tree = useCategoryTree();
-  const roots = tree.roots;
+  const roots = tree.menuRoots || tree.roots;
   const isCheckout = location.pathname.includes("/odeme") || location.pathname.includes("/checkout");
   const variant = forcedVariant || (location.pathname === "/" ? "home" : "shop");
   const home = variant === "home";
@@ -616,8 +734,8 @@ export default function Header({ announcement, announcementFirst = false, varian
                     </div>
                   ) : (
                     <>
-                      <div className="col d-none d-xl-block">
-                        <HorizontalNav tabs={tabs} saleMenu={saleMenu} />
+                      <div className="col d-none d-xl-block el-hnav-col">
+                        <HorizontalNav tabs={tabs} saleMenu={saleMenu} maxVisible={NAV_MAX_SHOP} />
                       </div>
                       <div className="d-none d-xl-block col-md-auto">
                         <div className="d-flex">
@@ -664,7 +782,7 @@ export default function Header({ announcement, announcementFirst = false, varian
                       </div>
                     </div>
                   </div>
-                  <div className="col">
+                  <div className="col el-hnav-col">
                     <HorizontalNav tabs={tabs} saleMenu={saleMenu} freeShippingText={freeShip} showLast />
                   </div>
                 </div>

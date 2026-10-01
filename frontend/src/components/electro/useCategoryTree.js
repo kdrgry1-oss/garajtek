@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-const LS = "el_cat_tree_v1";
+const LS = "el_cat_tree_v2"; // v2: show_in_menu alanı da önbellekte (v1 bozuk ağacı titretmesin)
 
 let _promise = null;
 let _key = null;
@@ -31,7 +31,11 @@ export function buildTree(list) {
     arr.forEach((n) => sortRec(n.children));
     return arr;
   };
-  return { roots: sortRec(roots), byId, flat: cats };
+  sortRec(roots);
+  // Menülerde (dikey "Tüm Kategoriler", mobil menü) gösterilecek kökler: show_in_menu=false
+  // olanlar (ör. sanal "İndirimli Ürünler" kategorisi) URL'den erişilebilir ama menüde yer almaz.
+  const menuRoots = roots.filter((r) => r.show_in_menu !== false);
+  return { roots, menuRoots, byId, flat: cats };
 }
 
 function cached() {
@@ -54,7 +58,7 @@ export function loadCategories() {
     .get(`${API}/categories?visible_only=true`, tok ? { headers: { Authorization: `Bearer ${tok}` } } : undefined)
     .then((r) => {
       const raw = Array.isArray(r.data) ? r.data : (r.data?.categories || r.data?.items || []);
-      try { localStorage.setItem(`${LS}:${k}`, JSON.stringify(raw.map(({ id, name, slug, parent_id, sort_order, icon, image, image_url, is_active, product_count, description }) => ({ id, name, slug, parent_id, sort_order, icon, image, image_url, is_active, product_count, description })))); } catch { /* kota */ }
+      try { localStorage.setItem(`${LS}:${k}`, JSON.stringify(raw.map(({ id, name, slug, parent_id, sort_order, icon, image, image_url, is_active, show_in_menu, product_count, description }) => ({ id, name, slug, parent_id, sort_order, icon, image, image_url, is_active, show_in_menu, product_count, description })))); } catch { /* kota */ }
       const tree = buildTree(raw);
       _resolved = { k, tree };
       return tree;
@@ -63,7 +67,7 @@ export function loadCategories() {
   return _promise;
 }
 
-/** { roots, byId, flat, ready } */
+/** { roots, menuRoots, byId, flat, ready } */
 export default function useCategoryTree() {
   const [tree, setTree] = useState(() => cached());
   useEffect(() => {
@@ -71,7 +75,7 @@ export default function useCategoryTree() {
     loadCategories().then((t) => { if (alive) setTree(t); });
     return () => { alive = false; };
   }, []);
-  return tree ? { ...tree, ready: true } : { roots: [], byId: new Map(), flat: [], ready: false };
+  return tree ? { ...tree, ready: true } : { roots: [], menuRoots: [], byId: new Map(), flat: [], ready: false };
 }
 
 /** Bir kategorinin kökten kendisine kadar yolu (breadcrumb için). */

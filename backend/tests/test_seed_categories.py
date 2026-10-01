@@ -183,9 +183,12 @@ def test_header_menu_seed(nodes):
     assert run(sc.seed_header_menu(db, nodes)) is True
     menu = run(db.settings.find_one({"id": "header_menu"}))
     tabs = menu["tabs"]
-    tops = [n for n in nodes if not n.get("parent") and n.get("show_in_menu") is not False]
-    assert [t["link"] for t in tabs[:-1]] == [f"/{n['slug']}" for n in tops]
-    assert tabs[-1]["link"] == "/sale"
+    # Kısa Electro tarzı menü: Kampanyalar + Yeni Ürünler + 5 ana kategori
+    assert [t["link"] for t in tabs] == ["/sale", "/en-yeniler", "/liftler", "/kompresorler",
+                                         "/lastik-ekipmanlari", "/el-aletleri", "/lokma-takimlari"]
+    assert tabs[0]["label"] == "Kampanyalar" and tabs[0]["style"] == "sale"
+    assert len(tabs) <= 8 and all(len(t["label"]) <= 20 for t in tabs)
+    assert menu["updated_by"] == sc.SEED_TAG and menu["seed_menu_version"] == sc.HEADER_MENU_VERSION
     el = next(t for t in tabs if t["link"] == "/el-aletleri")
     assert el["type"] == "mega"
     anahtar = next(c for c in el["columns"] if c["link"] == "/anahtarlar")
@@ -195,6 +198,61 @@ def test_header_menu_seed(nodes):
     run(db.settings.update_one({"id": "header_menu"}, {"$set": {"tabs": menu["tabs"]}}))
     assert run(sc.seed_header_menu(db, nodes)) is False
     assert run(db.settings.find_one({"id": "header_menu"}))["tabs"][0]["id"] == "x"
+
+
+def test_header_menu_skips_missing_categories():
+    nodes = [{"slug": "liftler", "name": "Liftler", "parent": None, "sort_order": 10},
+             {"slug": "el-aletleri", "name": "El Aletleri", "parent": None, "sort_order": 20,
+              "show_in_menu": False}]
+    tabs = sc.build_header_menu(nodes)
+    assert [t["link"] for t in tabs] == ["/sale", "/en-yeniler", "/liftler"]
+    assert tabs[2]["type"] == "link"
+
+
+def _legacy_doc(nodes, **extra):
+    doc = {"id": "header_menu", "tabs": sc.build_legacy_header_menu(nodes),
+           "updated_at": "2026-09-30T00:00:00+00:00", "updated_by": sc.SEED_TAG}
+    doc.update(extra)
+    return doc
+
+
+def test_upgrade_replaces_untouched_legacy_menu(nodes):
+    db = FakeDB()
+    db.settings.docs.append(_legacy_doc(nodes))
+    assert len(db.settings.docs[0]["tabs"]) == 15  # 14 kategori + İndirimli Ürünler
+    assert run(sc.upgrade_seeded_header_menu(db, nodes)) is True
+    doc = run(db.settings.find_one({"id": "header_menu"}))
+    assert doc["tabs"] == sc.build_header_menu(nodes)
+    assert doc["seed_menu_version"] == sc.HEADER_MENU_VERSION
+    # idempotent
+    assert run(sc.upgrade_seeded_header_menu(db, nodes)) is False
+
+
+def test_upgrade_never_touches_admin_menu(nodes):
+    # 1) Panelden kaydedilmiş (updated_by = yönetici) — içerik eski menüyle aynı olsa bile
+    db = FakeDB()
+    db.settings.docs.append(_legacy_doc(nodes, updated_by="owner@garajtek.com"))
+    assert run(sc.upgrade_seeded_header_menu(db, nodes)) is False
+    assert len(db.settings.docs[0]["tabs"]) == 15
+    # 2) updated_by seed etiketi ama sekmeler değiştirilmiş (elle DB düzenlemesi)
+    db = FakeDB()
+    doc = _legacy_doc(nodes)
+    doc["tabs"] = doc["tabs"][:3]
+    db.settings.docs.append(doc)
+    assert run(sc.upgrade_seeded_header_menu(db, nodes)) is False
+    assert len(db.settings.docs[0]["tabs"]) == 3
+    # 3) Kayıt yok → hiçbir şey yazılmaz
+    db = FakeDB()
+    assert run(sc.upgrade_seeded_header_menu(db, nodes)) is False
+    assert db.settings.docs == []
+
+
+def test_seed_if_empty_upgrades_legacy_menu_on_existing_catalog(nodes):
+    db = FakeDB()
+    run(sc.seed_categories(db, nodes))
+    db.settings.docs.append(_legacy_doc(nodes))
+    assert run(sc.seed_if_empty(db)) is None
+    assert run(db.settings.find_one({"id": "header_menu"}))["tabs"][0]["label"] == "Kampanyalar"
 
 
 def test_seed_if_empty_only_on_empty_collection():
@@ -209,3 +267,42 @@ def test_json_file_is_utf8_turkish():
     raw = json.loads((BACKEND / "data" / "garajtek_categories.json").read_text(encoding="utf-8"))
     names = {c["name"] for c in raw["categories"]}
     assert "Takım Arabaları ve Tezgahlar" in names and "Özel Aparatlar" in names
+
+
+# ── Vitrin görünürlüğü: gerçek "Test ..." kategorisi gizlenmemeli ─────────────
+
+def test_storefront_filter_keeps_real_test_category_and_tree(nodes):
+    from utils.category_visibility import hide_test_placeholders, is_test_placeholder
+
+    db = FakeDB()
+    run(sc.seed_categories(db, nodes))
+    cats = db.categories.docs
+    kept = hide_test_placeholders(cats)
+    assert len(kept) == len(cats)
+    ids = {c["id"] for c in kept}
+    roots = [c for c in kept if not c.get("parent_id")]
+    assert all(c["parent_id"] in ids for c in kept if c.get("parent_id"))  # yetim yok
+    menu_roots = sorted((c for c in roots if c.get("show_in_menu") is not False),
+                        key=lambda c: c["sort_order"])
+    assert [c["slug"] for c in menu_roots] == [
+        n["slug"] for n in nodes if not n.get("parent") and n.get("show_in_menu") is not False]
+    assert len(menu_roots) == 14
+    assert menu_roots[10]["slug"] == "test-ve-ariza-tespit-cihazlari"
+    # Panelden açılmış (seed_source'suz) aynı isimli kategori de gizlenmez
+    assert not is_test_placeholder({"id": "1", "slug": "test-ve-ariza-tespit-cihazlari",
+                                    "name": "Test ve Arıza Tespit Cihazları"})
+    assert not is_test_placeholder({"id": "2", "slug": "duman-kacak-test", "name": "Duman Kaçak Test"})
+
+
+def test_storefront_filter_hides_placeholders_with_subtree():
+    from utils.category_visibility import hide_test_placeholders
+
+    cats = [
+        {"id": "1", "slug": "liftler", "name": "Liftler", "parent_id": None},
+        {"id": "HB_CAT_TEST_123", "slug": "hb-cat", "name": "HB_CAT_TEST_123", "parent_id": None},
+        {"id": "3", "slug": "alt", "name": "Alt", "parent_id": "HB_CAT_TEST_123"},
+        {"id": "4", "slug": "alt-alt", "name": "Alt Alt", "parent_id": "3"},
+        {"id": "5", "slug": "test", "name": "Test", "parent_id": None},
+        {"id": "6", "slug": "test_1", "name": "x", "parent_id": "1"},
+    ]
+    assert [c["id"] for c in hide_test_placeholders(cats)] == ["1"]

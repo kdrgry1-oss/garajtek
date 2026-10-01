@@ -8,7 +8,7 @@
 //   full_banner   → tam genişlik banner
 //   text_block / video_banner / instashop → Electro bölüm başlığıyla
 //   rotating_text / countdown_bar → header üst barları
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import Header from "../components/Header";
@@ -37,8 +37,113 @@ function splitPrice(n) {
 }
 
 /* ---------------------------------------------------------------- Hero */
+const HERO_MIN = 420; // Electro home-v1 hero yüksekliği (min-height-420)
+
+/** Masaüstünde ana sayfada AÇIK duran "Tüm Kategoriler" dikey menüsü hero'nun üstüne biner.
+ * Menü hero'dan uzunsa (çok kategori / büyük yazı tipi) alttaki 4'lü banner şeridini örtmesin
+ * diye hero yüksekliği (--el-hero-h) menünün altına kadar uzatılır. Mobil/tablette menü gizli
+ * olduğundan değişken kaldırılır ve hero 420px kalır. */
+function useHeroClearance() {
+  useLayoutEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return undefined;
+    const root = document.documentElement;
+    let last = 0;
+    const calc = () => {
+      const vm = document.querySelector('.el-header-wrap [data-testid="vertical-menu"]');
+      const hero = document.querySelector(".el-hero-bg");
+      if (!vm || !hero || window.innerWidth < 1200) {
+        if (last) { root.style.removeProperty("--el-hero-h"); last = 0; }
+        return;
+      }
+      const vr = vm.getBoundingClientRect();
+      if (!vr.height) return; // menü kapalı → son değeri koru (tıklamada zıplamasın)
+      const need = Math.ceil(vr.bottom - hero.getBoundingClientRect().top) + 24;
+      const h = need > HERO_MIN ? need : 0;
+      if (h !== last) {
+        if (h) root.style.setProperty("--el-hero-h", `${h}px`); else root.style.removeProperty("--el-hero-h");
+        last = h;
+      }
+    };
+    calc();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(calc) : null;
+    const mo = typeof MutationObserver !== "undefined" ? new MutationObserver(calc) : null;
+    const wrap = document.querySelector(".el-header-wrap");
+    if (ro) { ro.observe(document.body); if (wrap) ro.observe(wrap); }
+    if (mo && wrap) mo.observe(wrap, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    window.addEventListener("resize", calc);
+    return () => {
+      if (ro) ro.disconnect();
+      if (mo) mo.disconnect();
+      window.removeEventListener("resize", calc);
+      root.style.removeProperty("--el-hero-h");
+    };
+  }, []);
+}
+
+/** Varsayılan GarajTek hero'su — panelde slayt/banner ve öne çıkan ürün yokken (yeni kurulum)
+ * hero alanı Electro yüksekliğini (420px) korusun, açık "Tüm Kategoriler" menüsü alttaki
+ * banner'ların üstüne taşmasın. Harici görsel yok: yalnız CSS + satır içi SVG. */
+function DefaultHero() {
+  return (
+    <div className="mb-5" data-testid="hero-slider">
+      <div className="bg-img-hero bg-gray-1 el-hero-bg el-hero-default" data-testid="hero-default">
+        <div className="container min-height-420 overflow-hidden position-relative">
+          <div className="row min-height-420 align-items-center py-6 py-md-0">
+            <div className="offset-xl-3 col-xl-5 col-md-7 col-12 el-hero-default__text">
+              <span className="el-hero-default__eyebrow">OTO SERVİS &amp; GARAJ EKİPMANLARI</span>
+              <h2 className="font-size-46 text-lh-57 font-weight-light mb-3">
+                Atölyeniz için <strong className="font-weight-bold d-block">profesyonel ekipman</strong>
+              </h2>
+              <p className="font-size-15 text-gray-90 mb-4">
+                Liftler, kompresörler, lastik ekipmanları ve el aletleri — servisinizi kurmak ya da
+                büyütmek için ihtiyacınız olan her şey tek adreste.
+              </p>
+              <div className="d-flex flex-wrap align-items-center">
+                <Link to="/tum-urunler" className="btn btn-primary transition-3d-hover rounded-lg font-weight-normal py-2 px-md-7 px-4 font-size-16 mr-3 mb-2"
+                  onClick={() => promo("hero_default", "Kategorileri Keşfet")} data-testid="hero-default-cta">
+                  Kategorileri Keşfet
+                </Link>
+                <Link to="/sale" className="font-weight-bold text-gray-90 font-size-15 mb-2">Kampanyalar <i className="ec ec-arrow-right-categproes ml-1" /></Link>
+              </div>
+            </div>
+            <div className="col-xl-4 col-md-5 d-none d-md-flex el-hero-media">
+              <svg className="el-hero-default__art" viewBox="0 0 420 340" role="img" aria-label="Araç lifti üzerinde otomobil">
+                <circle cx="230" cy="170" r="150" fill="#fed700" opacity=".18" />
+                <circle cx="230" cy="170" r="110" fill="#fed700" opacity=".22" />
+                {/* Lift sütunları */}
+                <rect x="70" y="40" width="26" height="270" rx="4" fill="#333e48" />
+                <rect x="324" y="40" width="26" height="270" rx="4" fill="#333e48" />
+                <rect x="62" y="300" width="42" height="12" rx="3" fill="#333e48" />
+                <rect x="316" y="300" width="42" height="12" rx="3" fill="#333e48" />
+                <rect x="76" y="50" width="14" height="250" fill="#fed700" opacity=".9" />
+                <rect x="330" y="50" width="14" height="250" fill="#fed700" opacity=".9" />
+                {/* Kollar */}
+                <rect x="92" y="186" width="96" height="10" rx="3" fill="#5b6670" />
+                <rect x="232" y="186" width="96" height="10" rx="3" fill="#5b6670" />
+                {/* Otomobil */}
+                <path d="M118 176 L136 136 Q146 116 172 114 L250 112 Q276 112 292 132 L314 160 Q332 164 334 176 L334 186 L106 186 L106 180 Q108 176 118 176 Z" fill="#333e48" />
+                <path d="M150 140 Q156 126 174 124 L208 123 L208 156 L142 158 Z" fill="#cfd8dc" />
+                <path d="M218 123 L250 122 Q268 122 280 136 L292 154 L218 156 Z" fill="#cfd8dc" />
+                <circle cx="160" cy="188" r="22" fill="#1f262c" /><circle cx="160" cy="188" r="9" fill="#9aa5ad" />
+                <circle cx="288" cy="188" r="22" fill="#1f262c" /><circle cx="288" cy="188" r="9" fill="#9aa5ad" />
+                <rect x="316" y="166" width="14" height="6" rx="2" fill="#fed700" />
+                {/* Zemin + anahtar */}
+                <rect x="40" y="312" width="340" height="4" rx="2" fill="#333e48" opacity=".25" />
+                <g transform="translate(176 236) rotate(-28)">
+                  <rect x="0" y="-6" width="86" height="12" rx="6" fill="#fed700" />
+                  <circle cx="0" cy="0" r="15" fill="#fed700" /><rect x="-6" y="-16" width="12" height="13" fill="#f5f5f5" />
+                </g>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HeroSlider({ slides }) {
-  if (!slides.length) return null;
+  if (!slides.length) return <DefaultHero />;
   return (
     <div className="mb-5" data-testid="hero-slider">
       <div className="bg-img-hero bg-gray-1 el-hero-bg">
@@ -536,7 +641,7 @@ function InstaShop({ block }) {
 function HomeSkeleton() {
   return (
     <div data-testid="home-skeleton">
-      <div className="bg-gray-1 mb-5"><div className="container min-height-420" /></div>
+      <div className="bg-gray-1 mb-5 el-hero-bg"><div className="container min-height-420" /></div>
       <div className="container">
         <div className="row mb-5">{[0, 1, 2, 3].map((i) => <div key={i} className="col-md-6 col-xl-3 mb-4"><div className="el-skel" style={{ height: 132 }} /></div>)}</div>
         <div className="row mb-5">{[0, 1, 2, 3].map((i) => <div key={i} className="col-6 col-md-3 mb-4"><div className="el-skel" style={{ height: 320 }} /></div>)}</div>
@@ -563,7 +668,8 @@ export default function Home() {
   const [featured, setFeatured] = useState([]);
   const [loading, setLoading] = useState(true);
   const tree = useCategoryTree();
-  const roots = tree.roots;
+  useHeroClearance();
+  const roots = tree.menuRoots || tree.roots;
 
   useEffect(() => {
     let active = true;

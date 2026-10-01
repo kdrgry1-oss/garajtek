@@ -22,13 +22,24 @@ const GUESS = [
   [/çekiç|cekic|hammer/i, "fas fa-hammer"],
 ];
 
+// Seed ağacındaki (backend/data/garajtek_categories.json) Lucide tarzı ikon adları → Font Awesome 5.
+// Eskiden bilinmeyen ad olduğu gibi sınıf yapılıyordu → üst kategorilerde ikon BOŞ kalıyordu.
+const NAMED = {
+  "arrow-up-from-line": "fas fa-car-side", gauge: "fas fa-tachometer-alt", disc: "fas fa-life-ring",
+  car: "fas fa-car", truck: "fas fa-truck-pickup", archive: "fas fa-toolbox", wrench: "fas fa-wrench",
+  hexagon: "fas fa-cog", "battery-charging": "fas fa-car-battery", flame: "fas fa-fire",
+  activity: "fas fa-heartbeat", droplet: "fas fa-oil-can", settings: "fas fa-cogs",
+  package: "fas fa-box-open", percent: "fas fa-percent", tools: "fas fa-tools", hammer: "fas fa-hammer",
+};
+
 export function iconClassFor(cat) {
   const raw = String((cat && cat.icon) || "").trim();
   if (raw && !/^(https?:)?\//.test(raw)) {
     if (/^ec[\s-]/.test(raw)) return raw.startsWith("ec ") ? raw : `ec ${raw}`;
     if (/^fa[bsr]?\s/.test(raw)) return raw;
     if (/^fa-/.test(raw)) return `fas ${raw}`;
-    return raw;
+    if (NAMED[raw.toLowerCase()]) return NAMED[raw.toLowerCase()];
+    // Bilinmeyen ad → aşağıdaki isimden tahmine düş (boş ikon göstermez)
   }
   const name = String((cat && cat.name) || "");
   for (const [re, cls] of GUESS) if (re.test(name)) return cls;
