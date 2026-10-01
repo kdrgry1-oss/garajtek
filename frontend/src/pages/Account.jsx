@@ -20,14 +20,15 @@
 import { useState, useEffect } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import {
-  User, Package, MapPin, Bookmark, LogOut, ChevronRight, ChevronDown,
+  User, Package, MapPin, Bookmark, ChevronRight, ChevronDown,
   Eye, Truck, CheckCircle, Clock, X, Edit2, Trash2, Plus, Star,
-  ShoppingBag, Calendar, Mail, Phone, Lock, Gift, Copy
+  ShoppingBag, Calendar, Phone, Lock, Gift, Copy
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import Breadcrumb from "../components/electro/Breadcrumb";
 import ProvinceDistrictSelect from "../components/ProvinceDistrictSelect";
 import ProductCard from "../components/ProductCard";
 import { useAuth } from "../context/AuthContext";
@@ -40,7 +41,7 @@ const MENU_ITEMS = [
   { id: "profile",   label: "Profil",       icon: User },
   { id: "orders",    label: "Siparişlerim", icon: Package },
   { id: "addresses", label: "Adreslerim",   icon: MapPin },
-  { id: "favorites", label: "Kaydedilenler", icon: Bookmark },
+  { id: "favorites", label: "Favorilerim", icon: Bookmark },
   { id: "referral",  label: "Davet Et",     icon: Gift },
   { id: "security",  label: "Şifre",        icon: Lock },
 ];
@@ -272,77 +273,47 @@ export default function Account() {
   if (!user) return <Navigate to="/giris" />;
 
   return (
-    <div className="sf-page min-h-screen bg-[#fafafa]" data-testid="account-page">
+    <div className="sf-page" data-testid="account-page">
       <Header />
-
-      {/* ───────────────────── Hero / Welcome ───────────────────── */}
-      <section className="bg-white border-b border-gray-100">
-        <div className="max-w-screen-xl mx-auto px-4 py-8 md:py-12">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="flex items-center gap-4 md:gap-6">
-              <div
-                className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-black text-white flex items-center justify-center text-xl md:text-2xl font-light tracking-wider shrink-0"
-                data-testid="account-avatar"
-                aria-hidden
-              >
+      <div className="electro">
+        <Breadcrumb items={[{ label: "Hesabım" }]} />
+        <div className="container"><div className="mb-4"><h1 className="text-center">Hesabım</h1></div></div>
+      </div>
+      <div className="mx-auto px-[15px] pb-12" style={{ maxWidth: 1200 }}>
+        <div className="lg:grid lg:grid-cols-[270px_minmax(0,1fr)] lg:gap-8">
+          <aside className="electro mb-6 lg:mb-0">
+            <div className="mb-4 border border-width-2 border-color-3 borders-radius-6 p-4 d-flex align-items-center">
+              <div className="width-50 height-50 rounded-circle bg-primary d-flex align-items-center justify-content-center font-weight-bold font-size-18 mr-3 flex-shrink-0" data-testid="account-avatar" aria-hidden>
                 {initialsOf(user)}
               </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">{greeting()}</p>
-                <h1 className="text-2xl md:text-3xl font-light tracking-wide text-black" data-testid="account-greeting">
-                  {user.first_name || (user.email ? user.email.split("@")[0] : "Hesabım")}
-                </h1>
-                <p className="text-xs md:text-sm text-gray-500 mt-1 flex items-center gap-2 flex-wrap">
-                  <Mail size={12} /> {user.email}
-                  {user.created_at && (
-                    <>
-                      <span className="text-gray-300">•</span>
-                      <Calendar size={12} /> Üye: {formatDate(user.created_at, { month: "short", year: "numeric" })}
-                    </>
-                  )}
-                </p>
+              <div className="min-width-0">
+                <div className="font-size-12 text-gray-5">{greeting()}</div>
+                <div className="font-weight-bold text-gray-90 el-line-1" data-testid="account-greeting">{user.first_name || (user.email ? user.email.split("@")[0] : "Hesabım")}</div>
+                <div className="font-size-12 text-gray-90 el-line-1">{user.email}</div>
+                {user.created_at && <div className="font-size-12 text-gray-5">Üye: {formatDate(user.created_at, { month: "short", year: "numeric" })}</div>}
               </div>
             </div>
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-500 hover:text-black transition-colors self-start md:self-center"
-              data-testid="logout-btn"
-            >
-              <LogOut size={14} /> Çıkış Yap
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ───────────────────── Tab Pills ───────────────────── */}
-      <nav className="sticky top-0 z-10 bg-white border-b border-gray-100">
-        <div className="max-w-screen-xl mx-auto px-4">
-          <div className="flex overflow-x-auto scrollbar-hide gap-1 py-2">
-            {MENU_ITEMS.map((m) => {
-              const Icon = m.icon;
-              const active = activeTab === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => switchTab(m.id)}
-                  data-testid={`tab-${m.id}`}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-xs uppercase tracking-[0.15em] whitespace-nowrap transition-all border-b-2 ${
-                    active
-                      ? "text-black border-black font-semibold"
-                      : "text-gray-400 border-transparent hover:text-black"
-                  }`}
-                >
-                  <Icon size={14} />
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
-
-      {/* ───────────────────── Content ───────────────────── */}
-      <main className="max-w-screen-xl mx-auto px-4 py-8 md:py-10">
+            <div className="mb-4 border border-width-2 border-color-3 borders-radius-6">
+              <ul className="list-unstyled mb-0 sidebar-navbar view-all" role="tablist">
+                <li><div className="dropdown-title">Hesap Menüsü</div></li>
+                {MENU_ITEMS.map((m) => {
+                  const active = activeTab === m.id;
+                  return (
+                    <li key={m.id}>
+                      <button type="button" role="tab" aria-selected={active} onClick={() => switchTab(m.id)} data-testid={`tab-${m.id}`}
+                        className={`dropdown-current btn btn-link p-0 text-left w-100${active ? " active font-weight-bold" : ""}`}>
+                        {m.label}
+                      </button>
+                    </li>
+                  );
+                })}
+                <li>
+                  <button type="button" onClick={logout} className="dropdown-current btn btn-link p-0 text-left w-100 text-red" data-testid="logout-btn">Çıkış Yap</button>
+                </li>
+              </ul>
+            </div>
+          </aside>
+      <main className="min-w-0">
         {activeTab === "profile"   && <ProfilePane user={user} editing={editingProfile} setEditing={setEditingProfile} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} />}
         {activeTab === "orders"    && <OrdersPane loading={loading} orders={orders} expandedOrder={expandedOrder} setExpandedOrder={setExpandedOrder} onChanged={fetchOrders} />}
         {activeTab === "addresses" && <AddressesPane loading={loading} addresses={addresses} editing={editingAddress} setEditing={setEditingAddress} form={addressForm} setForm={setAddressForm} onSubmit={handleSaveAddress} onDelete={handleDeleteAddress} />}
@@ -419,6 +390,8 @@ export default function Account() {
         )}
         {activeTab === "security"  && <SecurityPane />}
       </main>
+        </div>
+      </div>
 
       <Footer />
     </div>
@@ -1088,10 +1061,12 @@ function FavoritesPane() {
   return (
     <div className="max-w-4xl" data-testid="favorites-grid">
       <p className="text-xs text-gray-500 mb-5 tracking-wide">{products.length} favori ürün</p>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-8">
-        {products.map((p) => (
-          <ProductCard key={p.id} product={p} />
-        ))}
+      <div className="electro">
+        <ul className="row list-unstyled products-group no-gutters">
+          {products.map((p) => (
+            <ProductCard key={p.id} product={p} as="li" className="col-6 col-md-4" />
+          ))}
+        </ul>
       </div>
     </div>
   );

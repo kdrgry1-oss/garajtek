@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Package, Truck, CheckCircle, Clock, MapPin, Search, ExternalLink } from "lucide-react";
+import { Package, Truck, CheckCircle, Clock, MapPin, ExternalLink } from "lucide-react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import Breadcrumb from "../components/electro/Breadcrumb";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -65,35 +66,41 @@ export default function TrackOrder() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50" data-testid="track-order-page">
+    <div className="sf-page" data-testid="track-order-page">
       <Header />
-      
-      <div className="max-w-2xl mx-auto px-4 py-12">
-        <h1 className="text-2xl font-light text-center mb-8">Sipariş Takibi</h1>
-        
-        {/* Search Form */}
-        <form onSubmit={handleSearch} className="mb-8">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={trackingCode}
-              onChange={(e) => setTrackingCode(e.target.value)}
-              placeholder="Sipariş numarası veya kargo takip numarası"
-              className="flex-1 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:border-black"
-              data-testid="tracking-input"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 flex items-center gap-2"
-              data-testid="tracking-search-btn"
-            >
-              <Search size={20} />
-              {loading ? "Aranıyor..." : "Ara"}
-            </button>
+      <div className="electro">
+        <Breadcrumb items={[{ label: "Sipariş Takibi" }]} />
+        <div className="container">
+          <div className="mx-xl-10">
+            <div className="mb-6 text-center">
+              <h1 className="mb-6">Sipariş Takibi</h1>
+              <p className="text-gray-90 px-xl-10">Siparişinizi takip etmek için sipariş onay e-postanızda yer alan sipariş numaranızı veya kargo takip numaranızı aşağıdaki kutuya yazıp "Takip Et" düğmesine basın.</p>
+            </div>
+            <div className="my-4 my-xl-8">
+              <form onSubmit={handleSearch}>
+                <div className="row">
+                  <div className="col-md-8 mb-3">
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="orderid">Sipariş / Kargo Takip Numarası</label>
+                      <input type="text" className="form-control" id="orderid" value={trackingCode} onChange={(e) => setTrackingCode(e.target.value)}
+                        placeholder="Sipariş onay e-postanızda yer alır." data-testid="tracking-input" />
+                    </div>
+                  </div>
+                  <div className="col-md-4 mb-3 d-flex align-items-end">
+                    <div className="form-group w-100">
+                      <button type="submit" disabled={loading} className="btn btn-soft-secondary mb-3 mb-md-0 font-weight-normal px-5 px-md-4 px-lg-5 w-100" data-testid="tracking-search-btn">
+                        <i className="ec ec-search mr-1" /> {loading ? "Aranıyor..." : "Takip Et"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
-        </form>
+        </div>
+      </div>
 
+      <div className="max-w-2xl mx-auto px-4 pb-12">
         {/* Error */}
         {error && searched && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
