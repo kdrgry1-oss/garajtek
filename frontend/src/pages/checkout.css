@@ -1,0 +1,417 @@
+/* ==========================================================================
+   Checkout (Shopify tarzı tek sayfa ödeme) — TAMAMEN `.gt-checkout` kapsamında.
+   Tailwind preflight / Bootstrap reboot / Electro tema stillerinden bağımsız olacak şekilde
+   tüm temel özellikler (box-sizing, margin, font, line-height, renk) burada açıkça verilir.
+   Marka rengi: --gt-primary (varsayılan Electro sarısı #fed700) + koyu metin #333e48.
+   ========================================================================== */
+
+.gt-checkout {
+  --gt-primary: #fed700;
+  --gt-primary-ink: #333e48;
+  --gt-primary-hover: #f0cb00;
+  --gt-primary-tint: #fffbe6;
+  --gt-ink: #333e48;
+  --gt-text: #1f1f1f;
+  --gt-muted: #707070;
+  --gt-border: #d9d9d9;
+  --gt-border-soft: #e6e6e6;
+  --gt-summary-bg: #f5f5f5;
+  --gt-error: #dd1d1d;
+  --gt-error-bg: #fff4f4;
+  --gt-ok: #0b7a3b;
+  --gt-radius: 6px;
+  --gt-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+
+  min-height: 100vh;
+  background: #fff;
+  color: var(--gt-text);
+  font-family: var(--gt-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-align: left;
+}
+.gt-checkout *, .gt-checkout *::before, .gt-checkout *::after { box-sizing: border-box; }
+.gt-checkout p, .gt-checkout h1, .gt-checkout h2, .gt-checkout h3, .gt-checkout ul, .gt-checkout li, .gt-checkout figure { margin: 0; padding: 0; }
+.gt-checkout ul { list-style: none; }
+.gt-checkout img { max-width: 100%; display: block; border: 0; }
+.gt-checkout a { color: var(--gt-ink); text-decoration: underline; text-underline-offset: 2px; }
+.gt-checkout a:hover { color: #000; }
+.gt-checkout button, .gt-checkout input, .gt-checkout select, .gt-checkout textarea {
+  font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; margin: 0;
+}
+.gt-checkout label { margin: 0; font-weight: inherit; display: block; }
+.gt-checkout strong, .gt-checkout b { font-weight: 600; }
+.gt-checkout .gt-muted { color: var(--gt-muted); }
+.gt-checkout .gt-small { font-size: 12px; }
+.gt-checkout .gt-ok { color: var(--gt-ok); }
+.gt-checkout .gt-warn { color: #9a5b00; font-weight: 600; }
+.gt-checkout .gt-mt-sm { margin-top: 12px; }
+
+/* ---------- Header ---------- */
+.gt-checkout .gt-co-header { border-bottom: 1px solid var(--gt-border-soft); background: #fff; }
+.gt-checkout .gt-co-header-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 1140px; margin: 0 auto; padding: 18px 21px; min-height: 72px;
+}
+.gt-checkout .gt-co-logo { display: inline-flex; align-items: center; text-decoration: none; }
+.gt-checkout .gt-co-logo img { height: 30px; width: auto; }
+.gt-checkout .gt-co-logo-text { font-size: 22px; font-weight: 700; color: var(--gt-ink); letter-spacing: -.01em; }
+.gt-checkout .gt-co-header-right { display: flex; align-items: center; gap: 18px; }
+.gt-checkout .gt-co-secure { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--gt-muted); }
+.gt-checkout .gt-co-cart-link { color: var(--gt-ink); display: inline-flex; padding: 4px; border-radius: 4px; }
+.gt-checkout .gt-co-cart-link:focus-visible { outline: 2px solid var(--gt-primary); outline-offset: 2px; }
+
+/* ---------- Layout (masaüstü: sol form ~58%, sağ özet ~42%) ---------- */
+.gt-checkout .gt-co-layout { display: grid; grid-template-columns: minmax(0, 1fr); }
+.gt-checkout .gt-co-main-inner { padding: 21px 16px 0; max-width: 660px; margin: 0 auto; }
+
+@media (min-width: 1000px) {
+  .gt-checkout .gt-co-layout {
+    grid-template-columns: minmax(0, 58fr) minmax(0, 42fr);
+    min-height: calc(100vh - 73px);
+  }
+  .gt-checkout .gt-co-main { grid-column: 1; grid-row: 1; display: flex; justify-content: flex-end; }
+  .gt-checkout .gt-co-main-inner { width: 100%; max-width: 660px; margin: 0; padding: 38px 38px 0 38px; }
+  .gt-checkout .gt-summary { grid-column: 2; grid-row: 1; }
+  /* Header içeriği formla hizalı: aynı 58/42 bölme */
+  .gt-checkout .gt-co-header-inner {
+    max-width: none; padding: 0;
+    display: grid; grid-template-columns: minmax(0, 58fr) minmax(0, 42fr);
+  }
+  .gt-checkout .gt-co-header-inner > .gt-co-logo { justify-self: end; width: 100%; max-width: 660px; padding: 20px 38px; }
+  .gt-checkout .gt-co-header-inner > .gt-co-header-right { justify-self: start; width: 100%; max-width: 480px; padding: 20px 38px; justify-content: flex-end; }
+}
+
+/* ---------- Section ---------- */
+.gt-checkout .gt-section { margin-top: 32px; }
+.gt-checkout .gt-co-main-inner > .gt-section:first-of-type,
+.gt-checkout .gt-co-main-inner > .gt-banner + .gt-section { margin-top: 8px; }
+.gt-checkout .gt-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.gt-checkout .gt-h1 { font-size: 24px; font-weight: 600; line-height: 1.25; color: var(--gt-text); }
+.gt-checkout .gt-h2 { font-size: 21px; font-weight: 600; line-height: 1.3; color: var(--gt-text); letter-spacing: -.005em; }
+.gt-checkout .gt-section-sub { color: var(--gt-muted); margin: -8px 0 14px; font-size: 14px; }
+.gt-checkout .gt-subsection { margin-top: 20px; }
+.gt-checkout .gt-label-sm { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--gt-text); }
+.gt-checkout .gt-hint { font-size: 13px; color: var(--gt-muted); margin-top: 8px; }
+.gt-checkout .gt-free-hint strong { color: var(--gt-text); }
+.gt-checkout .gt-row-hint { display: flex; justify-content: space-between; gap: 12px; }
+.gt-checkout .gt-fineprint { font-size: 12px; color: var(--gt-muted); margin-top: 8px; line-height: 1.45; }
+.gt-checkout .gt-placeholder-box {
+  background: var(--gt-summary-bg); border-radius: var(--gt-radius); padding: 16px; color: var(--gt-muted); font-size: 14px;
+}
+
+/* ---------- Grid ---------- */
+.gt-checkout .gt-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 12px; }
+.gt-checkout .gt-col-2 { grid-column: 1 / -1; }
+
+/* ---------- Floating-label field ---------- */
+.gt-checkout .gt-field { min-width: 0; }
+.gt-checkout .gt-field-control { position: relative; }
+.gt-checkout .gt-input {
+  display: block; width: 100%; height: 52px;
+  padding: 22px 13px 6px; border: 1px solid var(--gt-border); border-radius: var(--gt-radius);
+  background: #fff; color: var(--gt-text); font-size: 14px; line-height: 1.3;
+  outline: none; box-shadow: none; appearance: none; -webkit-appearance: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.gt-checkout .gt-input::placeholder { color: transparent; }
+.gt-checkout .gt-input:focus {
+  border-color: var(--gt-ink);
+  box-shadow: 0 0 0 1px var(--gt-ink), 0 0 0 4px rgba(254, 215, 0, .45);
+}
+.gt-checkout .gt-input:disabled { background: #fafafa; color: var(--gt-muted); cursor: not-allowed; }
+.gt-checkout .gt-float-label {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--gt-muted); font-size: 14px; pointer-events: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 28px);
+  transition: top .15s ease, font-size .15s ease, transform .15s ease;
+}
+.gt-checkout .gt-field.is-filled .gt-float-label,
+.gt-checkout .gt-field-control:focus-within .gt-float-label,
+.gt-checkout .gt-input:not(:placeholder-shown) + .gt-float-label {
+  top: 7px; transform: none; font-size: 12px;
+}
+.gt-checkout .gt-field-suffix {
+  position: absolute; right: 13px; top: 50%; transform: translateY(-50%); color: var(--gt-muted);
+  display: inline-flex; align-items: center;
+}
+.gt-checkout .gt-help-dot {
+  width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--gt-muted);
+  font-size: 11px; display: inline-flex; align-items: center; justify-content: center; cursor: help;
+}
+.gt-checkout .gt-select { padding-right: 36px; cursor: pointer; }
+.gt-checkout .gt-select-caret { position: absolute; right: 14px; top: 50%; width: 10px; height: 6px; transform: translateY(-50%); color: var(--gt-muted); pointer-events: none; }
+.gt-checkout .gt-field.has-error .gt-input,
+.gt-checkout .gt-pds-wrap.has-error .gt-input {
+  border-color: var(--gt-error); box-shadow: 0 0 0 1px var(--gt-error);
+}
+.gt-checkout .gt-field-error {
+  display: flex; align-items: flex-start; gap: 6px; color: var(--gt-error); font-size: 13px; margin-top: 6px;
+}
+.gt-checkout .gt-field-error svg { flex-shrink: 0; margin-top: 2px; }
+.gt-checkout .gt-field-ok { color: var(--gt-ok); font-size: 13px; margin-top: 6px; }
+.gt-checkout .gt-textarea { height: auto; min-height: 76px; padding: 12px 13px; resize: vertical; }
+.gt-checkout .gt-textarea-wrap { margin-top: 10px; }
+.gt-checkout .gt-textarea-wrap .gt-label-sm { font-weight: 500; font-size: 13px; margin-bottom: 6px; color: var(--gt-muted); }
+
+/* İl / İlçe arama kutuları (ProvinceDistrictSelect) — Shopify select görünümü */
+.gt-checkout .gt-pds { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.gt-checkout .gt-pds > div { position: relative; min-width: 0; }
+.gt-checkout .gt-pds .gt-pds-label {
+  position: absolute; z-index: 1; left: 14px; top: 7px; font-size: 12px; color: var(--gt-muted); pointer-events: none; margin: 0;
+}
+.gt-checkout .gt-pds .gt-pds-label span { display: none; }
+.gt-checkout .gt-pds .gt-pds-input { padding-top: 22px; }
+.gt-checkout .gt-pds .gt-pds-input::placeholder { color: #9a9a9a; }
+.gt-checkout .gt-pds ul[role="listbox"] {
+  position: absolute; z-index: 40; left: 0; right: 0; margin-top: 4px; max-height: 240px; overflow: auto;
+  background: #fff; border: 1px solid var(--gt-border); border-radius: var(--gt-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12); font-size: 14px; padding: 4px 0;
+}
+.gt-checkout .gt-pds li[role="option"], .gt-checkout .gt-pds ul[role="listbox"] > li { padding: 8px 13px; cursor: pointer; }
+.gt-checkout .gt-pds li[role="option"]:hover { background: var(--gt-primary-tint); }
+.gt-checkout .gt-pds-errors { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ---------- Checkbox ---------- */
+.gt-checkout .gt-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; position: relative; font-size: 14px; }
+.gt-checkout .gt-check input { position: absolute; opacity: 0; width: 18px; height: 18px; margin: 0; }
+.gt-checkout .gt-check-box {
+  flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; border: 1px solid var(--gt-border); border-radius: 4px; background: #fff;
+  display: inline-flex; align-items: center; justify-content: center; color: transparent; transition: background .12s, border-color .12s;
+}
+.gt-checkout .gt-check-box svg { width: 11px; height: 9px; }
+.gt-checkout .gt-check input:checked + .gt-check-box { background: var(--gt-ink); border-color: var(--gt-ink); color: #fff; }
+.gt-checkout .gt-check input:focus-visible + .gt-check-box { box-shadow: 0 0 0 3px rgba(254, 215, 0, .6); border-color: var(--gt-ink); }
+.gt-checkout .gt-check input[aria-invalid="true"] + .gt-check-box { border-color: var(--gt-error); box-shadow: 0 0 0 1px var(--gt-error); }
+.gt-checkout .gt-check-label { line-height: 1.45; }
+.gt-checkout .gt-check-wrap + .gt-check-wrap { margin-top: 10px; }
+
+/* ---------- Radio list (Shopify gruplanmış liste) ---------- */
+.gt-checkout .gt-radio-list { border: 1px solid var(--gt-border); border-radius: var(--gt-radius); overflow: hidden; background: #fff; }
+.gt-checkout .gt-radio-item + .gt-radio-item { border-top: 1px solid var(--gt-border); }
+.gt-checkout .gt-radio-row {
+  display: flex; align-items: center; gap: 12px; padding: 15px 16px; cursor: pointer; position: relative; min-height: 54px;
+  transition: background .12s;
+}
+.gt-checkout .gt-radio-row input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.gt-checkout .gt-radio-dot {
+  flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--gt-border); background: #fff;
+  transition: border-width .12s, border-color .12s;
+}
+.gt-checkout .gt-radio-item.is-selected > .gt-radio-row { background: var(--gt-primary-tint); box-shadow: inset 0 0 0 1px var(--gt-ink); }
+.gt-checkout .gt-radio-item:first-child.is-selected > .gt-radio-row { border-radius: var(--gt-radius) var(--gt-radius) 0 0; }
+.gt-checkout .gt-radio-item:last-child.is-selected:not(:has(.gt-radio-content)) > .gt-radio-row { border-radius: 0 0 var(--gt-radius) var(--gt-radius); }
+.gt-checkout .gt-radio-item.is-selected .gt-radio-dot { border: 6px solid var(--gt-ink); }
+.gt-checkout .gt-radio-row input:focus-visible + .gt-radio-dot { box-shadow: 0 0 0 3px rgba(254, 215, 0, .7); }
+.gt-checkout .gt-radio-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gt-checkout .gt-radio-label { font-size: 14px; font-weight: 500; color: var(--gt-text); }
+.gt-checkout .gt-radio-desc { font-size: 13px; color: var(--gt-muted); }
+.gt-checkout .gt-radio-aside { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.gt-checkout .gt-radio-content { background: var(--gt-summary-bg); border-top: 1px solid var(--gt-border); padding: 16px; }
+.gt-checkout .gt-badge-discount {
+  display: inline-block; align-self: flex-start; background: var(--gt-primary); color: var(--gt-primary-ink);
+  font-size: 12px; font-weight: 700; border-radius: 4px; padding: 1px 6px;
+}
+
+/* Kart markaları */
+.gt-checkout .gt-brands { display: inline-flex; gap: 4px; }
+.gt-checkout .gt-brand { display: inline-flex; opacity: .95; transition: opacity .12s, transform .12s; }
+.gt-checkout .gt-brand svg { width: 38px; height: 24px; }
+.gt-checkout .gt-brand.is-active { transform: translateY(-1px); }
+.gt-checkout .gt-brands:has(.is-active) .gt-brand:not(.is-active) { opacity: .3; }
+
+/* Ödeme içerikleri */
+.gt-checkout .gt-pm-content { font-size: 14px; color: var(--gt-text); }
+.gt-checkout .gt-pm-content > p { margin-bottom: 12px; line-height: 1.55; }
+.gt-checkout .gt-bank-info [data-testid="bank-transfer-info"] { margin-bottom: 0 !important; background: #fff; border-radius: var(--gt-radius); overflow: hidden; border-color: var(--gt-border) !important; }
+.gt-checkout .gt-bank-info [data-testid="bank-transfer-loading"] { margin-bottom: 0 !important; min-height: 60px !important; }
+.gt-checkout .gt-card-form .gt-input { background: #fff; }
+.gt-checkout .gt-installments { margin-top: 16px; }
+.gt-checkout .gt-inst-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.gt-checkout .gt-inst {
+  text-align: left; background: #fff; border: 1px solid var(--gt-border); border-radius: var(--gt-radius);
+  padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+}
+.gt-checkout .gt-inst.is-selected { border-color: var(--gt-ink); box-shadow: inset 0 0 0 1px var(--gt-ink); background: var(--gt-primary-tint); }
+.gt-checkout .gt-inst:focus-visible { outline: 2px solid var(--gt-primary); outline-offset: 1px; }
+.gt-checkout .gt-inst-title { font-weight: 600; font-size: 13px; }
+.gt-checkout .gt-inst-sub { font-size: 12px; color: var(--gt-muted); }
+.gt-checkout .gt-secure-note { margin-top: 14px; display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--gt-muted); }
+.gt-checkout .gt-secure-note svg { flex-shrink: 0; margin-top: 2px; color: var(--gt-ok); }
+.gt-checkout .gt-card-form [data-testid="use-points-toggle"] { margin-top: 14px; }
+.gt-checkout .gt-tier { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--gt-border); background: #fafafa; }
+.gt-checkout .gt-tier-gold { background: #fff8e1; border-color: #f2d27a; color: #8a6200; }
+.gt-checkout .gt-tier-platinum { background: #eef1f4; border-color: #c5ccd3; color: #3d4852; }
+
+/* İletişim */
+.gt-checkout .gt-account-box { display: flex; align-items: center; gap: 12px; border: 1px solid var(--gt-border); border-radius: var(--gt-radius); padding: 12px 14px; }
+.gt-checkout .gt-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--gt-primary); color: var(--gt-primary-ink); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+.gt-checkout .gt-account-email { font-weight: 500; word-break: break-all; }
+.gt-checkout .gt-sms-consent { margin-top: 2px; }
+.gt-checkout .gt-otp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0 28px; }
+.gt-checkout .gt-otp-field { width: 150px; }
+
+.gt-checkout .gt-extras > * + * { margin-top: 12px; }
+.gt-checkout .gt-agreements { margin-top: 28px; }
+
+/* ---------- Buttons / links ---------- */
+.gt-checkout .gt-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: var(--gt-radius); border: 1px solid transparent; padding: 0 18px; height: 52px;
+  font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s, opacity .15s;
+}
+.gt-checkout .gt-btn:focus-visible { outline: 2px solid var(--gt-ink); outline-offset: 2px; }
+.gt-checkout .gt-btn:disabled { cursor: not-allowed; opacity: .55; }
+.gt-checkout .gt-btn-primary { background: var(--gt-primary); color: var(--gt-primary-ink); border-color: var(--gt-primary); }
+.gt-checkout .gt-btn-primary:hover:not(:disabled) { background: var(--gt-primary-hover); border-color: var(--gt-primary-hover); }
+.gt-checkout .gt-btn-secondary { background: #ededed; color: var(--gt-text); border-color: var(--gt-border); }
+.gt-checkout .gt-btn-secondary:hover:not(:disabled) { background: #e2e2e2; }
+.gt-checkout .gt-btn-sm { height: 38px; padding: 0 14px; font-size: 13px; }
+.gt-checkout .gt-btn-pay { width: 100%; height: 58px; font-size: 18px; font-weight: 700; margin-top: 22px; letter-spacing: .005em; }
+.gt-checkout .gt-btn-pay:disabled { opacity: .8; }
+.gt-checkout .gt-pay-hint { text-align: center; margin-top: 10px; font-size: 13px; color: var(--gt-muted); }
+.gt-checkout .gt-link {
+  background: none; border: 0; padding: 0; color: var(--gt-ink); text-decoration: underline; text-underline-offset: 2px;
+  cursor: pointer; font: inherit; display: inline;
+}
+.gt-checkout .gt-link:hover { color: #000; }
+.gt-checkout .gt-icon-btn { background: none; border: 0; padding: 6px; border-radius: 4px; cursor: pointer; color: var(--gt-text); display: inline-flex; }
+.gt-checkout .gt-icon-btn:hover { background: #f0f0f0; }
+
+/* Spinner */
+.gt-checkout .gt-spinner {
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+  display: inline-block; animation: gt-spin .7s linear infinite;
+}
+.gt-checkout .gt-spinner-lg { width: 48px; height: 48px; border-width: 3px; color: var(--gt-ink); margin: 0 auto 18px; }
+@keyframes gt-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Banner ---------- */
+.gt-checkout .gt-banner {
+  display: flex; gap: 12px; align-items: flex-start; border-radius: var(--gt-radius); padding: 14px 16px; margin-bottom: 20px; font-size: 14px;
+}
+.gt-checkout .gt-banner svg { flex-shrink: 0; margin-top: 1px; }
+.gt-checkout .gt-banner-critical { background: var(--gt-error-bg); border: 1px solid var(--gt-error); color: #8f1414; }
+.gt-checkout .gt-banner-critical svg { color: var(--gt-error); }
+.gt-checkout .gt-banner-title { font-weight: 600; margin-bottom: 2px; color: #6d0f0f; }
+
+/* ---------- Order summary ---------- */
+.gt-checkout .gt-summary { background: var(--gt-summary-bg); }
+.gt-checkout .gt-summary-toggle {
+  display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px; background: var(--gt-summary-bg); border: 0; border-bottom: 1px solid var(--gt-border-soft);
+  cursor: pointer; font-size: 14px; color: var(--gt-ink); text-align: left;
+}
+.gt-checkout .gt-summary-toggle-label { display: inline-flex; align-items: center; gap: 8px; text-decoration: underline; text-underline-offset: 2px; }
+.gt-checkout .gt-summary.is-open .gt-chev { transform: rotate(180deg); }
+.gt-checkout .gt-summary-toggle-total { font-size: 17px; font-weight: 700; color: var(--gt-text); }
+.gt-checkout .gt-summary-body { display: none; padding: 16px 16px 22px; border-bottom: 1px solid var(--gt-border-soft); }
+.gt-checkout .gt-summary.is-open .gt-summary-body { display: block; }
+
+@media (min-width: 1000px) {
+  .gt-checkout .gt-summary { border-left: 1px solid var(--gt-border-soft); }
+  .gt-checkout .gt-summary-toggle { display: none; }
+  .gt-checkout .gt-summary-body,
+  .gt-checkout .gt-summary.is-open .gt-summary-body {
+    display: block; position: sticky; top: 0; max-width: 480px; padding: 38px; border-bottom: 0;
+  }
+}
+
+.gt-checkout .gt-lines > li + li { margin-top: 14px; }
+.gt-checkout .gt-line { display: flex; align-items: center; gap: 14px; }
+.gt-checkout .gt-line-thumb {
+  position: relative; width: 64px; height: 64px; flex-shrink: 0; border-radius: 8px; background: #fff;
+  border: 1px solid rgba(0, 0, 0, .1);
+}
+.gt-checkout .gt-line-thumb img { width: 100%; height: 100%; object-fit: contain; border-radius: 7px; }
+.gt-checkout .gt-line-noimg { display: block; width: 100%; height: 100%; border-radius: 7px; background: #ececec; }
+.gt-checkout .gt-line-qty {
+  position: absolute; top: -9px; right: -9px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  background: rgba(90, 90, 90, .92); color: #fff; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;
+}
+.gt-checkout .gt-line-info { flex: 1; min-width: 0; }
+.gt-checkout .gt-line-name { font-size: 14px; font-weight: 500; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.gt-checkout .gt-line-variant { font-size: 12px; color: var(--gt-muted); margin-top: 2px; }
+.gt-checkout .gt-line-price { text-align: right; font-size: 14px; white-space: nowrap; display: flex; flex-direction: column; }
+.gt-checkout .gt-line-price s { font-size: 12px; color: var(--gt-muted); }
+
+.gt-checkout .gt-discount { margin-top: 22px; }
+.gt-checkout .gt-discount-row { display: flex; gap: 10px; align-items: flex-start; }
+.gt-checkout .gt-discount-row .gt-field { flex: 1; }
+.gt-checkout .gt-discount-row .gt-btn { flex-shrink: 0; }
+.gt-checkout .gt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+.gt-checkout .gt-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  background: #e6e6e6; border-radius: 4px; padding: 5px 6px 5px 9px; font-size: 13px; font-weight: 500;
+}
+.gt-checkout .gt-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-checkout .gt-chip-amt { color: var(--gt-muted); white-space: nowrap; }
+.gt-checkout .gt-chip button {
+  background: none; border: 0; cursor: pointer; font-size: 16px; line-height: 1; color: var(--gt-muted); padding: 0 3px; border-radius: 3px;
+}
+.gt-checkout .gt-chip button:hover { color: var(--gt-error); background: #fff; }
+.gt-checkout .gt-chips .gt-small { font-size: 12px; }
+
+.gt-checkout .gt-totals { margin-top: 22px; display: flex; flex-direction: column; gap: 9px; font-size: 14px; }
+.gt-checkout .gt-rows { display: flex; flex-direction: column; gap: 9px; }
+.gt-checkout .gt-rows:empty { display: none; }
+.gt-checkout .gt-row { display: flex; justify-content: space-between; gap: 12px; }
+.gt-checkout .gt-row > span:first-child { display: inline-flex; align-items: center; gap: 5px; }
+.gt-checkout .gt-row > span:last-child { text-align: right; white-space: nowrap; }
+.gt-checkout .gt-row-discount > span:first-child { color: var(--gt-text); }
+.gt-checkout .gt-row-sub { font-size: 12.5px; color: var(--gt-muted); }
+.gt-checkout .gt-row-total { margin-top: 8px; align-items: baseline; font-size: 19px; font-weight: 600; }
+.gt-checkout .gt-row-total small { font-size: 12px; font-weight: 400; color: var(--gt-muted); margin-right: 4px; }
+.gt-checkout .gt-row-total strong { font-size: 21px; font-weight: 700; }
+.gt-checkout .gt-tax-note { font-size: 12.5px; color: var(--gt-muted); margin-top: -4px; }
+
+/* ---------- Footer (politika bağlantıları) ---------- */
+.gt-checkout .gt-co-footer { margin-top: 40px; padding: 16px 0 28px; border-top: 1px solid var(--gt-border-soft); }
+.gt-checkout .gt-co-footer nav { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.gt-checkout .gt-co-footer a { font-size: 12.5px; color: var(--gt-ink); }
+
+/* ---------- Status ekranları ---------- */
+.gt-checkout .gt-status { max-width: 520px; margin: 0 auto; padding: 64px 16px 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.gt-checkout .gt-status .gt-co-footer { width: 100%; }
+.gt-checkout .gt-status-icon { width: 56px; height: 56px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+.gt-checkout .gt-status-icon.is-ok { background: #e6f4ea; color: var(--gt-ok); }
+.gt-checkout .gt-status-icon.is-error { background: var(--gt-error-bg); color: var(--gt-error); }
+.gt-checkout .gt-status .gt-btn { margin-top: 12px; }
+.gt-checkout > .gt-co-footer { max-width: 660px; margin: 40px auto 0; padding-left: 16px; padding-right: 16px; }
+
+/* ---------- Modal ---------- */
+.gt-checkout .gt-modal-backdrop {
+  position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, .5);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.gt-checkout .gt-modal {
+  background: #fff; border-radius: 8px; width: 100%; max-width: 720px; max-height: 86vh;
+  display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+}
+.gt-checkout .gt-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--gt-border-soft); }
+.gt-checkout .gt-modal-body { padding: 18px 20px; overflow: auto; }
+.gt-checkout .gt-modal-foot { padding: 12px 20px; border-top: 1px solid var(--gt-border-soft); display: flex; justify-content: flex-end; }
+.gt-checkout .gt-legal-content { font-size: 14px; line-height: 1.65; color: #333; }
+.gt-checkout .gt-legal-content p { margin: 0 0 10px; }
+.gt-checkout .gt-legal-content h2, .gt-checkout .gt-legal-content h3, .gt-checkout .gt-legal-content h4 { margin: 18px 0 8px; font-size: 16px; font-weight: 600; }
+.gt-checkout .gt-legal-content ul, .gt-checkout .gt-legal-content ol { margin: 0 0 10px; padding-left: 20px; list-style: disc; }
+
+/* ---------- Mobil ince ayarlar ---------- */
+@media (max-width: 999px) {
+  .gt-checkout .gt-co-header-inner { padding: 14px 16px; min-height: 60px; }
+  .gt-checkout .gt-co-logo img { height: 24px; }
+  .gt-checkout .gt-co-secure { font-size: 12px; }
+}
+@media (max-width: 560px) {
+  .gt-checkout .gt-h2 { font-size: 19px; }
+  .gt-checkout .gt-inst-grid { grid-template-columns: 1fr 1fr; }
+  .gt-checkout .gt-radio-row { padding: 14px 13px; gap: 10px; }
+  .gt-checkout .gt-radio-aside .gt-brand:nth-child(n+3) { display: none; }
+  .gt-checkout .gt-co-secure span, .gt-checkout .gt-co-secure { gap: 4px; }
+}
+@media (max-width: 380px) {
+  .gt-checkout .gt-grid { grid-template-columns: minmax(0, 1fr); }
+  .gt-checkout .gt-pds, .gt-checkout .gt-pds-errors { grid-template-columns: minmax(0, 1fr); }
+}

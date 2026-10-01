@@ -1,13 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { shippingQuote } from "../lib/shippingRules";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { CreditCard, Building, CheckCircle, AlertCircle, ChevronDown, ChevronUp, ChevronLeft, MapPin, Mail, Plus, ShieldCheck, Lock, X, Pencil, Gift, StickyNote } from "lucide-react";
 import axios from "axios";
 import { useShipping } from "../lib/shipping";
 import { toast } from "sonner";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
-import ProvinceDistrictSelect from "../components/ProvinceDistrictSelect";
 import { useCart } from "../context/CartContext";
 import { cartLineView } from "../lib/price";
 import { useAuth } from "../context/AuthContext";
@@ -15,6 +11,17 @@ import { trackInitiateCheckout, trackPurchase, trackAddPaymentInfo, trackAddShip
 import { collectClickIds } from "../lib/dataLayer";
 import { getSessionId } from "../lib/attribution";
 import { SITE_NAME } from "../lib/brand";
+import { CheckoutHeader, CheckoutFooter } from "../components/checkout/CheckoutChrome";
+import OrderSummary from "../components/checkout/OrderSummary";
+import AddressFields from "../components/checkout/AddressFields";
+import PaymentSection from "../components/checkout/PaymentSection";
+import LegalModal from "../components/checkout/LegalModal";
+import { Banner, Checkbox, Section } from "../components/checkout/Fields";
+import { BillingSection, ContactSection, ExtrasSection, ShippingMethodSection, SmsConsent } from "../components/checkout/Sections";
+import {
+  analyticsItems, estimateDelivery, foldCode, formatTRY, isValidTCKN, mergeAddressLine, validateAddress,
+} from "../components/checkout/utils";
+import "./checkout.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -29,34 +36,25 @@ const emptyAddress = {
   last_name: "",
   phone: "",
   address: "",
+  address2: "",
   city: "",
   district: "",
   postal_code: "",
 };
 
-// Telefon alanı: yalnızca rakam (ve baştaki tek +) kabul edilir — harf/sembol engellenir
-const sanitizePhone = (v) => {
-  const raw = (v || "").replace(/[^\d+]/g, "");
-  const plus = raw.startsWith("+") ? "+" : "";
-  const digits = raw.replace(/\+/g, "").slice(0, 15);
-  return plus + digits;
+const LEGAL_DOCS = {
+  "mesafeli-satis": "Mesafeli Satış Sözleşmesi",
+  "on-bilgilendirme": "Ön Bilgilendirme Formu",
 };
 
-// Tahmini teslimat aralığı (iş günü bazlı; hafta sonu atlanır) — TR pazarı dönüşüm sinyali
-function estimateDelivery(minDays = 2, maxDays = 4) {
-  const addBiz = (base, n) => {
-    const r = new Date(base);
-    let added = 0;
-    while (added < n) {
-      r.setDate(r.getDate() + 1);
-      const wd = r.getDay();
-      if (wd !== 0 && wd !== 6) added++;
-    }
-    return r;
-  };
-  const fmt = (d) => d.toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
-  const now = new Date();
-  return `${fmt(addBiz(now, minDays))} - ${fmt(addBiz(now, maxDays))}`;
+// Checkout'a özel kabuk: site menüsü/footer yok (Shopify tek-sayfa ödeme).
+function CheckoutShell({ children, testId = "checkout-page" }) {
+  return (
+    <div className="gt-checkout" data-testid={testId}>
+      <CheckoutHeader />
+      {children}
+    </div>
+  );
 }
 
 export default function Checkout() {
@@ -65,19 +63,32 @@ export default function Checkout() {
   const { items, total, clearCart } = useCart();
   const { user } = useAuth();
 
-  // Cart collapse + payment flow
-  const [cartCollapsed, setCartCollapsed] = useState(true);
+  // UI durumu
+  const [summaryOpen, setSummaryOpen] = useState(false); // mobil sipariş özeti
+  const [errors, setErrors] = useState({});              // alan-içi hatalar { "ship.phone": "..." }
+  const [submitError, setSubmitError] = useState("");    // Shopify tarzı kırmızı banner
+  const [couponMsg, setCouponMsg] = useState(null);      // { type: "error"|"ok", text }
+  const [legalDoc, setLegalDoc] = useState(null);        // açık sözleşme modalı slug'ı
+
+  // Payment flow
   const [loading, setLoading] = useState(false);
   const [paymentStep, setPaymentStep] = useState("form"); // form | processing | iframe | success | error
-  const [orderId, setOrderId] = useState(null);
+  const [, setOrderId] = useState(null);
 
   // Addresses
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [shippingAddress, setShippingAddress] = useState({ ...emptyAddress, email: user?.email || "" });
   const [billingAddress, setBillingAddress] = useState({ ...emptyAddress });
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
-  const [addressModal, setAddressModal] = useState(null); // null | 'shipping' | 'billing'
-  const [addressForm, setAddressForm] = useState({ ...emptyAddress });
+
+  const clearErr = useCallback((...keys) => {
+    setErrors((prev) => {
+      if (!keys.some((k) => prev[k])) return prev;
+      const next = { ...prev };
+      keys.forEach((k) => delete next[k]);
+      return next;
+    });
+  }, []);
 
   // Üye girişliyse e-posta alanı GİZLENİR; siparişte gerekli olduğundan otomatik doldurulur.
   useEffect(() => {
@@ -138,6 +149,7 @@ export default function Checkout() {
   };
   const idemKeyRef = useRef(null);
   if (idemKeyRef.current == null) idemKeyRef.current = _getIdemKey();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { idemKeyRef.current = _getIdemKey(); }, [items]);
 
   // Payment options
@@ -215,7 +227,6 @@ export default function Checkout() {
       toast.error(e.response?.data?.detail || "Kod doğrulanamadı");
     } finally { setOtpBusy(false); }
   };
-  // Quick-signup state — OrderSuccess sayfasına taşındı, burada artık kullanılmıyor
 
   // KURUMSAL FATURA
   const [corporateInvoice, setCorporateInvoice] = useState(false);
@@ -228,7 +239,6 @@ export default function Checkout() {
 
   // Sipariş tutarları (türetilmiş) — useEffect'lerden ÖNCE tanımlanmalı (TDZ hatası önlenir)
   const { shippingFee, freeShippingThreshold } = useShipping();
-  const freeShippingLimit = freeShippingThreshold || 0;
 
   // DENETİM FIX (#46): Kargo Kuralları (shipping_rules) sepet tutarına göre kargo bedelini
   // belirlesin. Eşleşen kural varsa onun bedeli kullanılır; yoksa genel settings.shipping_fee'ye
@@ -257,22 +267,16 @@ export default function Checkout() {
     return () => { cancel = true; };
   }, []);
 
-  // ÜYE GRUBU İNDİRİMİ — artık SUNUCUDA, kampanya motorunun içinde hesaplanıyor
-  // (/coupons/evaluate + create_order aynı kaynak). Burada AYRICA düşülmemeli: eskiden
-  // yalnız ekranda düşülüyor, siparişte hesaplanmıyordu → indirimli gruptaki üye onay-tutarı
-  // denetimine takılıp (409) sipariş VEREMİYORDU. İndirim, uygulanan kampanyalar listesinde
-  // "Üye İndirimi (grup)" satırı olarak görünür ve `discount` içinde gelir.
+  // ÜYE GRUBU İNDİRİMİ — SUNUCUDA, kampanya motorunun içinde hesaplanıyor
+  // (/coupons/evaluate + create_order aynı kaynak). Burada AYRICA düşülmemeli.
 
-  // Y25: Ücretsiz kargo kuponu uygulandıysa kargo 0 gösterilir (önceden etiket "Ücretsiz Kargo"
-  // yazsa da tutara kargo ekleniyordu). Eşik ya da kupon → kargo bedava.
+  // Y25: Ücretsiz kargo kuponu uygulandıysa kargo 0 gösterilir. Eşik ya da kupon → kargo bedava.
   const hasFreeShippingPromo = (appliedPromotions || []).some((p) => p && p.free_shipping);
   // A rule's preliminary zero fee cannot bypass the final merchandise minimum.
   const baseShipFee = ruleShipCost > 0 ? ruleShipCost : shippingFee;
   const giftWrapTotal = giftWrap ? GIFT_WRAP_PRICE : 0;
   const codFee = paymentMethod === "cash_on_delivery" ? COD_FEE : 0;
   // Puan tavanı SUNUCUYLA aynı tabandan hesaplanır: (ara toplam − kupon/kampanya indirimi).
-  // Eskiden indirimSİZ `total` baz alınıyordu → istemci sunucudan fazla puan düşüyor, ödenecek
-  // tutar ekranda farklı çıkıyordu (onaylanan ≠ çekilen).
   const pointsDeduction = usePoints
     ? Math.min(userPoints, Math.max(0, total - discount) * (POINTS_MAX_PCT / 100))
     : 0;
@@ -297,8 +301,7 @@ export default function Checkout() {
   const visiblePromotions = appliedPromotions.filter((p) => !p.free_shipping || shipping.free || Number(p.discount) > 0);
   const preGiftTotal = Math.max(0, total + shippingCost - discount - bankTransferDiscount - paymentMethodDiscount - pointsDeduction + giftWrapTotal + codFee);
   // C2 Hediye çeki: tüm indirimlerden SONRA, ödenecek tutardan düşer (sunucu-otoriter;
-  // burada yalnız gösterim). Bakiye kısmi kullanılır, kalan çekte kalır.
-  // Hediye çeki: TL bakiye → min(bakiye, tutar); YÜZDE çeki → tutar × % (maks. tutar tavanlı). Sunucu yine kendi hesaplar.
+  // burada yalnız gösterim). TL bakiye → min(bakiye, tutar); YÜZDE çeki → tutar × % (tavanlı).
   const giftCardDeduction = giftCardApplied
     ? (giftCardApplied.value_type === "percent"
         ? Math.min(Math.round(preGiftTotal * (Number(giftCardApplied.percent) || 0)) / 100,
@@ -308,13 +311,11 @@ export default function Checkout() {
   const grandTotal = Math.max(0, Math.round((preGiftTotal - giftCardDeduction) * 100) / 100);
 
   // Yalnız ürün kartındaki sale_price farkı motorun dışında kalır. Kampanyaları
-  // cartLineView/campaignPct ile TEKRAR hesaplama: üst ve alt özet aynı sunucu
-  // sonucunu kullanmalı (kapsam, kaldırılan kampanya, global tavan dahil).
+  // cartLineView/campaignPct ile TEKRAR hesaplama: özet sunucu sonucunu kullanmalı.
   const listSum = items.reduce((s, it) => s + cartLineView(it).listUnit * it.quantity, 0);
   const productDisc = Math.max(0, listSum - total);
 
-  // Seçili taksitin GERÇEK ödeme değerleri — özet "Toplam" ve "Ödeme Yap" butonu
-  // peşin grandTotal'ı değil, seçilen taksitin totalPrice/installmentPrice'ını yansıtır.
+  // Seçili taksitin GERÇEK ödeme değerleri — özet "Toplam" ve buton seçilen taksiti yansıtır.
   const ccInstallmentOpt = paymentMethod === "credit_card"
     ? (installments.find((o) => o.number === selectedInstallment) || null)
     : null;
@@ -335,7 +336,9 @@ export default function Checkout() {
         setEnabledPM({
           credit_card: pm.credit_card !== false,          // varsayılan AÇIK
           bank_transfer: pm.bank_transfer !== false,      // varsayılan AÇIK
-          cash_on_delivery: false, // Kapıda ödeme tamamen kapalı
+          // Kapıda ödeme yalnız admin AÇIKÇA açtıysa (true) görünür — sunucu da aynı kuralla
+          // (payment_methods.cash_on_delivery is True) doğrular ve hizmet bedelini ekler.
+          cash_on_delivery: pm.cash_on_delivery === true,
         });
         // Havale/EFT teşvik indirimi yüzdesi (ayardan; varsayılan %5)
         const bp = r.data?.bank_transfer_discount_pct;
@@ -347,7 +350,7 @@ export default function Checkout() {
 
   // Seçili ödeme yöntemi kapatılmışsa ilk aktif yönteme düş
   useEffect(() => {
-    const order = ["credit_card", "bank_transfer"];
+    const order = ["credit_card", "bank_transfer", "cash_on_delivery"];
     if (!enabledPM[paymentMethod]) {
       const first = order.find((k) => enabledPM[k]);
       if (first) setPaymentMethod(first);
@@ -360,8 +363,6 @@ export default function Checkout() {
     setSavedAddresses([]);
     setShippingAddress({ ...emptyAddress, email: user?.email || "" });
     setBillingAddress({ ...emptyAddress });
-    setAddressForm({ ...emptyAddress });
-    setAddressModal(null);
     if (!user) return;
     const token = localStorage.getItem("token");
     axios.get(`${API}/my-addresses`, { headers: { Authorization: `Bearer ${token}` } })
@@ -371,8 +372,8 @@ export default function Checkout() {
         setSavedAddresses(list);
         const def = list.find((a) => a.is_default) || list[0];
         if (def) {
-          setShippingAddress({ ...def, email: user.email || "" });
-          setBillingAddress({ ...def });
+          setShippingAddress({ ...emptyAddress, ...def, email: user.email || "" });
+          setBillingAddress({ ...emptyAddress, ...def });
         }
       })
       .catch(() => {});
@@ -388,10 +389,7 @@ export default function Checkout() {
   }, []);
 
   // Madde 4 — Kampanya motoru: otomatik kampanyalar + (varsa) girilen kodu BIRLIKTE hesaplar.
-  // Sunucudaki /coupons/evaluate ile ayni sonuc (onizleme = siparis).
-  // YARIS KORUMASI: kupon/ödeme yöntemi hızlı değişince birden çok istek uçar; en son
-  // DÖNEN değil en son GÖNDERİLEN kazanmalı — yoksa eski (stale) indirim tutarı gösterilip
-  // gönderilebiliyordu. Sıra numarasıyla yalnız en güncel isteğin cevabını uygula.
+  // YARIS KORUMASI: en son GÖNDERİLEN istek kazanır (sıra numarası).
   const recalcSeq = useRef(0);
   const recalcPromotions = async (code = "") => {
     const seq = ++recalcSeq.current;
@@ -400,11 +398,8 @@ export default function Checkout() {
         cart_total: total,
         items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity })),
         user_id: user?.id || null,
-        // KRİTİK: Sunucu (create_order) uygunluğu shipping_address.email ile değerlendirir.
-        // Burada sadece user?.email gönderilince MİSAFİR müşteride ayrışma oluyordu: forma
-        // e-postasını yazan misafir için istemci "ilk siparişe özel" kampanyayı uygun görmüyor
-        // (ekranda görünmüyor), sunucu görüyor ve uyguluyordu → ekrandaki tutar ile bankadan
-        // çekilen tutar farklı çıkıyordu. Aynı e-posta gönderilerek iki taraf hizalanır.
+        // KRİTİK: Sunucu (create_order) uygunluğu shipping_address.email ile değerlendirir;
+        // misafirin forma yazdığı e-posta gönderilerek iki taraf hizalanır.
         email: shippingAddress?.email || user?.email || "",
         code: code || "",
         payment_method: paymentMethod,
@@ -425,21 +420,12 @@ export default function Checkout() {
     }
   };
 
-  // Available coupons + InitiateCheckout pixel
+  // InitiateCheckout pixel (GA4 begin_checkout + Meta/TikTok)
   useEffect(() => {
     if (items.length === 0) return;
     trackInitiateCheckout({
       total: grandTotal,
-      items: items.map((it) => ({
-        product_id: it.productId, name: it.name, price: it.price, quantity: it.quantity,
-        category: it.category || it.categoryName || "",
-        sku: it.sku || it.stockCode || "",
-        size: it.size || "", color: it.color || "",
-        list_price: it.list_price || it.price,
-        sale_price: it.sale_price || it.price,
-        brand: it.brand || SITE_NAME,
-        breadcrumb: it.breadcrumb || "",
-      })),
+      items: analyticsItems(items, SITE_NAME),
       discount, shipping_cost: shippingCost,
       coupon: appliedCoupon?.code || "",
     });
@@ -447,7 +433,6 @@ export default function Checkout() {
   }, [items, total, user?.id, discount, shippingCost, appliedCoupon?.code]);
 
   // GA4: add_shipping_info — geçerli teslimat adresi ilk kez hazır olduğunda BİR KEZ.
-  // Tek-sayfa checkout olduğu için ayrı "Devam Et" adımı yok; adres geçerli olunca tetiklenir.
   useEffect(() => {
     if (shippingInfoTracked.current) return;
     if (items.length === 0) return;
@@ -457,16 +442,7 @@ export default function Checkout() {
     shippingInfoTracked.current = true;
     trackAddShippingInfo({
       total: grandTotal,
-      items: items.map((it) => ({
-        product_id: it.productId, name: it.name, price: it.price, quantity: it.quantity,
-        category: it.category || it.categoryName || "",
-        sku: it.sku || it.stockCode || "",
-        size: it.size || "", color: it.color || "",
-        list_price: it.list_price || it.price,
-        sale_price: it.sale_price || it.price,
-        brand: it.brand || SITE_NAME,
-        breadcrumb: it.breadcrumb || "",
-      })),
+      items: analyticsItems(items, SITE_NAME),
       coupon: appliedCoupon?.code || "",
       shipping_cost: shippingCost,
       shipping_tier: shippingCost > 0 ? "Standart Kargo" : "Ücretsiz",
@@ -478,14 +454,11 @@ export default function Checkout() {
   useEffect(() => {
     if (items.length === 0) { setAppliedPromotions([]); setEligiblePromotions([]); setDiscount(0); return; }
     recalcPromotions(appliedCoupon?.code || "");
-    // shippingAddress.email DEP: misafir e-postasını yazınca uygunluk (ilk-siparişe-özel
-    // kampanyalar) sunucudaki ile aynı şekilde yeniden değerlendirilsin.
+    // shippingAddress.email DEP: misafir e-postasını yazınca uygunluk yeniden değerlendirilsin.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, total, user?.id, appliedCoupon?.code, paymentMethod, excludedIds, shippingAddress?.email]);
 
-  // İLK-SİPARİŞ KODU OTOMATİK YENİDEN UYGULAMA: müşteri kodu kimlik yokken girip
-  // reddedildiyse (pendingCode), sonradan GİRİŞ yapınca (user.id) veya GEÇERLİ bir üyelik
-  // e-postası girince kodu otomatik yeniden uygular. Böylece "uygulanamadı" deneyimi biter.
+  // İLK-SİPARİŞ KODU OTOMATİK YENİDEN UYGULAMA (giriş / geçerli e-posta sonrası).
   useEffect(() => {
     if (!pendingCode || appliedCoupon) return;
     const em = (shippingAddress?.email || user?.email || "").trim();
@@ -538,6 +511,21 @@ export default function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.number, grandTotal, paymentMethod]);
 
+  const buildUserInfo = () => ({
+    email: shippingAddress.email || user?.email || "",
+    phone: shippingAddress.phone || user?.phone || "",
+    first_name: shippingAddress.first_name || "",
+    last_name: shippingAddress.last_name || "",
+    city: shippingAddress.city || "",
+    state: shippingAddress.district || shippingAddress.state || "",
+    country: shippingAddress.country || "TR",
+    zipcode: shippingAddress.zipcode || shippingAddress.postal_code || "",
+    street: shippingAddress.address || "",
+    // Üye → user id; misafir → stabil first-party visitor id (store_sid).
+    // Aynı değer server-side Purchase'ta da external_id olur → browser↔server dedup.
+    external_id: user?.id || getSessionId() || "",
+  });
+
   const handlePaymentSuccess = async (orderNumber) => {
     if (!orderNumber) return;
     _clearIdemKeys();  // ödeme başarılı → idem anahtarlarını temizle (sonraki aynı-sepet alımı yeni sipariş açsın)
@@ -547,38 +535,15 @@ export default function Checkout() {
       const r = await axios.get(`${API}/orders/by-number/${orderNumber}`);
       amount = r.data?.total || grandTotal;
     } catch (e) { /* sessiz */ }
-    const _userInfo = {
-      email: shippingAddress.email || user?.email || "",
-      phone: shippingAddress.phone || user?.phone || "",
-      first_name: shippingAddress.first_name || "",
-      last_name: shippingAddress.last_name || "",
-      city: shippingAddress.city || "",
-      state: shippingAddress.district || shippingAddress.state || "",
-      country: shippingAddress.country || "TR",
-      zipcode: shippingAddress.zipcode || shippingAddress.postal_code || "",
-      street: shippingAddress.address || "",
-      // Üye → user id; misafir → stabil first-party visitor id (store_sid).
-      // Aynı değer server-side Purchase'ta da external_id olur → browser↔server dedup + external_id coverage.
-      external_id: user?.id || getSessionId() || "",
-    };
     trackPurchase({
       order_id: orderNumber,
       total: amount,
-      items: items.map((it) => ({
-        product_id: it.productId, name: it.name, price: it.price, quantity: it.quantity,
-        category: it.category || it.categoryName || "",
-        sku: it.sku || it.stockCode || "",
-        size: it.size || "", color: it.color || "",
-        list_price: it.list_price || it.price,
-        sale_price: it.sale_price || it.price,
-        brand: it.brand || SITE_NAME,
-        breadcrumb: it.breadcrumb || "",
-      })),
+      items: analyticsItems(items, SITE_NAME),
       coupon: appliedCoupon?.code || "",
       discount, shipping: shippingCost, tax: 0,
       payment_type: paymentMethod,
       shipping_tier: shippingCost > 0 ? "Standart Kargo" : "Ücretsiz",
-      user: _userInfo,
+      user: buildUserInfo(),
     });
     clearCart();
     setPaymentStep("success");
@@ -586,47 +551,34 @@ export default function Checkout() {
     setTimeout(() => navigate(`/order-success/${orderNumber}`), 1200);
   };
 
-  // Kodu HARF-DUYARSIZ + TÜRKÇE-I DUYARSIZ tek forma indir (İ/ı → I). Böylece 'HOSGELDİN',
-  // 'hosgeldin', 'hosgeldın' hepsi kayıtlı 'HOSGELDIN' ile eşleşir (kullanıcı isteği).
-  const foldCode = (s) => {
-    const folded = (s || "").trim()
-      .replace(/[İı]/g, "I").replace(/[Şş]/g, "S").replace(/[Ğğ]/g, "G")
-      .replace(/[Üü]/g, "U").replace(/[Öö]/g, "O").replace(/[Çç]/g, "C")
-      .toUpperCase();
-    const compact = folded.replace(/[\s_-]+/g, "");
-    return ["HOSGELDIN", "HOSGELDIN10"].includes(compact) ? "HOSGELDIN10" : folded;
-  };
-
   const applyCode = async (rawCode, _fromGift = false) => {
     const code = foldCode(rawCode);
     if (!code) return;
+    setCouponMsg(null);
     const d = await recalcPromotions(code);
-    if (!d) { toast.error("Kampanya hesaplanamadı"); return; }
-    // BULANIK ÇÖZÜMLEME: sunucu, yazılan varyantı (hoş geldin %10, HOSGELDN10, HOSGELDIN1O…)
-    // sistemdeki KANONİK koda çözer (entered_resolved). applied/rejected eşlemesi ve
-    // appliedCoupon bu kanonik kodla yapılır; böylece sonraki hesaplamalar/sipariş doğru kodu taşır.
+    if (!d) { setCouponMsg({ type: "error", text: "Kampanya hesaplanamadı" }); return; }
+    // BULANIK ÇÖZÜMLEME: sunucu yazılan varyantı KANONİK koda çözer (entered_resolved).
     const resolved = foldCode(d.entered_resolved || code);
     const hit = (d.applied || []).find((a) => foldCode(a.code) === resolved || foldCode(a.code) === code);
     if (hit) {
       setAppliedCoupon({ code: hit.code || resolved });
       setCouponCode(rawCode);
       setPendingCode(""); // uygulandı → bekleyen kod kalmasın
-      toast.success(`Kupon uygulandı (${hit.code || resolved}): ${Number(hit.discount).toFixed(2)} TL indirim`);
+      setCouponMsg({ type: "ok", text: `Kupon uygulandı (${hit.code || resolved}): ${formatTRY(hit.discount)} indirim` });
       return;
     }
     const rej = (d.rejected || []).find((r) =>
       foldCode(r.code) === resolved || foldCode(r.code) === code || foldCode(r.entered || "") === code);
     if (rej) {
-      // Kod GEÇERLİ bir kupon ama bu sepete uygulanamıyor (ör. kampanya çakışması / ilk sipariş).
       // İLK-SİPARİŞ + KİMLİK YOK: kodu HATIRLA; müşteri giriş yapınca/e-posta girince otomatik uygulanır.
       const _em = (shippingAddress?.email || user?.email || "").trim();
       const _noIdentity = !(user?.id) && !_em;
       if (_noIdentity && /giriş yap|ilk sipariş/i.test(rej.reason || "")) {
         setPendingCode(code);
-        toast.error("Bu kod ilk siparişe özeldir — giriş yapın ya da üyelik e-postanızı girin; kod otomatik uygulanacak.");
+        setCouponMsg({ type: "error", text: "Bu kod ilk siparişe özeldir — giriş yapın ya da üyelik e-postanızı girin; kod otomatik uygulanacak." });
       } else {
         setPendingCode(""); // kimlik var ama yine reddedildi → gerçekten uygulanamıyor
-        toast.error(rej.reason || "Bu kupon şu an bu sepete uygulanamıyor.");
+        setCouponMsg({ type: "error", text: rej.reason || "Bu kupon şu an bu sepete uygulanamıyor." });
       }
       return;
     }
@@ -640,26 +592,27 @@ export default function Checkout() {
         if (data?.valid) {
           setGiftCardApplied({ code, balance: Number(data.balance) || 0, kind: data.kind || "gift",
                                value_type: data.value_type || "amount", percent: Number(data.percent) || 0, max_amount: Number(data.max_amount) || 0 });
-          toast.success(data.value_type === "percent"
-            ? `Hediye çeki uygulandı — %${Number(data.percent) || 0} indirim${Number(data.max_amount) > 0 ? ` (en fazla ${Number(data.max_amount).toFixed(0)} TL)` : ""}`
-            : `Hediye çeki uygulandı — bakiye: ${(Number(data.balance) || 0).toFixed(2)} TL`);
+          setCouponCode("");
+          setCouponMsg({ type: "ok", text: data.value_type === "percent"
+            ? `Hediye çeki uygulandı — %${Number(data.percent) || 0} indirim${Number(data.max_amount) > 0 ? ` (en fazla ${formatTRY(data.max_amount)})` : ""}`
+            : `Hediye çeki uygulandı — bakiye: ${formatTRY(data.balance)}` });
           return;
         }
       } catch { /* sessiz */ }
       finally { setGiftCardBusy(false); }
     }
-    toast.error("Bu kod geçersiz veya bu sepete uygulanamıyor.");
+    setCouponMsg({ type: "error", text: "Bu kod geçersiz veya bu sepete uygulanamıyor." });
   };
 
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponCode("");
+    setCouponMsg(null);
     recalcPromotions(""); // girilen kod kalkar, otomatik kampanyalar uygulanmaya devam eder
   };
 
   // Uygulanan bir kampanyayı X ile kaldır
   const removePromotion = (p) => {
-    // Girilen kod kampanyasıysa: kodu temizlemek doğal kaldırmadır
     if (appliedCoupon && p.code && appliedCoupon.code === p.code) { handleRemoveCoupon(); return; }
     const id = p.coupon_id;
     if (!id) return;
@@ -667,97 +620,119 @@ export default function Checkout() {
   };
   const resetExcluded = () => setExcludedIds([]);
 
-  // ----- Address Modal -----
-  const openAddressModal = (which) => {
-    setAddressModal(which);
-    const current = which === "shipping" ? shippingAddress : billingAddress;
-    setAddressForm({ ...emptyAddress, ...current });
+  // ----- Adres güncelleme (satır içi form) -----
+  const updateShipping = (patch) => {
+    setShippingAddress((p) => {
+      const next = { ...p, ...patch };
+      // Kayıtlı adres seçiliyken alan değişirse artık "yeni adres"tir (seçim etiketi düşer).
+      if (p.id && Object.keys(patch).some((k) => k !== "email" && patch[k] !== p[k])) next.id = "";
+      return next;
+    });
+    clearErr(...Object.keys(patch).map((k) => `ship.${k}`));
+  };
+  const updateBilling = (patch) => {
+    setBillingAddress((p) => {
+      const next = { ...p, ...patch };
+      if (p.id && Object.keys(patch).some((k) => patch[k] !== p[k])) next.id = "";
+      return next;
+    });
+    clearErr(...Object.keys(patch).map((k) => `bill.${k}`));
+  };
+  const pickSavedShipping = (a) => {
+    setShippingAddress((p) => (a ? { ...emptyAddress, ...a, email: user?.email || a.email || p.email || "" } : { ...emptyAddress, email: p.email || "" }));
+    if (a && billingSameAsShipping) setBillingAddress({ ...emptyAddress, ...a });
+    setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith("ship."))));
+  };
+  const pickSavedBilling = (a) => {
+    setBillingAddress(a ? { ...emptyAddress, ...a } : { ...emptyAddress });
+    setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith("bill."))));
   };
 
-  const closeAddressModal = () => { setAddressModal(null); setAddressForm({ ...emptyAddress }); };
-
-  const handleSaveAddress = async () => {
-    // Validate
-    const required = ["first_name","last_name","phone","address","city","district"];
-    for (const k of required) {
-      if (!addressForm[k]) { toast.error("Tüm zorunlu alanları doldurun"); return; }
-    }
-    const _digits = (addressForm.phone || "").replace(/\D/g, "");
-    if (_digits.length < 10) { toast.error("Geçerli bir telefon numarası girin (en az 10 hane)"); return; }
-    // Persist for logged in users (async, page does not reload)
-    if (user) {
-      const token = localStorage.getItem("token");
-      try {
-        if (addressForm.id) {
-          await axios.put(`${API}/addresses/${addressForm.id}`, addressForm, { headers: { Authorization: `Bearer ${token}` } });
-        } else {
-          const r = await axios.post(`${API}/addresses`, addressForm, { headers: { Authorization: `Bearer ${token}` } });
-          addressForm.id = r.data?.address_id;
-        }
-        // Refresh list
-        const list = await axios.get(`${API}/my-addresses`, { headers: { Authorization: `Bearer ${token}` } });
-        setSavedAddresses(list.data?.addresses || []);
-      } catch (e) {
-        // Hatayı kullanıcıya bildir (önceden silently catch ediliyordu)
-        const msg = e?.response?.data?.detail || e?.message || "Adres kaydedilemedi";
-        toast.error(`Adres kayıt hatası: ${msg}`);
-        if (e?.response?.status === 401) {
-          toast.warning("Oturumunuz sonlanmış olabilir. Lütfen tekrar giriş yapın.");
-        }
-        // Local state ile devam et — checkout akışını bozmasın
-      }
-    }
-    if (addressModal === "shipping") {
-      setShippingAddress({ ...addressForm, email: user?.email || addressForm.email || shippingAddress.email || "" });
-      if (billingSameAsShipping) setBillingAddress({ ...addressForm });
-    } else {
-      setBillingAddress({ ...addressForm });
-    }
-    closeAddressModal();
-    toast.success("Adres kaydedildi");
+  const onSelectMethod = (key) => {
+    setPaymentMethod(key);
+    clearErr("card.holder", "card.number", "card.expiry", "card.cvc");
+    // GA4 + CAPI: add_payment_info — zengin payload
+    try {
+      const mappedItems = (items || []).map((it) => ({
+        item_id: String(it.product_id || it.productId || it.id || it.sku || ""),
+        item_name: it.name || "",
+        item_brand: it.brand || SITE_NAME,
+        item_category: it.category || it.categoryName || "",
+        item_variant: `${it.size || ""} ${it.color || ""}`.trim(),
+        price: Number(it.price) || 0,
+        list_price: Number(it.list_price || it.price) || 0,
+        sale_price: Number(it.sale_price || it.price) || 0,
+        discount: Math.max(0, Number(it.list_price || it.price) - Number(it.price)),
+        sku: it.sku || it.stockCode || "",
+        size: it.size || "", color: it.color || "",
+        quantity: Number(it.quantity) || 1,
+        coupon: appliedCoupon?.code || "",
+      }));
+      trackAddPaymentInfo({
+        items: mappedItems,
+        value: grandTotal,
+        currency: "TRY",
+        coupon: appliedCoupon?.code || "",
+        discount, shipping: shippingCost, tax: 0,
+        payment_type: key,
+      });
+    } catch (_) { /* silent */ }
   };
 
-  const pickSavedAddress = (a) => {
-    if (addressModal === "shipping") {
-      setShippingAddress({ ...a, email: user?.email || a.email || shippingAddress.email || "" });
-      if (billingSameAsShipping) setBillingAddress({ ...a });
-    } else {
-      setBillingAddress({ ...a });
-    }
-    closeAddressModal();
-  };
-
-  // ----- Submit -----
-  const validateAddresses = () => {
-    const ok = (a) => a && a.first_name && a.last_name && a.phone && a.address && a.city && a.district;
-    if (!ok(shippingAddress)) { toast.error("Lütfen teslimat adresi seçin / ekleyin"); return false; }
-    if (!billingSameAsShipping && !ok(billingAddress)) { toast.error("Lütfen fatura adresi seçin / ekleyin"); return false; }
-    if (corporateInvoice) {
-      if (!corporateData.company_name?.trim()) { toast.error("Firma Ünvanı gereklidir"); return false; }
-      if (!corporateData.tax_office?.trim()) { toast.error("Vergi Dairesi gereklidir"); return false; }
-      const tn = (corporateData.tax_number || "").replace(/\D/g, "");
-      if (tn.length !== 10 && tn.length !== 11) { toast.error("VKN (10 hane) veya TCKN (11 hane) hatalı"); return false; }
-    }
+  // ----- Doğrulama (alan-içi hatalar) -----
+  const validateAll = () => {
+    const errs = {};
     const _email = (shippingAddress.email || user?.email || "").trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_email)) { toast.error("Lütfen geçerli bir e-posta adresi girin"); return false; }
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
-    if (e?.preventDefault) e.preventDefault();
-    if (!validateAddresses()) return;
-    if (!acceptTerms) { toast.error("Lütfen sözleşmeleri onaylayın"); return; }
-    if (items.length === 0) { toast.error("Sepetiniz boş"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_email)) errs.email = "Geçerli bir e-posta adresi girin";
+    Object.assign(errs, validateAddress(shippingAddress, "ship"));
+    if (!billingSameAsShipping) Object.assign(errs, validateAddress(billingAddress, "bill"));
+    if (corporateInvoice) {
+      if (!corporateData.company_name?.trim()) errs["corp.company_name"] = "Firma ünvanı gereklidir";
+      if (!corporateData.tax_office?.trim()) errs["corp.tax_office"] = "Vergi dairesi gereklidir";
+      const tn = (corporateData.tax_number || "").replace(/\D/g, "");
+      if (tn.length !== 10 && tn.length !== 11) errs["corp.tax_number"] = "VKN (10 hane) veya TCKN (11 hane) girin";
+      else if (tn.length === 11 && !isValidTCKN(tn)) errs["corp.tax_number"] = "Geçerli bir TC kimlik numarası girin";
+    }
     if (paymentMethod === "credit_card") {
       const _n = card.number.replace(/\s/g, "");
       const _e = card.expiry.split("/");
-      if (!card.holder.trim() || _n.length < 15 || (_e[0] || "").length !== 2 || (_e[1] || "").length !== 2 || card.cvc.length < 3) {
-        toast.error("Lütfen kart bilgilerini eksiksiz girin");
-        return;
+      if (_n.length < 15) errs["card.number"] = "Geçerli bir kart numarası girin";
+      if ((_e[0] || "").length !== 2 || (_e[1] || "").length !== 2 || Number(_e[0]) < 1 || Number(_e[0]) > 12) errs["card.expiry"] = "Son kullanma tarihini AA/YY biçiminde girin";
+      if (card.cvc.length < 3) errs["card.cvc"] = "Güvenlik kodunu girin";
+      if (!card.holder.trim()) errs["card.holder"] = "Kart üzerindeki ismi girin";
+    }
+    if (!acceptTerms) errs.terms = "Devam etmek için sözleşmeleri onaylamanız gerekir";
+    return errs;
+  };
+
+  const focusFirstError = () => {
+    setTimeout(() => {
+      const el = document.querySelector('.gt-checkout [aria-invalid="true"]');
+      if (el) {
+        try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* jsdom */ }
+        try { el.focus({ preventScroll: true }); } catch { /* yoksay */ }
       }
+    }, 0);
+  };
+
+  // ----- Submit -----
+  const handleSubmit = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    setSubmitError("");
+    if (items.length === 0) { setSubmitError("Sepetiniz boş"); return; }
+    const errs = validateAll();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setSubmitError("Devam etmeden önce lütfen işaretli alanları düzeltin.");
+      focusFirstError();
+      return;
     }
     setLoading(true);
     try {
+      const shipAddr = mergeAddressLine({ ...shippingAddress, email: shippingAddress.email || user?.email || "" });
+      const billAddr = billingSameAsShipping
+        ? { ...shipAddr }
+        : mergeAddressLine({ ...billingAddress, email: shipAddr.email });
       const orderData = {
         user_id: user?.id || null,
         items: items.map((item) => ({
@@ -765,8 +740,8 @@ export default function Checkout() {
           category_id: item.categoryId,
           price: item.price, name: item.name, image: item.image, size: item.size, color: item.color,
         })),
-        shipping_address: { ...shippingAddress, email: shippingAddress.email || user?.email || "" },
-        billing_address: billingSameAsShipping ? { ...shippingAddress } : { ...billingAddress },
+        shipping_address: shipAddr,
+        billing_address: billAddr,
         billing_same_as_shipping: billingSameAsShipping,
         billing_info: corporateInvoice ? {
           is_corporate: true,
@@ -780,8 +755,7 @@ export default function Checkout() {
         discount, coupon_code: appliedCoupon?.code || "",
         gift_card_code: giftCardApplied?.code || "",
         applied_promotions: appliedPromotions,
-        // Müşterinin "×" ile kaldırdığı kampanyalar SUNUCUYA da bildirilmeli; aksi halde
-        // sunucu bu kampanyaları yeniden uygulayıp onaylanandan FARKLI tutar çekiyordu.
+        // Müşterinin "×" ile kaldırdığı kampanyalar SUNUCUYA da bildirilmeli.
         excluded_ids: excludedIds,
         gift_note: giftNote || "", gift_wrap: giftWrap, gift_wrap_price: giftWrapTotal,
         notes: orderNote.trim(),
@@ -791,14 +765,11 @@ export default function Checkout() {
         payment_method: paymentMethod,
         attribution_session_id:
           (typeof window !== "undefined" && (window.__STORE_SID__ || localStorage.getItem("store_sid"))) || null,
-        // Reklam tıklama kimlikleri (ttclid/fbc/gclid …) siparişe kaydedilir:
-        // ödeme onayı iyzico webhook'undan (tarayıcısız) geldiğinde CAPI
-        // purchase event'inde atıf için kullanılır.
+        // Reklam tıklama kimlikleri (ttclid/fbc/gclid …) — webhook CAPI purchase atfı için.
         click_ids: (typeof window !== "undefined" ? collectClickIds() : {}),
         // İYS — ticari ileti izni (kutu işaretliyse). SMS izni OTP doğrulaması ister.
         marketing_consent: { email: mktEmail, sms: mktSms, otp_verified: otpVerified },
-        // KVKK: çerez bildirimindeki 'pazarlama' onayı — consent gate açıkken tarayıcısız
-        // (webhook) server Purchase CAPI'si buna göre gönderilir/atlanır.
+        // KVKK: çerez bildirimindeki 'pazarlama' onayı — server Purchase CAPI buna göre.
         ad_tracking_consent: (() => {
           try { return !!JSON.parse(localStorage.getItem("store_cookie_consent") || "{}").marketing; }
           catch (_) { return false; }
@@ -807,18 +778,15 @@ export default function Checkout() {
         idempotency_key: idemKeyRef.current,
       };
 
-      // Üye girişliyse token'ı gönder ki sipariş user_id'ye bağlansın (misafirde token yok → eskisi gibi).
+      // Üye girişliyse token'ı gönder ki sipariş user_id'ye bağlansın (misafirde token yok).
       const _authToken = localStorage.getItem("token");
       const orderRes = await axios.post(`${API}/orders`, orderData,
         _authToken ? { headers: { Authorization: `Bearer ${_authToken}` } } : undefined);
       const newOrderId = orderRes.data.order_id;
       setOrderId(newOrderId);
-      // Başarı sayfası sipariş NUMARASI ile açılır (by-number). Numara yoksa akışı kırma:
-      // order_id'ye düşme (OrderSuccess her ikisini de dener) — 'undefined' rotası oluşmasın.
       const _successNum = orderRes.data.order_number || orderRes.data.order_id;
 
-      // İdempotency: aynı sepet zaten ÖDENMİŞ bir siparişe bağlıysa tekrar ödeme başlatma
-      // (çift çekim önlemi) — doğrudan başarı sayfasına götür.
+      // İdempotency: aynı sepet zaten ÖDENMİŞ bir siparişe bağlıysa tekrar ödeme başlatma.
       if (orderRes.data.idempotent && orderRes.data.payment_status === "paid") {
         setPaymentStep("success");
         clearCart();
@@ -826,8 +794,7 @@ export default function Checkout() {
         return;
       }
 
-      // C2: Tutarın TAMAMI hediye çekiyle karşılandı → sunucu siparişi paid/confirmed açtı,
-      // ödeme adımı atlanır (iyzico'ya 0 TL gitmez).
+      // C2: Tutarın TAMAMI hediye çekiyle karşılandı → ödeme adımı atlanır.
       if (orderRes.data.payment_status === "paid" && Number(orderRes.data.total) === 0) {
         setPaymentStep("success");
         clearCart();
@@ -845,80 +812,52 @@ export default function Checkout() {
           expireYear: (_exp[1] || "").trim(),
           cvc: card.cvc.trim(),
         };
-        // İYZİCO 3D SECURE ZORUNLU (iyzico: "İşlemi 3dsecure olarak gerçekleştirmeniz
-        // gerekmektedir"). 3DS'siz (card/pay) yol KALDIRILDI — iyzico 3DS'siz denemeleri
-        // reddedip siparişi 'failed' bırakıyor, müşteri tekrar deneyip öksüz/çift sipariş
-        // üretiyordu. TÜM kart ödemeleri artık 3DS ile başlatılır.
-        {
-          const res = await axios.post(`${API}/payment/3ds/initialize`, {
-            order_id: newOrderId,
-            callback_url: `${API}/payment/3ds/callback`,
-            return_url: `${window.location.origin}/odeme`,
-            card: cardPayload,
-            installment: selectedInstallment,
-          });
-          if (res.data.success && res.data.threeDSHtmlContent) {
-            const html = window.atob(res.data.threeDSHtmlContent);
-            document.open();
-            document.write(html);
-            document.close();
-            return;
-          }
-          setLoading(false);
-          toast.error(res.data.error || "Ödeme başlatılamadı");
+        // İYZİCO 3D SECURE ZORUNLU — TÜM kart ödemeleri 3DS ile başlatılır.
+        const res = await axios.post(`${API}/payment/3ds/initialize`, {
+          order_id: newOrderId,
+          callback_url: `${API}/payment/3ds/callback`,
+          return_url: `${window.location.origin}/odeme`,
+          card: cardPayload,
+          installment: selectedInstallment,
+        });
+        if (res.data.success && res.data.threeDSHtmlContent) {
+          const html = window.atob(res.data.threeDSHtmlContent);
+          document.open();
+          document.write(html);
+          document.close();
           return;
         }
-      } else {
-        const _userInfo = {
-          email: shippingAddress.email || user?.email || "",
-          phone: shippingAddress.phone || user?.phone || "",
-          first_name: shippingAddress.first_name || "",
-          last_name: shippingAddress.last_name || "",
-          city: shippingAddress.city || "",
-          state: shippingAddress.district || shippingAddress.state || "",
-          country: shippingAddress.country || "TR",
-          zipcode: shippingAddress.zipcode || shippingAddress.postal_code || "",
-          street: shippingAddress.address || "",
-          // Üye → user id; misafir → stabil first-party visitor id (store_sid).
-      // Aynı değer server-side Purchase'ta da external_id olur → browser↔server dedup + external_id coverage.
-      external_id: user?.id || getSessionId() || "",
-        };
-        trackPurchase({
-          order_id: orderRes.data.order_number, total: grandTotal,
-          items: items.map((it) => ({
-            product_id: it.productId, name: it.name, price: it.price, quantity: it.quantity,
-            category: it.category || it.categoryName || "",
-            sku: it.sku || it.stockCode || "",
-            size: it.size || "", color: it.color || "",
-            list_price: it.list_price || it.price,
-            sale_price: it.sale_price || it.price,
-            brand: it.brand || SITE_NAME,
-            breadcrumb: it.breadcrumb || "",
-          })),
-          coupon: appliedCoupon?.code || "",
-          discount, shipping: shippingCost, tax: 0,
-          payment_type: paymentMethod,
-          shipping_tier: shippingCost > 0 ? "Standart Kargo" : "Ücretsiz",
-          user: _userInfo,
-        });
-        // ÖNCE paymentStep'i "success"'e çevir (useEffect'in /sepet'e yönlendirmesini önler)
-        setPaymentStep("success");
-        _clearIdemKeys();  // sipariş alındı → idem anahtarlarını temizle
-        clearCart();
-        toast.success("Siparişiniz alındı!");
-        // Guest veya logged-in: doğrudan OrderSuccess sayfasına yönlendir (havale/EFT dahil —
-        // OrderSuccess havale ise banka bilgilerini kopyalanabilir gösterir).
-        navigate(`/order-success/${_successNum}`, { replace: true });
+        setLoading(false);
+        setSubmitError(res.data.error || "Ödeme başlatılamadı");
+        return;
       }
+
+      trackPurchase({
+        order_id: orderRes.data.order_number, total: grandTotal,
+        items: analyticsItems(items, SITE_NAME),
+        coupon: appliedCoupon?.code || "",
+        discount, shipping: shippingCost, tax: 0,
+        payment_type: paymentMethod,
+        shipping_tier: shippingCost > 0 ? "Standart Kargo" : "Ücretsiz",
+        user: buildUserInfo(),
+      });
+      // ÖNCE paymentStep'i "success"'e çevir (useEffect'in /sepet'e yönlendirmesini önler)
+      setPaymentStep("success");
+      _clearIdemKeys();  // sipariş alındı → idem anahtarlarını temizle
+      clearCart();
+      toast.success("Siparişiniz alındı!");
+      // OrderSuccess havale ise banka bilgilerini kopyalanabilir gösterir.
+      navigate(`/order-success/${_successNum}`, { replace: true });
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Sipariş oluşturulamadı");
+      const detail = err.response?.data?.detail;
+      setSubmitError(typeof detail === "string" ? detail : "Sipariş oluşturulamadı. Lütfen tekrar deneyin.");
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* jsdom */ }
     } finally {
       setLoading(false);
     }
   };
 
-  // Boş sepet → /sepet'e yönlendir (render içinde değil, useEffect'te)
-  // Ödeme dönüşünde (?status=...) yönlendirme yapma — başarı/başarısızlık ekranı gösterilecek
+  // Boş sepet → /sepet'e yönlendir. Ödeme dönüşünde (?status=...) yönlendirme yapma.
   useEffect(() => {
     if (items.length === 0 && paymentStep === "form" && !searchParams.get("status")) {
       navigate("/sepet");
@@ -927,719 +866,215 @@ export default function Checkout() {
 
   if (items.length === 0 && paymentStep === "form" && !searchParams.get("status")) return null;
 
-  if (paymentStep === "success") {
+  if (paymentStep === "success" || paymentStep === "error" || paymentStep === "processing") {
     return (
-      <div className="min-h-screen bg-stone-50" data-testid="checkout-page">
-        <Header />
-        <div className="container-main py-16 text-center">
-          <CheckCircle size={64} className="mx-auto text-green-500 mb-4" />
-          <h1 className="text-2xl font-medium mb-2">Ödemeniz Başarılı!</h1>
-          <p className="text-gray-600">Siparişiniz alındı. Yönlendiriliyorsunuz...</p>
+      <CheckoutShell>
+        <div className="gt-status" data-testid={`checkout-status-${paymentStep}`}>
+          {paymentStep === "success" && (
+            <>
+              <div className="gt-status-icon is-ok" aria-hidden="true">✓</div>
+              <h1 className="gt-h1">Ödemeniz başarılı!</h1>
+              <p className="gt-muted">Siparişiniz alındı. Yönlendiriliyorsunuz…</p>
+            </>
+          )}
+          {paymentStep === "error" && (
+            <>
+              <div className="gt-status-icon is-error" aria-hidden="true">!</div>
+              <h1 className="gt-h1">Ödeme başarısız</h1>
+              <p className="gt-muted">Kartınızdan çekim yapılmadı. Bilgilerinizi kontrol edip tekrar deneyebilirsiniz.</p>
+              <button type="button" className="gt-btn gt-btn-primary" onClick={() => setPaymentStep("form")}>Tekrar dene</button>
+            </>
+          )}
+          {paymentStep === "processing" && (
+            <>
+              <div className="gt-spinner gt-spinner-lg" aria-hidden="true" />
+              <h1 className="gt-h1">Ödeme doğrulanıyor…</h1>
+            </>
+          )}
         </div>
-        <Footer />
-      </div>
-    );
-  }
-  if (paymentStep === "error") {
-    return (
-      <div className="min-h-screen bg-stone-50" data-testid="checkout-page">
-        <Header />
-        <div className="container-main py-16 text-center">
-          <AlertCircle size={64} className="mx-auto text-red-500 mb-4" />
-          <h1 className="text-2xl font-medium mb-2">Ödeme Başarısız</h1>
-          <button onClick={() => setPaymentStep("form")} className="btn-primary">Tekrar Dene</button>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-  if (paymentStep === "processing") {
-    return (
-      <div className="min-h-screen bg-stone-50">
-        <Header />
-        <div className="container-main py-16 text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-black mx-auto mb-4"></div>
-          <h1 className="text-2xl font-medium">Ödeme Doğrulanıyor...</h1>
-        </div>
-        <Footer />
-      </div>
+        <CheckoutFooter />
+      </CheckoutShell>
     );
   }
 
-  // ───────── Render ─────────
-  // Konsept A — numaralı, kutusuz akış başlığı
-  const Step = ({ n, title, hint, icon: Icon }) => (
-    <div className="flex items-center gap-3 mb-4">
-      <span className="w-7 h-7 rounded-full bg-black text-white text-[12px] font-extrabold grid place-items-center shrink-0">{n}</span>
-      <span className="text-[15px] font-semibold tracking-tight text-black">{title}</span>
-      {Icon && <Icon size={15} className="text-black/40" />}
-      {hint && <span className="text-[11px] text-black/45 ml-auto">{hint}</span>}
-    </div>
-  );
-  // Adım numaraları — üye girişliyse "İletişim" adımı olmadığından kayar
-  const sBase = user ? 0 : 1;
-
-  const addressCardContent = (a, label) => (
-    <div className="text-xs text-gray-700 leading-relaxed">
-      <div className="font-semibold text-sm">{a.title || label}</div>
-      <div className="text-gray-500">{a.first_name} {a.last_name} {a.phone && <span>· {a.phone}</span>}</div>
-      <div className="mt-1 line-clamp-2">{a.address}</div>
-      <div className="text-gray-500">{a.district} / {a.city}</div>
-    </div>
-  );
+  const hasShippingAddress = !!(shippingAddress.city && shippingAddress.district && shippingAddress.address);
+  const deliveryEstimate = estimateDelivery();
+  const isCard = paymentMethod === "credit_card";
 
   return (
-    <div className="min-h-screen bg-white" data-testid="checkout-page">
-      <Header />
+    <CheckoutShell>
+      <form className="gt-co-layout" onSubmit={handleSubmit} noValidate>
+        <OrderSummary
+          items={items}
+          open={summaryOpen}
+          onToggle={() => setSummaryOpen((v) => !v)}
+          couponCode={couponCode}
+          onCouponChange={(v) => { setCouponCode(v); if (couponMsg?.type === "error") setCouponMsg(null); }}
+          onApplyCode={applyCode}
+          appliedCoupon={appliedCoupon}
+          onRemoveCoupon={handleRemoveCoupon}
+          giftCardBusy={giftCardBusy}
+          couponMsg={couponMsg}
+          giftCardEnabled={bizRules["giftcard.enabled"] !== false}
+          giftCardApplied={giftCardApplied}
+          onRemoveGiftCard={() => setGiftCardApplied(null)}
+          giftCardDeduction={giftCardDeduction}
+          appliedPromotions={appliedPromotions}
+          eligiblePromotions={eligiblePromotions}
+          visiblePromotions={visiblePromotions}
+          autoPromoIds={AUTO_PROMO_IDS}
+          onRemovePromotion={removePromotion}
+          excludedIds={excludedIds}
+          onResetExcluded={resetExcluded}
+          shippingFree={shipping.free}
+          listSum={listSum}
+          productDisc={productDisc}
+          shippingCost={shippingCost}
+          baseShipFee={baseShipFee}
+          deliveryEstimate={deliveryEstimate}
+          bankTransferDiscount={bankTransferDiscount}
+          bankPct={bankPct}
+          paymentMethodDiscount={paymentMethodDiscount}
+          paymentRuleLabel={_payRule?.label}
+          pointsDeduction={pointsDeduction}
+          giftWrap={giftWrap}
+          giftWrapPrice={GIFT_WRAP_PRICE}
+          codFee={codFee}
+          chargeTotal={chargeTotal}
+          isInstallmentSelected={isInstallmentSelected}
+          selectedInstallment={selectedInstallment}
+          perInstallmentAmount={perInstallmentAmount}
+          installmentDiff={installmentDiff}
+        />
 
-      <div className="container-main py-6 md:py-10">
-        {/* Top bar with SSL badge */}
-        <div className="flex items-center justify-between mb-8 md:mb-10">
-          <div className="flex items-center gap-3 md:gap-4">
-            <button type="button" onClick={() => navigate(-1)}
-              data-testid="checkout-back-btn"
-              aria-label="Geri Dön"
-              className="w-9 h-9 md:w-10 md:h-10 border border-black flex items-center justify-center hover:bg-black hover:text-white transition-colors flex-shrink-0">
-              <ChevronLeft size={16} strokeWidth={2} />
-            </button>
-            <div>
-              <h1 className="text-xl md:text-2xl font-light tracking-tight text-black">Sipariş Onayı</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-black/70">
-            <ShieldCheck size={13} className="text-black" strokeWidth={1.6} />
-            <span>SSL Güvenli</span>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="grid lg:grid-cols-12 gap-8">
-            {/* SOL — numaralı akış */}
-            <div className="lg:col-span-8 space-y-7">
-              {/* Sepetimdeki Ürünler — collapsible (varsayılan kapalı; özet sağda) */}
-              <div className="border border-stone-200 rounded-lg" data-testid="cart-summary-block">
-                <button type="button" onClick={() => setCartCollapsed((v) => !v)}
-                  className="w-full flex items-center justify-between px-4 md:px-5 py-3.5 md:py-4 hover:bg-stone-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-light tracking-[0.05em]">Sepetimdeki Ürünler ({items.length})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {cartCollapsed && (
-                      <div className="flex -space-x-1.5">
-                        {items.slice(0, 4).map((it) => (
-                          <img key={it.id} src={it.image} alt="" className="w-7 h-9 border border-white object-contain" />
-                        ))}
-                        {items.length > 4 && (
-                          <div className="w-7 h-9 bg-stone-100 border border-white text-[10px] flex items-center justify-center font-light">+{items.length - 4}</div>
-                        )}
-                      </div>
-                    )}
-                    {cartCollapsed ? <ChevronDown size={16} strokeWidth={1.4} /> : <ChevronUp size={16} strokeWidth={1.4} />}
-                  </div>
-                </button>
-                {!cartCollapsed && (
-                  <div className="px-4 md:px-5 pb-5 border-t border-black/10 pt-4 space-y-3">
-                    {items.map((item) => (
-                      <div key={item.id} className="flex gap-3 items-center">
-                        <img src={item.image} alt={item.name} className="w-12 h-14 object-contain bg-gray-50" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-light truncate">{item.name}</p>
-                          <p className="text-[11px] text-black/55 mt-0.5">
-                            {item.size && <>Beden: {item.size} · </>}
-                            {item.color && <>Renk: {item.color} · </>}
-                            Adet: {item.quantity}
-                          </p>
-                        </div>
-                        {(() => {
-                          const lv = cartLineView(item);
-                          return lv.hasDiscount ? (
-                            <div className="text-right whitespace-nowrap">
-                              <div className="text-[11px] text-black/40 line-through tabular-nums">{(lv.listUnit * item.quantity).toFixed(2)} TL</div>
-                              <div className="text-sm font-medium text-red-600 tabular-nums">{(lv.unit * item.quantity).toFixed(2)} TL</div>
-                            </div>
-                          ) : (
-                            <div className="text-sm font-light tabular-nums whitespace-nowrap">{(lv.unit * item.quantity).toFixed(2)} TL</div>
-                          );
-                        })()}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 1) İletişim — yalnızca misafir (üye girişliyse gizli; mail otomatik) */}
-              {!user && (
-              <section data-testid="contact-block" className="border border-stone-200 rounded-xl p-4 md:p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                <Step n={1} title="İletişim" icon={Mail} />
-                <input
-                  type="email"
-                  value={shippingAddress.email || ""}
-                  onChange={(e) => setShippingAddress((p) => ({ ...p, email: e.target.value }))}
-                  placeholder="ornek@eposta.com"
-                  autoComplete="email"
-                  data-testid="contact-email"
-                  className="w-full border-1.5 border border-stone-300 rounded-lg px-3.5 py-2.5 text-sm focus:border-black outline-none transition-colors"
-                  required
-                />
-                <p className="text-[11px] text-gray-500 mt-1.5">
-                  Sipariş onayı ve faturanız bu adrese gönderilir.
-                </p>
-                <p className="text-[11px] text-gray-600 mt-2">
-                  Hesabın var mı?{" "}
-                  <a href="/giris?redirect=/odeme" className="underline hover:text-black font-medium">Giriş yap</a>
-                  {" · "}
-                  <a href="/giris?redirect=/odeme" className="underline hover:text-black font-medium">Üye ol</a>
-                </p>
-              </section>
-              )}
-
-              {/* 2) Teslimat Adresi + Kurumsal Fatura — TEK KART (Zara/Mango sadeliği: tek adres.
-                  Fatura varsayılan teslimatla aynı; ayrı fatura YALNIZCA istenirse açılır). */}
-              <div className="border border-stone-200 rounded-xl p-4 md:p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-              <section data-testid="address-block">
-                <div className="flex items-center justify-between">
-                  <Step n={sBase + 1} title="Teslimat Adresi" icon={MapPin} />
-                  <button type="button" onClick={() => openAddressModal("shipping")}
-                    data-testid="edit-shipping-addr-btn"
-                    className="inline-flex items-center gap-1 text-xs text-black border border-stone-900 px-3 py-1 hover:bg-stone-50 transition">
-                    <Plus size={14} /> {shippingAddress.first_name ? "Değiştir" : "Adres Ekle"}
-                  </button>
-                </div>
-                <button type="button" onClick={() => openAddressModal("shipping")}
-                  className={`w-full text-left rounded p-3 transition-colors border ${shippingAddress.first_name ? "bg-stone-50 border-stone-200" : "bg-stone-50 border-dashed border-gray-300 hover:border-stone-400"}`}>
-                  {shippingAddress.first_name
-                    ? addressCardContent(shippingAddress, "Teslimat Adresi")
-                    : <span className="text-xs text-gray-500">Henüz teslimat adresi seçilmedi. Eklemek için tıklayın.</span>}
-                </button>
-
-                <label className="inline-flex items-center gap-2 text-sm cursor-pointer pt-3">
-                  <input type="checkbox" checked={billingSameAsShipping}
-                    onChange={(e) => {
-                      setBillingSameAsShipping(e.target.checked);
-                      if (e.target.checked) setBillingAddress({ ...shippingAddress });
-                    }}
-                    className="accent-black"
-                    data-testid="same-billing-checkbox" />
-                  <span>Fatura adresim teslimat adresimle aynı</span>
-                </label>
-
-                {/* Ayrı fatura adresi — yalnızca kutu işaretsizken görünür */}
-                {!billingSameAsShipping && (
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Fatura Adresi</span>
-                      <button type="button" onClick={() => openAddressModal("billing")}
-                        data-testid="edit-billing-addr-btn"
-                        className="inline-flex items-center gap-1 text-xs text-black border border-stone-900 px-3 py-1 hover:bg-stone-50 transition">
-                        <Plus size={14} /> {billingAddress.first_name ? "Değiştir" : "Adres Ekle"}
-                      </button>
-                    </div>
-                    <button type="button" onClick={() => openAddressModal("billing")}
-                      className={`w-full text-left rounded p-3 border ${billingAddress.first_name ? "bg-stone-50 border-stone-200" : "bg-stone-50 border-dashed border-gray-300 hover:border-stone-400"}`}>
-                      {billingAddress.first_name
-                        ? addressCardContent(billingAddress, "Fatura Adresi")
-                        : <span className="text-xs text-gray-500">Fatura adresi seçilmedi. Eklemek için tıklayın.</span>}
-                    </button>
-                  </div>
-                )}
-              </section>
-
-              {/* 2.b) Kurumsal Fatura — sade/kompakt tik-kutu; üstteki 'aynı adres' satırına
-                  yaklaştırıldı (-mt-4, space-y-7 boşluğunu azaltır). İşlev/tik→alan-açma aynı. */}
-              <div data-testid="corporate-invoice-block" className="mt-4 pt-4 border-t border-stone-100">
-                <label className="inline-flex items-center gap-2 text-sm cursor-pointer pt-1">
-                  <input type="checkbox" checked={corporateInvoice}
-                    onChange={(e) => setCorporateInvoice(e.target.checked)}
-                    className="accent-black" data-testid="corporate-invoice-checkbox" />
-                  <span>Kurumsal Fatura İstiyorum</span>
-                </label>
-                {corporateInvoice && (
-                  <div className="mt-3 space-y-3" data-testid="corporate-invoice-fields">
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-700 mb-1">Firma Ünvanı *</label>
-                        <input value={corporateData.company_name}
-                          onChange={(e) => setCorporateData({ ...corporateData, company_name: e.target.value })}
-                          placeholder="Örn. Örnek Tekstil A.Ş."
-                          className="w-full border px-3 py-2 text-sm focus:outline-none focus:border-stone-900"
-                          data-testid="corp-company-name-input" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-700 mb-1">VKN / TCKN *</label>
-                        <input value={corporateData.tax_number}
-                          onChange={(e) => setCorporateData({ ...corporateData, tax_number: e.target.value.replace(/\D/g, "").slice(0, 11) })}
-                          placeholder="10 hane VKN veya 11 hane TCKN"
-                          className="w-full border px-3 py-2 text-sm focus:outline-none focus:border-stone-900"
-                          data-testid="corp-tax-number-input" />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-xs text-gray-700 mb-1">Vergi Dairesi *</label>
-                        <input value={corporateData.tax_office}
-                          onChange={(e) => setCorporateData({ ...corporateData, tax_office: e.target.value })}
-                          placeholder="Örn. Beşiktaş Vergi Dairesi"
-                          className="w-full border px-3 py-2 text-sm focus:outline-none focus:border-stone-900"
-                          data-testid="corp-tax-office-input" />
-                      </div>
-                    </div>
-                    <label className="inline-flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-                      <input type="checkbox" checked={corporateData.eInvoice_user}
-                        onChange={(e) => setCorporateData({ ...corporateData, eInvoice_user: e.target.checked })}
-                        className="accent-black" data-testid="corp-einvoice-user" />
-                      Şirketim e-Fatura mükellefidir (e-Fatura kesilsin)
-                    </label>
-                  </div>
-                )}
-              </div>
-              </div>
-
-              {/* 3) Ödeme */}
-              <section data-testid="payment-block" className="border border-stone-200 rounded-xl p-4 md:p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                <Step n={sBase + 2} title="Ödeme" icon={CreditCard} />
-                <div className="space-y-3">
-                  {/* Method radios */}
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {[
-                      { key: "bank_transfer", label: "Havale / EFT", icon: Building },
-                      { key: "credit_card", label: "Kredi / Banka Kartı", icon: CreditCard },
-                    ].filter(({ key }) => enabledPM[key]).map(({ key, label, icon: Icon }) => (
-                      <label key={key} className={`relative flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${paymentMethod === key ? "border-stone-900 ring-1 ring-stone-900 bg-stone-50" : "border-stone-200 hover:border-stone-400"}`}>
-                        <input type="radio" name="payment" value={key}
-                          checked={paymentMethod === key}
-                          onChange={(e) => {
-                            setPaymentMethod(e.target.value);
-                            // GA4 + CAPI: add_payment_info — zengin payload
-                            try {
-                              const mappedItems = (items || []).map((it) => ({
-                                item_id: String(it.product_id || it.productId || it.id || it.sku || ""),
-                                item_name: it.name || "",
-                                item_brand: it.brand || SITE_NAME,
-                                item_category: it.category || it.categoryName || "",
-                                item_variant: `${it.size || ""} ${it.color || ""}`.trim(),
-                                price: Number(it.price) || 0,
-                                list_price: Number(it.list_price || it.price) || 0,
-                                sale_price: Number(it.sale_price || it.price) || 0,
-                                discount: Math.max(0, Number(it.list_price || it.price) - Number(it.price)),
-                                sku: it.sku || it.stockCode || "",
-                                size: it.size || "", color: it.color || "",
-                                quantity: Number(it.quantity) || 1,
-                                coupon: appliedCoupon?.code || "",
-                              }));
-                              trackAddPaymentInfo({
-                                items: mappedItems,
-                                value: grandTotal,
-                                currency: "TRY",
-                                coupon: appliedCoupon?.code || "",
-                                discount, shipping: shippingCost, tax: 0,
-                                payment_type: key,
-                              });
-                            } catch (_) { /* silent */ }
-                          }}
-                          className="sr-only" />
-                        <span className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${paymentMethod === key ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-500"}`}>
-                          <Icon size={18} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-stone-900">{label}</span>
-                          </span>
-                          <span className="block text-xs text-stone-500">
-                            {key === "credit_card"
-                              ? "Tek çekim veya taksit imkânı"
-                              : (bankPct > 0
-                                  ? <>Havale/EFT'de <span className="text-red-600 font-bold">%{bankPct} indirim</span> · IBAN sipariş sonrası paylaşılır</>
-                                  : "Sipariş sonrası IBAN paylaşılır")}
-                          </span>
-                        </span>
-                        <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${paymentMethod === key ? "border-stone-900" : "border-stone-300"}`}>
-                          {paymentMethod === key && <span className="w-2 h-2 rounded-full bg-stone-900" />}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-
-                  {paymentMethod === "credit_card" && (
-                    <div className="mt-1 rounded-xl border border-stone-200 bg-stone-50/60 p-4 space-y-4">
-                      <div className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
-                        <Lock size={12} className="text-green-600" /> Kart Bilgileri
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="sm:col-span-2">
-                          <label className="block text-[11px] text-gray-500 mb-1">Kart Üzerindeki İsim</label>
-                          <input value={card.holder} autoComplete="cc-name" placeholder="AD SOYAD"
-                            onChange={(e) => setCard({ ...card, holder: e.target.value.toUpperCase() })}
-                            className="w-full border rounded px-3 py-2 text-sm tracking-wide focus:border-stone-900 outline-none" />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-[11px] text-gray-500 mb-1">Kart Numarası</label>
-                          <input value={card.number} inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000"
-                            onChange={(e) => { const d = e.target.value.replace(/\D/g, "").slice(0, 16); setCard({ ...card, number: d.replace(/(.{4})/g, "$1 ").trim() }); }}
-                            className="w-full border rounded px-3 py-2 text-sm tracking-widest font-mono focus:border-stone-900 outline-none" />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] text-gray-500 mb-1">Son Kullanma (AA/YY)</label>
-                          <input value={card.expiry} inputMode="numeric" autoComplete="cc-exp" placeholder="AA/YY"
-                            onChange={(e) => { let d = e.target.value.replace(/\D/g, "").slice(0, 4); if (d.length >= 3) d = d.slice(0, 2) + "/" + d.slice(2); setCard({ ...card, expiry: d }); }}
-                            className="w-full border rounded px-3 py-2 text-sm font-mono focus:border-stone-900 outline-none" />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] text-gray-500 mb-1">CVC</label>
-                          <input value={card.cvc} inputMode="numeric" autoComplete="cc-csc" placeholder="000"
-                            onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                            className="w-full border rounded px-3 py-2 text-sm font-mono focus:border-stone-900 outline-none" />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-gray-700 mb-1">Taksit Seçenekleri</div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {installments.map((opt) => (
-                            <button type="button" key={opt.number}
-                              onClick={() => setSelectedInstallment(opt.number)}
-                              className={`border rounded-lg px-2.5 py-2 text-left transition-colors ${selectedInstallment === opt.number ? "border-stone-900 bg-stone-50" : "border-stone-200 hover:border-stone-400"}`}>
-                              <div className="text-xs font-semibold">{opt.number === 1 ? "Tek Çekim" : `${opt.number} Taksit`}</div>
-                              <div className="text-[11px] text-gray-500">
-                                {(opt.totalPrice ?? grandTotal).toFixed(2)} TL
-                                {opt.number > 1 && opt.installmentPrice ? ` · ${opt.installmentPrice.toFixed(2)}×${opt.number}` : ""}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      {/* 3D Secure ZORUNLU (iyzico kuralı) — kapatılamaz; bilgi amaçlı statik rozet. */}
-                      <div className="inline-flex items-center gap-2 text-sm text-green-700">
-                        <ShieldCheck size={14} className="text-green-600" /> Ödemeniz 3D Secure ile güvenle alınır
-                      </div>
-                      <div className="text-[11px] text-gray-400 flex items-center gap-1">
-                        <Lock size={11} /> Kart bilgileriniz şifreli olarak iyzico altyapısıyla işlenir, sitemizde saklanmaz.
-                      </div>
-                      {userPoints > 0 && (
-                        <label className="inline-flex items-center gap-2 text-sm flex-wrap" data-testid="use-points-toggle">
-                          <input type="checkbox" checked={usePoints} onChange={(e) => setUsePoints(e.target.checked)} className="accent-black" />
-                          <span className="text-black font-semibold">{userPoints.toFixed(2)} ₺</span> Puan Kullan
-                          {loyaltyTier && (
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
-                              loyaltyTier === "platinum" ? "bg-slate-100 text-slate-700 border-slate-300"
-                              : loyaltyTier === "gold" ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-gray-50 text-gray-500 border-gray-200"}`}>
-                              {loyaltyTier === "platinum" ? "PLATINUM" : loyaltyTier === "gold" ? "GOLD" : "SILVER"}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-gray-400">(sepetin en fazla %{POINTS_MAX_PCT}'i)</span>
-                        </label>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* 4) Hediye */}
-              <section data-testid="gift-options-section" className="border border-stone-200 rounded-xl p-4 md:p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                <Step n={sBase + 3} title="Hediye Seçenekleri" icon={Gift} hint="opsiyonel" />
-                <div className="space-y-3">
-                  {/* Sadeleştirildi (Zara/Mango): tek satır onay; not yalnızca paket seçilince görünür. */}
-                  <label className="flex items-center justify-between gap-3 cursor-pointer">
-                    <span className="inline-flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)}
-                        className="accent-black" data-testid="gift-wrap-toggle" />
-                      Hediye paketi
-                    </span>
-                    <span className="text-sm text-gray-500">+{GIFT_WRAP_PRICE.toFixed(2)} TL</span>
-                  </label>
-                  {giftWrap && (
-                    <textarea value={giftNote} onChange={(e) => setGiftNote(e.target.value.slice(0, 300))}
-                      rows={2} placeholder="Hediye notu (opsiyonel)"
-                      className="w-full border px-3 py-2 text-sm focus:outline-none focus:border-stone-900 resize-none"
-                      data-testid="gift-note-input" />
-                  )}
-                </div>
-              </section>
-
-              {/* 5) Sipariş Notu — hediye notundan BAĞIMSIZ. Hediye paketi alınmasa da
-                     müşteri siparişiyle ilgili not bırakabilsin (teslimat saati, kapı kodu…). */}
-              <section data-testid="order-note-section" className="border border-stone-200 rounded-xl p-4 md:p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                <Step n={sBase + 4} title="Sipariş Notu" icon={StickyNote} hint="opsiyonel" />
-                <textarea
-                  value={orderNote}
-                  onChange={(e) => setOrderNote(e.target.value.slice(0, 500))}
-                  rows={3}
-                  placeholder="Siparişinizle ilgili bize iletmek istediğiniz bir şey var mı? (ör. teslimat saati tercihi, kapı/zil bilgisi)"
-                  className="w-full border px-3 py-2 text-sm focus:outline-none focus:border-stone-900 resize-none"
-                  data-testid="order-note-input" />
-                <div className="flex items-center justify-between mt-1">
-                  <p className="text-[11px] text-gray-400">
-                    Bu not hediye notundan farklıdır — hediye kartına yazdırılmaz, yalnız ekibimiz görür.
-                  </p>
-                  <span className="text-[11px] text-gray-400">{orderNote.length}/500</span>
-                </div>
-              </section>
-            </div>
-
-            {/* SAĞ — Sticky Sipariş Özeti */}
-            <div className="lg:col-span-4">
-              <div className="bg-white border border-stone-200 rounded-xl sticky top-24">
-                <div className="px-5 py-4 border-b">
-                  <span className="font-medium">Sipariş Özeti</span>
-                </div>
-
-                {/* En avantajlı indirim otomatik uygulandı + uygulanan kampanyalar (X ile kaldır) */}
-                {(appliedPromotions.length > 0 || eligiblePromotions.length > 0) && (
-                  <div className="px-5 pt-4" data-testid="applied-promotions">
-                    {visiblePromotions.length > 0 && (
-                      <>
-                        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-green-700 mb-2">
-                          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3 3 6.8-6.8a1 1 0 011.4 0z" clipRule="evenodd" /></svg>
-                          İndirimler uygulandı
-                        </div>
-                        <div className="space-y-1">
-                          {visiblePromotions.map((p, i) => (
-                            <div key={i} className="flex items-center justify-between text-xs gap-2">
-                              <span className="text-gray-700 truncate flex-1">{p.title || p.code}{p.free_shipping && shipping.free ? " · Ücretsiz Kargo" : ""}</span>
-                              <span className="text-green-600 font-semibold shrink-0">-{Number(p.discount).toFixed(2)} ₺</span>
-                              {!AUTO_PROMO_IDS.includes(p.coupon_id) && (
-                                <button type="button" onClick={() => removePromotion(p)} title="Kampanyayı kaldır" aria-label="Kaldır"
-                                  className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">×</button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                    {excludedIds.length > 0 && (
-                      <button type="button" onClick={resetExcluded} className="mt-2 text-[11px] text-gray-500 underline hover:text-stone-900">Kaldırılan kampanyaları geri al</button>
-                    )}
-                  </div>
-                )}
-
-                {/* TEK KUTU: indirim VEYA hediye çeki kodu — ne girilirse otomatik algılanır
-                    (kullanıcı isteği: iki ayrı alan yerine tek alan; kod hangi türse o uygulanır). */}
-                <div className="px-5 pt-4">
-                  {/* Uygulanmış hediye çeki (varsa) ayrı satırda gösterilir + kaldırılabilir */}
-                  {bizRules["giftcard.enabled"] !== false && giftCardApplied && (
-                    <div className="mb-2 flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded px-3 py-2 text-xs" data-testid="gift-card-applied">
-                      <span className="text-emerald-800">
-                        🎁 {giftCardApplied.kind === "credit" ? "Mağaza kredisi" : "Hediye çeki"} <b>{giftCardApplied.code}</b> — {giftCardApplied.value_type === "percent" ? `%${giftCardApplied.percent} indirim${giftCardApplied.max_amount > 0 ? ` (en fazla ${Number(giftCardApplied.max_amount).toFixed(0)} TL)` : ""}` : `bakiye ${Number(giftCardApplied.balance).toFixed(2)} TL`}
-                      </span>
-                      <button type="button" onClick={() => setGiftCardApplied(null)}
-                        className="text-emerald-700 underline" data-testid="remove-gift-card-btn">Kaldır</button>
-                    </div>
-                  )}
-                  {/* Kupon/hediye çeki giriş alanı HER ZAMAN AÇIK (soru/toggle yok) — işlev aynı. */}
-                  <div className="flex gap-2">
-                    <input type="text" value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => { if (e.key === "Enter" && !appliedCoupon && !giftCardBusy) applyCode(couponCode); }}
-                      placeholder="İndirim veya hediye çeki kodu"
-                      className="flex-1 border rounded px-3 py-2 text-sm"
-                      data-testid="manual-coupon-input" />
-                    {appliedCoupon
-                      ? <button type="button" onClick={handleRemoveCoupon} className="text-xs px-3 border rounded hover:bg-stone-50" data-testid="remove-coupon-btn">Kaldır</button>
-                      : <button type="button" onClick={() => applyCode(couponCode)} disabled={giftCardBusy || !couponCode.trim()}
-                          className="text-xs px-3 border rounded hover:bg-stone-50 disabled:opacity-50" data-testid="apply-coupon-btn">
-                          {giftCardBusy ? "..." : "Uygula"}
-                        </button>}
-                  </div>
-                </div>
-
-                {/* Totals */}
-                <div className="px-5 py-4 mt-3 border-t space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-gray-600">Ara Toplam</span><span>{listSum.toFixed(2)} TL</span></div>
-                  {productDisc > 0.001 && <div className="flex justify-between text-emerald-700"><span>Ürün fiyat indirimi</span><span>-{productDisc.toFixed(2)} TL</span></div>}
-                  <div data-testid="promotion-totals" className="space-y-2">
-                    {visiblePromotions.filter((p) => Number(p.discount) > 0).map((p, i) => (
-                      <div key={p.coupon_id || i} className="flex justify-between text-green-600 gap-2">
-                        <span>{p.title || p.code}</span><span className="shrink-0">-{Number(p.discount).toFixed(2)} TL</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between" data-testid="shipping-cost">
-                    <span className="text-gray-600">Kargo Tutarı</span>
-                    {shippingCost === 0
-                      ? <span><s className="text-gray-400">{baseShipFee.toFixed(2)} TL</s> <span className="ml-1 inline-block bg-green-50 text-green-700 px-1.5 py-0.5 text-[10px] font-semibold rounded">Bedava</span></span>
-                      : <span>{shippingCost.toFixed(2)} TL</span>}
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500" data-testid="delivery-estimate">
-                    <span>Tahmini teslimat</span>
-                    <span>{estimateDelivery()} <span className="text-gray-400">· 2-4 iş günü</span></span>
-                  </div>
-                  {bankTransferDiscount > 0 && <div className="flex justify-between" style={{ color: "#dc2626" }}><span>Havale/EFT İndirimi (%{bankPct})</span><span>-{bankTransferDiscount.toFixed(2)} TL</span></div>}
-                  {paymentMethodDiscount > 0 && <div className="flex justify-between" style={{ color: "#7b1e2b" }}><span>{_payRule?.label || "Ödeme İndirimi"}</span><span>-{paymentMethodDiscount.toFixed(2)} TL</span></div>}
-                  {pointsDeduction > 0 && <div className="flex justify-between text-black"><span>Puan Kullanımı</span><span>-{pointsDeduction.toFixed(2)} TL</span></div>}
-                  {giftCardDeduction > 0 && <div className="flex justify-between text-emerald-700" data-testid="gift-card-row"><span>Hediye Çeki ({giftCardApplied?.code})</span><span>-{giftCardDeduction.toFixed(2)} TL</span></div>}
-                  {giftWrap && <div className="flex justify-between"><span className="text-gray-600">Hediye paketi</span><span>+{GIFT_WRAP_PRICE.toFixed(2)} TL</span></div>}
-                  {codFee > 0 && <div className="flex justify-between"><span className="text-gray-600">Kapıda Ödeme</span><span>+{codFee.toFixed(2)} TL</span></div>}
-                  <div className="flex justify-between text-base font-semibold pt-2 border-t">
-                    <span>{isInstallmentSelected ? `Toplam (${selectedInstallment} Taksit)` : "Toplam"}</span>
-                    <span className="text-black">{chargeTotal.toFixed(2)} TL</span>
-                  </div>
-                  {isInstallmentSelected && (
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>Aylık ödeme</span>
-                      <span>{selectedInstallment} × {perInstallmentAmount.toFixed(2)} TL</span>
-                    </div>
-                  )}
-                  {isInstallmentSelected && installmentDiff > 0 && (
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>Vade farkı</span>
-                      <span>+{installmentDiff.toFixed(2)} TL</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Submit */}
-                <div className="px-5 pb-5">
-                  <button type="submit" disabled={loading || !acceptTerms}
-                    className={`w-full py-3 rounded font-semibold text-sm transition-colors ${(loading || !acceptTerms) ? "bg-gray-300 text-white cursor-not-allowed" : "bg-stone-900 hover:bg-stone-800 text-white"}`}
-                    data-testid="place-order-btn">
-                    {loading ? "İşleniyor..." : `Ödeme Yap · ${chargeTotal.toFixed(2)} TL`}
-                  </button>
-
-                  {/* Sözleşme — Trendyol style: Ödeme Yap'ın altında */}
-                  <label className="flex items-start gap-2 mt-3 text-[11px] text-gray-700 cursor-pointer leading-relaxed">
-                    <input type="checkbox" checked={acceptTerms}
-                      onChange={(e) => setAcceptTerms(e.target.checked)}
-                      className="mt-0.5 accent-black" data-testid="accept-terms-checkbox" />
-                    <span>
-                      <a href="/sayfa/mesafeli-satis" target="_blank" rel="noreferrer" className="underline hover:text-black">Mesafeli Satış Sözleşmesi</a>{"'"}ni okudum, onaylıyorum.
-                    </span>
-                  </label>
-
-                  {/* İYS — ticari ileti (kampanya) izni. Opsiyonel; sipariş için ZORUNLU DEĞİL. */}
-                  <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
-                    <label className="flex items-start gap-2 text-[11px] text-gray-700 cursor-pointer leading-relaxed">
-                      <input type="checkbox" checked={mktEmail} onChange={(e) => setMktEmail(e.target.checked)}
-                        className="mt-0.5 accent-black" data-testid="consent-email" />
-                      <span>E-posta ile kampanya, indirim ve yeniliklerden haberdar olmak istiyorum.</span>
-                    </label>
-                    <label className="flex items-start gap-2 text-[11px] text-gray-700 cursor-pointer leading-relaxed">
-                      <input type="checkbox" checked={mktSms}
-                        onChange={(e) => { setMktSms(e.target.checked); if (!e.target.checked) { setOtpSent(false); setOtpVerified(false); setOtpCode(""); } }}
-                        className="mt-0.5 accent-black" data-testid="consent-sms" />
-                      <span>SMS ile kampanya almak istiyorum. {mktSms && !otpVerified && <b className="text-amber-700">(telefon doğrulaması gerekir)</b>}{otpVerified && <b className="text-emerald-700">✓ doğrulandı</b>}</span>
-                    </label>
-
-                    {/* SMS izni için OTP doğrulama */}
-                    {mktSms && !otpVerified && (
-                      <div className="ml-6 flex flex-wrap items-center gap-2">
-                        {!otpSent ? (
-                          <button type="button" onClick={sendOtp} disabled={otpBusy}
-                            className="px-3 py-1.5 text-[11px] border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
-                            {otpBusy ? "Gönderiliyor…" : "Doğrulama kodu gönder"}
-                          </button>
-                        ) : (
-                          <>
-                            <input value={otpCode} onChange={(e) => setOtpCode(e.target.value)} inputMode="numeric" maxLength={6}
-                              placeholder="6 haneli kod" className="w-28 border border-gray-300 rounded px-2 py-1.5 text-[11px]" />
-                            <button type="button" onClick={verifyOtp} disabled={otpBusy}
-                              className="px-3 py-1.5 text-[11px] bg-black text-white rounded hover:bg-gray-800 disabled:opacity-50">
-                              {otpBusy ? "…" : "Doğrula"}
-                            </button>
-                            <button type="button" onClick={sendOtp} disabled={otpBusy}
-                              className="text-[11px] text-gray-500 underline">Tekrar gönder</button>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    <p className="text-[10px] text-gray-400 leading-relaxed">
-                      İzniniz İYS'ye (İleti Yönetim Sistemi) kaydedilir. İstediğiniz zaman{" "}
-                      <a href="https://iys.org.tr" target="_blank" rel="noreferrer" className="underline">iys.org.tr</a>{" "}
-                      üzerinden, her e-postadaki "abonelikten çık" bağlantısından ya da SMS'e "RET" yazarak izni iptal edebilirsiniz.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Address Modal */}
-      {addressModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" data-testid="address-modal">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-5 py-3 border-b sticky top-0 bg-white">
-              <h2 className="font-semibold text-base">{addressModal === "shipping" ? "Teslimat Adresi" : "Fatura Adresi"} {addressForm.id ? "Düzenle" : "Ekle"}</h2>
-              <button type="button" onClick={closeAddressModal} className="p-1 hover:bg-gray-100 rounded" data-testid="close-address-modal">
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Saved addresses (if user logged in) */}
-            {user && savedAddresses.length > 0 && (
-              <div className="px-5 py-4 border-b bg-stone-50">
-                <div className="text-xs font-semibold text-gray-700 mb-2">Kayıtlı Adreslerim</div>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {savedAddresses.map((a) => (
-                    <button key={a.id} type="button" onClick={() => pickSavedAddress(a)}
-                      className="text-left p-3 border rounded text-xs bg-white hover:border-stone-900 transition-colors">
-                      <div className="font-semibold text-sm">{a.title || `${a.first_name} ${a.last_name}`}</div>
-                      <div className="text-gray-500 mt-0.5 line-clamp-2">{a.address}</div>
-                      <div className="text-gray-500">{a.district} / {a.city}</div>
-                    </button>
-                  ))}
-                </div>
-                <div className="text-[11px] text-gray-500 mt-2">— veya yeni adres oluşturun:</div>
-              </div>
+        <main className="gt-co-main">
+          <div className="gt-co-main-inner">
+            {submitError && (
+              <Banner title="Siparişiniz tamamlanamadı" testId="checkout-error-banner">{submitError}</Banner>
             )}
 
-            {/* Address form */}
-            <div className="p-5 grid md:grid-cols-2 gap-3">
-              <div className="md:col-span-2">
-                <label className="block text-xs text-gray-700 mb-1">Adres Başlığı (örn. Ev, İş)</label>
-                <input value={addressForm.title} onChange={(e) => setAddressForm({ ...addressForm, title: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-700 mb-1">Ad *</label>
-                <input value={addressForm.first_name} onChange={(e) => setAddressForm({ ...addressForm, first_name: e.target.value })}
-                  autoComplete="given-name"
-                  className="w-full border rounded px-3 py-2 text-sm" required />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-700 mb-1">Soyad *</label>
-                <input value={addressForm.last_name} onChange={(e) => setAddressForm({ ...addressForm, last_name: e.target.value })}
-                  autoComplete="family-name"
-                  className="w-full border rounded px-3 py-2 text-sm" required />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs text-gray-700 mb-1">Telefon *</label>
-                <input value={addressForm.phone} onChange={(e) => setAddressForm({ ...addressForm, phone: sanitizePhone(e.target.value) })}
-                  type="tel" inputMode="numeric" autoComplete="tel" placeholder="05XX XXX XX XX"
-                  className="w-full border rounded px-3 py-2 text-sm" required />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs text-gray-700 mb-1">Adres *</label>
-                <textarea value={addressForm.address} onChange={(e) => setAddressForm({ ...addressForm, address: e.target.value })}
-                  rows={3} autoComplete="street-address"
-                  className="w-full border rounded px-3 py-2 text-sm resize-none" required />
-              </div>
-              <div className="md:col-span-2">
-                <ProvinceDistrictSelect
-                  city={addressForm.city}
-                  district={addressForm.district}
-                  onChange={({ city, district }) => setAddressForm((p) => ({ ...p, city, district }))}
-                  testIdPrefix="address-modal"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs text-gray-700 mb-1">Posta Kodu</label>
-                <input value={addressForm.postal_code} onChange={(e) => setAddressForm({ ...addressForm, postal_code: e.target.value })}
-                  autoComplete="postal-code"
-                  className="w-full border rounded px-3 py-2 text-sm" />
-              </div>
+            {/* Express checkout: backend'de cüzdan (Apple/Google Pay) desteği yok → bölüm gösterilmez. */}
+
+            <ContactSection
+              user={user}
+              email={shippingAddress.email || ""}
+              onEmailChange={(v) => { setShippingAddress((p) => ({ ...p, email: v })); clearErr("email"); }}
+              error={errors.email}
+              mktEmail={mktEmail}
+              setMktEmail={setMktEmail}
+            />
+
+            <Section title="Teslimat" testId="address-block">
+              <AddressFields
+                value={shippingAddress}
+                onChange={updateShipping}
+                errors={errors}
+                prefix="ship"
+                testIdPrefix="shipping"
+                savedAddresses={user ? savedAddresses : []}
+                onPickSaved={pickSavedShipping}
+                phoneFooter={(
+                  <SmsConsent
+                    mktSms={mktSms}
+                    onSmsChange={(c) => { setMktSms(c); if (!c) { setOtpSent(false); setOtpVerified(false); setOtpCode(""); } }}
+                    otpSent={otpSent} otpCode={otpCode} setOtpCode={setOtpCode}
+                    otpVerified={otpVerified} otpBusy={otpBusy} sendOtp={sendOtp} verifyOtp={verifyOtp}
+                  />
+                )}
+              />
+            </Section>
+
+            <ShippingMethodSection
+              hasAddress={hasShippingAddress}
+              shippingCost={shippingCost}
+              baseShipFee={baseShipFee}
+              deliveryEstimate={deliveryEstimate}
+              freeShippingThreshold={freeShippingThreshold}
+              basis={shipping.basis}
+            />
+
+            <PaymentSection
+              enabledPM={enabledPM}
+              paymentMethod={paymentMethod}
+              onSelectMethod={onSelectMethod}
+              bankPct={bankPct}
+              codFee={COD_FEE}
+              card={card}
+              setCard={(c) => {
+                setCard(c);
+                clearErr("card.holder", "card.number", "card.expiry", "card.cvc");
+              }}
+              errors={errors}
+              installments={installments}
+              selectedInstallment={selectedInstallment}
+              setSelectedInstallment={setSelectedInstallment}
+              grandTotal={grandTotal}
+              userPoints={userPoints}
+              usePoints={usePoints}
+              setUsePoints={setUsePoints}
+              loyaltyTier={loyaltyTier}
+              pointsMaxPct={POINTS_MAX_PCT}
+            />
+
+            <BillingSection
+              billingSameAsShipping={billingSameAsShipping}
+              onSameChange={(same) => {
+                setBillingSameAsShipping(same);
+                if (same) setBillingAddress({ ...shippingAddress });
+                else setBillingAddress({ ...emptyAddress });
+              }}
+              billingAddress={billingAddress}
+              onBillingChange={updateBilling}
+              errors={errors}
+              savedAddresses={user ? savedAddresses : []}
+              onPickSavedBilling={pickSavedBilling}
+              corporateInvoice={corporateInvoice}
+              setCorporateInvoice={(v) => { setCorporateInvoice(v); if (!v) clearErr("corp.company_name", "corp.tax_office", "corp.tax_number"); }}
+              corporateData={corporateData}
+              setCorporateData={(d) => { setCorporateData(d); clearErr("corp.company_name", "corp.tax_office", "corp.tax_number"); }}
+            />
+
+            <ExtrasSection
+              giftWrap={giftWrap} setGiftWrap={setGiftWrap} giftWrapPrice={GIFT_WRAP_PRICE}
+              giftNote={giftNote} setGiftNote={setGiftNote}
+              orderNote={orderNote} setOrderNote={setOrderNote}
+            />
+
+            <div className="gt-agreements">
+              <Checkbox checked={acceptTerms} onChange={(c) => { setAcceptTerms(c); if (c) clearErr("terms"); }}
+                testId="accept-terms-checkbox" error={errors.terms} name="terms">
+                <button type="button" className="gt-link" data-testid="open-distance-sales"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalDoc("mesafeli-satis"); }}>
+                  Mesafeli Satış Sözleşmesi
+                </button>
+                {"'ni ve "}
+                <button type="button" className="gt-link" data-testid="open-preinfo"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalDoc("on-bilgilendirme"); }}>
+                  Ön Bilgilendirme Formu
+                </button>
+                {"'nu okudum, onaylıyorum."}
+              </Checkbox>
             </div>
-            <div className="px-5 py-3 border-t flex justify-end gap-2 sticky bottom-0 bg-white">
-              <button type="button" onClick={closeAddressModal} className="px-4 py-2 text-sm border rounded hover:bg-stone-50">İptal</button>
-              <button type="button" onClick={handleSaveAddress}
-                className="px-4 py-2 text-sm bg-stone-900 hover:bg-stone-800 text-white rounded font-medium"
-                data-testid="save-address-btn">Kaydet ve Kullan</button>
-            </div>
+
+            <button type="submit" className="gt-btn gt-btn-primary gt-btn-pay" disabled={loading} data-testid="place-order-btn" aria-busy={loading}>
+              {loading
+                ? <><span className="gt-spinner" aria-hidden="true" /> İşleniyor…</>
+                : (isCard ? "Şimdi öde" : "Siparişi tamamla")}
+            </button>
+            <p className="gt-pay-hint">
+              {isCard
+                ? <>Ödeme tutarı: <strong>{formatTRY(chargeTotal)}</strong>{isInstallmentSelected ? ` (${selectedInstallment} taksit)` : ""}. Bankanızın 3D Secure ekranına yönlendirileceksiniz.</>
+                : <>Ödenecek tutar: <strong>{formatTRY(chargeTotal)}</strong></>}
+            </p>
+
+            <CheckoutFooter />
           </div>
-        </div>
+        </main>
+      </form>
+
+      {legalDoc && (
+        <LegalModal slug={legalDoc} fallbackTitle={LEGAL_DOCS[legalDoc]} onClose={() => setLegalDoc(null)} />
       )}
-
-      {/* Hızlı Üyelik Modal — KALDIRILDI: OrderSuccess sayfasında inline CTA olarak gösteriliyor */}
-
-      <Footer />
-    </div>
+    </CheckoutShell>
   );
 }

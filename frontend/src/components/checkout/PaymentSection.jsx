@@ -20,10 +20,10 @@ function CardForm({
           inputMode="numeric" autoComplete="cc-number" error={errors["card.number"]} testId="card-number"
           onChange={(v) => { const d = v.replace(/\D/g, "").slice(0, 16); upd({ number: d.replace(/(.{4})/g, "$1 ").trim() }); }}
           suffix={<LockSmall />} />
-        <Field label="Son kullanma tarihi (AA / YY)" value={card.expiry} name="card.expiry"
+        <Field label="Son kullanma (AA/YY)" value={card.expiry} name="card.expiry"
           inputMode="numeric" autoComplete="cc-exp" error={errors["card.expiry"]} testId="card-expiry"
           onChange={(v) => { let d = v.replace(/\D/g, "").slice(0, 4); if (d.length >= 3) d = d.slice(0, 2) + "/" + d.slice(2); upd({ expiry: d }); }} />
-        <Field label="Güvenlik kodu (CVC)" value={card.cvc} name="card.cvc"
+        <Field label="Güvenlik kodu" value={card.cvc} name="card.cvc"
           inputMode="numeric" autoComplete="cc-csc" error={errors["card.cvc"]} testId="card-cvc"
           onChange={(v) => upd({ cvc: v.replace(/\D/g, "").slice(0, 4) })} />
         <Field label="Kart üzerindeki isim" value={card.holder} name="card.holder" className="gt-col-2"

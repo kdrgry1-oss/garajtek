@@ -30,6 +30,9 @@ const PaymentNotification = lazy(() => import("./pages/PaymentNotification"));
 const ReturnRequest = lazy(() => import("./pages/ReturnRequest"));
 const GuestReturn = lazy(() => import("./pages/GuestReturn"));
 const MiuMiuTheme = lazy(() => import("./pages/storefront/MiuMiuTheme"));
+const Wishlist = lazy(() => import("./pages/Wishlist"));
+const Compare = lazy(() => import("./pages/Compare"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 import MarketingPixelsInjector from "./components/MarketingPixelsInjector";
 import SlugRouter from "./components/SlugRouter";
@@ -47,6 +50,9 @@ import { trackVisit } from "./lib/attribution";
 
 import "./App.css";
 import "./storefront.css";
+// Electro vitrin teması — uyum kuralları (tamamı `.electro` kapsamlı; admin etkilenmez)
+import "./components/electro/electro.css";
+import ElectroStyles from "./components/electro/ElectroStyles";
 
 // Rota değişiminde sayfayı anında en üste al — 2./3. sayfaya geçişte veya yeni
 // sayfa açıldığında footer'ın önce görünüp sonra yukarı zıplaması engellenir.
@@ -90,8 +96,10 @@ function StorefrontScope({ children }) {
     : pathname.startsWith("/kategori/") ? "category"
     : pathname.startsWith("/urun/") ? "product"
     : pathname === "/sepet" ? "cart"
+    : pathname === "/odeme" ? "checkout"
     : pathname === "/hesabim" ? "account"
     : pathname === "/giris" ? "login"
+    : pathname === "/favoriler" ? "wishlist"
     : pathname.startsWith("/sayfa/") || pathname === "/gizlilik" || pathname.includes("sorulan") ? "static"
     : "utility";
   // DOM'a yeni bir wrapper eklemeyerek mevcut tema/CSS child selector'larını bozma.
@@ -106,6 +114,13 @@ function StorefrontScope({ children }) {
     };
   }, [isAdmin, section]);
   return children;
+}
+
+// CHECKOUT (/odeme) dikkat dağıtmayan Shopify düzenindedir: kendi sade header'ını çizer;
+// global duyuru barı / popup / WhatsApp butonu orada gösterilmez. (Checkout ajanı — küçük değişiklik)
+function HideOnCheckout({ children }) {
+  const { pathname } = useLocation();
+  return pathname === "/odeme" ? null : children;
 }
 
 function App() {
@@ -130,6 +145,7 @@ function App() {
             <MarketingPixelsInjector />
             <CookieConsent />
             <StorefrontScope>
+            <ElectroStyles />
             {/* Storefront Duyuru barı + Popup + SEO (native uygulamada gösterme).
                 Görünüm bozulmasının gerçek nedeni lock-file (yarn.lock) değişikliğiydi;
                 düzeltildi. Bu bileşenler güvenli (aktif popup/duyuru/yönlendirme yoksa
@@ -138,9 +154,11 @@ function App() {
               <Suspense fallback={null}>
                 <SeoManager />
                 <CustomThemeInjector />
-                <AnnouncementBar />
-                <SitePopup />
-                <WhatsAppButton />
+                <HideOnCheckout>
+                  <AnnouncementBar />
+                  <SitePopup />
+                  <WhatsAppButton />
+                </HideOnCheckout>
               </Suspense>
             )}
             <MaintenanceGate>
@@ -171,6 +189,8 @@ function App() {
                 <Route path="/odeme-bildirimi/:orderNumber" element={<PaymentNotification />} />
                 <Route path="/iade/:orderNumber" element={<ReturnRequest />} />
                 <Route path="/iade-islemleri" element={<GuestReturn />} />
+                <Route path="/favoriler" element={<Wishlist />} />
+                <Route path="/karsilastir" element={<Compare />} />
 
                 {/* Tema önizleme */}
                 <Route path="/tema/:slug/*" element={<MiuMiuTheme />} />
@@ -188,6 +208,7 @@ function App() {
                 <Route path="/kampanya/:id" element={<CampaignProducts />} />
                 <Route path="/urun/:slug" element={<ProductDetail />} />
                 <Route path="/:slug" element={<SlugRouter />} />
+                <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
             </MaintenanceGate>
