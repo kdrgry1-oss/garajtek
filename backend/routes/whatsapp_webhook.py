@@ -1560,17 +1560,7 @@ async def _handoff(sender: str, body: str, name: Optional[str]):
         })
     except Exception:
         pass
-    # Yedek alarm 1 — mobil admin push (panel)
-    try:
-        from .push import send_push_to_admins
-        await send_push_to_admins(
-            "📞 Yanıt bekleyen müşteri",
-            f"{who} ({cust_disp}): {body[:120]}",
-            {"type": "whatsapp_handoff", "phone": sender},
-        )
-    except Exception as e:
-        logger.warning(f"handoff admin push atlandı: {e}")
-    # Yedek alarm 2 — firma e-postası (best-effort)
+    # Yedek alarm — firma e-postası (best-effort)
     try:
         import company
         from notification_service import _email_send

@@ -69,7 +69,6 @@ async def _get_ai_settings_raw() -> dict:
             "use_emergent_key": False,
             "custom_api_key": "",
             "channels": {
-                "trendyol": True, "hepsiburada": True, "temu": True,
                 "whatsapp": False, "instagram": False, "messenger": False, "site": True,
             },
         }
@@ -240,9 +239,6 @@ async def delete_kb_entry(entry_id: str, current_user: dict = Depends(require_ad
 # -------------------- Draft generation --------------------
 
 MARKETPLACE_TO_COLL = {
-    "trendyol": "trendyol_questions",
-    "hepsiburada": "hepsiburada_questions",
-    "temu": "temu_questions",
     "whatsapp": "whatsapp_messages",
     "instagram": "instagram_messages",
     "messenger": "messenger_messages",
@@ -509,48 +505,3 @@ async def upsert_product_qa_rule(payload: dict, current_user: dict = Depends(req
 async def delete_product_qa_rule(product_id: str, current_user: dict = Depends(require_admin)):
     res = await db.product_qa_rules.delete_one({"product_id": str(product_id)})
     return {"success": True, "deleted": res.deleted_count}
-
-
-@router.post("/kb/backfill-marketplace")
-async def backfill_kb_from_marketplace(payload: Optional[dict] = None, current_user: dict = Depends(require_admin)):
-    """Geçmişteki TÜM cevaplanmış TY/HB/Temu sorularını Bilgi Bankası'na aktarır (tek tıkla eğit).
-    Aynı soru-cevap zaten varsa atlar (idempotent)."""
-    colls = {"trendyol": "trendyol_questions", "hepsiburada": "hepsiburada_questions", "temu": "temu_questions"}
-    added = 0
-    scanned = 0
-    skipped = 0
-    for mp, cname in colls.items():
-        try:
-            cur = db[cname].find(
-                {"answer": {"$nin": ["", None]}},
-                {"_id": 0, "question_text": 1, "question": 1, "answer": 1, "product_name": 1, "question_id": 1},
-            )
-            async for q in cur:
-                scanned += 1
-                qt = (q.get("question_text") or q.get("question") or "").strip()
-                at = (q.get("answer") or "").strip()
-                if not qt or not at:
-                    skipped += 1
-                    continue
-                exists = await db.ai_knowledge_base.find_one(
-                    {"question": qt, "answer": at}, {"_id": 0, "id": 1}
-                )
-                if exists:
-                    skipped += 1
-                    continue
-                await db.ai_knowledge_base.insert_one({
-                    "id": str(uuid.uuid4()),
-                    "question": qt,
-                    "answer": at,
-                    "channel": mp,
-                    "source_question_id": q.get("question_id"),
-                    "tags": ["backfill", mp],
-                    "product_name": q.get("product_name", ""),
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "created_by": current_user.get("email", "backfill"),
-                    "usage_count": 0,
-                })
-                added += 1
-        except Exception as e:
-            logger.warning(f"[kb-backfill] {mp} atlandı: {e}")
-    return {"success": True, "scanned": scanned, "added": added, "skipped": skipped}

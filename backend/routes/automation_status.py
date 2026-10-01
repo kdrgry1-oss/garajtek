@@ -79,22 +79,6 @@ async def get_automation_status(
     except Exception as e:
         jobs_out.append({"error": f"Scheduler okunamadı: {e}"})
 
-    # 2) Marketplace auto_sync ayarları (Trendyol/HB/Temu vb.)
-    marketplaces: List[Dict[str, Any]] = []
-    async for acc in db.marketplace_accounts.find({}, {"_id": 0}):
-        auto = acc.get("auto_sync") or {}
-        marketplaces.append({
-            "key": acc.get("key"),
-            "name": acc.get("name") or acc.get("key"),
-            "enabled": bool(acc.get("enabled")),
-            "products_enabled": bool(auto.get("products_enabled")),
-            "products_interval_min": auto.get("products_interval_min"),
-            "orders_enabled": bool(auto.get("orders_enabled")),
-            "orders_interval_min": auto.get("orders_interval_min"),
-            "last_orders_sync": auto.get("_last_orders_sync"),
-            "last_products_sync": auto.get("_last_products_sync"),
-        })
-
     # 3) Son N integration log
     log_cursor = db.integration_logs.find({}, {"_id": 0}).sort("created_at", -1).limit(log_limit)
     logs = await log_cursor.to_list(length=log_limit)
@@ -109,20 +93,15 @@ async def get_automation_status(
         ) + 1
 
     # 4) Webhook konfigürasyonu (frontend için kolay erişim)
-    settings = await db.settings.find_one({"id": "ticimax"}) or {}
-    has_dogan = bool((await db.settings.find_one({"id": "dogan_edonusum"}) or {}).get("api_key"))
     import os
     has_resend = bool(os.environ.get("RESEND_API_KEY", "").strip())
 
     return {
         "now": _to_iso(datetime.now(timezone.utc)),
         "jobs": jobs_out,
-        "marketplaces": marketplaces,
         "logs": logs,
         "log_summary": summary,
         "integrations": {
-            "ticimax_configured": bool(settings.get("api_key")),
-            "dogan_configured": has_dogan,
             "resend_configured": has_resend,
         },
     }

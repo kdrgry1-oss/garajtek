@@ -91,32 +91,20 @@ from routes.loyalty import router as loyalty_router
 from routes.barcode_cards import router as barcode_cards_router
 from routes.provider_settings import router as provider_settings_router
 from routes.iys import router as iys_consent_router  # /iys — OTP + ticari ileti izni (iys_router ile ÇAKIŞMASIN)
-from routes.marketplace_hub import router as marketplace_hub_router
-from routes.brand_mapping import router as brand_mapping_router
-from routes.category_mapping import router as category_mapping_router
 from routes.automation_status import router as automation_status_router
 from routes.footer_template import public_router as footer_public_router, admin_router as footer_admin_router
 from routes.newsletter import public_router as newsletter_public_router, admin_router as newsletter_admin_router
 from routes.instagram import public_router as instagram_public_router, admin_router as instagram_admin_router
-# [A4b-ticimax-off] from routes.ticimax_stock_sync import router as ticimax_stock_sync_router
-# [ticimax-off] from routes.ticimax_history import router as ticimax_history_router  # geçmiş veri kurtarma — kullanıcı kararı: Ticimax TAMAMEN kapalı
-# [A4-ticimax-off] from routes.ticimax_category_sync import router as ticimax_category_sync_router
-# [A4-ticimax-off] from routes.ticimax_member_sync import router as ticimax_member_sync_router
-# [A4-ticimax-off] from routes.ticimax_product_pull import router as ticimax_product_pull_router
 from routes.rooftr_returns import router as rooftr_returns_router
 from routes.bulk_ops import router as bulk_ops_router
 from routes.analytics_extra import router as analytics_extra_router
 from routes.notifications import router as notifications_router
-from routes.integrations_temu import router as integrations_temu_router
-from routes.trendyol_retry_queue import router as trendyol_retry_queue_router, background_retry_loop as trendyol_retry_bg_loop
 from routes.capi import router as capi_router
 from services.capi.orchestrator import background_retry_loop as capi_retry_bg_loop
 from routes.customer_risk import router as customer_risk_router
 from routes.marketing_pixels import router as marketing_pixels_router
 from routes.social_auth import router as social_auth_router
 from routes.security_dashboard import router as security_dashboard_router
-from routes.mobile import router as mobile_router
-from routes.admin_mobile import router as admin_mobile_router
 from routes.secrets_vault import router as secrets_vault_router
 from routes.system_health import router as system_health_router
 from routes.mail_admin import router as mail_admin_router  # kendi mail sunucusu (deploy/mail)
@@ -339,10 +327,6 @@ async def lifespan(app: FastAPI):
         await db.audit_logs.create_index([("created_at", -1)])
         await db.audit_logs.create_index([("actor.email", 1), ("created_at", -1)])
         await db.audit_logs.create_index([("action", 1), ("source", 1), ("created_at", -1)])
-        # Mobile devices (push notifications)
-        await db.user_devices.create_index([("user_id", 1), ("device_id", 1)], unique=True)
-        await db.user_devices.create_index([("push_token", 1)])
-        await db.user_devices.create_index([("is_active", 1), ("platform", 1)])
         # IP blocklist (Iter36 — brute force IP-level ban)
         await db.ip_blocklist.create_index([("ip", 1)], unique=True)
         await db.ip_blocklist.create_index([("blocked_until", 1)])
@@ -357,8 +341,6 @@ async def lifespan(app: FastAPI):
         # Product costs (manuel maliyet) — Iter 42
         await db.product_costs.create_index("product_id", unique=True)
         # Iter 43 indexes
-        await db.production_plan.create_index([("product_id", 1), ("status", 1)])
-        await db.production_plan.create_index([("created_at", -1)])
         await db.iys_permissions.create_index(
             [("recipient", 1), ("recipient_type", 1), ("message_type", 1)], unique=True)
         await db.iys_permissions.create_index([("expires_at", 1)])
@@ -409,14 +391,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Scheduler start warning: {e}")
 
-    # Start Trendyol stuck barcode retry queue (saatte bir)
-    try:
-        import asyncio as _asyncio
-        _asyncio.create_task(trendyol_retry_bg_loop(lambda: db))
-        logger.info("Trendyol retry queue background loop started (her saat)")
-    except Exception as e:
-        logger.warning(f"Trendyol retry loop start warning: {e}")
-
     # Start CAPI (Conversions API) retry queue (30 dk'da bir)
     try:
         import asyncio as _asyncio
@@ -433,15 +407,6 @@ async def lifespan(app: FastAPI):
         _asyncio.create_task(repair_size_table_markers())
     except Exception as e:
         logger.warning(f"Size-table marker repair start warning: {e}")
-
-    # Tek seferlik onarım: eski Trendyol yorumlarının created_at'i gerçek yorum tarihine
-    # çekilir (bayrak korumalı; ham comment_date kayıtlı olanlar — ağ gerekmez).
-    try:
-        import asyncio as _asyncio
-        from routes.integrations_trendyol_qna import backfill_review_dates
-        _asyncio.create_task(backfill_review_dates())
-    except Exception as e:
-        logger.warning(f"Review date backfill start warning: {e}")
 
     # Tek seferlik onarım: geçmişte iptal edilmiş siparişlerde yanan kupon hakları
     # geri açılır (hoş geldin kodu iptal sonrası tekrar kullanılamıyordu) — bayrak korumalı.
@@ -480,17 +445,8 @@ async def lifespan(app: FastAPI):
         _asyncio.create_task(migrate_welcome_coupon_sale_policy())
         # Kupon birleşme varsayılanı: hepsiyle birleşir, engellenenler kuponun içinden seçilir (tek seferlik).
         _asyncio.create_task(migrate_coupon_stacking_default())
-        # Hepsiburada: mevcut siparişlerin kargo takip no'ları (tek seferlik geçmiş çekimi, bayraklı)
-        try:
-            from routes.integrations_hepsiburada import hb_cargo_backfill_once
-            _asyncio.create_task(hb_cargo_backfill_once())
-        except Exception as _hbe:
-            logger.warning(f"[hb] cargo backfill task kurulamadı: {_hbe}")
-        # Çöpteki ürünlerin pazaryeri stokları 0'a çekilir (tek seferlik; hedefli gönderim açığı sonrası temizlik)
-        _asyncio.create_task(zero_deleted_on_marketplaces_once())
         # Galeri sırası: beden tablosu nesnesi ilk sırada kalan ürünleri düzelt (tek seferlik, bayraklı)
         _asyncio.create_task(fix_size_table_order_once())
-        _asyncio.create_task(trendyol_orphan_preview())
         _asyncio.create_task(refit_installment_returns_once())
         _asyncio.create_task(audit_unpaid_confirmed_card_orders_once())
         _asyncio.create_task(audit_member_group_discount_once())
@@ -746,98 +702,6 @@ class BodySizeLimitMiddleware(_BHM):
 app.add_middleware(BodySizeLimitMiddleware)
 
 # ---------------------------------------------------------------------------
-# INTEGRATION LOGGING MIDDLEWARE
-# ---------------------------------------------------------------------------
-# /api/integrations/{marketplace}/... altındaki tüm çağrıları otomatik olarak
-# `integration_logs` koleksiyonuna kaydeder. Bu sayede main agent'ın her
-# endpoint'i manuel sarmalamasına gerek kalmaz.
-#
-# Marketplace, URL path'inin 3. segmentinden (trendyol / hepsiburada / temu /
-# iyzico vb.) alınır. iyzico/gib/cargo gibi non-marketplace olanlar atlanır.
-# Action, URL path'in kalanından türetilir (products/sync → product_push vb.).
-# ---------------------------------------------------------------------------
-import time as _time
-from starlette.middleware.base import BaseHTTPMiddleware
-
-
-MARKETPLACE_PATH_KEYS = {"trendyol", "hepsiburada", "temu", "n11", "amazon-tr",
-                         "amazon-de", "aliexpress", "etsy", "hepsi-global",
-                         "fruugo", "emag", "trendyol-ihracat", "ciceksepeti"}
-
-
-def _action_from_path(path: str) -> str:
-    """
-    URL'den kaba bir "action" çıkarır. Örn:
-      /api/integrations/trendyol/products/sync        → product_push
-      /api/integrations/trendyol/orders/import        → order_pull
-      /api/integrations/trendyol/products/inventory-sync → stock_update
-      /api/integrations/hepsiburada/products/push     → product_push
-    """
-    p = path.lower()
-    if "inventory" in p or "stock" in p: return "stock_update"
-    if "price" in p: return "price_update"
-    if "category" in p or "categories" in p: return "category_sync"
-    if "brand" in p: return "brand_sync"
-    if "claim" in p or "return" in p: return "return_pull"
-    if "/orders/import" in p or "/orders/pull" in p or "/orders/sync" in p or "/orders/fetch" in p: return "order_pull"
-    if "/orders/" in p: return "order_update"
-    if "/products/" in p: return "product_push"
-    if "webhook" in p: return "webhook_receive"
-    if "settings" in p or "status" in p or "debug" in p: return "config_read"
-    return "api_call"
-
-
-class IntegrationLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        path = request.url.path
-        # Sadece /api/integrations/{marketplace}/... yollarını ilgilendir
-        if not path.startswith("/api/integrations/"):
-            return await call_next(request)
-
-        parts = [p for p in path.split("/") if p]
-        # parts: ["api","integrations","<marketplace>","..."]
-        mk = parts[2] if len(parts) > 2 else None
-        # non-marketplace veya ayar/okuma ise log atla
-        if mk not in MARKETPLACE_PATH_KEYS:
-            return await call_next(request)
-        # GET = config_read — çok gürültü yapar, atla
-        if request.method.upper() == "GET":
-            return await call_next(request)
-
-        start = _time.time()
-        status = "success"
-        msg = ""
-        response = None
-        try:
-            response = await call_next(request)
-            if response.status_code >= 500: status = "failed"
-            elif response.status_code >= 400: status = "failed"
-            msg = f"{request.method} {path} → HTTP {response.status_code}"
-        except Exception as e:
-            status = "failed"
-            msg = f"{request.method} {path} → EX {type(e).__name__}: {e}"
-            raise
-        finally:
-            try:
-                duration = int((_time.time() - start) * 1000)
-                # Lazy import — circular dependency'yi önler
-                from routes.marketplace_hub import log_integration_event
-                await log_integration_event(
-                    marketplace=mk,
-                    action=_action_from_path(path),
-                    status=status,
-                    direction="outbound",
-                    message=msg,
-                    duration_ms=duration,
-                )
-            except Exception:
-                pass
-        return response
-
-
-app.add_middleware(IntegrationLoggingMiddleware)
-
-# ---------------------------------------------------------------------------
 # ERROR TRACKING & ALERTING — captures 5xx, slow responses, exceptions
 # ---------------------------------------------------------------------------
 from security.monitoring import ErrorTrackingMiddleware
@@ -873,24 +737,15 @@ api_router.include_router(cms_router)
 from routes.full_look import router as full_look_router
 api_router.include_router(full_look_router)
 api_router.include_router(pages_router)
-# Iyzico endpoint'leri — integrations_router'ın catch-all /{marketplace} rotasından ÖNCE include edilmeli
+# Iyzico endpoint'leri — integrations_router'ın catch-all /{provider} rotasından ÖNCE include edilmeli
 from routes.integrations_iyzico import router as iyzico_router
-from routes.integrations_dogan import router as dogan_router
-from routes.integrations_trendyol_qna import router as trendyol_qna_router
 api_router.include_router(iyzico_router, prefix="/integrations")
-# Doğan e-Dönüşüm — Iter35 refactor: ayrı modül. Catch-all /{marketplace}'den ÖNCE
-api_router.include_router(dogan_router, prefix="/integrations")
-# Trendyol Q&A + Reviews — Iter37 refactor: catch-all'dan ÖNCE
-api_router.include_router(trendyol_qna_router, prefix="/integrations")
-# Amazon entegrasyon uçları (amazon-tr/products/*) — catch-all /{marketplace}'den ÖNCE
 # BirFatura e-Fatura/e-Arşiv: BirFatura'nın çağırdığı token'lı uçlar (/api/birfatura/api/...)
 # + panel ayarları (/api/integrations/birfatura/...) — catch-all /{provider}'dan ÖNCE.
 from routes.integrations_birfatura import public_router as birfatura_public_router, admin_router as birfatura_admin_router
 api_router.include_router(birfatura_public_router)
 api_router.include_router(birfatura_admin_router)
 api_router.include_router(integrations_router, prefix="/integrations")
-api_router.include_router(integrations_temu_router, prefix="/integrations")
-api_router.include_router(trendyol_retry_queue_router)
 api_router.include_router(capi_router)
 api_router.include_router(admin_router)
 api_router.include_router(customer_router)
@@ -918,8 +773,6 @@ api_router.include_router(meta_messaging_webhook_router)
 api_router.include_router(ai_assistant_router)
 api_router.include_router(locations_router)
 api_router.include_router(attribution_router)
-from routes.push import router as push_router  # mobil admin push bildirimleri
-api_router.include_router(push_router)
 
 from routes.consent import router as consent_router  # KVKK çerez onayı kaydı
 api_router.include_router(consent_router)
@@ -972,14 +825,6 @@ api_router.include_router(barcode_cards_router)
 api_router.include_router(provider_settings_router)
 # İYS (ticari ileti izni) + OTP doğrulama — ödeme adımında kampanya izni ve dijital İYS bildirimi.
 api_router.include_router(iys_consent_router)
-# Marketplace Hub: tüm e-ticaret pazaryerlerinin (Trendyol, HB, Temu, N11,
-# Amazon, AliExpress, Etsy, ...) merkezi yönetimi: credentials, transfer_rules,
-# auto_sync ayarları + integration_logs.
-api_router.include_router(marketplace_hub_router)
-# Marka Eşleştirme (multi-marketplace)
-api_router.include_router(brand_mapping_router)
-# Kategori Eşleştirme (multi-marketplace)
-api_router.include_router(category_mapping_router)
 # Otomasyon durumu — admin için cron + log özet
 api_router.include_router(automation_status_router)
 # Footer şablonu (public + admin)
@@ -992,20 +837,13 @@ api_router.include_router(email_mkt_admin_router)
 api_router.include_router(email_mkt_public_router)
 api_router.include_router(instagram_public_router)
 api_router.include_router(instagram_admin_router)
-# Ticimax canlı stok senkronu (admin)
-# [A4b-ticimax-off] api_router.include_router(ticimax_stock_sync_router)
-# [ticimax-off] api_router.include_router(ticimax_history_router)  # kullanıcı kararı: Ticimax'a ait HİÇBİR uç açık değil
-# Ticimax kategori senkronu — "En Yeniler" tam ayna + tüm kategoriler (admin)
-# [A4-ticimax-off] api_router.include_router(ticimax_category_sync_router)
-# Ticimax üye içe aktarma — e-posta eşleştirme + geçmiş sipariş bağlama (admin)
-# [A4-ticimax-off] api_router.include_router(ticimax_member_sync_router)
-# Ticimax belirli kart ID ürün çekme — kaynak→hedef kart ID ile yeni ürün (admin)
-# [A4-ticimax-off] api_router.include_router(ticimax_product_pull_router)
-
 api_router.include_router(rooftr_returns_router)
+# Site iadeleri — toplu gider pusulası (eski /integrations/trendyol/claims/gp-bulk-range yerine)
+from routes.returns import router as returns_router
+api_router.include_router(returns_router)
 # Toplu fiyat/stok Excel ops + stok uyarı + yeniden sipariş önerisi
 api_router.include_router(bulk_ops_router)
-# RFM müşteri segmentasyonu + marketplace karlılık + Google Merchant feed
+# RFM müşteri segmentasyonu + Google Merchant feed
 api_router.include_router(analytics_extra_router)
 api_router.include_router(notifications_router)
 api_router.include_router(customer_risk_router)
@@ -1013,9 +851,6 @@ api_router.include_router(marketing_pixels_router)
 api_router.include_router(social_auth_router)
 # Security dashboard — auth_audit_logs üzerinde admin görünürlüğü
 api_router.include_router(security_dashboard_router)
-# Mobile app endpoints — version check, device registration, runtime config
-api_router.include_router(mobile_router)
-api_router.include_router(admin_mobile_router)
 # Secrets Vault (encrypted credentials store) + System Health monitoring
 api_router.include_router(secrets_vault_router)
 api_router.include_router(system_health_router)
@@ -1023,21 +858,11 @@ api_router.include_router(mail_admin_router)
 # Iteration 42 — Yeni rapor seti (stok değer, hızlı/yavaş satan, iade oranı, kanal kâr)
 api_router.include_router(reports_v2_router)
 api_router.include_router(product_costs_router)
-# Iteration 43 — production hooks + size recommender + IYS
+# Iteration 43 — size recommender + IYS
 api_router.include_router(size_rec_router)
 api_router.include_router(iys_router)
 
-# Theme management (admin) + storefront theme reader (public)
-
-# Influencer CRM & Seeding & ROI (Modül 3 + 4)
-
-# Amazon Selling Partner API (SP-API) — LWA only, no SigV4
-
-# Amazon DPP / Compliance (PII retention + checklist)
-from routes.compliance import router as compliance_router
-api_router.include_router(compliance_router)
-
-# TOTP MFA (çok faktörlü doğrulama) — Amazon DPP uyumu
+# TOTP MFA (çok faktörlü doğrulama)
 from routes.mfa import router as mfa_router
 api_router.include_router(mfa_router)
 # Cloudflare Email Routing — gelen mail webhook'u
@@ -1054,32 +879,6 @@ async def root():
     }
 
 # Health check
-async def zero_deleted_on_marketplaces_once() -> None:
-    """Çöp kutusundaki (is_deleted) TÜM ürünler için pazaryerlerine 0 stok gönderir (tek seferlik, bayraklı).
-    Hedefli stok güncellemesi çöpteki ürünleri de yakalayıp Trendyol'a stok geri göndermişti."""
-    from routes.deps import db as _db
-    from datetime import datetime as _dt, timezone as _tz
-    import asyncio as _aio
-    flag_id = "migrations.deleted_zero_push_v1"
-    try:
-        if await _db.settings.find_one({"id": flag_id, "done": True}):
-            return
-        from routes.integrations_common import on_product_deactivated
-        n = 0
-        async for p in _db.products.find({"is_deleted": True, "variants.barcode": {"$exists": True}}, {"_id": 0}).limit(400):
-            try:
-                await on_product_deactivated(dict(p))
-                n += 1
-            except Exception as _pe:
-                logger.warning(f"[deleted-zero] {p.get('name')}: {_pe}")
-            await _aio.sleep(0.3)
-        await _db.settings.update_one({"id": flag_id}, {"$set": {"id": flag_id, "done": True, "pushed": n,
-                                                                 "at": _dt.now(_tz.utc).isoformat()}}, upsert=True)
-        logger.warning(f"[deleted-zero] pazaryerlerine 0 stok gönderilen çöp ürün: {n}")
-    except Exception as e:
-        logger.error(f"[deleted-zero] hata: {e}")
-
-
 async def fix_size_table_order_once() -> None:
     """Ürün galerisinde beden tablosu (is_size_table) nesnesi normal görsellerin ÖNÜNE geçmişse sona alır.
     Kartlar images[0]'ı görsel sandığı için ürün resimsiz görünüyordu (ör. Mold Balon Pantolon)."""
@@ -1636,22 +1435,6 @@ async def audit_subset_return_money_v2_once() -> None:
         logger.error(f"[denetim] alt-kume iade v2 hata: {e}")
 
 
-async def trendyol_orphan_preview() -> None:
-    """Açılışta KURU tarama: Trendyol'da olup sistemde olmayan ürünler (sıfırlama YAPMAZ).
-    Sonuç settings.trendyol_orphan_zero_preview → /health.trendyol_orphan_preview."""
-    from routes.deps import db as _db
-    import asyncio as _aio
-    await _aio.sleep(20)
-    try:
-        from routes.integrations_trendyol import _trendyol_orphan_zero_core
-        res = await _trendyol_orphan_zero_core(dry_run=True)
-        await _db.settings.update_one({"id": "trendyol_orphan_zero_preview"},
-                                      {"$set": {"id": "trendyol_orphan_zero_preview", **res}}, upsert=True)
-        logger.warning(f"[orphan-preview] tarandı={res.get('scanned')} aday={res.get('candidates_first_check')} onaylı={res.get('confirmed')}")
-    except Exception as e:
-        logger.error(f"[orphan-preview] hata: {e}")
-
-
 async def scrub_phone_once(raw_phone: str, reason: str = "") -> None:
     """Bir telefon numarasını TÜM kayıtlardan siler (üye, adres, sipariş, İYS izni, OTP, influencer)
     ve SMS kara listesine alır. Tek seferlik (bayraklı); sonuç sayaçları settings.phone_scrub_<tail>."""
@@ -1936,434 +1719,6 @@ async def _order_lookup(nos: str = "") -> dict:
         return {"hata": f"{type(_e).__name__}: {str(_e)[:300]}"}
 
 
-async def _marketplace_clock_block(days: int = 60) -> dict:
-    """SALT OKUNUR: her kanalın kayıtlı sipariş saatinin UTC dağılımı.
-
-    Trendyol'da kanıtlandı: pazaryeri ms-epoch'u TÜRKİYE yerel saatini taşıyordu, biz
-    UTC sanıp kaydediyorduk → raporlar +3 saat kayıyor, 21:00 sonrası siparişler ertesi
-    güne/aya yazılıyordu. AYNI hatanın Hepsiburada/Amazon/Temu'da olup olmadığı ancak
-    ölçülerek anlaşılır.
-
-    Ölçüt: Türkiye'de alışveriş saat 20:00–23:00 TR arasında zirve yapar; bu, doğru
-    kaydedilmiş veride UTC 17:00–20:00 demektir. Bir kanalın zirvesi UTC 20:00–23:00'te
-    çıkıyorsa saat TR yerel olarak kaydediliyor (3 saat kayma) demektir.
-
-    Ayrıca her kanalda 'marketplace_order_date' alanının doluluk oranını verir: alan boşsa
-    rapor 'created_at'e düşer, o da senkron anı olabilir (gerçek sipariş saati değil).
-    Hiçbir şey YAZMAZ.
-    """
-    try:
-        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
-        _since = (_dt.now(_tz.utc) - _td(days=max(1, int(days or 60)))).isoformat()
-        _ed = {"$ifNull": ["$marketplace_order_date", "$created_at"]}
-        rows = await db.orders.aggregate([
-            {"$addFields": {"_ed": _ed}},
-            {"$match": {"$expr": {"$gte": [{"$toString": "$_ed"}, _since]}}},
-            {"$addFields": {
-                "_saat": {"$toInt": {"$substr": [{"$toString": "$_ed"}, 11, 2]}},
-                "_kanal": {"$ifNull": ["$platform", "site"]},
-                "_mod_var": {"$cond": [
-                    {"$in": [{"$ifNull": ["$marketplace_order_date", ""]}, [None, ""]]}, 0, 1]},
-            }},
-            {"$group": {"_id": {"k": "$_kanal", "s": "$_saat"},
-                        "n": {"$sum": 1}, "mod": {"$sum": "$_mod_var"}}},
-        ], allowDiskUse=True).to_list(None)
-        out: dict = {}
-        for r in rows:
-            k = str((r.get("_id") or {}).get("k") or "site") or "site"
-            s = int((r.get("_id") or {}).get("s") or 0)
-            d = out.setdefault(k, {"toplam": 0, "mod_dolu": 0, "saat": {}})
-            d["toplam"] += int(r.get("n") or 0)
-            d["mod_dolu"] += int(r.get("mod") or 0)
-            d["saat"][s] = d["saat"].get(s, 0) + int(r.get("n") or 0)
-        for k, d in out.items():
-            h = d["saat"]
-            # En yoğun 3 saatlik pencerenin başlangıcı (UTC)
-            best, best_n = 0, -1
-            for st in range(24):
-                tot = sum(h.get((st + i) % 24, 0) for i in range(3))
-                if tot > best_n:
-                    best, best_n = st, tot
-            d["zirve_3saat_utc"] = f"{best:02d}:00-{(best + 3) % 24:02d}:00"
-            d["zirve_3saat_tr"] = f"{(best + 3) % 24:02d}:00-{(best + 6) % 24:02d}:00"
-            d["saat"] = dict(sorted(h.items()))
-            d["mod_dolulugu"] = (f"{round(100 * d['mod_dolu'] / d['toplam'])}%"
-                                 if d["toplam"] else "-")
-            d["deger"] = ("BEKLENEN (TR akşam zirvesi doğru yerde)"
-                          if 15 <= best <= 19 else
-                          "ŞÜPHELİ — saat TR yerel kaydediliyor olabilir (3 saat kayma)"
-                          if 18 <= (best + 3) % 24 <= 22 and best >= 19 else
-                          "İNCELE")
-        # ── Trendyol saat göçünün KAPSAMI (geçmiş aylar dahil mi?) ───────────
-        # Göç ay süzgeci kullanmaz: marketplace_order_date'i olan TÜM Trendyol
-        # siparişlerini düzeltir. Yine de "eski aylar atlandı mı" sorusu ancak
-        # sayımla cevaplanır. Kalan varsa hangi aylarda olduğu da dökülür.
-        kapsam: dict = {}
-        try:
-            _q_ty = {"platform": "trendyol"}
-            kapsam["trendyol_toplam"] = await db.orders.count_documents(_q_ty)
-            kapsam["duzeltildi"] = await db.orders.count_documents(
-                {**_q_ty, "ty_date_utc_fixed": True})
-            # Göçten SONRA gelen siparişler zaten doğru yazılıyor ve damga taşımıyor;
-            # onları "kalan" saymak yanlış alarm üretirdi. Bu yüzden eşik, göçün
-            # uygulandığı andır — yalnız ondan ÖNCEKİ kayıtlar denetlenir.
-            _mig = await db.settings.find_one({"id": "ty_date_utc_fix_v1"},
-                                              {"_id": 0, "applied_at": 1}) or {}
-            _esik = str(_mig.get("applied_at") or "")
-            _kq = {**_q_ty, "ty_date_utc_fixed": {"$ne": True},
-                   "marketplace_order_date": {"$exists": True, "$nin": ["", None]}}
-            if _esik:
-                _kq["marketplace_order_date"] = {"$exists": True, "$nin": ["", None],
-                                                 "$lt": _esik}
-            kapsam["KALAN_tarihi_olan"] = await db.orders.count_documents(_kq)
-            kapsam["kalan_esigi"] = _esik or "(göç kaydı yok)"
-            kapsam["goc_sonrasi_yeni"] = await db.orders.count_documents(
-                {**_q_ty, "ty_date_utc_fixed": {"$ne": True},
-                 "marketplace_order_date": {"$exists": True, "$gte": _esik}}) if _esik else 0
-            kapsam["siparis_tarihi_YOK"] = await db.orders.count_documents(
-                {**_q_ty, "$or": [{"marketplace_order_date": {"$exists": False}},
-                                  {"marketplace_order_date": {"$in": ["", None]}}]})
-            _ay: dict = {}
-            async for r in db.orders.aggregate([
-                {"$match": {**_q_ty, "ty_date_utc_fixed": True}},
-                {"$group": {"_id": {"$substr": [{"$toString": "$marketplace_order_date"}, 0, 7]},
-                            "n": {"$sum": 1}}},
-            ]):
-                _ay[str(r.get("_id") or "?")] = int(r.get("n") or 0)
-            kapsam["duzeltilen_ay_dagilimi"] = dict(sorted(_ay.items()))
-            _ay2: dict = {}
-            async for r in db.orders.aggregate([
-                {"$match": {**_q_ty, "$or": [
-                    {"marketplace_order_date": {"$exists": False}},
-                    {"marketplace_order_date": {"$in": ["", None]}}]}},
-                {"$group": {"_id": {"$substr": [{"$toString": "$created_at"}, 0, 7]},
-                            "n": {"$sum": 1}}},
-            ]):
-                _ay2[str(r.get("_id") or "?")] = int(r.get("n") or 0)
-            kapsam["tarihi_olmayanlarin_ay_dagilimi"] = dict(sorted(_ay2.items()))
-            kapsam["ticimax_kopyasi_trendyol"] = await db.orders.count_documents(
-                {**_q_ty, "imported_from": "ticimax_history"})
-            # Trendyol API'si sınırlı geriye gidiyor; eski aylarda kayıtlarımızın
-            # büyük kısmı Ticimax'tan TAŞINAN geçmiş veri olabilir. O aylarda
-            # "API ile birebir tutuyor mu" sorusu ancak bu kırılımla cevaplanır.
-            _tay: dict = {}
-            async for r in db.orders.aggregate([
-                {"$match": {**_q_ty}},
-                {"$addFields": {"_ay": {"$substr": [{"$toString": {
-                    "$ifNull": ["$marketplace_order_date", "$created_at"]}}, 0, 7]},
-                    "_tic": {"$cond": [{"$eq": ["$imported_from", "ticimax_history"]}, 1, 0]}}},
-                {"$group": {"_id": "$_ay", "toplam": {"$sum": 1},
-                            "ticimax": {"$sum": "$_tic"}}},
-            ]):
-                _tay[str(r.get("_id") or "?")] = {
-                    "toplam": int(r.get("toplam") or 0),
-                    "ticimax_tasima": int(r.get("ticimax") or 0),
-                    "api_kaynakli": int(r.get("toplam") or 0) - int(r.get("ticimax") or 0)}
-            kapsam["ay_bazinda_kaynak"] = dict(sorted(_tay.items()))
-            kapsam["not"] = ("'KALAN_tarihi_olan' 0 DEĞİLSE göç eksik kalmıştır. "
-                             "'siparis_tarihi_YOK' kayıtlar pazaryeri tarihi taşımadığı "
-                             "için rapor created_at'e düşer — bunlar kaydırılmadı "
-                             "(kaydırmak uydurma olurdu).")
-        except Exception as _ke:
-            kapsam = {"hata": f"{type(_ke).__name__}: {str(_ke)[:200]}"}
-
-        return {"gun": int(days), "kanallar": out,
-                "ty_duzeltme_kapsami": kapsam,
-                "olcut": ("TR akşam zirvesi 20:00-23:00 TR = 17:00-20:00 UTC. "
-                          "'zirve_3saat_tr' 20:00-23:00 civarındaysa saat DOĞRU. "
-                          "Bir kanalın zirvesi TR 23:00-02:00'ye kaymışsa o kanalın "
-                          "tarihleri 3 saat ileri kaydediliyor demektir."),
-                "mod_notu": ("mod_dolulugu = marketplace_order_date dolu olan siparişlerin "
-                             "oranı. %0 ise rapor created_at'e düşer; created_at senkron "
-                             "anıysa sipariş saati gerçek değildir.")}
-    except Exception as _e:
-        return {"hata": f"{type(_e).__name__}: {str(_e)[:300]}"}
-
-
-async def _ty_siparis_sorgu(nos: str = "") -> dict:
-    """SALT OKUNUR: verilen sipariş numaralarını DOĞRUDAN Trendyol API'sine sorar.
-
-    Bizde olup Trendyol'un dönem listesinde görünmeyen siparişlerin gerçek durumu
-    (Trendyol'daki sipariş tarihi, paket statüsü, tutarı) ancak Trendyol'a numarayla
-    sorularak öğrenilir. Yalnız GET; hiçbir kayıt değiştirilmez, sipariş çekme
-    akışına dokunulmaz.
-    """
-    try:
-        _l = [x.strip() for x in str(nos or "").replace(";", ",").split(",") if x.strip()][:20]
-        if not _l:
-            return {"hata": "ty_siparis_q gerekli"}
-        from routes.integrations_trendyol import get_trendyol_config
-        from routes.integrations_common import _ms_to_iso
-        import sys as _sys, os as _os
-        _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-        from trendyol_client import TrendyolClient
-        cfg = await get_trendyol_config()
-        cli = TrendyolClient(supplier_id=cfg["supplier_id"], api_key=cfg["api_key"],
-                             api_secret=cfg["api_secret"], mode=cfg["mode"])
-        out = {}
-        for _n in _l:
-            try:
-                resp = await cli.get_orders(order_number=_n, size=50, page=0)
-                pk = (resp or {}).get("content") or []
-                out[_n] = {
-                    "trendyolda_BULUNDU": bool(pk),
-                    "paketler": [{
-                        "statu": p.get("shipmentPackageStatus") or p.get("status"),
-                        "siparis_tarihi_utc": _ms_to_iso(p.get("orderDate")),
-                        "tutar": p.get("totalPrice"),
-                        "adet": sum(int((ln or {}).get("quantity") or 1)
-                                    for ln in (p.get("lines") or [])),
-                    } for p in pk],
-                }
-            except Exception as _qe:
-                out[_n] = {"hata": f"{type(_qe).__name__}: {str(_qe)[:160]}"}
-            _b = await db.orders.find_one(
-                {"order_number": _n},
-                {"_id": 0, "status": 1, "total": 1, "created_at": 1,
-                 "marketplace_order_date": 1, "imported_from": 1, "source": 1})
-            out[_n]["bizde"] = _b
-        return out
-    except Exception as _e:
-        return {"hata": f"{type(_e).__name__}: {str(_e)[:300]}"}
-
-
-async def _iptal_tarih_teshis(mode: str = "1") -> dict:
-    """SALT OKUNUR: şüpheli iptal tarihlerinin (cancelled_at) KURU ÇALIŞTIRMA teşhisi.
-
-    Kök neden (2026-09-23 ~13:55 UTC): Trendyol statü geçişi ZATEN iptal olan eski
-    siparişlere de 'şimdi' damgası bastı (cancelled_at_source=trendyol_status_pass).
-    Bu blok, tahmini/şüpheli kaynaklı kayıtları damga zamanına göre KÜMELER ve her
-    sipariş için kanıta dayalı DOĞRU tarih önerir. HİÇBİR ŞEY YAZMAZ — veri onarımı
-    ayrıca, kullanıcı onayıyla yapılacak; bu onun kuru çalıştırmasıdır.
-
-    Kanıt sırası (en güvenilirden):
-      1) Trendyol paketinin packageHistories Cancelled/UnSupplied zamanı (canlı GET;
-         yalnız mode 'ty' / 'ty<N>' ile, en çok N≤150 sipariş),
-      2) Trendyol lastModifiedDate (paket iptal statüsündeyken; canlı GET),
-      3) status_history içindeki cancelled/cancel_refunded girişi (en erkeni),
-      4) stock_movements iptal/iade-atla hareketi (en erkeni),
-      5) siparişte saklı marketplace_last_modified (pazaryeri statüsü iptalse).
-    Damgayla ±15 dk içindeki kanıt BAĞIMSIZ sayılmaz (aynı hatalı turda üretilmiş
-    olabilir) → 'damga_ile_ayni' olarak ayrı raporlanır, öneri üretmez.
-    Aylar TR yerel saatine göre (UTC+3) hesaplanır.
-    """
-    try:
-        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-        import asyncio as _aio
-        _SRC = ["trendyol_status_pass", "trendyol_reconcile", "trendyol_cron",
-                "updated_at_fallback"]
-        _CST = ("cancelled", "cancel_refunded")
-        _MV = ["order_cancelled", "auto_cancel_expired", "havale_auto_cancel",
-               "restock_skipped_no_deduction"]
-        _TOL = _td(minutes=15)
-
-        def _p(s):
-            try:
-                s = str(s or "").strip()
-                if not s:
-                    return None
-                d = _dt.fromisoformat(s.replace("Z", "+00:00"))
-                if d.tzinfo is None:
-                    d = d.replace(tzinfo=_tz.utc)
-                return d.astimezone(_tz.utc)
-            except Exception:
-                return None
-
-        def _tr_ay(s):
-            d = _p(s)
-            return (d + _td(hours=3)).strftime("%Y-%m") if d else ""
-
-        def _kume(s):          # 10 dakikalık UTC kovası: "2026-09-23 13:5x"
-            d = _p(s)
-            return (d.strftime("%Y-%m-%d %H:%M")[:15] + "x") if d else "?"
-
-        # ── 1) Şüpheli kayıtlar ──────────────────────────────────────────────
-        rows = []
-        async for o in db.orders.find(
-                {"cancelled_at_source": {"$in": _SRC}},
-                {"_id": 0, "id": 1, "order_number": 1, "platform": 1, "status": 1,
-                 "cancelled_at": 1, "cancelled_at_source": 1, "created_at": 1,
-                 "marketplace_order_date": 1, "marketplace_status": 1,
-                 "marketplace_last_modified": 1, "trendyol_status_raw": 1,
-                 "status_history.status": 1, "status_history.at": 1}).limit(20000):
-            rows.append(o)
-        # Küme süzgeci: mode "ty150@2026-09-23T13:5" → yalnız cancelled_at bu önekle
-        # başlayan kayıtlar (satır sınırına ve canlı GET kotasına o küme girsin).
-        _onek = ""
-        if "@" in str(mode or ""):
-            mode, _onek = str(mode).split("@", 1)
-            _onek = _onek.strip().replace(" ", "T")
-        if _onek:
-            rows = [o for o in rows if str(o.get("cancelled_at") or "").replace(" ", "T").startswith(_onek)]
-        if not rows:
-            return {"supheli_kayit": 0, "not": "şüpheli kaynaklı cancelled_at yok",
-                    "kume_oneki": _onek}
-
-        # ── 2) Hareket defteri kanıtı (toplu) ────────────────────────────────
-        _ids = [str(o.get("id")) for o in rows if o.get("id")]
-        _nums = [str(o.get("order_number")) for o in rows if o.get("order_number")]
-        mv_id, mv_no = {}, {}
-        for i in range(0, max(len(_ids), len(_nums)), 3000):
-            _q = []
-            if _ids[i:i + 3000]:
-                _q.append({"order_id": {"$in": _ids[i:i + 3000]}})
-            if _nums[i:i + 3000]:
-                _q.append({"order_number": {"$in": _nums[i:i + 3000]}})
-            if not _q:
-                continue
-            async for m in db.stock_movements.find(
-                    {"$or": _q, "type": {"$in": _MV}},
-                    {"_id": 0, "order_id": 1, "order_number": 1, "created_at": 1}):
-                _c = str(m.get("created_at") or "")
-                if not _c:
-                    continue
-                for _k, _d in ((m.get("order_id"), mv_id), (m.get("order_number"), mv_no)):
-                    _k = str(_k or "")
-                    if _k and (_k not in _d or _c < _d[_k]):
-                        _d[_k] = _c
-
-        # ── 3) (İsteğe bağlı) Trendyol canlı GET: packageHistories ───────────
-        ty_ev, ty_err = {}, []
-        _m = str(mode or "").strip().lower()
-        if _m.startswith("ty"):
-            try:
-                _n = int(_m[2:] or 40)
-            except Exception:
-                _n = 40
-            _n = max(1, min(_n, 150))
-            _hedef = [str(o.get("order_number")) for o in rows
-                      if str(o.get("platform") or "") == "trendyol" and o.get("order_number")]
-            # En kalabalık kümeden başla (asıl hatalı tur) — ilk N sipariş.
-            _kc = {}
-            for o in rows:
-                _kc[_kume(o.get("cancelled_at"))] = _kc.get(_kume(o.get("cancelled_at")), 0) + 1
-            _byn = {str(o.get("order_number")): o for o in rows}
-            _hedef.sort(key=lambda n: -_kc.get(_kume((_byn.get(n) or {}).get("cancelled_at")), 0))
-            _hedef = list(dict.fromkeys(_hedef))[:_n]
-            try:
-                from routes.integrations_trendyol import get_trendyol_config, _ty_cancel_time_iso
-                import sys as _sys, os as _os
-                _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-                from trendyol_client import TrendyolClient
-                cfg = await get_trendyol_config()
-                cli = TrendyolClient(supplier_id=cfg["supplier_id"], api_key=cfg["api_key"],
-                                     api_secret=cfg["api_secret"], mode=cfg["mode"])
-                _sem = _aio.Semaphore(5)
-
-                async def _one(num):
-                    async with _sem:
-                        try:
-                            r = await cli.get_orders(order_number=num, size=50, page=0)
-                            best = ("", "")
-                            for pk in ((r or {}).get("content") or []):
-                                if str(pk.get("orderNumber") or "") != num:
-                                    continue
-                                t, s = _ty_cancel_time_iso(pk)
-                                if t and (not best[0] or t < best[0]):
-                                    best = (t, s)
-                            if best[0]:
-                                ty_ev[num] = best
-                        except Exception as _qe:
-                            ty_err.append([num, f"{type(_qe).__name__}: {str(_qe)[:80]}"])
-                await _aio.wait_for(_aio.gather(*[_one(x) for x in _hedef]), timeout=60)
-            except Exception as _te:
-                ty_err.append(["genel", f"{type(_te).__name__}: {str(_te)[:120]}"])
-
-        # ── 4) Sipariş başına öneri ──────────────────────────────────────────
-        kumeler, tasima, kaynak_say = {}, {}, {}
-        ornek = []
-        oneri_var = ayni = kanitsiz = ay_degisir = 0
-        for o in rows:
-            _ca = str(o.get("cancelled_at") or "")
-            _cad = _p(_ca)
-            _od = str(o.get("marketplace_order_date") or o.get("created_at") or "")
-            _num = str(o.get("order_number") or "")
-            adaylar = []
-            if _num in ty_ev:
-                adaylar.append((ty_ev[_num][0], "trendyol_" + ty_ev[_num][1]))
-            _sh = ""
-            for h in (o.get("status_history") or []):
-                if str((h or {}).get("status") or "") in _CST:
-                    _at = str((h or {}).get("at") or "")
-                    if _at and (not _sh or _at < _sh):
-                        _sh = _at
-            if _sh:
-                adaylar.append((_sh, "status_history"))
-            _mv = mv_id.get(str(o.get("id") or "")) or mv_no.get(_num) or ""
-            if _mv:
-                adaylar.append((_mv, "stock_movement"))
-            if (str(o.get("marketplace_status") or o.get("trendyol_status_raw") or "")
-                    in ("Cancelled", "UnSupplied") and o.get("marketplace_last_modified")):
-                adaylar.append((str(o["marketplace_last_modified"]), "marketplace_last_modified"))
-            # İLK GEÇERLİ (en güvenilir) kanıt karar verir; damgayı teyit ediyorsa
-            # daha zayıf kanıta geçilmez.
-            oneri, oneri_src, durum = "", "", "kanit_yok"
-            for _t, _s in adaylar:
-                _td0 = _p(_t)
-                if not _td0:
-                    continue
-                if _cad and abs(_td0 - _cad) <= _TOL:
-                    durum = "damga_ile_ayni"
-                else:
-                    oneri, oneri_src, durum = _t, _s, "oneri"
-                break
-            k = _kume(_ca)
-            b = kumeler.setdefault(k, {"adet": 0, "kaynak": {}, "siparis_tarihi_min": "",
-                                       "siparis_tarihi_max": "", "siparis_ayi": {},
-                                       "oneri": 0, "damga_ile_ayni": 0, "kanit_yok": 0})
-            b["adet"] += 1
-            _src = str(o.get("cancelled_at_source") or "")
-            b["kaynak"][_src] = b["kaynak"].get(_src, 0) + 1
-            if _od:
-                _o19 = _od[:19]
-                if not b["siparis_tarihi_min"] or _o19 < b["siparis_tarihi_min"]:
-                    b["siparis_tarihi_min"] = _o19
-                if not b["siparis_tarihi_max"] or _o19 > b["siparis_tarihi_max"]:
-                    b["siparis_tarihi_max"] = _o19
-                _oa = _tr_ay(_od)
-                b["siparis_ayi"][_oa] = b["siparis_ayi"].get(_oa, 0) + 1
-            b[durum] += 1
-            if durum == "oneri":
-                oneri_var += 1
-                kaynak_say[oneri_src] = kaynak_say.get(oneri_src, 0) + 1
-                _a0, _a1 = _tr_ay(_ca), _tr_ay(oneri)
-                if _a0 != _a1:
-                    ay_degisir += 1
-                    _kk = f"{_a0} -> {_a1}"
-                    tasima[_kk] = tasima.get(_kk, 0) + 1
-            elif durum == "damga_ile_ayni":
-                ayni += 1
-            else:
-                kanitsiz += 1
-            if len(ornek) < 400:
-                ornek.append([_num, str(o.get("platform") or ""), str(o.get("status") or ""),
-                              _od[:19], _ca[:19], _src, oneri[:19], oneri_src, durum])
-        _ks = sorted(kumeler.items(), key=lambda kv: -kv[1]["adet"])
-        return {
-            "supheli_kayit": len(rows),
-            "kume_oneki": _onek,
-            "kaynak_filtresi": _SRC,
-            "trendyol_canli": ({"sorgulanan_mod": _m, "bulunan": len(ty_ev),
-                                "hatalar": ty_err[:20]} if _m.startswith("ty")
-                               else "kapalı (iptal_tarih_q=ty veya ty<N> ile aç, N≤150)"),
-            "ozet": {"oneri_var": oneri_var, "damga_ile_ayni": ayni, "kanit_yok": kanitsiz,
-                     "ay_degistirecek": ay_degisir, "oneri_kaynaklari": kaynak_say},
-            "ay_tasima_tr": dict(sorted(tasima.items(), key=lambda kv: -kv[1])),
-            "kumeler": [dict(v, kume_utc=k) for k, v in _ks[:25]],
-            "diger_kume_adedi": max(0, len(_ks) - 25),
-            "siparisler_kolonlar": ["no", "platform", "statu", "siparis_tarihi",
-                                    "mevcut_cancelled_at", "mevcut_kaynak",
-                                    "onerilen_tarih", "onerilen_kaynak", "durum"],
-            "siparisler": ornek,
-            "siparisler_kirpildi": len(rows) > len(ornek),
-            "not": ("SALT OKUNUR — hiçbir kayıt değiştirilmedi. 'damga_ile_ayni' = kanıt "
-                    "damgayla ±15 dk içinde (gerçek geçiş olabilir ya da aynı hatalı turda "
-                    "üretilmiş olabilir; Trendyol canlı kanıtıyla ayırt edin)."),
-        }
-    except Exception as _e:
-        return {"hata": f"{type(_e).__name__}: {str(_e)[:300]}"}
-
-
 async def _iade_listesi(start_date: str = "", end_date: str = "") -> dict:
     """SALT OKUNUR: dönemdeki iade belgelerimizin KOMPAKT dökümü.
 
@@ -2414,50 +1769,6 @@ async def _iade_listesi(start_date: str = "", end_date: str = "") -> dict:
                 "talep_alanlar": ["siparis", "claim_id", "statu", "tip", "acilis",
                                   "onay", "iade_tutari", "kalemler(barkod,adet,statu)"],
                 "talepler": cl}
-    except Exception as _e:
-        return {"hata": f"{type(_e).__name__}: {str(_e)[:300]}"}
-
-
-async def _ty_ay_listesi(start_date: str = "", end_date: str = "") -> dict:
-    """SALT OKUNUR: dönemdeki Trendyol siparişlerimizin KOMPAKT listesi.
-
-    Pazaryerinin kendi Excel'iyle SİPARİŞ SİPARİŞ, iki yönlü kıyas için: Excel'de olup
-    bizde olmayan ve bizde olup Excel'de olmayan siparişler ancak bizim tam listemizle
-    görülebilir. Rapor ekranıyla AYNI nüfus: etkin sipariş tarihi + ticimax kopya
-    elemesi + sipariş no başına tek belge. Yalnız no/statü/tutar/tarih/adet döner;
-    müşteri kişisel verisi DÖNMEZ.
-    """
-    try:
-        from routes.reports import _iso_range
-        from routes.report_dedup import (merge_match as _mm, canonical_order_stages as _cos,
-                                         effective_order_date_match as _eodm,
-                                         load_dup_order_numbers as _ldc)
-        try:
-            await _ldc()
-        except Exception:
-            pass
-        s, e = _iso_range(start_date or None, end_date or None)
-        out = []
-        async for o in db.orders.aggregate([
-            {"$match": _mm({"$and": [_eodm(s, e), {"platform": "trendyol"}]})},
-            *_cos(),
-            {"$project": {"_id": 0, "order_number": 1, "status": 1, "total": 1,
-                          "marketplace_order_date": 1, "created_at": 1,
-                          "adet": {"$sum": {"$map": {"input": {"$ifNull": ["$items", []]},
-                                                     "as": "i", "in": {"$ifNull": ["$$i.quantity", 1]}}}}}},
-        ], allowDiskUse=True):
-            try:
-                _t = float(o.get("total") or 0)
-                _t = _t if _t == _t and abs(_t) != float("inf") else 0.0
-            except Exception:
-                _t = 0.0
-            out.append([str(o.get("order_number") or ""), str(o.get("status") or ""),
-                        round(_t, 2),
-                        str(o.get("marketplace_order_date") or o.get("created_at") or "")[:19],
-                        int(o.get("adet") or 0)])
-        return {"aralik": [s, e], "adet": len(out),
-                "alanlar": ["siparis_no", "statu", "tutar", "tarih_utc", "urun_adedi"],
-                "siparisler": out}
     except Exception as _e:
         return {"hata": f"{type(_e).__name__}: {str(_e)[:300]}"}
 
@@ -2663,236 +1974,6 @@ async def _asistan_log_block() -> dict:
     return {"son": rows,
             "anahtar_var": {"gemini": bool(await _anahtar("GEMINI_API_KEY", "gemini|google")),
                             "openai": bool(await _anahtar("OPENAI_API_KEY", "openai"))}}
-
-
-async def _iade_sayfa_teshis() -> dict:
-    """SALT OKUNUR: İadeler sayfasının açılışta çağırdığı uçları sayfanın parametreleriyle
-    çalıştırır; yalnız satır sayısı / süre / HATA ve hatanın dosya:satırını döndürür
-    (müşteri verisi DÖNDÜRMEZ). "İadeler sayfasına girilmiyor" teşhisi için."""
-    import time as _t, traceback as _tb
-    from routes.report_assistant import _cagir
-    from routes import rooftr_returns as _rr, integrations_trendyol as _it, settings as _st
-    _u = {"id": "diag", "role": "super_admin", "email": "diag@local", "is_super_admin": True}
-    cagrilar = [
-        ("web_iade_listesi", _rr.list_rooftr_return_orders, {"limit": 10000}),
-        ("ty_iadeler", _it.get_trendyol_claims, {"page": 1, "limit": 20, "platform": "trendyol"}),
-        ("hb_iadeler", _it.get_trendyol_claims, {"page": 1, "limit": 20, "platform": "hepsiburada"}),
-        ("amazon_iadeler", _it.get_trendyol_claims, {"page": 1, "limit": 20, "platform": "amazon"}),
-        ("site_talepleri", _it.get_trendyol_claims, {"page": 1, "limit": 20, "platform": "web"}),
-        ("siparis_durumlari", _st.get_order_statuses, {}),
-    ]
-    out = {}
-    for ad, fn_, kw in cagrilar:
-        t0 = _t.monotonic()
-        try:
-            r = await _cagir(fn_, _u, **kw)
-            n = None
-            if isinstance(r, dict):
-                for k in ("orders", "claims", "items", "rows", "statuses"):
-                    if isinstance(r.get(k), list):
-                        n = len(r[k]); break
-                toplam = r.get("total")
-            else:
-                toplam = None
-            out[ad] = {"ok": True, "satir": n, "toplam": toplam, "ms": int((_t.monotonic() - t0) * 1000)}
-        except Exception as e:
-            fr = [f"{f.filename.rsplit('/', 1)[-1]}:{f.lineno} {f.name}" for f in _tb.extract_tb(e.__traceback__)][-4:]
-            out[ad] = {"ok": False, "hata": f"{type(e).__name__}: {str(e)[:400]}", "yer": fr,
-                       "ms": int((_t.monotonic() - t0) * 1000)}
-    return out
-
-
-async def _ty_urun_probe(barkodlar: str = "") -> dict:
-    """SALT OKUNUR (yalnız GET): Trendyol ürün listeleme V1 kapandı (426). Aday V2 uçlarını
-    size=1 ile dener, durum kodu + alan adlarını döndürür; verilen barkodların Trendyol'daki
-    stok/satış durumunu okur. HİÇBİR YAZMA YAPMAZ."""
-    import httpx
-    from routes.integrations_trendyol import get_trendyol_config
-    from trendyol_client import TrendyolClient
-    cfg = await get_trendyol_config()
-    if not cfg.get("is_active"):
-        return {"hata": "trendyol aktif değil"}
-    c = TrendyolClient(supplier_id=cfg["supplier_id"], api_key=cfg["api_key"],
-                       api_secret=cfg["api_secret"], mode=cfg["mode"])
-    sid, base = cfg["supplier_id"], c.base_url
-    h = c._get_headers()
-    h_sf = dict(h, storeFrontCode="TR")
-    bcs = [b.strip() for b in (barkodlar or "").split(",") if b.strip()][:10]
-    adaylar = [
-        ("v1_products", f"/product/sellers/{sid}/products", {"page": 0, "size": 1}),
-        ("v1_size100", f"/product/sellers/{sid}/products", {"page": 0, "size": 100}),
-        ("v1_size200", f"/product/sellers/{sid}/products", {"page": 0, "size": 200}),
-        ("v1_archived_false", f"/product/sellers/{sid}/products", {"page": 0, "size": 1, "archived": "false"}),
-        ("v1_size200_archived_false", f"/product/sellers/{sid}/products", {"page": 0, "size": 200, "archived": "false"}),
-        ("v1_page5_size100", f"/product/sellers/{sid}/products", {"page": 5, "size": 100}),
-        ("v2_approved_size100", f"/product/sellers/{sid}/products/approved", {"page": 0, "size": 100}),
-        ("v2_approved", f"/product/sellers/{sid}/products/approved", {"page": 0, "size": 1}),
-        ("v2_unapproved", f"/product/sellers/{sid}/products/unapproved", {"page": 0, "size": 1}),
-        ("v2_products", f"/product/sellers/{sid}/v2/products", {"page": 0, "size": 1}),
-    ]
-    for b in bcs[:3]:
-        adaylar.append((f"base_info:{b}", f"/product/sellers/{sid}/product/{b}", {}))
-        adaylar.append((f"v2_approved?barcode={b}", f"/product/sellers/{sid}/products/approved", {"barcode": b, "page": 0, "size": 5}))
-
-    def _ozet(j):
-        if isinstance(j, dict):
-            ic = j.get("content") if isinstance(j.get("content"), list) else None
-            o = {"anahtarlar": list(j.keys())[:25], "toplam": j.get("totalElements", j.get("total"))}
-            if ic is not None:
-                o["icerik_adet"] = len(ic)
-                if ic and isinstance(ic[0], dict):
-                    o["ilk_alanlar"] = list(ic[0].keys())[:60]
-                    o["ilk"] = {k: ic[0].get(k) for k in ("barcode", "stockCode", "quantity", "onSale",
-                                                         "archived", "approved", "salePrice", "title",
-                                                         "productMainId", "locked", "blacklisted")
-                                if k in ic[0]}
-                    # varyant/iç yapı (V2'de stok varyant altında olabilir)
-                    for k in ("variants", "items", "attributes"):
-                        if isinstance(ic[0].get(k), list) and ic[0][k] and isinstance(ic[0][k][0], dict):
-                            o[f"ilk_{k}_alanlari"] = list(ic[0][k][0].keys())[:40]
-                            o[f"ilk_{k}_ornek"] = {kk: ic[0][k][0].get(kk) for kk in
-                                                  ("barcode", "quantity", "stock", "onSale", "salePrice", "stockCode")
-                                                  if kk in ic[0][k][0]}
-            else:
-                o["deger"] = {k: j.get(k) for k in ("barcode", "stockCode", "quantity", "onSale", "archived",
-                                                   "approved", "salePrice", "title", "locked") if k in j}
-            return o
-        return {"tip": type(j).__name__}
-
-    out = {"base_url": base}
-    async with httpx.AsyncClient(timeout=25.0) as cl:
-        for ad, yol, prm in adaylar:
-            for etiket, hh in (("", h), ("+storeFront", h_sf)):
-                try:
-                    r = await cl.get(f"{base}{yol}", headers=hh, params=prm)
-                    try:
-                        j = r.json()
-                    except Exception:
-                        j = None
-                    out[ad + etiket] = {"durum": r.status_code,
-                                        **(_ozet(j) if (j is not None and r.status_code < 400) else
-                                           {"govde": (r.text or "")[:240]})}
-                except Exception as e:
-                    out[ad + etiket] = {"hata": f"{type(e).__name__}: {str(e)[:200]}"}
-    return out
-
-
-async def _barkod_dokum() -> dict:
-    """SALT OKUNUR: tüm ürün barkodları (pasif/silinmiş dahil) → stok ve durum. Pazaryeri
-    ürün listesiyle barkod barkod kıyas için. Müşteri verisi yok (yalnız katalog)."""
-    out = []
-    async for p in db.products.find({}, {"_id": 0, "id": 1, "name": 1, "stock_code": 1, "barcode": 1,
-                                         "stock": 1, "is_active": 1, "is_deleted": 1,
-                                         "variants.barcode": 1, "variants.stock": 1, "variants.size": 1,
-                                         "variants.color": 1, "variants.stock_code": 1}):
-        base = [str(p.get("id") or "")[:8], (p.get("name") or "")[:60], p.get("stock_code") or "",
-                p.get("is_active") is not False, bool(p.get("is_deleted"))]
-        vs = p.get("variants") or []
-        if vs:
-            for v in vs:
-                if v.get("barcode"):
-                    out.append([str(v["barcode"]).strip(), int(v.get("stock") or 0),
-                                v.get("size") or "", v.get("color") or "", v.get("stock_code") or ""] + base)
-        elif p.get("barcode"):
-            out.append([str(p["barcode"]).strip(), int(p.get("stock") or 0), "", "", ""] + base)
-    return {"kolonlar": ["barkod", "stok", "beden", "renk", "varyant_stok_kodu", "urun_id8", "ad",
-                         "stok_kodu", "aktif", "silinmis"], "satir": len(out), "barkodlar": out}
-
-
-async def _hb_yetim_onizleme() -> dict:
-    """SALT OKUNUR önizleme — tespit integrations_hepsiburada.hb_yetim_ilanlar'da (süpürmeyle ortak)."""
-    from routes.integrations_hepsiburada import hb_yetim_ilanlar
-    r = await hb_yetim_ilanlar()
-    if isinstance(r.get("yetimler"), list):
-        r["yetimler"] = [{k: v for k, v in y.items() if not k.startswith("_")} for y in r["yetimler"][:300]]
-    return r
-
-
-async def _ty_canli_kiyas() -> dict:
-    """SALT OKUNUR: Trendyol'un CANLI ürün listesi (V1, size=100, arşiv dahil) ile bizim
-    barkodlarımızı barkod barkod kıyaslar (Excel kıyasının canlı hâli). Yazma yok."""
-    from routes.integrations_trendyol import get_trendyol_config
-    from trendyol_client import TrendyolClient
-    cfg = await get_trendyol_config()
-    cli = TrendyolClient(supplier_id=cfg["supplier_id"], api_key=cfg["api_key"],
-                         api_secret=cfg["api_secret"], mode=cfg["mode"])
-    ty, page = [], 0
-    while page < 60:
-        r = await cli.get_filtered_products(page=page, size=100)
-        c = r.get("content") or []
-        ty.extend(c)
-        page += 1
-        if not c or page >= (r.get("totalPages") or 0):
-            break
-    biz = {}
-    async for p in db.products.find({}, {"_id": 0, "name": 1, "is_active": 1, "is_deleted": 1, "barcode": 1,
-                                         "stock": 1, "variants.barcode": 1, "variants.stock": 1}):
-        akt = p.get("is_active") is not False and not p.get("is_deleted")
-        vs = p.get("variants") or []
-        pairs = [(v.get("barcode"), v.get("stock")) for v in vs] if vs else [(p.get("barcode"), p.get("stock"))]
-        for bc, st in pairs:
-            if not bc:
-                continue
-            bc = str(bc).strip()
-            prev = biz.get(bc)
-            if prev is None or (akt and not prev[1]):
-                biz[bc] = (int(st or 0), akt, bool(p.get("is_deleted")), (p.get("name") or "")[:50])
-    kat = {"aktif_ayni": 0, "aktif_farkli": [], "pasif_silinmis_stoklu": [], "bizde_yok_stoklu": [],
-           "pasif_silinmis_sifir": 0, "bizde_yok_sifir_veya_arsiv": 0}
-    for t in ty:
-        bc = str(t.get("barcode") or "").strip()
-        q = int(t.get("quantity") or 0)
-        sat = bool(t.get("onSale")) and not t.get("archived")
-        b = biz.get(bc)
-        row = {"barkod": bc, "ty_stok": q, "satista": sat, "arsiv": bool(t.get("archived")),
-               "ad": (t.get("title") or "")[:50]}
-        if b is None:
-            if q > 0 and not t.get("archived"):
-                kat["bizde_yok_stoklu"].append(row)
-            else:
-                kat["bizde_yok_sifir_veya_arsiv"] += 1
-        elif not b[1]:
-            if q > 0 and not t.get("archived"):
-                kat["pasif_silinmis_stoklu"].append({**row, "biz": b[0], "silinmis": b[2]})
-            else:
-                kat["pasif_silinmis_sifir"] += 1
-        elif b[0] != q:
-            kat["aktif_farkli"].append({**row, "biz": b[0]})
-        else:
-            kat["aktif_ayni"] += 1
-    return {"trendyol_barkod": len(ty), **{k: (v if isinstance(v, int) else {"adet": len(v), "liste": v[:80]})
-                                           for k, v in kat.items()}}
-
-
-async def _ty_batch_sonuc(ids: str = "", barkodlar: str = "") -> dict:
-    """SALT OKUNUR: Trendyol toplu işlem (batch) sonucu — kalem bazında başarısızlık nedenleri.
-    'barkodlar' verilirse yalnız o barkodların kalemleri döndürülür."""
-    from routes.integrations_trendyol import get_trendyol_config
-    from trendyol_client import TrendyolClient
-    cfg = await get_trendyol_config()
-    cli = TrendyolClient(supplier_id=cfg["supplier_id"], api_key=cfg["api_key"],
-                         api_secret=cfg["api_secret"], mode=cfg["mode"])
-    want = {b.strip() for b in (barkodlar or "").split(",") if b.strip()}
-    out = {}
-    for bid in [x.strip() for x in (ids or "").split(",") if x.strip()][:6]:
-        try:
-            r = await cli.get_batch_request_result(bid)
-        except Exception as e:
-            out[bid] = {"hata": f"{type(e).__name__}: {str(e)[:200]}"}
-            continue
-        items = r.get("items") or []
-        from collections import Counter as _C
-        dur = _C(str(i.get("status")) for i in items)
-        sec = []
-        for i in items:
-            rq = i.get("requestItem") or {}
-            bc = str(rq.get("barcode") or (rq.get("product") or {}).get("barcode") or "")
-            if (want and bc in want) or (not want and str(i.get("status")).upper() != "SUCCESS"):
-                sec.append({"barkod": bc, "durum": i.get("status"), "nedenler": i.get("failureReasons"),
-                            "istek": {k: rq.get(k) for k in ("quantity", "salePrice", "listPrice")}})
-        out[bid] = {"batch_durum": r.get("status"), "kalem": len(items), "durum_dagilimi": dict(dur),
-                    "secilen": sec[:60]}
-    return out
 
 
 async def _destek_teshis(mod: str = "", eposta: str = "") -> dict:
@@ -3126,38 +2207,6 @@ async def _destek_teshis(mod: str = "", eposta: str = "") -> dict:
                 "son_basarili": last_ok, "en_eski_bekleyen": oldest_pending,
                 "gunluk_toplu": await db.settings.find_one({"id": "iys_daily_batch"}, {"_id": 0}),
                 "url": os.environ.get("NETGSM_IYS_URL") or "https://api.netgsm.com.tr/iys/add"}
-    if mod == "ty_batch":
-        # Trendyol batch sonucu (salt okunur GET) — destek_email parametresi = batch id.
-        # İsteğe bağlı: "batch|STOKKODU" → ürünün yerel durumu da döner. PII yok (ürün verisi).
-        bid, _, sc = (eposta or "").partition("|")
-        out = {}
-        try:
-            from routes.integrations_trendyol import get_trendyol_config
-            from trendyol_client import TrendyolClient
-            cfg = await get_trendyol_config()
-            cl = TrendyolClient(supplier_id=cfg["supplier_id"], api_key=cfg["api_key"],
-                                api_secret=cfg["api_secret"], mode=cfg.get("mode", "live"))
-            data = await cl.get_batch_request_result(bid.strip()) if bid.strip() else {}
-            out["batch"] = {"status": data.get("status"), "itemCount": data.get("itemCount"),
-                            "items": [{"status": it.get("status"), "failureReasons": it.get("failureReasons"),
-                                       "barcode": (it.get("requestItem") or {}).get("barcode")
-                                       or ((it.get("requestItem") or {}).get("product") or {}).get("barcode")}
-                                      for it in (data.get("items") or [])][:60]}
-        except Exception as e:
-            out["batch_error"] = str(e)[:300]
-        if sc.strip():
-            prods = []
-            async for pr in db.products.find({"stock_code": sc.strip()}, {"_id": 0, "id": 1, "name": 1, "is_active": 1,
-                                                  "is_deleted": 1, "stock": 1, "price": 1, "member_price_1": 1,
-                                                  "category_id": 1, "category_ids": 1, "trendyol_category_id": 1,
-                                                  "trendyol_attributes": 1, "variants.barcode": 1, "variants.stock": 1,
-                                                  "variants.size": 1, "images": 1, "trendyol_status": 1,
-                                                  "trendyol_last_error": 1, "trendyol_synced_at": 1}):
-                pr["images"] = len(pr.get("images") or [])
-                pr["trendyol_attributes"] = len(pr.get("trendyol_attributes") or [])
-                prods.append(pr)
-            out["urunler"] = prods
-        return out
     if mod == "blokaj":
         # Olay döngüsü kilitlenmeleri (son 24 sa): o an çalışan işler/istekler — salt okunur.
         since = (now - _td(hours=24)).isoformat()
@@ -3291,7 +2340,7 @@ async def _destek_teshis(mod: str = "", eposta: str = "") -> dict:
                                                         "created_at": 1, "error": 1}).sort("created_at", -1).to_list(20)
         tracked = await db.cart_sessions.count_documents({"user_id": {"$nin": [None, ""]}, "total": {"$gt": 0}})
         return {"kuru_calistirma": dry, "uye_bagli_sepet": tracked, "son_gonderimler": last}
-    return {"detay": "mod=kargo|uyelik|yavas|meta|siparis|iys|ty_batch|blokaj|tarama|paylasim|sepet_mail"}
+    return {"detay": "mod=kargo|uyelik|yavas|meta|siparis|iys|blokaj|tarama|paylasim|sepet_mail"}
 
 
 async def _kupon_teshis(kod: str = "") -> dict:
@@ -3377,286 +2426,6 @@ async def _safe_block(coro):
         return res
     except Exception as _se:
         return {"hata": f"temizleme: {type(_se).__name__}: {str(_se)[:200]}"}
-
-
-async def _trendyol_live_count(start_date: str = "", end_date: str = "") -> dict:
-    """SALT OKUNUR: Trendyol'un KENDİ verisiyle bizim sayımızı karşılaştır.
-
-    "Trendyol panelinde çok farklı bir rakam var" sorusunun tek kesin cevabı:
-    aynı dönemi Trendyol'a sorup yanıtı bizim kayıtlarımızla yan yana koymak.
-
-    Trendyol /orders ucu SİPARİŞ değil KARGO PAKETİ döndürür; bir sipariş birden
-    çok pakete bölünebilir ve paketler AYNI orderNumber'ı taşır. Bu yüzden üç ayrı
-    sayı raporlanır: paket, tekil sipariş numarası, ve bizim kayıtlarımızdaki adet.
-
-    YALNIZ OKUR: Trendyol'a GET atar, hiçbir sipariş oluşturmaz/güncellemez,
-    veritabanına yazmaz. Sipariş çekme akışına DOKUNMAZ.
-    """
-    try:
-        from routes.reports import _iso_range
-        from routes.integrations_trendyol import get_trendyol_config
-        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
-        import sys as _sys, os as _os
-        _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-        from trendyol_client import TrendyolClient
-
-        s, e = _iso_range(start_date or None, end_date or None)
-        cfg = await get_trendyol_config()
-        if not cfg.get("is_active"):
-            return {"hata": "Trendyol entegrasyonu aktif değil"}
-        cli = TrendyolClient(supplier_id=cfg["supplier_id"], api_key=cfg["api_key"],
-                             api_secret=cfg["api_secret"], mode=cfg["mode"])
-        _s_dt = _dt.fromisoformat(s.replace("Z", "+00:00"))
-        _e_dt = _dt.fromisoformat(e.replace("Z", "+00:00"))
-        # ÖNEMLİ: Trendyol tarih süzgeci PAKET tarihine göre çalışır; paket, siparişten
-        # GÜNLER SONRA açılabilir (veya sipariş dönem başından önce verilip paketi
-        # dönem içinde açılmış olabilir). Sipariş tarihine göre eksiksiz saymak için
-        # çekim penceresi iki yana GENİŞLETİLİR, süzme yine orderDate ile yapılır.
-        _PAD = _td(days=21)
-        _fetch_s, _fetch_e = _s_dt - _PAD, min(_e_dt + _PAD, _dt.now(_tz.utc))
-
-        paketler, sayfa_sayisi, hata = {}, 0, ""
-        _dilim_beyan, _dilim_alinan = [], []
-        # Trendyol tarih aralığını sınırlar → 10 günlük dilimlere böl.
-        _cur = _fetch_s
-        while _cur < _fetch_e:
-            _nxt = min(_cur + _td(days=10), _fetch_e)
-            _dilim_alinan.append(0)
-            page = 0
-            while page < 60:
-                try:
-                    resp = await cli.get_orders(
-                        start_date_ms=int(_cur.timestamp() * 1000),
-                        end_date_ms=int(_nxt.timestamp() * 1000),
-                        size=200, page=page, order_by_field="CreatedDate")
-                except Exception as _qe:
-                    hata = f"{type(_qe).__name__}: {str(_qe)[:200]}"
-                    break
-                sayfa_sayisi += 1
-                chunk = resp.get("content") or []
-                # EKSİKSİZLİK KANITI: Trendyol her yanıtta o dilim için toplam kayıt
-                # sayısını (totalElements) bildirir. Dilim başına bir kez toplanır;
-                # sonunda "Trendyol kaç dedi / biz kaç topladık" karşılaştırılır.
-                if page == 0:
-                    _dilim_beyan.append(int(resp.get("totalElements") or 0))
-                _dilim_alinan[-1] = _dilim_alinan[-1] + len(chunk)
-                for t in chunk:
-                    _pid = str(t.get("id") or "")
-                    if _pid:
-                        paketler[_pid] = t
-                if page + 1 >= int(resp.get("totalPages") or 0):
-                    break
-                page += 1
-            if hata:
-                break
-            _cur = _nxt
-
-        # Trendyol'un kendi orderDate'ine göre DÖNEME düşenleri say (TR sınırları s..e)
-        #
-        # SAAT DİLİMİ (kanıtlanmış): Trendyol'un orderDate ms-epoch'u UTC değil TÜRKİYE
-        # yerel saatini taşır — ms UTC gibi çözüldüğünde panelin TR saatiyle BİREBİR aynı
-        # rakamlar çıkıyor (örn. 11559154819: panel 21:09, çözüm 21:08:57). Gerçek UTC
-        # anı için TY_TR_OFFSET_HOURS çıkarılmalı; aksi halde s..e (gerçek UTC sınırları)
-        # ile kıyas 3 saat kayar → ay/gün sınırındaki siparişler yanlış kovaya düşer.
-        # integrations_common._ms_to_iso ile AYNI dönüşüm (tek kaynak).
-        from routes.integrations_common import TY_TR_OFFSET_HOURS as _TYOFF
-
-        def _iso(ms):
-            try:
-                return (_dt.fromtimestamp(int(ms) / 1000, tz=_tz.utc)
-                        - _td(hours=_TYOFF)).isoformat()
-            except Exception:
-                return ""
-        _in, _durum, _nos, _gun = [], {}, set(), {}
-        _adet = 0            # ÜRÜN ADEDİ (panel "Adet" sütunu bunu gösteriyor)
-        _adet_iptal = 0
-        _brut = 0.0          # paket totalPrice toplamı
-        _brut_iptalsiz = 0.0
-        _CANCEL_TY = ("Cancelled", "UnSupplied", "Returned", "UnDeliveredAndReturned")
-        for t in paketler.values():
-            _od = _iso(t.get("orderDate"))
-            if not _od or not (s <= _od <= e):
-                continue
-            _in.append(t)
-            _st = str(t.get("shipmentPackageStatus") or t.get("status") or "?")
-            _durum[_st] = _durum.get(_st, 0) + 1
-            _q = 0
-            for _ln in (t.get("lines") or []):
-                try:
-                    _q += max(1, int(_ln.get("quantity") or 1))
-                except Exception:
-                    _q += 1
-            _adet += _q
-            try:
-                _tp = float(t.get("totalPrice") or 0)
-            except Exception:
-                _tp = 0.0
-            _brut += _tp
-            if _st in _CANCEL_TY:
-                _adet_iptal += _q
-            else:
-                _brut_iptalsiz += _tp
-            _nos.add(str(t.get("orderNumber") or ""))
-            _g = (_dt.fromisoformat(_od) + _td(hours=3)).date().isoformat()
-            _gun[_g] = _gun.get(_g, 0) + 1
-
-        # ── PANEL HANGİ TANIMI SAYIYOR? ─────────────────────────────────────
-        # Trendyol'un kendi kaynakları bile birbirini tutmuyor (eylül: panel 1.566,
-        # dağılım raporu 1.406, sipariş listesi Excel 1.361). Fark tanımdan gelir:
-        # sipariş mi paket mi, hangi TARİHE göre, iptaller dahil mi. Aynı çekilmiş
-        # veri kümesi üzerinden tüm makul tanımlar yan yana sayılır ki panelin
-        # rakamı hangi satıra denk geliyorsa tanım kesinleşsin. Salt okuma.
-        def _ms_tr_gun(ms):
-            """ms epoch → TR yerel gün (Trendyol epoch'u TR saatini taşır)."""
-            try:
-                return _dt.fromtimestamp(int(ms) / 1000, tz=_tz.utc).date().isoformat()
-            except Exception:
-                return ""
-        _s_gun = str(start_date or "")[:10]
-        _e_gun = str(end_date or "")[:10]
-
-        def _gun_icinde(g):
-            return bool(g) and (not _s_gun or g >= _s_gun) and (not _e_gun or g <= _e_gun)
-
-        _tanim = {}
-        try:
-            _pk_sip, _pk_pkt, _pk_adet = set(), 0, 0
-            _sip_iptalsiz = set()
-            for t in paketler.values():
-                _g_ord = _ms_tr_gun(t.get("orderDate"))
-                _g_pkt = _ms_tr_gun(t.get("packageLastModifiedDate")
-                                    or t.get("lastModifiedDate")
-                                    or t.get("orderDate"))
-                _st2 = str(t.get("shipmentPackageStatus") or t.get("status") or "?")
-                _on2 = str(t.get("orderNumber") or "")
-                if _gun_icinde(_g_pkt):
-                    _pk_pkt += 1
-                    if _on2:
-                        _pk_sip.add(_on2)
-                    for _ln in (t.get("lines") or []):
-                        try:
-                            _pk_adet += max(1, int(_ln.get("quantity") or 1))
-                        except Exception:
-                            _pk_adet += 1
-                if _gun_icinde(_g_ord) and _st2 not in _CANCEL_TY and _on2:
-                    _sip_iptalsiz.add(_on2)
-            _tanim = {
-                "A_siparis_tarihine_gore_paket": len(_in),
-                "B_siparis_tarihine_gore_TEKIL_SIPARIS": len(_nos),
-                "C_siparis_tarihine_gore_URUN_ADEDI": _adet,
-                "D_siparis_tarihine_gore_IPTALSIZ_SIPARIS": len(_sip_iptalsiz),
-                "E_PAKET_tarihine_gore_paket": _pk_pkt,
-                "F_PAKET_tarihine_gore_TEKIL_SIPARIS": len(_pk_sip),
-                "G_PAKET_tarihine_gore_URUN_ADEDI": _pk_adet,
-                "not": ("Panelde gördüğünüz rakam bu satırlardan HANGİSİNE eşitse "
-                        "panelin tanımı odur. Bizim raporumuz B satırını kullanır "
-                        "(siparişin verildiği tarihe göre tekil sipariş)."),
-            }
-        except Exception as _te:
-            _tanim = {"hata": f"{type(_te).__name__}: {str(_te)[:200]}"}
-
-        # Bizim kayıtlarımız (aynı dönem, aynı ölçüt)
-        _bizim = await db.orders.count_documents({
-            "platform": "trendyol",
-            "$expr": {"$and": [
-                {"$gte": [{"$ifNull": ["$marketplace_order_date", "$created_at"]}, s]},
-                {"$lte": [{"$ifNull": ["$marketplace_order_date", "$created_at"]}, e]}]}})
-
-        # RAPOR EKRANIYLA BİREBİR AYNI SAYIM.
-        # Yukarıdaki _bizim HAM sayımdır: ticimax_history'den gelen eski kopyalar ve aynı
-        # sipariş numarasının ikinci belgesi de sayılır. Rapor ekranı bunları eler; bu
-        # yüzden ham sayı Trendyol'dan BÜYÜK çıkıp sahte "fazla sipariş" izlenimi veriyordu
-        # (haziran: ham 865 / Trendyol 444). Aşağısı raporların kullandığı tam boru hattıdır:
-        #   merge_match (ticimax kopyaları) → canonical_order_stages (sipariş no başına tek
-        #   belge) → geçerli satış statüleri. Salt okuma.
-        _rapor = {"hata": ""}
-        try:
-            from routes.reports import _EXCLUDED_STATUSES as _EXC
-            from routes.report_dedup import (
-                merge_match as _mm, canonical_order_stages as _cos,
-                effective_order_date_match as _eodm, load_dup_order_numbers as _ldc)
-            try:
-                await _ldc()          # ticimax kopya listesi (rapor isteğinde dependency yapar)
-            except Exception:
-                pass
-            _base = [
-                {"$match": _mm({"$and": [_eodm(s, e), {"platform": "trendyol"}]})},
-                *_cos(),
-            ]
-            _r1 = await db.orders.aggregate(_base + [{"$count": "n"}]).to_list(1)
-            _r2 = await db.orders.aggregate(_base + [
-                {"$match": {"status": {"$nin": list(_EXC)}}},
-                {"$group": {"_id": None, "n": {"$sum": 1},
-                            "tutar": {"$sum": {"$ifNull": ["$total", 0]}},
-                            "adet": {"$sum": {"$sum": {"$map": {
-                                "input": {"$ifNull": ["$items", []]}, "as": "it",
-                                "in": {"$ifNull": ["$$it.quantity", 1]}}}}}}},
-            ]).to_list(1)
-            _d2 = _r2[0] if _r2 else {}
-            _rapor = {
-                "tekil_belge": int(_r1[0]["n"]) if _r1 else 0,
-                "gecerli_satis_siparis": int(_d2.get("n") or 0),
-                "gecerli_satis_urun_adedi": int(_d2.get("adet") or 0),
-                "gecerli_satis_tutar": round(float(_d2.get("tutar") or 0), 2),
-                "hata": "",
-                "not": ("'tekil_belge' Trendyol'un 'tekil_siparis_no' değeriyle "
-                        "eşleşmeli. 'gecerli_satis_*' rapor ekranındaki Trendyol "
-                        "satırıdır: iptal/iade/ödenmemiş elenmiş hâli."),
-            }
-        except Exception as _re:
-            _rapor = {"hata": f"{type(_re).__name__}: {str(_re)[:200]}"}
-        _bizde_var = set()
-        async for o in db.orders.find(
-                {"platform": "trendyol", "order_number": {"$in": list(_nos)[:20000]}},
-                {"_id": 0, "order_number": 1}):
-            _bizde_var.add(str(o.get("order_number")))
-        _eksik = sorted(_nos - _bizde_var)
-
-        return {
-            "aralik": {"baslangic": start_date, "bitis": end_date, "utc": [s, e]},
-            "trendyol": {
-                "paket": len(_in),
-                "tekil_siparis_no": len(_nos),
-                "cok_paketli_siparis_farki": len(_in) - len(_nos),
-                "statu": _durum,
-                "gunluk_paket": dict(sorted(_gun.items())),
-                # PANEL KARŞILAŞTIRMASI: Trendyol panelindeki "Adet" sütunu SİPARİŞ değil
-                # ÜRÜN ADEDİ. Doğru kıyas için kalem adetleri toplanır.
-                "urun_adedi_brut": _adet,
-                "urun_adedi_iptal_iade": _adet_iptal,
-                "urun_adedi_iptalsiz": _adet - _adet_iptal,
-                "tutar_paket_toplami": round(_brut, 2),
-                "tutar_iptalsiz": round(_brut_iptalsiz, 2),
-            },
-            "bizde": {
-                "kayit": _bizim,
-                "ham_kayit_notu": ("HAM sayım: ticimax_history kopyaları ve aynı sipariş "
-                                   "numarasının ikinci belgesi DAHİL. Rapor ekranıyla "
-                                   "kıyas için 'rapor_ekrani' bloğunu kullanın."),
-                "rapor_ekrani": _rapor,
-                "trendyolda_olup_bizde_OLMAYAN_siparis": len(_eksik),
-                "ornek_eksik": _eksik[:25],
-            },
-            "PANEL_TANIM_ARAMA": _tanim,
-            "cekilen_sayfa": sayfa_sayisi,
-            "cekim_penceresi": [_fetch_s.isoformat(), _fetch_e.isoformat()],
-            "cekilen_toplam_paket": len(paketler),
-            "eksiksizlik": {
-                "trendyol_beyan_toplam": sum(_dilim_beyan),
-                "biz_aldik_toplam": sum(_dilim_alinan),
-                "tekil_paket": len(paketler),
-                "not": ("trendyol_beyan = Trendyol'un totalElements toplamı. "
-                        "'biz_aldik' ondan KÜÇÜKSE sayfalama eksik demektir. "
-                        "'tekil_paket' daha küçükse dilimler örtüşmüştür (zararsız)."),
-            },
-            "hata": hata,
-            "not": ("Trendyol /orders KARGO PAKETİ döndürür; bir sipariş birden çok "
-                    "pakete bölünebilir ve paketler AYNI orderNumber'ı taşır. "
-                    "'paket' panelle, 'tekil_siparis_no' bizim sayımızla kıyaslanmalı. "
-                    "'trendyolda_olup_bizde_OLMAYAN' > 0 ise gerçek veri kaybı var."),
-        }
-    except Exception as _e:
-        return {"hata": f"{type(_e).__name__}: {str(_e)[:300]}"}
 
 
 async def _stock_drift_block(limit: int = 50) -> dict:
@@ -3799,13 +2568,9 @@ async def _sales_audit_block(start_date: str = "", end_date: str = "",
 @api_router.get("/health")
 async def health(diag: str = "", audit_key: str = "",
                  audit_start: str = "", audit_end: str = "", stock_q: str = "",
-                 drift: str = "", ty_count: str = "", orders_q: str = "",
-                 clock: str = "", audit_source: str = "", pusula_q: str = "",
-                 ty_list: str = "", ty_siparis_q: str = "", iade_list: str = "",
-                 rapor_q: str = "", asistan_log: str = "", iptal_tarih_q: str = "",
-                 iade_sayfa_q: str = "", ty_urun_probe: str = "", zero_sweep: str = "",
-                 barkod_dokum: str = "", hb_yetim_q: str = "", ty_kiyas: str = "",
-                 ty_batch_q: str = "", ty_batch_barkod: str = "", kupon_q: str = "",
+                 drift: str = "", orders_q: str = "",
+                 audit_source: str = "", pusula_q: str = "", iade_list: str = "",
+                 rapor_q: str = "", asistan_log: str = "", kupon_q: str = "",
                  destek_q: str = "", destek_email: str = ""):
     # Deploy teşhisi: hangi commit çalışıyor (Railway RAILWAY_GIT_COMMIT_SHA sağlar).
     _sha = (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or os.environ.get("GIT_SHA") or "")[:12]
@@ -3838,14 +2603,6 @@ async def health(diag: str = "", audit_key: str = "",
         _jobs = sorted(j.id for j in _sched.get_jobs())[:60] if _sched else []
     except Exception as _e:
         _jobs = [f"okunamadı: {str(_e)[:60]}"]
-    # Influencer kargo takip taraması sağlığı + MNG WSDL operasyon adları (PII yok) — teşhis.
-    _pt = {}
-    try:
-        _pt = await db.settings.find_one({"id": "influencer_pr_track_health"},
-                                         {"_id": 0, "status": 1, "last_finish_at": 1, "candidates": 1, "checked": 1,
-                                          "found": 1, "errors": 1, "mng_ops": 1, "mng_ops_at": 1, "by_date": 1, "nz_retro": 1}) or {}
-    except Exception as _e:
-        _pt = {"error": f"okunamadı: {str(_e)[:80]}"}
     _rp = None   # iade sondası KALDIRILDI (indeks-siz tarama)
     # TEŞHİS (yalnız ?diag=1, DB'ye DOKUNMAZ): kargo etiketi barkodu sunucuda üretilebiliyor mu?
     # python-barcode/Pillow eksikse etiket web-font yedeğine düşer → kurye okuyamayabilir.
@@ -3858,25 +2615,6 @@ async def health(diag: str = "", audit_key: str = "",
             _lbc[_c] = {"ok": bool(_png), "png_bytes": (len(_png) * 3 // 4) if _png else 0}
     except Exception as _e:
         _lbc = {"error": str(_e)[:120]}
-    # TEŞHİS: takip numarası bekleyen influencer gönderileri (kişisel veri yok; MNG yanıt özeti).
-    try:
-        _pp = []
-        async for _r in db.influencer_pr.find({
-            "$and": [
-                {"$or": [{"cargo_tracking_no": {"$nin": [None, ""]}}, {"cargo_barcode": {"$nin": [None, ""]}}]},
-                {"$or": [{"cargo_gonderi_no": {"$in": [None, ""]}}, {"cargo_gonderi_no": {"$exists": False}}]},
-            ]}, {"_id": 0, "influencer_name": 1, "shipped_at": 1, "created_at": 1, "cargo_tracking_no": 1,
-                 "cargo_barcode": 1, "cargo_mng_no": 1, "cargo_last_status_text": 1, "cargo_track_debug": 1,
-                 "cargo_track_error": 1, "cargo_status_checked_at": 1}).sort("shipped_at", -1).limit(40):
-            _pp.append({"kim": str(_r.get("influencer_name") or "")[:30], "gonderim": str(_r.get("shipped_at") or "")[:16],
-                        "olusturma": str(_r.get("created_at") or "")[:16], "ref": _r.get("cargo_tracking_no"),
-                        "barkod": _r.get("cargo_barcode"), "mng_no": _r.get("cargo_mng_no"),
-                        "mng_durum": _r.get("cargo_last_status_text"), "hata": (_r.get("cargo_track_error") or "")[:80],
-                        "son_kontrol": str(_r.get("cargo_status_checked_at") or "")[:16],
-                        "debug": (_r.get("cargo_track_debug") or "")[:220]})
-        _pt = dict(_pt or {}); _pt["pending"] = _pp
-    except Exception as _e:
-        _pt = dict(_pt or {}); _pt["pending_error"] = str(_e)[:80]
     _st = None
     try:
         _st = await db.settings.find_one({"id": "migrations.size_table_order_v1"}, {"_id": 0, "done": 1, "fixed": 1, "at": 1})
@@ -3884,12 +2622,9 @@ async def health(diag: str = "", audit_key: str = "",
         pass
     _inst = None   # süreç-etiketi teşhisi KALDIRILDI: indeks-siz log aggregation'ları DB'yi kilitliyordu
     return {"status": "healthy", "version": _sha or None, "havale_sweep": _hv or None,
-            "scheduler_jobs": _jobs, "pr_track": _pt or None, "size_table_order": _st,
+            "scheduler_jobs": _jobs, "size_table_order": _st,
             "instances": _inst,
             "otp_mail_fix": (await db.settings.find_one({"id": "migrations.otp_email_tpl_v2"}, {"_id": 0, "id": 0})),
-            "deleted_zero_push": (await db.settings.find_one({"id": "migrations.deleted_zero_push_v1"}, {"_id": 0, "done": 1, "pushed": 1, "at": 1})),
-            "trendyol_orphan_zero": (await db.settings.find_one({"id": "trendyol_orphan_zero_last"}, {"_id": 0, "id": 0})),
-            "trendyol_orphan_preview": (await db.settings.find_one({"id": "trendyol_orphan_zero_preview"}, {"_id": 0, "id": 0})),
             "vade_refit": (await db.settings.find_one({"id": "migrations.vade_refit_v1"}, {"_id": 0, "id": 0})),
             "label_barcode": _lbc,
             "unpaid_card_audit": (await db.settings.find_one({"id": "migrations.audit_unpaid_card_v2"}, {"_id": 0, "id": 0})),
@@ -3901,21 +2636,11 @@ async def health(diag: str = "", audit_key: str = "",
             # BAĞIMSIZ satış denetimi — panelin rakamına güvenilmediğinde kıyas için.
             # Ham db.orders üzerinden ayrı aritmetik; panelin sonucu da yanında döner.
             # Ticari veri taşıdığı için audit_key ZORUNLU. Salt-okunur.
-            # ty_count=1 isteklerinde audit_start/audit_end YALNIZ Trendyol penceresini
-            # tanımlar; ağır satış denetimini de çalıştırmak gereksizdi ve eski aylarda
-            # (haziran) zaman aşımına düşüp TÜM /health yanıtını 500'e çeviriyordu.
-            # Ayrıca kendi hatasını artık kendi içinde raporlar — tek blok tüm teşhisi
-            # düşürmesin.
             "sales_audit": (await _safe_block(_sales_audit_block(audit_start, audit_end,
                                                                  audit_source))
-                            if (_audit_ok and not ty_count and not ty_list and not iade_list
-                                and not rapor_q and not iptal_tarih_q and not iade_sayfa_q
-                                and not ty_urun_probe and not zero_sweep and not barkod_dokum
-                                and not hb_yetim_q and not ty_kiyas and not ty_batch_q
+                            if (_audit_ok and not iade_list and not rapor_q
                                 and not kupon_q and not destek_q)
-                            else {"detay": ("ty_count=1 ile birlikte çalıştırılmaz "
-                                            "(ayrı istek atın)" if ty_count
-                                            else "audit_key gerekli")}),
+                            else {"detay": "audit_key gerekli"}),
             # SALT OKUNUR stok izi: "bu ürünün stoğu neden bu değerde?" — hareket
             # defteri + canlı stok karşılaştırması. audit_key ZORUNLU, yazma YOK.
             "stock_trace": ((await _stock_trace_block(stock_q))
@@ -3931,25 +2656,10 @@ async def health(diag: str = "", audit_key: str = "",
                                             "cancelled_at_backfill_v1",
                                             "consignment_removed_v1")]
                        if d},
-            # Trendyol'un KENDİ verisiyle karşılaştırma (salt okuma, yalnız ty_count=1).
             # Sipariş-sipariş eşleştirme (salt okuma).
             "siparis_eslestir": ((await _order_lookup(orders_q))
                                  if (_audit_ok and orders_q)
                                  else {"detay": "audit_key + orders_q gerekli"}),
-            "trendyol_sayim": ((await _trendyol_live_count(audit_start, audit_end))
-                               if (_audit_ok and ty_count)
-                               else {"detay": "audit_key + ty_count=1 gerekli"}),
-            # Pazaryeri SAAT denetimi: Trendyol'daki TR-yerel/UTC hatası diğer
-            # kanallarda da var mı? (salt okuma, yalnız clock=1)
-            # Tek tek sipariş numarasıyla Trendyol API'sine sorgu (salt okuma, GET).
-            "ty_siparis_sorgu": ((await _safe_block(_ty_siparis_sorgu(ty_siparis_q)))
-                                 if (_audit_ok and ty_siparis_q)
-                                 else {"detay": "audit_key + ty_siparis_q gerekli"}),
-            # Şüpheli iptal tarihleri (cancelled_at) kuru çalıştırma teşhisi (salt okuma).
-            # iptal_tarih_q=1 → yalnız DB kanıtı; iptal_tarih_q=ty / ty<N> → + Trendyol canlı GET.
-            "iptal_tarih": ((await _safe_block(_iptal_tarih_teshis(iptal_tarih_q)))
-                            if (_audit_ok and iptal_tarih_q)
-                            else {"detay": "audit_key + iptal_tarih_q gerekli"}),
             # Dönemin iade belgeleri + talepleri (Excel ile iade iade kıyas; salt okuma).
             "iade_listesi": ((await _safe_block(_iade_listesi(audit_start, audit_end)))
                              if (_audit_ok and iade_list)
@@ -3965,36 +2675,9 @@ async def health(diag: str = "", audit_key: str = "",
             "kupon": ((await _safe_block(_kupon_teshis(kupon_q)))
                       if (_audit_ok and kupon_q)
                       else {"detay": "audit_key + kupon_q=<KOD> gerekli"}),
-            "ty_batch": ((await _safe_block(_ty_batch_sonuc(ty_batch_q, ty_batch_barkod)))
-                         if (_audit_ok and ty_batch_q)
-                         else {"detay": "audit_key + ty_batch_q=<id,..> gerekli"}),
-            "ty_kiyas": ((await _safe_block(_ty_canli_kiyas()))
-                         if (_audit_ok and ty_kiyas)
-                         else {"detay": "audit_key + ty_kiyas=1 gerekli"}),
-            "hb_yetim": ((await _safe_block(_hb_yetim_onizleme()))
-                         if (_audit_ok and hb_yetim_q)
-                         else {"detay": "audit_key + hb_yetim_q=1 gerekli"}),
-            "ty_yetim_son": ((await db.settings.find_one({"id": "trendyol_orphan_zero_last"}, {"_id": 0}))
-                             if (_audit_ok and zero_sweep) else {"detay": "zero_sweep=1"}),
-            "barkod_dokum": ((await _safe_block(_barkod_dokum()))
-                             if (_audit_ok and barkod_dokum)
-                             else {"detay": "audit_key + barkod_dokum=1 gerekli"}),
-            "ty_urun_probe": ((await _safe_block(_ty_urun_probe(ty_urun_probe)))
-                              if (_audit_ok and ty_urun_probe)
-                              else {"detay": "audit_key + ty_urun_probe=<barkod,..> gerekli"}),
-            "pasif_sifirlama": ((await db.settings.find_one({"id": "passive_zero_sweep_last"}, {"_id": 0}))
-                                if (_audit_ok and zero_sweep)
-                                else {"detay": "audit_key + zero_sweep=1 gerekli"}),
-            "iade_sayfa": ((await _safe_block(_iade_sayfa_teshis()))
-                           if (_audit_ok and iade_sayfa_q)
-                           else {"detay": "audit_key + iade_sayfa_q=1 gerekli"}),
             "asistan_log": ((await _safe_block(_asistan_log_block()))
                             if (_audit_ok and asistan_log)
                             else {"detay": "audit_key + asistan_log=1 gerekli"}),
-            # Dönemin Trendyol sipariş listesi (Excel ile iki yönlü kıyas; salt okuma).
-            "ty_ay_listesi": ((await _safe_block(_ty_ay_listesi(audit_start, audit_end)))
-                              if (_audit_ok and ty_list)
-                              else {"detay": "audit_key + ty_list=1 gerekli"}),
             # Bir siparişe kesilmiş gider pusulalarının TAMAMI (mükerrer teşhisi).
             "pusula_dokum": ((await _pusula_lookup(pusula_q))
                              if (_audit_ok and pusula_q)
@@ -4003,9 +2686,6 @@ async def health(diag: str = "", audit_key: str = "",
             "bozuk_tutar": (await _safe_block(_bozuk_tutar_block())
                             if _audit_ok
                             else {"detay": "audit_key gerekli"}),
-            "pazaryeri_saat": ((await _marketplace_clock_block())
-                               if (_audit_ok and clock)
-                               else {"detay": "audit_key + clock=1 gerekli"}),
             "stock_drift": ((await _stock_drift_block())
                             if (_audit_ok and drift)
                             else {"detay": "audit_key + drift=1 gerekli"}),

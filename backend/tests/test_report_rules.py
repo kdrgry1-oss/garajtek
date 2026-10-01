@@ -30,11 +30,6 @@ product_platform_metrics = report_dedup.product_platform_metrics
 payment_report_group_key = report_dedup.payment_report_group_key
 allocate_order_total = report_dedup.allocate_order_total
 
-mapping_spec = importlib.util.spec_from_file_location(
-    "marketplace_order_mapping", Path(__file__).parents[1] / "routes" / "marketplace_order_mapping.py"
-)
-marketplace_mapping = importlib.util.module_from_spec(mapping_spec)
-mapping_spec.loader.exec_module(marketplace_mapping)
 partial_cancel_net_values = report_dedup.partial_cancel_net_values
 
 
@@ -87,31 +82,6 @@ def test_hepsiburada_flat_raw_items_fall_back_to_normalized_items():
         "key": "HB-1:line-1", "barcode": "869", "quantity": 2,
         "amount": 250.0, "status": "Accepted",
     }]
-
-
-def test_marketplace_status_mappers_are_conservative():
-    assert marketplace_mapping.canonical_hb_order_number("hb4600") == "HB4600"
-    assert marketplace_mapping.hb_internal_status("Cancelled") == ("cancelled", "paid")
-    assert marketplace_mapping.hb_internal_status("Open") == ("confirmed", "paid")
-    assert marketplace_mapping.hb_internal_status("Unpacked") == ("confirmed", "paid")
-    assert marketplace_mapping.hb_internal_status("Packed") == ("confirmed", "paid")
-    assert marketplace_mapping.hb_internal_status("brand-new-state") == ("pending", "pending")
-    assert marketplace_mapping.amazon_internal_status("Unshipped") == ("confirmed", "paid")
-    assert marketplace_mapping.amazon_internal_status("Pending") == ("pending", "pending")
-    assert marketplace_mapping.amazon_internal_status("FutureStatus") == ("pending", "pending")
-
-
-def test_temu_payload_maps_only_present_financial_data():
-    full = marketplace_mapping.temu_order_fields({
-        "status": "paid", "total_amount": "450.25", "order_date": "2026-09-01T10:00:00Z",
-        "items": [{"sku": "SKU1", "name": "Ürün", "qty": 2, "unitPrice": "225.125"}],
-    })
-    assert (full["status"], full["payment_status"], full["total"]) == ("confirmed", "paid", 450.25)
-    assert full["items"][0]["quantity"] == 2
-    assert full["integration_incomplete"] is False
-    partial = marketplace_mapping.temu_order_fields({"status": "processing"})
-    assert partial["integration_incomplete"] is True
-    assert "total" not in partial and "items" not in partial
 
 
 def test_product_quantity_metrics_separates_trendyol_and_operational_rates():
@@ -263,33 +233,3 @@ def test_accepted_child_uses_its_own_normalized_net_price():
     }
     assert accepted_claim_items(claim)[0]["amount"] == 799.5
 
-
-def test_trendyol_reconciliation_can_request_created_date(monkeypatch):
-    import trendyol_client
-
-    captured = {}
-
-    class Response:
-        def raise_for_status(self):
-            return None
-
-        def json(self):
-            return {"content": []}
-
-    class ClientContext:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *_):
-            return None
-
-        async def get(self, _url, **kwargs):
-            captured.update(kwargs.get("params") or {})
-            return Response()
-
-    monkeypatch.setattr(trendyol_client.httpx, "AsyncClient", lambda **_: ClientContext())
-    client = trendyol_client.TrendyolClient("supplier", "key", "secret", "production")
-    asyncio.run(client.get_orders(
-        start_date_ms=1, end_date_ms=2, order_by_field="CreatedDate"
-    ))
-    assert captured["orderByField"] == "CreatedDate"

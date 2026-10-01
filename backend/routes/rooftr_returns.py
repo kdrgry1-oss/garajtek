@@ -688,16 +688,6 @@ async def flatten_order_financials(
             "items": len(new_items), "return_id": (_cr or {}).get("id")}
 
 
-@router.post("/orders/refresh-dates")
-async def refresh_order_dates(
-    page: int = Query(1, ge=1),
-    per_pages: int = Query(5, ge=1, le=15),
-    current_user: dict = Depends(require_admin),
-):
-    # [ticimax-off 2026-06-22] Ticimax SOAP entegrasyonu kapatildi; bu uc devre disi.
-    return {"success": False, "message": "Ticimax tarih senkronu kapatildi."}
-
-
 # ============================================================================
 # MÜKERRER İADE TEMİZLİĞİ — sistem geneli (işletme talebi: "site siparişlerinde
 # başka çift olan iade varsa sil sistem genelinde")

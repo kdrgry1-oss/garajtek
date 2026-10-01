@@ -82,22 +82,6 @@ RULE_CATALOG = [
     {"group": "Kargo & Teslimat", "key": "shipping.same_day_cutoff", "label": "Aynı gün kargo son saati",
      "type": "time", "default": "12:00", "options": ["09:00", "10:00", "10:30", "12:00", "14:00", "16:00"],
      "help": "Mesai gününde bu saate kadar verilen siparişler aynı gün kargolanır (ürün kartındaki geri sayım bu saate göre çalışır)."},
-    # Trendyol termin takvimi (kullanıcı, 2026-09-30) — trendyol_delivery.py uygular.
-    {"group": "Kargo & Teslimat", "key": "trendyol.delivery_auto", "label": "Trendyol termin takvimi (otomatik)",
-     "type": "toggle", "default": True, "options": [True, False],
-     "help": "Açıkken Trendyol ürünlerinin kargoya veriliş süresi aşağıdaki takvime göre otomatik güncellenir."},
-    {"group": "Kargo & Teslimat", "key": "trendyol.same_day_start_sunday", "label": "Trendyol aynı gün kargo başlangıcı (Pazar)",
-     "type": "time", "default": "12:00", "options": ["00:00", "09:00", "12:00", "15:00", "18:00"],
-     "help": "Pazar bu saatten itibaren aynı gün kargo açılır."},
-    {"group": "Kargo & Teslimat", "key": "trendyol.same_day_end_friday", "label": "Trendyol aynı gün kargo bitişi (Cuma)",
-     "type": "time", "default": "15:00", "options": ["10:00", "12:00", "14:00", "15:00", "16:00", "18:00"],
-     "help": "Cuma bu saatte aynı gün kargo kapanır."},
-    {"group": "Kargo & Teslimat", "key": "trendyol.delivery_duration_same_day", "label": "Trendyol termin — aynı gün kargo döneminde",
-     "type": "number", "default": 1, "unit": "gün", "options": [1],
-     "help": "Aynı gün kargo yalnız 1 günlük terminde geçerlidir."},
-    {"group": "Kargo & Teslimat", "key": "trendyol.delivery_duration_other", "label": "Trendyol termin — diğer zamanlarda",
-     "type": "number", "default": 2, "unit": "gün", "options": [1, 2, 3],
-     "help": "Cuma bitişinden Pazar başlangıcına kadar."},
     {"group": "Kargo & Teslimat", "key": "shipping.work_days", "label": "Çalışma (kargo) günleri",
      "type": "multiselect", "default": [1, 2, 3, 4, 5], "options": [1, 2, 3, 4, 5, 6, 7],
      "help": "Kargonun çıktığı günler (1=Pzt … 7=Paz). Resmî tatiller ayrıca hariç tutulur."},
@@ -121,7 +105,7 @@ RULE_CATALOG = [
     {"group": "Güvenlik", "key": "security.admin_mfa_required", "label": "Admin için MFA (2FA) zorunlu",
      "type": "toggle", "default": True, "options": [True, False],
      "help": "AÇIK: MFA kurmamış admin girişte MFA kurulumuna (SMS veya Authenticator) yönlendirilir; "
-             "kurmadan panele geçemez (Amazon DPP). Kilitlenmez — kurulum akışı zorunludur, oturum "
+             "kurmadan panele geçemez. Kilitlenmez — kurulum akışı zorunludur, oturum "
              "verilir. ACİL KAPATMA: Railway env ADMIN_MFA_ENFORCE=off (panel gerekmez)."},
     {"group": "Pazarlama & İzleme", "key": "marketing.capi_consent_gate", "label": "KVKK: Pazarlama onayı olmadan Meta/CAPI'ye gönderme",
      "type": "toggle", "default": False, "options": [True, False],
@@ -231,14 +215,6 @@ RULE_CATALOG = [
      "type": "text", "default": "", "options": [],
      "help": "Düşük stok ve stok tükenme uyarıları bu adrese gider. Boş bırakılırsa firma iletişim "
              "e-postası (İşletme/Firma Bilgileri) kullanılır; o da yoksa admin kullanıcılara gider."},
-    {"group": "Pazarlama & Stok", "key": "stock.amazon_full_sync", "label": "Amazon'a tüm aktif ürünleri gönder",
-     "type": "toggle", "default": True, "options": [True, False],
-     "help": "Açıkken Amazon stok senkronu yalnız DEĞİŞEN varyantları değil, tüm aktif ürünleri sürekli "
-             "yeniden gönderir (stok sapmasını kendi kendine onarır). Kapalıyken yalnız değişenler gider."},
-    {"group": "Pazarlama & Stok", "key": "stock.amazon_sync_batch", "label": "Amazon tur başına SKU adedi",
-     "type": "number", "default": 120, "unit": "SKU", "options": [40, 80, 120, 200, 400],
-     "help": "Amazon senkronu her turda (1 dk) en fazla bu kadar SKU gönderir ve kaldığı yerden devam eder. "
-             "Yüksek değer katalogu daha hızlı tarar ama Amazon hız sınırına takılma riskini artırır."},
 
     # ---- Sadakat & Referans (Bölüm C) ----
     {"group": "Sadakat & Referans", "key": "loyalty.enabled", "label": "Sadakat puanı programı",

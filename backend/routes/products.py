@@ -17,18 +17,6 @@ import io
 router = APIRouter(prefix="/products", tags=["Products"])
 
 
-def _fire_stock_zero_on_passive(product: dict):
-    """Ürün PASİFE alınınca (is_active True→FALSE) pazaryerlerine 0 stok gönderimini
-    FIRE-AND-FORGET başlatır — kullanıcı yanıtını BLOKLAMAZ, DB stoğuna DOKUNMAZ.
-    Import fonksiyon-içi (modül-seviyesi döngüsel import / başlatma riski YOK)."""
-    try:
-        import asyncio
-        from .integrations_common import on_product_deactivated
-        asyncio.create_task(on_product_deactivated(dict(product or {})))
-    except Exception as _e:
-        logger.warning(f"[pasif-stok0] görev başlatılamadı ({(product or {}).get('id')}): {_e}")
-
-
 # ---------------------------------------------------------------------------
 # XML ürün feed'leri (Google Merchant / Facebook Katalog / Genel)
 # Çoklu feed: her feed bir "target" ile public URL üretir → /products/feed/<slug>.xml
@@ -3344,44 +3332,6 @@ async def update_product(
             request=request,
         )
 
-    # ⛔→0 PASİFE ALMA KANCASI: yalnız is_active TRUE→FALSE GEÇİŞİNDE (spam yok) pazaryerlerine
-    # 0 stok gönder. DB stoğu KORUNUR (helper dokunmaz) → tekrar aktifte cron gerçek stoğu geri
-    # yazar. Fire-and-forget (yanıtı bloklamaz); barkodlar için pre-update 'existing' yeterli.
-    if existing.get("is_active") and ("is_active" in product_data) and not product_data.get("is_active"):
-        _fire_stock_zero_on_passive(dict(existing))
-
-    # İMALAT SENKRONU (kullanıcı isteği): bu üründen oluşturulmuş imalat kaydı varsa,
-    # üründeki KİMLİK değişiklikleri (ürün adı, stok kodu, renkler) imalata da yansır.
-    # Üretim/maliyet alanları (unit_price, size_distribution, ödeme, tarihler vb.) DEĞİŞMEZ.
-    try:
-        _mfg_set = {}
-        _new_name = product_data.get("name")
-        if _new_name and _new_name != existing.get("name"):
-            _mfg_set["product_name"] = _new_name
-        if "stock_code" in product_data:
-            _new_sc = str(product_data.get("stock_code") or "").strip()
-            if _new_sc and _new_sc != str(existing.get("stock_code") or "").strip():
-                _mfg_set["stock_code"] = _new_sc
-        # Renk listesi ürün varyantlarından türetilir (varyant güncellendiyse).
-        if variants:
-            _colors = []
-            for _v in variants:
-                _c = (_v.get("color") or _v.get("renk") or "").strip()
-                if _c and _c not in _colors:
-                    _colors.append(_c)
-            if _colors and _colors != (existing.get("colors") if isinstance(existing.get("colors"), list) else None):
-                _mfg_set["colors"] = _colors
-        if _mfg_set:
-            _mfg_set["updated_at"] = datetime.now(timezone.utc).isoformat()
-            _mres = await db.manufacturing.update_many(
-                {"$or": [{"product_id": product_id}, {"created_product_ids": product_id}]},
-                {"$set": _mfg_set},
-            )
-            if _mres.modified_count:
-                logger.info(f"[imalat-senkron] ürün {product_id} değişikliği {_mres.modified_count} imalat kaydına yansıtıldı: {list(_mfg_set)}")
-    except Exception as _mfg_e:
-        logger.warning(f"[imalat-senkron] ürün→imalat güncelleme başarısız {product_id}: {_mfg_e}")
-
     # RENK KARDEŞİ OTOMATİK SENKRONU (kullanıcı isteği): stok kodu AYNI olan kartlarda
     # model-düzeyi alanlar bu kayıtla birlikte eşitlenir — Sezon, Beden Önerisi (Kalıp)
     # ve Özellikler (Renk/Web Color HARİÇ; kardeşin kendi rengi korunur). Varyantlar,
@@ -3455,9 +3405,6 @@ async def delete_product(
             "manual_deleted": True,
         }}
     )
-    # Çöpe atma da bir TRUE→FALSE geçişidir → aktifti ise pazaryerlerine 0 stok.
-    if product.get("is_active"):
-        _fire_stock_zero_on_passive(dict(product))
     await record_admin_audit(
         db, action="product.soft_delete", entity_type="product", entity_id=product_id,
         before=product, after={**product, "is_deleted": True, "is_active": False},
@@ -3530,9 +3477,6 @@ async def toggle_product_active(
                         "manual_deactivated_at": _now, "updated_at": _now}}
     await db.products.update_one({"id": product_id}, _op)
 
-    # TRUE→FALSE geçişi (new_status False = önceki aktifti) → pazaryerlerine 0 stok.
-    if not new_status:
-        _fire_stock_zero_on_passive(dict(product))
 
     await record_admin_audit(
         db, action="product.toggle_active", entity_type="product", entity_id=product_id,
@@ -4297,8 +4241,6 @@ _PID_REFS = [
     ("size_tables", "scalar", "product_id"),
     ("whatsapp_active_product", "scalar", "product_id"),
     ("bin_stock", "scalar", "product_id"),
-    ("manufacturing", "scalar", "product_id"),
-    ("manufacturing", "arr_scalar", "created_product_ids"),
     ("coupons", "arr_scalar", "products"),
     ("coupons", "arr_scalar", "excluded_products"),
     ("referrals", "arr_scalar", "products"),
@@ -4708,7 +4650,7 @@ def _group_rows_by_color(rows: list, img_urls):
                 new[key] = ", ".join(s for s in sizes if s)
             elif key in ("Barkod", "Varyant ID"):
                 new[key] = ", ".join(str(r.get(key) or "") for r in rs if str(r.get(key) or ""))
-            elif key in ("Piyasa Fiyatı", "Satış Fiyatı", "Alış Fiyatı", "Trendyol Satış Fiyatı"):
+            elif key in ("Piyasa Fiyatı", "Satış Fiyatı", "Alış Fiyatı"):
                 new[key] = _span([r.get(key) for r in rs])
             elif key == "Stok":
                 new[key] = int(sum(stocks))
@@ -4825,20 +4767,6 @@ async def export_products_excel(
             except Exception:
                 return str(val)[:10]
 
-        # #71: Trendyol SATIŞ fiyatı sütunu — pazaryeri feed'iyle AYNI formül:
-        #   taban (member_price_1 ya da price) × (1 + markup/100). markup: Ana Ayarlar >
-        #   trendyol_markup ÖNCELİKLİ, yoksa Trendyol config default_markup.
-        _ty_markup = 0.0
-        try:
-            _main_s = await db.settings.find_one({"id": "main"}, {"_id": 0, "trendyol_markup": 1}) or {}
-            _ty_s = await db.settings.find_one({"id": "trendyol"}, {"_id": 0, "default_markup": 1}) or {}
-            _mk = _main_s.get("trendyol_markup")
-            if _mk in (None, ""):
-                _mk = _ty_s.get("default_markup")
-            _ty_markup = float(_mk or 0)
-        except Exception:
-            _ty_markup = 0.0
-
         # #71: manuel maliyet (product_costs) — alış fiyatı için toplu ön-yükleme (yedek kaynak).
         _cost_map = {}
         try:
@@ -4863,10 +4791,6 @@ async def export_products_excel(
                     return _num(cand)
             return 0.0
 
-        def _trendyol_price(v, p):
-            base = _num(v.get("member_price_1")) or _num(p.get("member_price_1")) \
-                or _num(v.get("price")) or _num(p.get("price"))
-            return round(base * (1 + _ty_markup / 100.0), 2) if base > 0 else 0
         
         # ── ÖZELLİKLERİ BİÇİMDEN BAĞIMSIZ OKU ───────────────────────────────────────
         # Ürün özellikleri katalogda BİRDEN ÇOK biçimde duruyor (panel kaydı, Excel içe
@@ -4961,7 +4885,6 @@ async def export_products_excel(
                     "Piyasa Fiyatı": v.get("price") or p.get("price", 0),
                     "Satış Fiyatı": v.get("sale_price") or p.get("sale_price") or p.get("price", 0),
                     "Alış Fiyatı": _alis_fiyati(v, p),
-                    "Trendyol Satış Fiyatı": _trendyol_price(v, p),
                     "Stok": v.get("stock", 0),
                     "Açıklama": p.get("description", ""),
                     "Aktif": "Evet" if p.get("is_active") else "Hayır",
@@ -5282,7 +5205,6 @@ async def _selective_import(file: UploadFile, sel_cols: list, sel_cats: set,
 
     stats = {"updated_rows": 0, "skipped": 0, "no_match": 0, "errors": 0}
     updated_products = set()
-    _deact_fired = set()   # toplu import'ta pasife-alma kancası ürün başına 1 kez
     _now = datetime.now(timezone.utc).isoformat()
 
     def _num(row, col):
@@ -5369,10 +5291,6 @@ async def _selective_import(file: UploadFile, sel_cols: list, sel_cats: set,
                 )
             stats["updated_rows"] += 1
             updated_products.add(p["id"])
-            # Toplu import ile is_active TRUE→FALSE geçişi → pazaryerlerine 0 stok (ürün başına 1 kez).
-            if pset.get("is_active") is False and p.get("is_active") and p["id"] not in _deact_fired:
-                _deact_fired.add(p["id"])
-                _fire_stock_zero_on_passive(dict(p))
         except Exception as row_err:
             logger.error(f"Selective import row error ({bc}): {row_err}")
             stats["errors"] += 1

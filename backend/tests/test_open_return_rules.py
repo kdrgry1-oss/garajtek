@@ -15,6 +15,7 @@ def _load_reports_module():
     deps.db = object()
     deps.require_admin = lambda: None
     deps.tr_range_to_utc = lambda start, end: (start, end)
+    deps.logger = __import__("logging").getLogger("open_return_test")
     sys.modules[deps.__name__] = deps
 
     dedup_spec = importlib.util.spec_from_file_location(

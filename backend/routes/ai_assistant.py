@@ -190,7 +190,7 @@ async def bulk_train_from_history(
 ):
     """Trendyol/HB/Temu collection'larındaki ANSWERED soruları KB'ye toplu aktar.
 
-    Body: {"channel": "trendyol|all", "min_answer_length": 30,
+    Body: {"channel": "site|all", "min_answer_length": 30,
            "skip_existing": true, "max_count": 1000}
     """
     cfg = payload or {}
@@ -205,7 +205,7 @@ async def bulk_train_from_history(
     elif channel in MARKETPLACE_TO_COLL:
         collections = [MARKETPLACE_TO_COLL[channel]]
     else:
-        raise HTTPException(status_code=400, detail="channel: trendyol|hepsiburada|temu|all")
+        raise HTTPException(status_code=400, detail="channel: whatsapp|instagram|messenger|site|all")
 
     inserted = 0
     skipped_short = 0
@@ -345,15 +345,12 @@ async def auto_answer_batch(
     payload: Optional[dict] = None,
     current_user: dict = Depends(require_admin),
 ):
-    """Bekleyen WAITING_FOR_ANSWER Trendyol soruları için draft + auto-send.
+    """Bekleyen WAITING_FOR_ANSWER mesajları için AI taslağı üretir (gönderim insan onaylı).
 
-    Body: {"channel":"trendyol", "max_count":10, "min_confidence":0.85,
-           "dry_run": false, "send": false}
-      - dry_run: sadece draft üret, gönderme
-      - send: confidence>=min_confidence olanları gerçekten Trendyol'a gönder
+    Body: {"channel":"site", "max_count":10, "min_confidence":0.85, "dry_run": false}
     """
     cfg = payload or {}
-    channel = cfg.get("channel", "trendyol")
+    channel = cfg.get("channel", "site")
     max_count = min(int(cfg.get("max_count") or 10), 50)   # A2.2: sunucu-tarafı cap (denial-of-wallet)
     min_conf = float(cfg.get("min_confidence") or 0.85)
     dry_run = bool(cfg.get("dry_run", False))
@@ -361,7 +358,7 @@ async def auto_answer_batch(
     # güven eşiği/handoff modelin serbest metninden sahtelenip satıcı adına kamuya
     # zararlı içerik yayınlanabildiğinden, gönderim İNSAN ONAYI gerektirir: taslaklar
     # ai_suggestions'a kuyruklanır; admin QnA panelinden manuel gönderir
-    # (POST /trendyol/questions/{id}/answer). 'send' parametresi yok sayılır.
+    # (Müşteri Soruları sayfası). 'send' parametresi yok sayılır.
     do_send = False
 
     if channel not in MARKETPLACE_TO_COLL:
@@ -381,14 +378,6 @@ async def auto_answer_batch(
     results = []
     sent_count = 0
     queued_count = 0
-
-    # Lazy import — circular import önle
-    if channel == "trendyol":
-        from .integrations import get_trendyol_config, get_trendyol_headers
-        ty_config = await get_trendyol_config()
-        ty_headers = await get_trendyol_headers()
-
-    import httpx
 
     for q in waiting:
         q_id = q.get("question_id")
@@ -442,32 +431,8 @@ async def auto_answer_batch(
 
         action = "queued"
         send_resp = None
-        if not dry_run and do_send and confidence >= min_conf and not handoff and is_sufficient:
-            # Trendyol'a gönder
-            if channel == "trendyol" and ty_config and ty_config.get("is_active") and ty_headers:
-                base_url = "https://apigw.trendyol.com" if ty_config.get("mode") == "live" else "https://stageapigw.trendyol.com"
-                url = f"{base_url}/integration/qna/sellers/{ty_config['supplier_id']}/questions/{q_id}/answers"
-                try:
-                    async with httpx.AsyncClient(timeout=15) as cli:
-                        resp_send = await cli.post(url, headers=ty_headers, json={"text": draft})
-                        if resp_send.status_code in (200, 201):
-                            await coll.update_one(
-                                {"question_id": q_id},
-                                {"$set": {"answer": draft, "status": "ANSWERED",
-                                          "answered_at": datetime.now(timezone.utc).isoformat(),
-                                          "auto_answered_by_ai": True,
-                                          "ai_confidence": confidence}}
-                            )
-                            action = "sent"
-                            sent_count += 1
-                        else:
-                            action = "send_failed"
-                            send_resp = f"HTTP {resp_send.status_code}: {resp_send.text[:120]}"
-                except Exception as e:
-                    action = "send_error"
-                    send_resp = str(e)
-        else:
-            queued_count += 1
+        # A1.4: gönderim her zaman insan onayıyla (taslak kuyruklanır).
+        queued_count += 1
 
         # AI suggestion her durumda kaydet
         await db.ai_suggestions.insert_one({
@@ -527,15 +492,17 @@ async def auto_answer_batch(
 @router.get("/auto-answer-stats")
 async def auto_answer_stats(current_user: dict = Depends(require_admin)):
     last = await db.settings.find_one({"id": "ai_assistant_last_auto_answer"}, {"_id": 0})
-    pending_trendyol = await db.trendyol_questions.count_documents({"status": "WAITING_FOR_ANSWER"})
-    auto_answered_today = await db.trendyol_questions.count_documents({
-        "auto_answered_by_ai": True,
-        "answered_at": {"$gte": (datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)).isoformat()},
-    })
+    _today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    pending_questions = 0
+    auto_answered_today = 0
+    for _coll in set(MARKETPLACE_TO_COLL.values()):
+        pending_questions += await db[_coll].count_documents({"status": "WAITING_FOR_ANSWER"})
+        auto_answered_today += await db[_coll].count_documents(
+            {"auto_answered_by_ai": True, "answered_at": {"$gte": _today}})
     suggestions_pending = await db.ai_suggestions.count_documents({"action": "queued"})
     return {
         "last_run": last,
-        "pending_trendyol": pending_trendyol,
+        "pending_questions": pending_questions,
         "auto_answered_today": auto_answered_today,
         "suggestions_pending": suggestions_pending,
     }

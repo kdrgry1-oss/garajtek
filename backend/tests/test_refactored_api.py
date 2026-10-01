@@ -344,15 +344,6 @@ class TestIntegrationStatusEndpoints:
         assert "configured" in data
         print(f"✓ Payment status: mode={data['mode']}, configured={data['configured']}")
     
-    def test_trendyol_status(self):
-        """Test Trendyol integration status endpoint"""
-        response = requests.get(f"{BASE_URL}/api/trendyol/status")
-        assert response.status_code == 200
-        data = response.json()
-        assert "mode" in data
-        assert "configured" in data
-        print(f"✓ Trendyol status: mode={data['mode']}, configured={data['configured']}")
-    
     def test_gib_status(self):
         """Test GIB E-Fatura status endpoint"""
         response = requests.get(f"{BASE_URL}/api/gib/status")

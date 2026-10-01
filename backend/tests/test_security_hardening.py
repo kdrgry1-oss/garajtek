@@ -159,7 +159,6 @@ def test_document_endpoints_have_no_query_token_auth():
         "orders.py": {"print_invoice_html", "get_cargo_label"},
         "barcode_cards.py": {"get_product_barcode_card"},
         "members.py": {"member_360_print"},
-        "influencers.py": {"influencer_pr_cargo_label", "influencer_pr_irsaliye"},
     }
     for file, names in targets.items():
         nodes = ast.parse((ROOT / "routes" / file).read_text()).body

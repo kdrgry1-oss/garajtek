@@ -35,8 +35,6 @@ jobs:
           backend/tests/test_open_return_rules.py
           backend/tests/test_stock_audit.py
           backend/tests/test_activity_audit.py
-          backend/tests/amazon_helpers_test.py
-          backend/tests/test_themes.py
           backend/tests/test_google_auth_flow.py
           backend/tests/test_email_brevo.py
           backend/tests/test_security_hardening.py

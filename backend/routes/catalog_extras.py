@@ -379,15 +379,6 @@ async def create_manual_order(payload: dict, current_user: dict = Depends(requir
                     # Varyantlı ama varyant çözülemedi → sessiz bozulma yerine UYAR, stoğa DOKUNMA.
                     logger.warning(f"[manuel-sipariş] varyant çözülemedi, stok DÜŞÜLMEDİ: "
                                    f"ürün={pid} ({_p.get('name','')}) sipariş={order_number}")
-                    try:
-                        from routes.push import send_push_to_admins
-                        await send_push_to_admins(
-                            "⚠️ Manuel siparişte varyant seçilmedi",
-                            f"{_p.get('name','ürün')} — beden/varyant çözülemediği için stok düşülmedi. "
-                            f"Manuel kontrol edin (sipariş {order_number}).",
-                            {"type": "manual_order_variant_missing"})
-                    except Exception:
-                        pass
                 elif _p:
                     # Gerçekten varyantsız ürün → oversell guard'lı koşullu düşüm.
                     _r = await db.products.update_one(

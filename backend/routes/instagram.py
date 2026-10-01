@@ -629,16 +629,10 @@ async def auto_sync_instagram():
             _alerted = _prev.get("alerted_at")
             if _age_h(_fail_since) >= 3 and (not _alerted or _age_h(_alerted) >= 24):
                 try:
-                    from .push import send_push_to_admins
-                    await send_push_to_admins(
-                        "⚠️ Instagram akışı durdu",
-                        "Bağlantı yenilenmeli — anasayfadaki akış güncellenmiyor. "
-                        f"Hata: {str(e)[:90]}",
-                        {"type": "instagram_sync_failed"},
-                    )
+                    logger.warning("[instagram] akış durdu — bağlantı yenilenmeli. Hata: %s", str(e)[:90])
                     await db.settings.update_one({"id": "instagram"},
                                                  {"$set": {"alerted_at": _now_dt.isoformat()}})
                 except Exception as _pe:
-                    logger.warning("[instagram] uyarı push'u gönderilemedi: %s", _pe)
+                    logger.warning("[instagram] uyarı kaydedilemedi: %s", _pe)
         except Exception:
             pass
