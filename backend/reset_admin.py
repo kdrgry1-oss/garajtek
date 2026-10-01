@@ -1,22 +1,16 @@
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
 import bcrypt
 import os
-import pathlib
 
-# Auto-detect MongoDB connection (same logic as deps.py)
-MONGO_URL = os.environ.get('MONGO_URL')
-if not MONGO_URL:
-    sock = pathlib.Path('/tmp/mongodb-27017.sock')
-    if sock.exists():
-        MONGO_URL = 'mongodb://%2Ftmp%2Fmongodb-27017.sock'
-    else:
-        MONGO_URL = 'mongodb://127.0.0.1:27017'
+# Uygulamayla AYNI veritabanı (routes/deps.py ile aynı mantık): gömülü localdb (DB_PATH);
+# yalnız DB_BACKEND=mongo + MONGO_URL verilirse Motor/MongoDB.
+# NOT: localdb tek-süreçlidir — bu betiği uygulama DURDURULMUŞKEN çalıştırın.
+from localdb import make_client
 
 db_name = os.environ.get('DB_NAME', 'test_database')
 
 async def reset():
-    client = AsyncIOMotorClient(MONGO_URL)
+    client = make_client()
     db = client[db_name]
     
     # GÜVENLİK: sabit "admin123" varsayılanı kaldırıldı. ADMIN_RESET_PASSWORD env
@@ -55,6 +49,7 @@ async def reset():
     else:
         print(f"Admin password RESET. Matched: {result.matched_count}, Modified: {result.modified_count}")
         print(f"Login: {admin_email} (parola ADMIN_RESET_PASSWORD ile ayarlandı)")
+    client.close()
 
 if __name__ == "__main__":
     asyncio.run(reset())

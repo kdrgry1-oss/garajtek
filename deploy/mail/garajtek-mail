@@ -1,0 +1,1001 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""
+garajtek-mail — GarajTek self-hosted mail sunucusu yönetim aracı.
+
+Kurulum:  deploy/mail/mail-kur.sh tarafından /usr/local/sbin/garajtek-mail olarak
+(root:root 0755) kurulur. Admin paneli bu aracı
+    sudo -n /usr/local/sbin/garajtek-mail <komut> ... --json
+şeklinde çağırır (bkz. /etc/sudoers.d/garajtek-mail). Bu yüzden:
+  * Tüm girdiler sıkı doğrulanır (e-posta regex'i, alan adı = yapılandırılmış alan adı).
+  * Hiçbir yerde shell kullanılmaz (subprocess listeleri, shell=False).
+  * Şifreler argv yerine stdin ile verilebilir (--password-stdin); --random üretir.
+  * users / vmailbox / virtual dosyaları flock ile kilitlenir, atomik yazılır.
+
+Komutlar:
+  list [--json]
+  add <email> [--password P | --password-stdin | --random] [--quota 1G]
+  passwd <email> [--password P | --password-stdin | --random]
+  quota <email> <boyut>                 (ör. 2G, 500M, 0 = sınırsız)
+  del <email> [--purge]
+  alias-list | alias-add <kaynak> <hedef[,hedef2]> | alias-del <kaynak>
+  status | dns-check | port25-check | queue | queue-flush | queue-delete <id>
+  test-send <alıcı> | dkim-record | backup
+Her komut --json kabul eder; hata durumunda {"ok": false, "error": "..."} döner.
+Çıkış kodları: 0 başarılı, 1 genel hata, 2 doğrulama hatası, 3 zaten var, 4 bulunamadı.
+"""
+import argparse
+import contextlib
+import datetime as _dt
+import fcntl
+import json
+import os
+import re
+import secrets
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+
+os.environ["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+os.environ["LC_ALL"] = "C"
+os.umask(0o022)
+
+CONF_FILE = os.environ.get("GARAJTEK_MAIL_CONF", "/etc/garajtek-mail/mail.conf")
+DEFAULTS = {
+    "DOMAIN": "garajtek.com",
+    "HOST": "mail.garajtek.com",
+    "PUBLIC_IP": "",
+    "VMAIL_HOME": "/var/mail/vhosts",
+    "USERS_FILE": "/etc/dovecot/users",
+    "VMAILBOX_FILE": "/etc/postfix/vmailbox",
+    "VIRTUAL_FILE": "/etc/postfix/virtual",
+    "META_FILE": "/var/lib/garajtek-mail/meta.json",
+    "LOCK_FILE": "/run/garajtek-mail.lock",
+    "DKIM_SELECTOR": "default",
+    "DKIM_DIR": "/etc/opendkim/keys",
+    "DEFAULT_QUOTA": "1G",
+    "BACKUP_DIR": "/var/backups/garajtek",
+    "BACKUP_KEEP": "3",
+    "DNS_RESOLVER": "1.1.1.1",
+    "WEBMAIL_URL": "",
+}
+
+EXIT_ERR, EXIT_INVALID, EXIT_EXISTS, EXIT_NOTFOUND = 1, 2, 3, 4
+
+LOCAL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9._+-]{0,62}[a-z0-9])?$")
+DOMAIN_RE = re.compile(r"^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+QUOTA_RE = re.compile(r"^(0|[1-9][0-9]{0,5}[MG])$")
+QUEUE_ID_RE = re.compile(r"^[0-9A-Za-z]{5,20}$")
+SERVICES = ["postfix", "dovecot", "opendkim", "nginx", "fail2ban"]
+MAIL_PORTS = [25, 143, 465, 587, 993, 80, 443, 8891]
+
+
+class CliError(Exception):
+    def __init__(self, message, code=EXIT_ERR):
+        super().__init__(message)
+        self.code = code
+
+
+# ───────────────────────────── yardımcılar ─────────────────────────────
+
+def load_conf():
+    conf = dict(DEFAULTS)
+    try:
+        with open(CONF_FILE, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                if k in conf:
+                    conf[k] = v.strip().strip('"').strip("'")
+    except FileNotFoundError:
+        pass
+    conf["DOMAIN"] = conf["DOMAIN"].lower()
+    conf["HOST"] = conf["HOST"].lower()
+    if not DOMAIN_RE.match(conf["DOMAIN"]) or not DOMAIN_RE.match(conf["HOST"]):
+        raise CliError("Yapılandırmadaki DOMAIN/HOST geçersiz: " + CONF_FILE)
+    if not conf["WEBMAIL_URL"]:
+        conf["WEBMAIL_URL"] = "https://" + conf["HOST"]
+    return conf
+
+
+CONF = None
+
+
+def run(cmd, input_text=None, timeout=30, check=False):
+    """shell=False; çıktı metin olarak döner."""
+    try:
+        p = subprocess.run(cmd, input=input_text, capture_output=True, text=True,
+                           timeout=timeout, check=False)
+    except FileNotFoundError:
+        if check:
+            raise CliError("Komut bulunamadı: " + cmd[0])
+        return subprocess.CompletedProcess(cmd, 127, "", "not found")
+    except subprocess.TimeoutExpired:
+        if check:
+            raise CliError("Komut zaman aşımına uğradı: " + cmd[0])
+        return subprocess.CompletedProcess(cmd, 124, "", "timeout")
+    if check and p.returncode != 0:
+        raise CliError("%s başarısız: %s" % (cmd[0], (p.stderr or p.stdout).strip()[:300]))
+    return p
+
+
+def have(binary):
+    return shutil.which(binary) is not None
+
+
+def now_iso():
+    return _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat()
+
+
+def norm_email(value, *, own_domain=True, what="E-posta"):
+    if value is None:
+        raise CliError(what + " gerekli", EXIT_INVALID)
+    v = str(value).strip().lower()
+    if len(v) > 254 or v.count("@") != 1:
+        raise CliError("%s geçersiz: %r" % (what, value), EXIT_INVALID)
+    local, domain = v.split("@")
+    if not LOCAL_RE.match(local) or ".." in local or not DOMAIN_RE.match(domain):
+        raise CliError("%s geçersiz: %r" % (what, value), EXIT_INVALID)
+    if own_domain and domain != CONF["DOMAIN"]:
+        raise CliError("%s yalnızca @%s alan adında olabilir" % (what, CONF["DOMAIN"]), EXIT_INVALID)
+    if own_domain and "+" in local:  # "+" Postfix'te alt adres ayracıdır (info+etiket@)
+        raise CliError("%s '+' içeremez" % what, EXIT_INVALID)
+    return v
+
+
+def validate_password(pw):
+    if pw is None:
+        raise CliError("Şifre gerekli", EXIT_INVALID)
+    if any(c in pw for c in "\r\n\x00"):
+        raise CliError("Şifre satır sonu içeremez", EXIT_INVALID)
+    if len(pw) < 10 or len(pw) > 128:
+        raise CliError("Şifre 10-128 karakter olmalı", EXIT_INVALID)
+    return pw
+
+
+def random_password():
+    # 24 karakter, URL-güvenli; kopyala-yapıştır dostu
+    return secrets.token_urlsafe(18)
+
+
+def resolve_password(args, *, required):
+    sources = [bool(getattr(args, "password", None)), bool(getattr(args, "password_stdin", False)),
+               bool(getattr(args, "random", False))]
+    if sum(sources) > 1:
+        raise CliError("--password, --password-stdin ve --random birlikte kullanılamaz", EXIT_INVALID)
+    if args.random:
+        return random_password(), True
+    if args.password_stdin:
+        line = sys.stdin.readline()
+        return validate_password(line.rstrip("\n").rstrip("\r")), False
+    if args.password:
+        return validate_password(args.password), False
+    if required:
+        if sys.stdin.isatty():
+            import getpass
+            a = getpass.getpass("Yeni şifre: ")
+            b = getpass.getpass("Tekrar: ")
+            if a != b:
+                raise CliError("Şifreler eşleşmiyor", EXIT_INVALID)
+            return validate_password(a), False
+        return random_password(), True
+    return None, False
+
+
+def hash_password(pw):
+    """SHA512-CRYPT. Önce doveadm pw (şifre stdin'den), olmazsa openssl passwd -6 -stdin."""
+    if have("doveadm"):
+        p = run(["doveadm", "pw", "-s", "SHA512-CRYPT"], input_text=pw + "\n" + pw + "\n", timeout=15)
+        out = (p.stdout or "").strip().splitlines()
+        if p.returncode == 0 and out and out[-1].startswith("{SHA512-CRYPT}$6$"):
+            return out[-1].strip()
+    p = run(["openssl", "passwd", "-6", "-stdin"], input_text=pw + "\n", timeout=15, check=True)
+    h = (p.stdout or "").strip()
+    if not h.startswith("$6$"):
+        raise CliError("Şifre özeti üretilemedi")
+    return "{SHA512-CRYPT}" + h
+
+
+def quota_to_bytes(q):
+    if not q or q == "0":
+        return 0
+    n, unit = int(q[:-1]), q[-1]
+    return n * (1024 ** 3 if unit == "G" else 1024 ** 2)
+
+
+def norm_quota(q):
+    q = (q or CONF["DEFAULT_QUOTA"]).strip().upper()
+    if q.endswith("B"):
+        q = q[:-1]
+    if not QUOTA_RE.match(q):
+        raise CliError("Kota geçersiz (ör. 500M, 1G, 0=sınırsız)", EXIT_INVALID)
+    return q
+
+
+@contextlib.contextmanager
+def transaction():
+    """Kilit + hata olursa users/vmailbox/virtual/meta dosyalarını önceki haline döndür."""
+    files = [CONF["USERS_FILE"], CONF["VMAILBOX_FILE"], CONF["VIRTUAL_FILE"], CONF["META_FILE"]]
+    with locked():
+        snap = {}
+        for f in files:
+            try:
+                with open(f, "rb") as fh:
+                    snap[f] = fh.read()
+            except FileNotFoundError:
+                snap[f] = None
+        try:
+            yield
+        except BaseException:
+            for f, data in snap.items():
+                with contextlib.suppress(Exception):
+                    if data is None:
+                        if os.path.exists(f):
+                            os.unlink(f)
+                    else:
+                        atomic_write(f, data.decode("utf-8").splitlines())
+                        if f in (CONF["VMAILBOX_FILE"], CONF["VIRTUAL_FILE"]):
+                            postmap(f)
+            raise
+
+
+@contextlib.contextmanager
+def locked():
+    os.makedirs(os.path.dirname(CONF["LOCK_FILE"]) or "/", exist_ok=True)
+    fd = os.open(CONF["LOCK_FILE"], os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        deadline = time.time() + 20
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.time() > deadline:
+                    raise CliError("Kilit alınamadı (başka bir işlem sürüyor)")
+                time.sleep(0.2)
+        yield
+    finally:
+        with contextlib.suppress(OSError):
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def read_lines(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read().splitlines()
+    except FileNotFoundError:
+        return []
+
+
+def atomic_write(path, lines, mode=None, uid=None, gid=None):
+    """Mevcut dosyanın sahibini/izinlerini koruyarak atomik yazar."""
+    d = os.path.dirname(path) or "."
+    os.makedirs(d, exist_ok=True)
+    try:
+        st = os.stat(path)
+        mode = st.st_mode & 0o7777 if mode is None else mode
+        uid = st.st_uid if uid is None else uid
+        gid = st.st_gid if gid is None else gid
+    except FileNotFoundError:
+        mode = 0o644 if mode is None else mode
+    fd, tmp = tempfile.mkstemp(prefix=".garajtek-mail.", dir=d)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + ("\n" if lines else ""))
+        os.chmod(tmp, mode)
+        if uid is not None or gid is not None:
+            with contextlib.suppress(PermissionError):
+                os.chown(tmp, -1 if uid is None else uid, -1 if gid is None else gid)
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+        raise
+
+
+def postmap(path):
+    if have("postmap"):
+        run(["postmap", "hash:" + path], check=True)
+
+
+def postfix_reload():
+    if have("postfix"):
+        run(["postfix", "reload"], timeout=30)
+
+
+# ─────────────────────────── veri modelleri ───────────────────────────
+
+def parse_users():
+    """/etc/dovecot/users → {email: {hash, quota, raw_extra}}"""
+    users = {}
+    for line in read_lines(CONF["USERS_FILE"]):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        parts = line.split(":", 7)  # extra alanı ":" içerir (quota_rule=*:storage=1G)
+        if len(parts) < 2:
+            continue
+        email = parts[0].strip().lower()
+        extra = parts[7] if len(parts) > 7 else ""
+        m = re.search(r"userdb_quota_rule=\*:storage=(\S+)", extra)
+        users[email] = {"hash": parts[1], "quota": (m.group(1) if m else "0"), "extra": extra}
+    return users
+
+
+def user_line(email, pw_hash, quota):
+    local, domain = email.split("@")
+    home = "%s/%s/%s" % (CONF["VMAIL_HOME"], domain, local)
+    # 0 = sınırsız (Dovecot'ta storage=0 limitsiz demektir); kural her zaman yazılır ki
+    # global varsayılan (plugin quota_rule) yerine bu değer geçerli olsun.
+    extra = "userdb_quota_rule=*:storage=%s" % (quota or "0")
+    # user:password:uid:gid:gecos:home:shell:extra
+    return "%s:%s:::%s:%s::%s" % (email, pw_hash, "", home, extra)
+
+
+def write_users(users):
+    lines = [user_line(e, u["hash"], u["quota"]) for e, u in sorted(users.items())]
+    atomic_write(CONF["USERS_FILE"], lines, mode=0o640)
+
+
+def write_vmailbox(emails):
+    lines = ["%s %s/%s/" % (e, e.split("@")[1], e.split("@")[0]) for e in sorted(emails)]
+    atomic_write(CONF["VMAILBOX_FILE"], lines, mode=0o644)
+    postmap(CONF["VMAILBOX_FILE"])
+
+
+def parse_aliases():
+    aliases = {}
+    for line in read_lines(CONF["VIRTUAL_FILE"]):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        parts = s.split(None, 1)
+        if len(parts) == 2:
+            aliases[parts[0].lower()] = [x.strip() for x in parts[1].split(",") if x.strip()]
+    return aliases
+
+
+def write_aliases(aliases):
+    lines = ["# garajtek-mail tarafından yönetilir — elle düzenlemeyin, `garajtek-mail alias-*` kullanın."]
+    lines += ["%s %s" % (k, ",".join(v)) for k, v in sorted(aliases.items())]
+    atomic_write(CONF["VIRTUAL_FILE"], lines, mode=0o644)
+    postmap(CONF["VIRTUAL_FILE"])
+
+
+def load_meta():
+    try:
+        with open(CONF["META_FILE"], encoding="utf-8") as fh:
+            data = json.load(fh)
+            return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, ValueError):
+        return {}
+
+
+def save_meta(meta):
+    atomic_write(CONF["META_FILE"], [json.dumps(meta, indent=1, sort_keys=True)], mode=0o600)
+
+
+def maildir_of(email):
+    local, domain = email.split("@")
+    return os.path.join(CONF["VMAIL_HOME"], domain, local)
+
+
+def du_bytes(path):
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            with contextlib.suppress(OSError):
+                total += os.lstat(os.path.join(root, f)).st_size
+    return total
+
+
+def dovecot_usage(email):
+    """doveadm quota get → STORAGE kullanım (bayt). Yoksa None."""
+    if not have("doveadm"):
+        return None
+    p = run(["doveadm", "-f", "tab", "quota", "get", "-u", email], timeout=10)
+    if p.returncode != 0:
+        return None
+    for line in p.stdout.splitlines()[1:]:
+        cols = line.split("\t")
+        if len(cols) >= 3 and cols[1].strip().upper() == "STORAGE":
+            with contextlib.suppress(ValueError):
+                return int(cols[2]) * 1024
+    return None
+
+
+# ───────────────────────────── komutlar ─────────────────────────────
+
+def cmd_list(args):
+    users, meta = parse_users(), load_meta()
+    items = []
+    for email, u in sorted(users.items()):
+        md = maildir_of(email)
+        usage = dovecot_usage(email)
+        if usage is None:
+            usage = du_bytes(md) if os.path.isdir(md) else 0
+        q = u["quota"] or "0"
+        items.append({
+            "address": email,
+            "quota": q,
+            "quota_bytes": quota_to_bytes(q) if QUOTA_RE.match(q) else None,
+            "usage_bytes": usage,
+            "created": (meta.get(email) or {}).get("created"),
+            "maildir": md,
+        })
+    if args.json:
+        return {"ok": True, "domain": CONF["DOMAIN"], "mailboxes": items}
+    for it in items:
+        print("%-40s kota=%-6s kullanim=%d bayt" % (it["address"], it["quota"], it["usage_bytes"]))
+    return None
+
+
+def cmd_add(args):
+    email = norm_email(args.email)
+    quota = norm_quota(args.quota)
+    pw, generated = resolve_password(args, required=True)
+    pw_hash = hash_password(pw)
+    with transaction():
+        users = parse_users()
+        if email in users:
+            raise CliError("Posta kutusu zaten var: " + email, EXIT_EXISTS)
+        if email in parse_aliases():
+            raise CliError("Bu adres bir yönlendirme (alias) olarak tanımlı; önce alias'ı silin", EXIT_EXISTS)
+        users[email] = {"hash": pw_hash, "quota": quota, "extra": ""}
+        write_users(users)
+        write_vmailbox(users.keys())
+        meta = load_meta()
+        meta[email] = {"created": now_iso()}
+        save_meta(meta)
+    res = {"ok": True, "address": email, "quota": quota}
+    if generated:
+        res["password"] = pw
+    if not args.json:
+        print("Eklendi: %s (kota %s)" % (email, quota))
+        if generated:
+            print("Şifre (bir kez gösterilir): " + pw)
+        return None
+    return res
+
+
+def cmd_passwd(args):
+    email = norm_email(args.email)
+    pw, generated = resolve_password(args, required=True)
+    pw_hash = hash_password(pw)
+    with transaction():
+        users = parse_users()
+        if email not in users:
+            raise CliError("Posta kutusu bulunamadı: " + email, EXIT_NOTFOUND)
+        users[email]["hash"] = pw_hash
+        write_users(users)
+    if have("doveadm"):  # açık IMAP oturumlarını düşür (eski şifreyle bağlı kalmasın)
+        run(["doveadm", "kick", email], timeout=10)
+    res = {"ok": True, "address": email}
+    if generated:
+        res["password"] = pw
+    if not args.json:
+        print("Şifre değişti: " + email + ((" → " + pw) if generated else ""))
+        return None
+    return res
+
+
+def cmd_quota(args):
+    email = norm_email(args.email)
+    quota = norm_quota(args.size)
+    with transaction():
+        users = parse_users()
+        if email not in users:
+            raise CliError("Posta kutusu bulunamadı: " + email, EXIT_NOTFOUND)
+        users[email]["quota"] = quota
+        write_users(users)
+    if have("doveadm"):
+        run(["doveadm", "quota", "recalc", "-u", email], timeout=30)
+    return {"ok": True, "address": email, "quota": quota}
+
+
+def cmd_del(args):
+    email = norm_email(args.email)
+    with transaction():
+        users = parse_users()
+        if email not in users:
+            raise CliError("Posta kutusu bulunamadı: " + email, EXIT_NOTFOUND)
+        del users[email]
+        write_users(users)
+        write_vmailbox(users.keys())
+        meta = load_meta()
+        meta.pop(email, None)
+        save_meta(meta)
+    if have("doveadm"):
+        run(["doveadm", "kick", email], timeout=10)
+    md = maildir_of(email)
+    purged = False
+    if args.purge and os.path.isdir(md):
+        real = os.path.realpath(md)
+        base = os.path.realpath(os.path.join(CONF["VMAIL_HOME"], CONF["DOMAIN"]))
+        if not real.startswith(base + os.sep):
+            raise CliError("Güvenlik: posta dizini beklenen yerde değil, silinmedi")
+        shutil.rmtree(real)
+        purged = True
+    res = {"ok": True, "address": email, "purged": purged,
+           "maildir_kept": (md if (not purged and os.path.isdir(md)) else None)}
+    if not args.json:
+        print("Silindi: %s%s" % (email, " (dosyalar da silindi)" if purged else ""))
+        return None
+    return res
+
+
+def cmd_alias_list(args):
+    aliases = parse_aliases()
+    items = [{"source": k, "destinations": v} for k, v in sorted(aliases.items())]
+    if args.json:
+        return {"ok": True, "aliases": items}
+    for it in items:
+        print("%s → %s" % (it["source"], ", ".join(it["destinations"])))
+    return None
+
+
+def cmd_alias_add(args):
+    src = norm_email(args.source, what="Kaynak adres")
+    dests = []
+    for d in str(args.destination).split(","):
+        if d.strip():
+            dests.append(norm_email(d, own_domain=False, what="Hedef adres"))
+    if not dests or len(dests) > 20:
+        raise CliError("1-20 hedef adres girin", EXIT_INVALID)
+    if src in dests:
+        raise CliError("Adres kendisine yönlendirilemez", EXIT_INVALID)
+    with transaction():
+        if src in parse_users():
+            raise CliError("Bu adres bir posta kutusu; yönlendirme posta kutusunu devre dışı bırakır. "
+                           "Önce posta kutusunu silin ya da başka bir adres kullanın.", EXIT_EXISTS)
+        aliases = parse_aliases()
+        aliases[src] = dests
+        write_aliases(aliases)
+    return {"ok": True, "source": src, "destinations": dests}
+
+
+def cmd_alias_del(args):
+    src = norm_email(args.source, what="Kaynak adres")
+    with transaction():
+        aliases = parse_aliases()
+        if src not in aliases:
+            raise CliError("Yönlendirme bulunamadı: " + src, EXIT_NOTFOUND)
+        del aliases[src]
+        write_aliases(aliases)
+    return {"ok": True, "source": src}
+
+
+def php_fpm_units():
+    units = []
+    for d in ("/lib/systemd/system", "/usr/lib/systemd/system", "/etc/systemd/system"):
+        with contextlib.suppress(OSError):
+            for f in sorted(os.listdir(d)):
+                if re.match(r"^php[0-9.]+-fpm\.service$", f) and f[:-8] not in units:
+                    units.append(f[:-8])
+    return units or ["php-fpm"]
+
+
+def cert_info():
+    path = "/etc/letsencrypt/live/%s/fullchain.pem" % CONF["HOST"]
+    info = {"path": path, "exists": os.path.exists(path), "not_after": None, "days_left": None}
+    if info["exists"]:
+        p = run(["openssl", "x509", "-enddate", "-noout", "-in", path], timeout=10)
+        m = re.search(r"notAfter=(.+)", p.stdout or "")
+        if m:
+            with contextlib.suppress(ValueError):
+                exp = _dt.datetime.strptime(m.group(1).strip(), "%b %d %H:%M:%S %Y %Z").replace(
+                    tzinfo=_dt.timezone.utc)
+                info["not_after"] = exp.isoformat()
+                info["days_left"] = (exp - _dt.datetime.now(_dt.timezone.utc)).days
+    return info
+
+
+def queue_items():
+    if not have("postqueue"):
+        return []
+    p = run(["postqueue", "-j"], timeout=20)
+    items = []
+    for line in (p.stdout or "").splitlines():
+        with contextlib.suppress(ValueError):
+            j = json.loads(line)
+            items.append({
+                "queue_id": j.get("queue_id"),
+                "queue_name": j.get("queue_name"),
+                "arrival_time": (_dt.datetime.fromtimestamp(j["arrival_time"], _dt.timezone.utc).isoformat()
+                                 if j.get("arrival_time") else None),
+                "size": j.get("message_size"),
+                "sender": j.get("sender"),
+                "recipients": [{"address": r.get("address"), "reason": r.get("delay_reason")}
+                               for r in (j.get("recipients") or [])],
+            })
+    return items
+
+
+def cmd_status(args):
+    services = {}
+    for svc in SERVICES + php_fpm_units():
+        p = run(["systemctl", "is-active", svc], timeout=10)
+        services[svc] = (p.stdout or "").strip() or "unknown"
+    listening = set()
+    p = run(["ss", "-ltnH"], timeout=10)
+    for line in (p.stdout or "").splitlines():
+        cols = line.split()
+        if len(cols) >= 4:
+            m = re.search(r":(\d+)$", cols[3])
+            if m:
+                listening.add(int(m.group(1)))
+    ports = {str(port): port in listening for port in MAIL_PORTS}
+    disk = {"vhosts_bytes": du_bytes(CONF["VMAIL_HOME"]) if os.path.isdir(CONF["VMAIL_HOME"]) else 0}
+    with contextlib.suppress(OSError):
+        st = shutil.disk_usage(CONF["VMAIL_HOME"] if os.path.isdir(CONF["VMAIL_HOME"]) else "/")
+        disk.update({"total_bytes": st.total, "used_bytes": st.used, "free_bytes": st.free})
+    relay = ""
+    if have("postconf"):
+        relay = (run(["postconf", "-h", "relayhost"], timeout=10).stdout or "").strip()
+    mem = {}
+    with contextlib.suppress(OSError):
+        with open("/proc/meminfo") as fh:
+            for line in fh:
+                k, v = line.split(":", 1)
+                if k in ("MemTotal", "MemAvailable"):
+                    mem[k] = int(v.split()[0]) * 1024
+    q = queue_items()
+    res = {
+        "ok": True, "installed": True, "domain": CONF["DOMAIN"], "host": CONF["HOST"],
+        "public_ip": CONF["PUBLIC_IP"], "webmail_url": CONF["WEBMAIL_URL"],
+        "services": services, "ports": ports, "queue_count": len(q),
+        "certificate": cert_info(), "disk": disk, "relayhost": relay, "memory": mem,
+        "mailbox_count": len(parse_users()), "alias_count": len(parse_aliases()),
+    }
+    if args.json:
+        return res
+    print(json.dumps(res, indent=2, ensure_ascii=False))
+    return None
+
+
+def dig(name, rtype):
+    if not have("dig"):
+        raise CliError("dig bulunamadı (apt install dnsutils)")
+    cmd = ["dig", "+short", "+time=3", "+tries=2"]
+    if CONF["DNS_RESOLVER"]:
+        cmd.append("@" + CONF["DNS_RESOLVER"])
+    if rtype == "PTR":
+        cmd += ["-x", name]
+    else:
+        cmd += [rtype, name]
+    p = run(cmd, timeout=15)
+    out = []
+    for line in (p.stdout or "").splitlines():
+        line = line.strip()
+        if not line or line.startswith(";"):
+            continue
+        if rtype == "TXT":
+            line = "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', line)) or line
+        out.append(line)
+    return out
+
+
+def public_ip():
+    if CONF["PUBLIC_IP"]:
+        return CONF["PUBLIC_IP"]
+    with contextlib.suppress(OSError):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("1.1.1.1", 53))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    return ""
+
+
+def dkim_local():
+    """Yerel DKIM anahtarı → {'name','value','p'}"""
+    sel, dom = CONF["DKIM_SELECTOR"], CONF["DOMAIN"]
+    path = os.path.join(CONF["DKIM_DIR"], dom, sel + ".txt")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = fh.read()
+    except OSError:
+        return None
+    value = "".join(re.findall(r'"([^"]*)"', raw))
+    value = re.sub(r"\s+", " ", value).strip()
+    m = re.search(r"p=([A-Za-z0-9+/=]+)", value.replace(" ", ""))
+    return {"name": "%s._domainkey" % sel, "fqdn": "%s._domainkey.%s" % (sel, dom),
+            "value": value, "p": m.group(1) if m else ""}
+
+
+def cmd_dkim_record(args):
+    rec = dkim_local()
+    if not rec:
+        raise CliError("DKIM anahtarı bulunamadı (%s)" % CONF["DKIM_DIR"], EXIT_NOTFOUND)
+    if args.json:
+        return {"ok": True, "type": "TXT", **rec}
+    print("%s  TXT  \"%s\"" % (rec["name"], rec["value"]))
+    return None
+
+
+def expected_records(ip):
+    dom, host = CONF["DOMAIN"], CONF["HOST"]
+    dk = dkim_local()
+    return {
+        "a": {"type": "A", "name": host.replace("." + dom, ""), "fqdn": host, "value": ip or "<SUNUCU_IP>",
+              "note": "Cloudflare: DNS only (gri bulut) olmalı"},
+        "mx": {"type": "MX", "name": "@", "fqdn": dom, "value": host, "priority": 10},
+        "spf": {"type": "TXT", "name": "@", "fqdn": dom,
+                "value": "v=spf1 mx a ip4:%s ~all" % (ip or "<SUNUCU_IP>")},
+        "dmarc": {"type": "TXT", "name": "_dmarc", "fqdn": "_dmarc." + dom,
+                  "value": "v=DMARC1; p=none; rua=mailto:info@%s" % dom},
+        "dkim": {"type": "TXT", "name": dk["name"] if dk else "default._domainkey",
+                 "fqdn": dk["fqdn"] if dk else "default._domainkey." + dom,
+                 "value": dk["value"] if dk else "(DKIM anahtarı yok)"},
+        "ptr": {"type": "PTR", "name": ip or "<SUNUCU_IP>", "fqdn": ip, "value": host,
+                "note": "DNS sağlayıcıda değil, hosting (SNET) panelinde 'rDNS/PTR' olarak ayarlanır"},
+    }
+
+
+def port25_open(timeout=5):
+    host = "gmail-smtp-in.l.google.com"
+    try:
+        # Postfix inet_protocols=ipv4 → test de IPv4 üzerinden yapılır
+        addr = socket.getaddrinfo(host, 25, socket.AF_INET, socket.SOCK_STREAM)[0][4]
+        with socket.create_connection(addr, timeout=timeout) as s:
+            s.settimeout(timeout)
+            banner = s.recv(200).decode("utf-8", "replace").strip()
+            with contextlib.suppress(OSError):
+                s.sendall(b"QUIT\r\n")
+            return True, banner[:200]
+    except OSError as e:
+        return False, str(e)[:200]
+
+
+def cmd_port25(args):
+    ok, detail = port25_open()
+    relay = ""
+    if have("postconf"):
+        relay = (run(["postconf", "-h", "relayhost"], timeout=10).stdout or "").strip()
+    res = {"ok": True, "open": ok, "detail": detail, "relayhost": relay,
+           "advice": ("Giden 25 portu açık." if ok else
+                      "Giden 25 portu kapalı: SNET destekten açılmasını isteyin ya da "
+                      "Brevo/Resend relay kullanın (mail-kur.sh --relay-host ...).")}
+    if args.json:
+        return res
+    print("ACIK" if ok else "KAPALI", detail)
+    return None
+
+
+def cmd_dns_check(args):
+    dom, host = CONF["DOMAIN"], CONF["HOST"]
+    ip = public_ip()
+    exp = expected_records(ip)
+    checks = []
+
+    def add(key, label, status, found, message=""):
+        checks.append({"key": key, "label": label, "status": status, "found": found,
+                       "expected": exp.get(key), "message": message})
+
+    a = dig(host, "A")
+    add("a", "A kaydı (%s)" % host, "pass" if ip and ip in a else "fail", a,
+        "" if ip in a else "mail alt alan adı sunucu IP'sine gitmeli (Cloudflare'de gri bulut).")
+
+    mx = dig(dom, "MX")
+    mx_hosts = [m.split()[-1].rstrip(".").lower() for m in mx if m.split()]
+    add("mx", "MX kaydı", "pass" if host in mx_hosts else "fail", mx,
+        "" if host in mx_hosts else "MX @ → %s (öncelik 10) olmalı." % host)
+
+    txt = dig(dom, "TXT")
+    spf = [t for t in txt if t.lower().startswith("v=spf1")]
+    if len(spf) == 1 and (("ip4:" + ip) in spf[0] or re.search(r"(^|\s)[+]?mx(\s|$)", spf[0])):
+        st, msg = "pass", ""
+    elif len(spf) > 1:
+        st, msg = "fail", "Birden fazla SPF kaydı var — tek kayıtta birleştirin."
+    elif spf:
+        st, msg = "warn", "SPF var ama bu sunucuyu (mx/ip4) içermiyor."
+    else:
+        st, msg = "fail", "SPF kaydı yok."
+    add("spf", "SPF", st, spf, msg)
+
+    dmarc = [t for t in dig("_dmarc." + dom, "TXT") if t.upper().startswith("V=DMARC1")]
+    add("dmarc", "DMARC", "pass" if len(dmarc) == 1 else "fail", dmarc,
+        "" if dmarc else "_dmarc TXT kaydı yok.")
+
+    loc = dkim_local()
+    dk = dig("%s._domainkey.%s" % (CONF["DKIM_SELECTOR"], dom), "TXT")
+    dns_p = ""
+    for t in dk:
+        m = re.search(r"p=([A-Za-z0-9+/=]+)", t.replace(" ", ""))
+        if m:
+            dns_p = m.group(1)
+    if not loc:
+        st, msg = "fail", "Sunucuda DKIM anahtarı yok."
+    elif dns_p and dns_p == loc["p"]:
+        st, msg = "pass", ""
+    elif dns_p:
+        st, msg = "fail", "DNS'teki DKIM anahtarı sunucudakiyle eşleşmiyor."
+    else:
+        st, msg = "fail", "DKIM TXT kaydı yok."
+    add("dkim", "DKIM (%s)" % CONF["DKIM_SELECTOR"], st, dk, msg)
+
+    ptr = [p.rstrip(".").lower() for p in dig(ip, "PTR")] if ip else []
+    add("ptr", "rDNS / PTR (%s)" % (ip or "?"), "pass" if host in ptr else "fail", ptr,
+        "" if host in ptr else "SNET panelinden IP'nin rDNS kaydını %s yapın." % host)
+
+    ok25, detail = port25_open()
+    checks.append({"key": "port25", "label": "Giden 25 portu", "status": "pass" if ok25 else "fail",
+                   "found": [detail], "expected": None,
+                   "message": "" if ok25 else "Kapalıysa relay (Brevo/Resend) kullanın."})
+
+    res = {"ok": True, "domain": dom, "host": host, "public_ip": ip, "checks": checks,
+           "all_pass": all(c["status"] == "pass" for c in checks)}
+    if args.json:
+        return res
+    for c in checks:
+        print("[%s] %s %s" % (c["status"].upper(), c["label"], c["message"]))
+    return None
+
+
+def cmd_queue(args):
+    items = queue_items()
+    if args.json:
+        return {"ok": True, "count": len(items), "items": items}
+    for it in items:
+        print(it["queue_id"], it["sender"], ",".join(r["address"] or "" for r in it["recipients"]))
+    return None
+
+
+def cmd_queue_flush(args):
+    run(["postqueue", "-f"], timeout=30, check=True)
+    return {"ok": True}
+
+
+def cmd_queue_delete(args):
+    qid = str(args.queue_id).strip()
+    if qid.upper() != "ALL" and not QUEUE_ID_RE.match(qid):
+        raise CliError("Geçersiz kuyruk kimliği", EXIT_INVALID)
+    if qid.upper() == "ALL":
+        qid = "ALL"
+    run(["postsuper", "-d", qid], timeout=30, check=True)
+    return {"ok": True, "deleted": qid}
+
+
+def cmd_test_send(args):
+    to = norm_email(args.to, own_domain=False, what="Alıcı")
+    sender = "noreply@" + CONF["DOMAIN"]
+    msgid = "<%s@%s>" % (secrets.token_hex(12), CONF["HOST"])
+    body = "\n".join([
+        "From: GarajTek Mail Testi <%s>" % sender,
+        "To: <%s>" % to,
+        "Subject: GarajTek mail sunucusu test mesaji",
+        "Date: " + _dt.datetime.now(_dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000"),
+        "Message-ID: " + msgid,
+        "MIME-Version: 1.0",
+        "Content-Type: text/plain; charset=UTF-8",
+        "Content-Transfer-Encoding: 8bit",
+        "",
+        "Merhaba,",
+        "",
+        "Bu mesaj %s sunucusundan gönderilen bir test e-postasıdır." % CONF["HOST"],
+        "Gmail'de 'Orijinali göster' ile SPF / DKIM / DMARC sonuçlarını kontrol edebilirsiniz.",
+        "",
+        "-- GarajTek",
+        "",
+    ])
+    run(["/usr/sbin/sendmail", "-i", "-f", sender, "--", to], input_text=body, timeout=30, check=True)
+    return {"ok": True, "to": to, "from": sender, "message_id": msgid}
+
+
+def cmd_backup(args):
+    paths = [p for p in [CONF["VMAIL_HOME"], CONF["USERS_FILE"], CONF["VMAILBOX_FILE"], CONF["VIRTUAL_FILE"],
+                         CONF["META_FILE"], "/etc/opendkim", "/etc/opendkim.conf", "/etc/dovecot/local.conf",
+                         "/etc/postfix/main.cf", "/etc/postfix/master.cf", "/etc/postfix/sasl_passwd",
+                         "/etc/postfix/sender_login_maps.pcre", CONF_FILE,
+                         "/var/www/roundcube/config/config.inc.php", "/var/www/roundcube/db"]
+             if os.path.exists(p)]
+    os.makedirs(CONF["BACKUP_DIR"], mode=0o700, exist_ok=True)
+    stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M")
+    out = os.path.join(CONF["BACKUP_DIR"], "mail-%s.tar.gz" % stamp)
+    run(["tar", "--warning=no-file-changed", "-czpf", out, "--absolute-names", "--"] + paths,
+        timeout=3600)
+    if not os.path.exists(out):
+        raise CliError("Yedek oluşturulamadı")
+    os.chmod(out, 0o600)
+    keep = max(1, int(CONF["BACKUP_KEEP"] or 3))
+    olds = sorted(f for f in os.listdir(CONF["BACKUP_DIR"]) if re.match(r"^mail-\d{8}-\d{4}\.tar\.gz$", f))
+    for f in olds[:-keep]:
+        with contextlib.suppress(OSError):
+            os.unlink(os.path.join(CONF["BACKUP_DIR"], f))
+    res = {"ok": True, "file": out, "size": os.path.getsize(out), "paths": paths}
+    if args.json:
+        return res
+    print("yedek: %s (%d bayt)" % (out, res["size"]))
+    return None
+
+
+# ───────────────────────────── giriş noktası ─────────────────────────────
+
+def build_parser():
+    p = argparse.ArgumentParser(prog="garajtek-mail", description="GarajTek mail sunucusu yönetimi")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    def sp(name, fn, help_text):
+        s = sub.add_parser(name, help=help_text)
+        s.add_argument("--json", action="store_true", help="JSON çıktı")
+        s.set_defaults(fn=fn)
+        return s
+
+    def pw_opts(s):
+        g = s.add_mutually_exclusive_group()
+        g.add_argument("--password", help="şifre (argv'de görünür — tercihen --password-stdin)")
+        g.add_argument("--password-stdin", action="store_true", help="şifreyi stdin'den (tek satır) oku")
+        g.add_argument("--random", action="store_true", help="rastgele şifre üret ve bir kez göster")
+
+    sp("list", cmd_list, "posta kutularını listele")
+    s = sp("add", cmd_add, "posta kutusu ekle")
+    s.add_argument("email")
+    s.add_argument("--quota", default=None, help="ör. 1G, 500M, 0=sınırsız")
+    pw_opts(s)
+    s = sp("passwd", cmd_passwd, "şifre değiştir")
+    s.add_argument("email")
+    pw_opts(s)
+    s = sp("quota", cmd_quota, "kota değiştir")
+    s.add_argument("email")
+    s.add_argument("size")
+    s = sp("del", cmd_del, "posta kutusunu sil")
+    s.add_argument("email")
+    s.add_argument("--purge", action="store_true", help="posta dosyalarını da sil")
+    sp("alias-list", cmd_alias_list, "yönlendirmeleri listele")
+    s = sp("alias-add", cmd_alias_add, "yönlendirme ekle/güncelle")
+    s.add_argument("source")
+    s.add_argument("destination", help="hedef adres(ler), virgülle")
+    s = sp("alias-del", cmd_alias_del, "yönlendirme sil")
+    s.add_argument("source")
+    sp("status", cmd_status, "servis durumu")
+    sp("dns-check", cmd_dns_check, "DNS / teslim edilebilirlik kontrolü")
+    sp("port25-check", cmd_port25, "giden 25 portu testi")
+    sp("queue", cmd_queue, "posta kuyruğu")
+    sp("queue-flush", cmd_queue_flush, "kuyruğu yeniden dene")
+    s = sp("queue-delete", cmd_queue_delete, "kuyruktan mesaj sil (ID veya ALL)")
+    s.add_argument("queue_id")
+    s = sp("test-send", cmd_test_send, "test e-postası gönder")
+    s.add_argument("to")
+    sp("dkim-record", cmd_dkim_record, "DKIM DNS kaydını yazdır")
+    sp("backup", cmd_backup, "posta verisini yedekle")
+    return p
+
+
+def main(argv=None):
+    global CONF
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    want_json = bool(getattr(args, "json", False))
+    try:
+        if os.geteuid() != 0 and not os.environ.get("GARAJTEK_MAIL_ALLOW_NONROOT"):
+            raise CliError("root olarak çalıştırın (sudo garajtek-mail ...)")
+        CONF = load_conf()
+        res = args.fn(args)
+        if res is not None:
+            if want_json:
+                print(json.dumps(res, ensure_ascii=False))
+            else:
+                print(json.dumps(res, indent=2, ensure_ascii=False))
+        return 0
+    except CliError as e:
+        if want_json:
+            print(json.dumps({"ok": False, "error": str(e), "code": e.code}, ensure_ascii=False))
+        else:
+            print("HATA: " + str(e), file=sys.stderr)
+        return e.code
+    except Exception as e:  # beklenmeyen hata — iz bırakmadan JSON döndür
+        if want_json:
+            print(json.dumps({"ok": False, "error": "beklenmeyen hata: %s" % e.__class__.__name__,
+                              "code": EXIT_ERR}, ensure_ascii=False))
+            return EXIT_ERR
+        raise
+
+
+if __name__ == "__main__":
+    sys.exit(main())

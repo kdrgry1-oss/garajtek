@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - name: Install focused test dependencies
@@ -45,6 +45,7 @@ jobs:
           backend/tests/test_registration_names.py
           backend/tests/test_promotion_order.py
           backend/tests/test_full_look.py
+          backend/tests/test_media_storage.py
           tests/seo_runtime_test.py
           tests/tenant_config_test.py
 

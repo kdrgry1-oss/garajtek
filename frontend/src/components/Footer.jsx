@@ -1,147 +1,103 @@
 /**
- * Footer.jsx — Admin'in `/api/footer-template` üzerinden tam yönetebildiği footer.
- * İki mod desteklenir:
- *   • mode = "html"        → custom_html alanı doğrudan render edilir
- *   • mode = "structured"  → columns + newsletter + social + copyright alanlarından
- *                            otomatik render edilir
+ * Footer.jsx — Electro footer (ürün widget'ları + sarı e-bülten şeridi + iletişim/link kolonları +
+ * telif & ödeme şeridi). Admin'in `/api/footer-template` ayarı korunur:
+ *   • mode = "html"        → custom_html (sanitize) alt bölümde render edilir
+ *   • mode = "structured"  → columns / newsletter / social / copyright alanları kullanılır
+ * E-bülten KVKK/İYS onay kutusu ZORUNLU olarak korunur.
  */
 import { Link } from "react-router-dom";
-import { sanitizeHtml } from "../lib/sanitizeHtml";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { sanitizeHtml } from "../lib/sanitizeHtml";
 import { useStoreInfo } from "../lib/storeInfo";
 import { socialUrl } from "../lib/brand";
-import { Instagram, Facebook, Twitter, ChevronDown, ArrowRight, Check, Lock } from "lucide-react";
+import ProductCard from "./ProductCard";
+import Logo from "./electro/Logo";
+import useCategoryTree from "./electro/useCategoryTree";
+import { optimizeImg } from "../lib/img";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const SERIF = { fontFamily: 'Georgia, "Times New Roman", "Playfair Display", serif' };
-
-/**
- * NewsletterBand — footer'ın hemen üstünde e-bülten kayıt bandı.
- * Metinler admin footer ayarındaki `newsletter` alanından okunur.
- */
-// KVKK / ticari-ileti onay metni — kutucuk etiketiyle AYNI; abone kaydına ve İYS'ye
-// bu metin işlenir (ne onayladığının kanıtı).
+// KVKK / ticari-ileti onay metni — kutucuk etiketiyle AYNI; abone kaydına ve İYS'ye işlenir.
 const CONSENT_TEXT =
   "KVKK Aydınlatma Metni'ni okudum; kampanya ve fırsatlar için ticari elektronik ileti (e-posta) almayı kabul ediyorum.";
 
 function NewsletterBand({ nl }) {
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
-  const [state, setState] = useState("idle"); // idle | loading | done | error
+  const [state, setState] = useState("idle");
   const [msg, setMsg] = useState("");
-
-  const title = nl?.title || "Bültenimize katıl";
-  const description =
-    nl?.description ||
-    "Yeni koleksiyonlar, özel kampanyalar ve sana özel fırsatlardan ilk sen haberdar ol.";
-  const placeholder = nl?.placeholder || "E-posta adresin";
+  const title = nl?.title || "E-Bültene Kaydolun";
+  const description = nl?.description || "...kampanya ve fırsatlardan ilk siz haberdar olun.";
 
   const submit = async (e) => {
     e.preventDefault();
     const v = (email || "").trim();
-    if (!v || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) {
-      setState("error");
-      setMsg("Lütfen geçerli bir e-posta adresi girin.");
-      return;
-    }
-    if (!consent) {
-      setState("error");
-      setMsg("Devam etmek için KVKK / ticari ileti onayını işaretlemelisin.");
-      return;
-    }
+    if (!v || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { setState("error"); setMsg("Lütfen geçerli bir e-posta adresi girin."); return; }
+    if (!consent) { setState("error"); setMsg("Devam etmek için KVKK / ticari ileti onayını işaretlemelisiniz."); return; }
     setState("loading");
     try {
-      const r = await axios.post(`${API}/newsletter/subscribe`, {
-        email: v, source: "footer", consent: true, consent_text: CONSENT_TEXT,
-      });
-      setState("done");
-      setMsg(r?.data?.message || "Aramıza hoş geldin!");
-      setEmail("");
-      setConsent(false);
+      const r = await axios.post(`${API}/newsletter/subscribe`, { email: v, source: "footer", consent: true, consent_text: CONSENT_TEXT });
+      setState("done"); setMsg(r?.data?.message || "Aramıza hoş geldiniz!"); setEmail(""); setConsent(false);
     } catch (err) {
-      setState("error");
-      setMsg(err?.response?.data?.detail || "Bir sorun oluştu, tekrar dene.");
+      setState("error"); setMsg(err?.response?.data?.detail || "Bir sorun oluştu, tekrar deneyin.");
     }
   };
 
   return (
-    <section className="bg-neutral-100 border-t border-neutral-200" data-testid="newsletter-band">
-      <div className="container-main py-14 md:py-20">
-        <div className="max-w-2xl mx-auto text-center">
-          <p className="text-[11px] tracking-[0.35em] uppercase text-neutral-700 mb-4">{nl?.eyebrow || "E-Bülten"}</p>
-          <h3 className="text-3xl md:text-5xl font-light tracking-tight text-black leading-none">
-            {title}
-          </h3>
-          <p className="text-sm md:text-base text-neutral-900 mt-4 leading-relaxed">{description}</p>
-
-          {state === "done" ? (
-            <div className="mt-8 inline-flex items-center gap-2 text-sm text-neutral-900" data-testid="newsletter-done">
-              <span className="w-6 h-6 rounded-full bg-neutral-900 text-white flex items-center justify-center">
-                <Check size={13} strokeWidth={2.5} />
-              </span>
-              {msg}
-            </div>
-          ) : (
-            <form onSubmit={submit} className="mt-8 max-w-md mx-auto" data-testid="newsletter-form">
-              <div className="flex items-stretch border-b border-neutral-400 focus-within:border-neutral-900 transition-colors">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); if (state === "error") setState("idle"); }}
-                  placeholder={placeholder}
-                  className="flex-1 bg-transparent px-1 py-3 text-sm text-neutral-900 placeholder-neutral-400 outline-none"
-                  aria-label="E-posta adresi"
-                  data-testid="newsletter-email"
-                />
-                <button
-                  type="submit"
-                  disabled={state === "loading"}
-                  className="px-2 text-neutral-900 hover:opacity-60 disabled:opacity-40 transition-opacity"
-                  aria-label="Abone ol"
-                  data-testid="newsletter-submit"
-                >
-                  <ArrowRight size={20} strokeWidth={1.5} />
-                </button>
+    <div className="bg-primary py-3" data-testid="newsletter-band">
+      <div className="container">
+        <div className="row align-items-center">
+          <div className="col-lg-7 mb-md-3 mb-lg-0">
+            <div className="row align-items-center">
+              <div className="col-auto flex-horizontal-center">
+                <i className="ec ec-newsletter font-size-40" />
+                <h2 className="font-size-20 mb-0 ml-3">{title}</h2>
               </div>
-              {state === "error" && (
-                <p className="text-xs text-red-500 mt-3 text-left" data-testid="newsletter-error">{msg}</p>
-              )}
-              {/* KVKK / ticari-ileti onayı — ZORUNLU kutucuk (İYS'ye 'ONAY' olarak işlenir) */}
-              <label className="flex items-start gap-2 mt-4 text-left text-[12px] text-neutral-700 leading-snug cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={consent}
-                  onChange={(e) => { setConsent(e.target.checked); if (state === "error") setState("idle"); }}
-                  className="mt-0.5 w-4 h-4 accent-black flex-shrink-0"
-                  aria-label="KVKK ve ticari ileti onayı"
-                  data-testid="newsletter-consent"
-                />
-                <span>
-                  <Link to="/sayfa/kvkk" className="underline hover:text-black">KVKK Aydınlatma Metni</Link>'ni okudum;
-                  kampanya ve fırsatlar için ticari elektronik ileti (e-posta) almayı kabul ediyorum.
-                </span>
-              </label>
-            </form>
-          )}
+              <div className="col my-4 my-md-0">
+                <h5 className="font-size-15 ml-4 mb-0">{description}</h5>
+              </div>
+            </div>
+          </div>
+          <div className="col-lg-5">
+            {state === "done" ? (
+              <div className="font-size-15 font-weight-bold py-2" data-testid="newsletter-done"><i className="fas fa-check-circle mr-2" />{msg}</div>
+            ) : (
+              <form onSubmit={submit} data-testid="newsletter-form" noValidate>
+                <label className="sr-only" htmlFor="subscribeSrEmail">E-posta adresi</label>
+                <div className="input-group input-group-pill">
+                  <input type="email" className="form-control border-0 height-40" id="subscribeSrEmail" placeholder={nl?.placeholder || "E-posta adresiniz"}
+                    value={email} onChange={(e) => { setEmail(e.target.value); if (state === "error") setState("idle"); }}
+                    aria-label="E-posta adresi" data-testid="newsletter-email" />
+                  <div className="input-group-append">
+                    <button type="submit" className="btn btn-dark btn-sm-wide height-40 py-2" disabled={state === "loading"} data-testid="newsletter-submit">Kaydol</button>
+                  </div>
+                </div>
+                <div className="custom-control custom-checkbox mt-2 font-size-12">
+                  <input type="checkbox" className="custom-control-input" id="nlConsent" checked={consent}
+                    onChange={(e) => { setConsent(e.target.checked); if (state === "error") setState("idle"); }} data-testid="newsletter-consent" />
+                  <label className="custom-control-label text-gray-90" htmlFor="nlConsent">
+                    <Link to="/sayfa/kvkk" className="text-gray-90 text-underline font-weight-bold">KVKK Aydınlatma Metni</Link>'ni okudum; kampanya ve fırsatlar için ticari elektronik ileti almayı kabul ediyorum.
+                  </label>
+                </div>
+                {state === "error" && <div className="font-size-12 text-red mt-1" data-testid="newsletter-error">{msg}</div>}
+              </form>
+            )}
+          </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-// Varsayılan sütunlar (admin footer şablonu girilmemişse). Katalog-özel kategori linki
-// YOK; iletişim satırları mağaza ayarlarından (tenant_config.contact) gelir.
-const buildDefaultColumns = (info) => [
-  { title: "Alışveriş", links: [
-    { to: "/arama", label: "Tüm Ürünler" },
-  ]},
-  { title: "Yardım", links: [
+// Varsayılan "Müşteri Hizmetleri" sütunu (admin footer şablonu girilmemişse).
+const DEFAULT_COLUMNS = [
+  { title: "Müşteri Hizmetleri", links: [
+    { to: "/hesabim", label: "Hesabım" },
     { to: "/siparis-takip", label: "Sipariş Takibi" },
-    { to: "/sayfa/uyelik-islemleri", label: "Üyelik İşlemleri" },
+    { to: "/favoriler", label: "Favorilerim" },
     { to: "/iade-islemleri", label: "İade Talebi" },
-    { to: "/sayfa/iade-kosullari", label: "İade İşlemleri" },
+    { to: "/sayfa/iade-kosullari", label: "İade & Değişim" },
     { to: "/sikca-sorulan-sorular", label: "Sıkça Sorulan Sorular" },
     { to: "/sayfa/iletisim", label: "İletişim" },
   ]},
@@ -151,43 +107,77 @@ const buildDefaultColumns = (info) => [
     { to: "/sayfa/kvkk", label: "KVKK Aydınlatma Metni" },
     { to: "/sayfa/gizlilik", label: "Gizlilik Politikası" },
   ]},
-  { title: "İletişim", static: [info?.email, info?.phone].filter(Boolean) },
-].filter((c) => !c.static || c.static.length);
+];
 
-function FooterColumn({ col, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen);
+/** Footer üstü: Öne Çıkanlar / İndirimdekiler / Çok Satanlar mini listeleri (+ banner). */
+let _widgetCache = null;
+function FooterWidgets() {
+  const [data, setData] = useState(_widgetCache);
+  useEffect(() => {
+    if (_widgetCache) return undefined;
+    let alive = true;
+    Promise.all([
+      axios.get(`${API}/products?limit=3&is_featured=true`).catch(() => null),
+      axios.get(`${API}/products/slider-feed?source=discounted&limit=3`).catch(() => null),
+      axios.get(`${API}/products?limit=3&sort=popular`).catch(() => null),
+      axios.get(`${API}/banners?position=footer&is_active=true`).catch(() => null),
+    ]).then(([f, d, p, b]) => {
+      let featured = f?.data?.products || [];
+      const popular = p?.data?.products || [];
+      if (!featured.length) featured = popular;
+      const out = { featured, discounted: d?.data?.products || [], popular, banner: (Array.isArray(b?.data) ? b.data : [])[0] || null };
+      _widgetCache = out;
+      if (alive) setData(out);
+    });
+    return () => { alive = false; };
+  }, []);
+  if (!data) return null;
+  const cols = [
+    ["Öne Çıkan Ürünler", data.featured],
+    ["İndirimdeki Ürünler", data.discounted],
+    ["Çok Satanlar", data.popular],
+  ].filter(([, list]) => list.length);
+  if (!cols.length) return null;
   return (
-    <div className="border-b border-white/10 md:border-b-0">
-      <button
-        type="button"
-        className="w-full flex items-center justify-between py-4 md:py-0 md:cursor-default md:pointer-events-none"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        data-testid={`footer-col-toggle-${col.title}`}
-      >
-        <h4 className="text-[10px] tracking-[0.3em] uppercase text-white">{col.title}</h4>
-        <ChevronDown size={14} className={`md:hidden transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
-      </button>
-      <ul
-        className={`grid transition-all duration-300 ease-out overflow-hidden md:!grid-rows-[1fr] md:!opacity-100 md:mt-5 ${
-          open ? "grid-rows-[1fr] opacity-100 pb-4" : "grid-rows-[0fr] opacity-0"
-        }`}
-      >
-        <li className="min-h-0">
-          <ul className="space-y-3">
-            {col.links?.map((l) => (
-              <li key={l.to}>
-                <Link to={l.to} className="text-xs text-white/55 hover:text-white transition-colors duration-300">
-                  {l.label}
-                </Link>
-              </li>
-            ))}
-            {col.static?.map((s, i) => (
-              <li key={i} className="text-xs text-white/55">{s}</li>
-            ))}
-          </ul>
-        </li>
-      </ul>
+    <div className="container d-none d-lg-block mb-3" data-testid="footer-widgets">
+      <div className="row">
+        {cols.map(([title, list]) => (
+          <div className="col-wd-3 col-lg-4" key={title}>
+            <div className="widget-column">
+              <div className="border-bottom border-color-1 mb-5">
+                <h3 className="section-title section-title__sm mb-0 pb-2 font-size-18">{title}</h3>
+              </div>
+              <ul className="list-unstyled products-group">
+                {list.slice(0, 3).map((p) => <ProductCard key={p.id} product={p} variant="list" as="li" />)}
+              </ul>
+            </div>
+          </div>
+        ))}
+        {data.banner && (data.banner.image_url || data.banner.image) && (
+          <div className="col-wd-3 d-none d-wd-block">
+            <Link to={data.banner.link_url || data.banner.link || "/"} className="d-block">
+              <img className="img-fluid" src={optimizeImg(data.banner.image_url || data.banner.image, 660)} alt={data.banner.title || ""} loading="lazy" />
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PaymentBadges() {
+  const badge = (label, inner) => (
+    <span className="d-inline-block bg-white border rounded p-1 ml-1 el-pay" aria-label={label} title={label}>{inner}</span>
+  );
+  return (
+    <div className="text-md-right" data-testid="payment-icons">
+      {badge("Visa", <span className="el-pay__visa">VISA</span>)}
+      {badge("Mastercard", (
+        <svg width="34" height="20" viewBox="0 0 34 20" aria-hidden="true"><circle cx="13" cy="10" r="8" fill="#eb001b" /><circle cx="21" cy="10" r="8" fill="#f79e1b" fillOpacity=".9" /></svg>
+      ))}
+      {badge("American Express", <span className="el-pay__amex">AMEX</span>)}
+      {badge("Troy", <span className="el-pay__troy">troy</span>)}
+      {badge("iyzico ile güvenli ödeme", <span className="el-pay__iyz"><i className="fas fa-lock mr-1" />iyzico</span>)}
     </div>
   );
 }
@@ -195,6 +185,7 @@ function FooterColumn({ col, defaultOpen = false }) {
 export default function Footer() {
   const [tpl, setTpl] = useState(null);
   const info = useStoreInfo();
+  const tree = useCategoryTree();
 
   useEffect(() => {
     let cancel = false;
@@ -204,130 +195,117 @@ export default function Footer() {
     return () => { cancel = true; };
   }, []);
 
-  const newsletter = tpl?.newsletter;
-
-  // HTML mode — admin tam serbest HTML yazdı
-  if (tpl?.mode === "html" && tpl?.custom_html) {
-    return (
-      <>
-        <NewsletterBand nl={newsletter} />
-        <footer className="bg-black text-white" data-testid="footer-html">
-          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(tpl.custom_html) }} />
-        </footer>
-      </>
-    );
-  }
-
-  // Structured mode — admin sütunları/sosyal/copyright güncelledi
-  let columns = tpl?.columns || buildDefaultColumns(info);
+  let columns = Array.isArray(tpl?.columns) && tpl.columns.length ? tpl.columns : DEFAULT_COLUMNS;
   // "İade Talebi" linki her zaman görünür olsun (admin sütunları override etse bile)
-  try {
-    const hasReturn = columns.some((c) => (c.links || []).some((l) => l.to === "/iade-islemleri"));
-    if (!hasReturn) {
-      columns = columns.map((c) => c.links ? c : c); // shallow copy tetikleyici
-      const svc = columns.find((c) => /müşteri|hizmet|iade|customer/i.test(c.title || ""));
-      if (svc && svc.links) {
-        svc.links = [...svc.links, { to: "/iade-islemleri", label: "İade Talebi" }];
-      } else {
-        columns = [...columns, { title: "İade İşlemleri", links: [{ to: "/iade-islemleri", label: "İade Talebi" }] }];
-      }
-    }
-  } catch (_) { /* yoksay */ }
-  // Sosyal linkler footer ayarından gelir; girilmemişse mağaza ayarlarındaki
-  // (tenant_config.contact) hesaplara düşer; o da yoksa ikon gösterilmez.
-  const _socialCfg = tpl?.social || {};
-  const social = {
-    instagram: _socialCfg.instagram || socialUrl("instagram", info.instagram),
-    tiktok: _socialCfg.tiktok || socialUrl("tiktok", info.tiktok),
-    facebook: _socialCfg.facebook || "",
-    twitter: _socialCfg.twitter || "",
-  };
-  const copyright = tpl?.copyright || `© ${new Date().getFullYear()} ${info.name} – Tüm hakları saklıdır.`;
+  if (!columns.some((c) => (c.links || []).some((l) => l.to === "/iade-islemleri"))) {
+    columns = columns.map((c, i) => (i === 0 && c.links ? { ...c, links: [...c.links, { to: "/iade-islemleri", label: "İade Talebi" }] } : c));
+  }
+  const s = tpl?.social || {};
+  const social = [
+    ["facebook", "fab fa-facebook-f", s.facebook],
+    ["instagram", "fab fa-instagram", s.instagram || socialUrl("instagram", info.instagram)],
+    ["twitter", "fab fa-twitter", s.twitter],
+    ["youtube", "fab fa-youtube", s.youtube],
+    ["tiktok", "fab fa-tiktok", s.tiktok || socialUrl("tiktok", info.tiktok)],
+  ].filter(([, , url]) => url);
+  const copyright = tpl?.copyright || null;
+  const roots = tree.roots.slice(0, 12);
+  const half = Math.ceil(roots.length / 2);
 
   return (
-    <>
-    <NewsletterBand nl={newsletter} />
-    <footer className="bg-black text-white" data-testid="footer-structured">
-      <div className="container-main pt-10 md:pt-12 pb-8">
-        {/* Brand strip — logo/slogan/ikon bloğu; üstte modest boşluk (çift padding kaldırıldı,
-            footer dikey olarak kısaldı). 'inspired...' alt hizası ikonlarla eşit (items-end + leading-none) */}
-        <div className="md:flex md:items-end md:justify-between mb-10 md:mb-12 pt-2 md:pt-4">
-          <div className="max-w-md">
-            <Link to="/" className="inline-block mb-5">
-              {/* Koyu footer → logo beyaza zorlanır (brightness-0 + invert) */}
-              <img src="/logo.webp" alt={info.name} className="h-6 md:h-7 w-auto brightness-0 invert" />
-            </Link>
-            {tpl?.slogan && (
-              <p className="text-sm text-white/60 leading-none italic">
-                {tpl.slogan}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-7 mt-8 md:mt-0">
-            {social.instagram && (
-              <a href={social.instagram} target="_blank" rel="noreferrer noopener" className="text-white hover:text-white/70 transition-colors" aria-label="Instagram">
-                <Instagram size={24} strokeWidth={2} />
-              </a>
-            )}
-            {social.tiktok && (
-              <a href={social.tiktok} target="_blank" rel="noreferrer noopener" className="text-white hover:text-white/70 transition-colors" aria-label="TikTok">
-                {/* lucide'da TikTok yok → inline SVG */}
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M16.5 3c.29 2.02 1.45 3.42 3.5 3.6v2.36c-1.18.11-2.21-.27-3.41-1v4.9c0 4.4-4.8 7.18-8.63 4.68-2.45-1.6-2.9-5.02-.85-7.16 1.2-1.27 3.02-1.78 4.89-1.31v2.5c-.4-.12-.86-.16-1.34-.05-1.05.22-1.85 1.14-1.74 2.31.13 1.5 1.9 2.28 3.1 1.34.66-.5.9-1.2.9-2.02V3h3.63z"/>
-                </svg>
-              </a>
-            )}
-            {social.facebook && (
-              <a href={social.facebook} target="_blank" rel="noreferrer noopener" className="text-white hover:text-white/70 transition-colors" aria-label="Facebook">
-                <Facebook size={24} strokeWidth={2} />
-              </a>
-            )}
-            {social.twitter && (
-              <a href={social.twitter} target="_blank" rel="noreferrer noopener" className="text-white hover:text-white/70 transition-colors" aria-label="Twitter">
-                <Twitter size={24} strokeWidth={2} />
-              </a>
-            )}
-          </div>
+    <footer className="electro el-footer" data-testid={tpl?.mode === "html" ? "footer-html" : "footer-structured"}>
+      <FooterWidgets />
+      <NewsletterBand nl={tpl?.newsletter} />
+      {tpl?.mode === "html" && tpl?.custom_html ? (
+        <div className="pt-8 pb-4 bg-gray-13">
+          <div className="container mt-1" dangerouslySetInnerHTML={{ __html: sanitizeHtml(tpl.custom_html) }} />
         </div>
-
-        {/* Columns */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-x-10 md:border-t md:border-white/10 md:pt-12">
-          {columns.map((col, i) => (
-            <FooterColumn key={col.title || i} col={col} defaultOpen={i === 0} />
-          ))}
-        </div>
-
-        {/* Bottom — mobilde üst çizgi YOK (son sütunun alt çizgisiyle çift çizgi olmasın); masaüstünde var */}
-        <div className="md:border-t md:border-white/10 mt-6 md:mt-12 pt-8 flex flex-col-reverse md:flex-row justify-between items-center gap-6">
-          <p className="text-[10px] tracking-[0.2em] uppercase text-white/40">{copyright}</p>
-          {/* Ödeme: kilit + iyzico güvenli ödeme etiketi + beyaz kart rozetleri (self-contained) */}
-          <div className="flex items-center gap-4 flex-wrap justify-center md:justify-end">
-            <span className="flex items-center gap-1.5 text-[10px] tracking-[0.18em] uppercase text-white/55 whitespace-nowrap">
-              <Lock size={13} strokeWidth={2} /> iyzico ile güvenli ödeme
-            </span>
-            <div className="flex items-center gap-2">
-              {/* VISA */}
-              <span className="h-7 px-2.5 rounded-md border border-white/25 bg-white/[0.06] flex items-center text-white text-[13px] font-extrabold italic tracking-wide" aria-label="Visa">VISA</span>
-              {/* Mastercard: iki halka + 'mastercard' */}
-              <span className="h-7 pl-1.5 pr-2 rounded-md border border-white/25 bg-white/[0.06] flex items-center gap-1" aria-label="Mastercard">
-                <svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true">
-                  <circle cx="8" cy="7" r="6" fill="#fff" />
-                  <circle cx="14" cy="7" r="6" fill="#fff" fillOpacity="0.5" />
-                </svg>
-                <span className="text-white text-[9px] font-semibold lowercase tracking-tight">mastercard</span>
-              </span>
-              {/* American Express — beyaz 'kutu' logosu */}
-              <span className="h-7 px-2 rounded-md border border-white bg-white/[0.06] flex flex-col items-center justify-center leading-[1.05]" aria-label="American Express">
-                <span className="text-white text-[7px] font-extrabold tracking-[0.06em]">AMERICAN</span>
-                <span className="text-white text-[7px] font-extrabold tracking-[0.06em]">EXPRESS</span>
-              </span>
-              {/* Troy — beyaz wordmark */}
-              <span className="h-7 px-2.5 rounded-md border border-white/25 bg-white/[0.06] flex items-center text-white text-[14px] font-black lowercase tracking-tighter" aria-label="Troy">troy</span>
+      ) : (
+        <div className="pt-8 pb-4 bg-gray-13">
+          <div className="container mt-1">
+            <div className="row">
+              <div className="col-lg-5">
+                <div className="mb-6"><Logo className="d-inline-block" /></div>
+                <div className="mb-4">
+                  <div className="row no-gutters">
+                    <div className="col-auto"><i className="ec ec-support text-primary font-size-56" /></div>
+                    <div className="col pl-3">
+                      <div className="font-size-13 font-weight-light">Sorunuz mu var? Bize ulaşın!</div>
+                      {info.phone
+                        ? <a href={`tel:${info.phone.replace(/\s/g, "")}`} className="font-size-20 text-gray-90">{info.phone}</a>
+                        : <Link to="/sayfa/iletisim" className="font-size-20 text-gray-90">İletişim</Link>}
+                      {info.whatsapp && <div className="font-size-14 mt-1"><i className="fab fa-whatsapp mr-1" />{info.whatsapp}</div>}
+                    </div>
+                  </div>
+                </div>
+                {(info.address || info.email) && (
+                  <div className="mb-4">
+                    <h6 className="mb-1 font-weight-bold">İletişim Bilgileri</h6>
+                    {info.address && <address className="mb-1">{info.address}</address>}
+                    {info.email && <a href={`mailto:${info.email}`} className="text-gray-90">{info.email}</a>}
+                  </div>
+                )}
+                {tpl?.slogan && <p className="font-size-13 text-gray-90">{tpl.slogan}</p>}
+                {social.length > 0 && (
+                  <div className="my-4 my-md-4">
+                    <ul className="list-inline mb-0 opacity-7">
+                      {social.map(([k, icon, url]) => (
+                        <li className="list-inline-item mr-0" key={k}>
+                          <a className="btn font-size-20 btn-icon btn-soft-dark btn-bg-transparent rounded-circle" href={url} target="_blank" rel="noreferrer noopener" aria-label={k}>
+                            <span className={`${icon} btn-icon__inner`} />
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="col-lg-7">
+                <div className="row">
+                  {roots.length > 0 && (
+                    <>
+                      <div className="col-12 col-md mb-4 mb-md-0">
+                        <h6 className="mb-3 font-weight-bold">Hızlı Erişim</h6>
+                        <ul className="list-group list-group-flush list-group-borderless mb-0 list-group-transparent">
+                          {roots.slice(0, half).map((c) => <li key={c.id}><Link className="list-group-item list-group-item-action" to={`/${c.slug}`}>{c.name}</Link></li>)}
+                        </ul>
+                      </div>
+                      {roots.length > 1 && (
+                        <div className="col-12 col-md mb-4 mb-md-0">
+                          <ul className="list-group list-group-flush list-group-borderless mb-0 list-group-transparent mt-md-6">
+                            {roots.slice(half).map((c) => <li key={c.id}><Link className="list-group-item list-group-item-action" to={`/${c.slug}`}>{c.name}</Link></li>)}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {columns.slice(0, roots.length ? 2 : 3).map((col, i) => (
+                    <div className="col-12 col-md mb-4 mb-md-0" key={col.title || i}>
+                      <h6 className="mb-3 font-weight-bold">{col.title}</h6>
+                      <ul className="list-group list-group-flush list-group-borderless mb-0 list-group-transparent">
+                        {(col.links || []).map((l) => (
+                          <li key={l.to + l.label}><Link className="list-group-item list-group-item-action" to={l.to}>{l.label}</Link></li>
+                        ))}
+                        {(col.static || []).map((t, j) => <li key={j} className="list-group-item">{t}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+      <div className="bg-gray-14 py-2">
+        <div className="container">
+          <div className="flex-center-between d-block d-md-flex">
+            <div className="mb-3 mb-md-0">
+              {copyright || <>© {new Date().getFullYear()} <Link to="/" className="font-weight-bold text-gray-90">{info.name}</Link> - Tüm hakları saklıdır</>}
+            </div>
+            <PaymentBadges />
           </div>
         </div>
       </div>
     </footer>
-    </>
   );
 }

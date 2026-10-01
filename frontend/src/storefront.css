@@ -72,17 +72,10 @@
   display: flex !important;
 }
 
-.storefront-shell .btn-primary {
-  border-radius: var(--sf-radius-sm);
-  background: var(--sf-ink);
-  box-shadow: none;
-}
-
-.storefront-shell .btn-primary:hover { background: var(--sf-ink-soft); }
-.storefront-shell .btn-secondary { border-radius: var(--sf-radius-sm); }
+/* NOT: Eski vitrin buton/rozet/fiyat renk geçersiz kılmaları (.btn-primary vb.) kaldırıldı —
+   vitrin artık Electro temasını (.electro kapsamı, components/electro) kullanıyor ve bu kurallar
+   Electro'nun sarı birincil butonlarını siyaha çeviriyordu. */
 .storefront-shell .skeleton { background: var(--sf-surface-strong); }
-.storefront-shell .badge-sale { background: var(--sf-accent); }
-.storefront-shell .price-sale { color: var(--sf-accent); }
 
 .sf-page-title {
   color: var(--sf-ink);

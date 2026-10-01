@@ -13,7 +13,10 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException
-from motor.motor_asyncio import AsyncIOMotorDatabase
+try:  # typing only — motor is optional (default backend is the embedded localdb)
+    from motor.motor_asyncio import AsyncIOMotorDatabase
+except ImportError:  # pragma: no cover
+    from localdb import AsyncIOMotorDatabase
 
 from .deps import db as _db, require_admin, generate_id
 

@@ -1,5 +1,5 @@
 """
-Export products, categories and orders from MongoDB to JSON files for GitHub.
+Export products, categories and orders from the store database (localdb/SQLite) to JSON files for GitHub.
 """
 import asyncio
 import json
@@ -7,14 +7,15 @@ import os
 from datetime import datetime
 
 async def main():
-    from motor.motor_asyncio import AsyncIOMotorClient
     from dotenv import load_dotenv
     load_dotenv()
+    # Uygulamayla AYNI veritabanı: gömülü localdb (DB_PATH) — DB_BACKEND=mongo + MONGO_URL
+    # verilirse eski Motor/MongoDB bağlantısı kullanılır.
+    from localdb import make_client
 
-    MONGO_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
     DB_NAME = os.getenv("DB_NAME", "test_database")
 
-    client = AsyncIOMotorClient(MONGO_URL)
+    client = make_client()
     db = client[DB_NAME]
 
     output_dir = os.path.join(os.path.dirname(__file__), "..", "data_export")

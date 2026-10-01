@@ -1,5 +1,5 @@
 """
-Import data from data_export/ JSON files into MongoDB.
+Import data from data_export/ JSON files into the store database (localdb/SQLite).
 Usage: python3 import_data.py
 """
 import asyncio
@@ -7,14 +7,15 @@ import json
 import os
 
 async def main():
-    from motor.motor_asyncio import AsyncIOMotorClient
     from dotenv import load_dotenv
     load_dotenv()
+    # Uygulamayla AYNI veritabanı: gömülü localdb (DB_PATH) — DB_BACKEND=mongo + MONGO_URL
+    # verilirse eski Motor/MongoDB bağlantısı kullanılır.
+    from localdb import make_client
 
-    MONGO_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
     DB_NAME = os.getenv("DB_NAME", "test_database")
 
-    client = AsyncIOMotorClient(MONGO_URL)
+    client = make_client()
     db = client[DB_NAME]
 
     data_dir = os.path.join(os.path.dirname(__file__), "..", "data_export")

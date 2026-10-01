@@ -1,359 +1,257 @@
-import { useState, useRef, useMemo } from "react";
+// Electro ürün kartı ("product-item__outer / __inner / __body / __footer").
+// Varyantlar:
+//   grid     → vitrin/kategori ızgarası (varsayılan)
+//   card     → yatay kart (Electro "Bestsellers" — product-item__card)
+//   list     → küçük liste (footer "Öne Çıkanlar/İndirimdekiler" — product-item__list)
+//   listview → kategori sayfası liste görünümü (açıklama + sağda fiyat/sepete ekle)
+// Mevcut davranışlar korunur: sepete ekle (varyant seçimi gerekiyorsa ürüne yönlendirir),
+// favori, tükendi, indirim rozeti, "3 Al 2 Öde" promo rozeti, select_item analitiği, data-testid'ler.
 import { Link, useNavigate } from "react-router-dom";
-import { Bookmark, ShoppingBag } from "lucide-react";
+import { toast } from "sonner";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
-import { optimizeImg, galleryImages } from "../lib/img";
-import { resolveColor, needsBorder, MULTI_GRADIENT } from "../lib/colorMap";
-import { sortLikeSize } from "../utils/sizeSort";
-import { priceView } from "../lib/price";
+import { optimizeImg, firstImage } from "../lib/img";
 import { trackSelectItem } from "../lib/dataLayer";
-import { toast } from "sonner";
+import { fmtPrice, productHref, priceOf, isSoldOut, needsVariantChoice } from "./electro/format";
+import { toggleCompare, useCompare } from "./electro/compare";
+import useCategoryTree from "./electro/useCategoryTree";
 
-export default function ProductCard({ product, listId = "", listName = "", index }) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [activeSib, setActiveSib] = useState(null); // hover edilen renk kardeşi
+function stripHtml(s) {
+  return String(s || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function CardPrice({ product, size = "grid" }) {
+  const pv = priceOf(product);
+  if (size === "list") {
+    return pv.hasDiscount ? (
+      <div className="prodcut-price mt-auto flex-horizontal-center">
+        <ins className="font-size-15 text-decoration-none text-red">{fmtPrice(pv.display)}</ins>
+        <del className="font-size-12 text-gray-9 ml-2">{fmtPrice(pv.list)}</del>
+      </div>
+    ) : (
+      <div className="prodcut-price mt-auto"><div className="font-size-15">{fmtPrice(pv.display)}</div></div>
+    );
+  }
+  return pv.hasDiscount ? (
+    <div className="prodcut-price d-flex align-items-center flex-wrap position-relative">
+      <ins className="font-size-20 text-red text-decoration-none mr-2">{fmtPrice(pv.display)}</ins>
+      <del className="font-size-12 tex-gray-6 position-absolute bottom-100">{fmtPrice(pv.list)}</del>
+    </div>
+  ) : (
+    <div className="prodcut-price"><div className="text-gray-100">{fmtPrice(pv.display)}</div></div>
+  );
+}
+
+export function useProductActions(product, { listId = "", listName = "", index } = {}) {
   const { addItem } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
   const navigate = useNavigate();
-  const isFav = isFavorite(product.id);
-  const imageContainerRef = useRef(null);
+  const compare = useCompare();
+  const soldOut = isSoldOut(product);
+  const href = productHref(product);
 
-  // Remove duplicate first image
-  // Yalnız gerçek görseller (beden tablosu/video nesneleri süzülür — lib/img.galleryImages)
-  const allImages = galleryImages(product);
-  const images = allImages.length > 1 && allImages[0] === allImages[1]
-    ? allImages.slice(1)
-    : allImages;
-
-  const hasMultipleImages = images.length > 1;
-  // İndirim görünümü TEK KAYNAK'tan (lib/price) — vitrin/arama/menü/kombin ile birebir tutarlı.
-  const pv = priceView(product);
-  const displayPrice = pv.display;
-  const hasDiscount = pv.hasDiscount;
-
-  // Renk kardeşleri (aynı modelin diğer renkleri) — backend `color_siblings` döndürür.
-  const siblings = Array.isArray(product.color_siblings) ? product.color_siblings : [];
-  const hasColors = siblings.length > 1;
-  const activeId = activeSib?.id || product.id;
-  const targetSlug = activeSib?.slug || product.slug || product.id;
-
-  // Bedenler (hover'da görsel altında) — varyantlardan benzersiz beden + stok.
-  const sizeList = useMemo(() => {
-    const vs = product.variants || [];
-    const map = new Map();
-    for (const v of vs) {
-      const s = (v.size || "").toString().trim();
-      if (!s) continue;
-      if (!map.has(s)) map.set(s, { size: s, variant: v, stock: Number(v.stock) || 0 });
-      else map.get(s).stock += Number(v.stock) || 0;
-    }
-    const arr = [...map.values()];
-    try { return sortLikeSize(arr, (x) => x.size); } catch { return arr; }
-  }, [product.variants]);
-
-  // Efektif stok: varyant varsa varyant stokları toplamı, yoksa ürün stoğu.
-  const variants = product.variants || [];
-  const variantStock = variants.reduce((s, v) => s + (Number(v.stock) || 0), 0);
-  const effectiveStock = variants.length > 0 ? variantStock : (Number(product.stock) || 0);
-  const isSoldOut = effectiveStock <= 0;
-
-  // Katmanlı galeri: hover/kaydırmada src DEĞİŞTİRİLMEZ (yüklenene kadar beyaz alan +
-  // alt yazısı [ürün adı] görünüyordu). Taban görsel hep altta kalır; diğer kareler ilk
-  // etkileşimde üstte şeffaf katman olarak yüklenir, opaklıkla geçiş yapılır.
-  const [galleryReady, setGalleryReady] = useState(false);
-
-  const handleQuickAdd = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (isSoldOut) {
-      toast.error("Bu ürün tükendi");
-      return;
-    }
-    // KRİTİK: Bedenli üründe beden SEÇMEDEN sepete ekleme yapma. Aksi halde siparişe bedensiz
-    // kalem düşüyor ve hangi bedenin gönderileceği bilinemiyordu (ör. W10322 bermuda şort).
-    // Bedeni olan üründe "+" butonu, beden seçimi için ürün sayfasına yönlendirir.
-    if (sizeList.length > 0) {
-      navigate(`/${targetSlug}`);
-      return;
-    }
-    addItem(product);
+  const select = () => { try { trackSelectItem({ product, listId, listName, index }); } catch (_) { /* silent */ } };
+  const add = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (soldOut) { toast.error("Bu ürün tükendi"); return; }
+    // Seçim gerektiren (birden çok varyantlı) üründe seçim yapılmadan sepete eklenmez → ürün sayfası.
+    if (needsVariantChoice(product)) { select(); navigate(href); return; }
+    const vs = (product.variants || []).filter((v) => v && v.id);
+    addItem(product, vs.length === 1 ? vs[0] : null);
     toast.success("Ürün sepete eklendi");
   };
-
-  // Hover'da bedene tıklayınca o beden varyantını sepete ekle.
-  const handleSizeAdd = (e, s) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!s || s.stock <= 0) return;
-    addItem(product, s.variant);
-    toast.success(`Sepete eklendi · Beden ${s.size}`);
+  const fav = (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } toggleFavorite(product); };
+  const cmp = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    const r = toggleCompare(product);
+    toast.success(r.added ? "Karşılaştırma listesine eklendi" : "Karşılaştırma listesinden çıkarıldı");
   };
-
-  const handleFavorite = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleFavorite(product);
+  return {
+    soldOut, href, select, add, fav, cmp,
+    isFav: isFavorite(product.id),
+    inCompare: compare.some((p) => p.id === product.id),
   };
+}
 
-  const handleSelect = () => {
-    try {
-      trackSelectItem({ product, listId, listName, index });
-    } catch (_) { /* silent */ }
-  };
+function useCategoryLabel(product) {
+  const tree = useCategoryTree();
+  const name = product.category_name || (product.category && typeof product.category === "object" ? product.category.name : "");
+  const id = product.category_id != null ? String(product.category_id) : null;
+  const node = id ? tree.byId.get(id) : null;
+  return { label: name || (node && node.name) || "", to: node ? `/${node.slug}` : null };
+}
 
-  // Görseller yatay kaydırma: fare/parmak sağa gittikçe sonraki görsel (Mango usulü).
-  // Ortak mantık — hem masaüstü mouse hem mobil touch bunu kullanır.
-  const updateImageFromX = (clientX) => {
-    if (activeSib || !hasMultipleImages || !imageContainerRef.current) return;
-    const rect = imageContainerRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const width = rect.width;
-    const segmentWidth = width / images.length;
-    const newIndex = Math.min(Math.max(Math.floor(x / segmentWidth), 0), images.length - 1);
-    setCurrentImageIndex((prev) => (newIndex !== prev ? newIndex : prev));
-  };
-
-  const handleMouseMove = (e) => {
-    updateImageFromX(e.clientX);
-  };
-
-  const handleMouseLeave = () => {
-    setCurrentImageIndex(0);
-  };
-
-  // Mobil dokunmatik kaydırma — yatay parmak hareketi resmi değiştirir (mouse hover'ın
-  // dokunmatik karşılığı); dikey hareket baskınsa sayfa scroll'una karışmaz.
-  const touchRef = useRef({ x: 0, y: 0, swiping: false });
-
-  const handleTouchStart = (e) => {
-    if (activeSib || !hasMultipleImages) return;
-    setGalleryReady(true);
-    const t = e.touches[0];
-    touchRef.current = { x: t.clientX, y: t.clientY, swiping: false };
-  };
-
-  const handleTouchMove = (e) => {
-    if (activeSib || !hasMultipleImages) return;
-    const t = e.touches[0];
-    const dx = t.clientX - touchRef.current.x;
-    const dy = t.clientY - touchRef.current.y;
-    if (touchRef.current.swiping || (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy))) {
-      touchRef.current.swiping = true;
-      e.preventDefault(); // yatay galeri kaydırması — sayfanın dikey scroll'unu engelle
-      updateImageFromX(t.clientX);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    touchRef.current.swiping = false;
-  };
-
+function CardImage({ product, w = 300, className = "img-fluid", boxClass = "el-img-box" }) {
+  const src = optimizeImg(firstImage(product) || "/placeholder.jpg", w);
   return (
-    <div className="product-card group" data-testid={`product-card-${product.id}`}>
-      {/* Image (Link) */}
-      <Link to={`/${targetSlug}`} onClick={handleSelect} aria-label={product.name}>
-        <div
-          ref={imageContainerRef}
-          className="relative aspect-[2/3] bg-white overflow-hidden"
-          onMouseEnter={() => { if (hasMultipleImages) setGalleryReady(true); }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          {/* Taban görsel — her zaman altta ve dolu; üst katman yüklenene kadar bu görünür */}
-          <img
-            src={optimizeImg(images[0] || "/placeholder.jpg", 700)}
-            alt={product.name}
-            className="w-full h-full object-cover object-top"
-            loading="lazy"
-            decoding="async"
-          />
-          {/* Galeri kareleri — ilk etkileşimde topluca yüklenir (ön-yükleme), opaklıkla geçilir.
-              alt="" olduğundan yüklenirken ASLA yazı/beyaz kutu görünmez. */}
-          {galleryReady && !activeSib && images.slice(1).map((im, i) => (
-            <img
-              key={im}
-              src={optimizeImg(im, 700)}
-              alt=""
-              aria-hidden="true"
-              className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-150 ${currentImageIndex === i + 1 ? "opacity-100" : "opacity-0"}`}
-              decoding="async"
-            />
-          ))}
-          {/* Renk kardeşi önizlemesi — o da katman: yüklenene kadar taban görünür */}
-          {activeSib?.image && (
-            <img
-              src={optimizeImg(activeSib.image, 700)}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover object-top"
-              decoding="async"
-            />
-          )}
+    <span className={boxClass}>
+      <img className={className} src={src} alt={product.name} loading="lazy" decoding="async" width="212" height="200" />
+    </span>
+  );
+}
 
-          {/* Tükendi rozeti — görselin TAM ORTASINDA (sol üst köşede değil) */}
-          {isSoldOut && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-              <span className="bg-black/80 text-white text-[11px] uppercase tracking-[0.15em] px-3 py-1.5">
-                Tükendi
-              </span>
-            </div>
-          )}
+function Badges({ product, pv, soldOut }) {
+  return (
+    <>
+      {pv.hasDiscount && pv.discountPct > 0 && (
+        <span className="el-badge el-badge--sale" data-testid={`discount-badge-${product.id}`}>-%{pv.discountPct}</span>
+      )}
+      {soldOut && <span className="el-badge el-badge--soldout">Tükendi</span>}
+    </>
+  );
+}
 
-          {/* İndirim oranı rozeti — tam sol üst köşeye yapışık */}
-          {hasDiscount && (
-            <div
-              className="absolute top-0 left-0 z-10 bg-[#6b6b64] text-white text-xs font-normal px-2.5 py-1.5 leading-none"
-              data-testid={`discount-badge-${product.id}`}
-            >
-              %{Math.round(((product.price - displayPrice) / product.price) * 100)}
-            </div>
-          )}
-
-          {/* Favorite Button */}
-          <button
-            onClick={handleFavorite}
-            className="absolute top-3 right-3 z-10"
-            data-testid={`favorite-${product.id}`}
-            aria-label={isFav ? "Kaydedilenlerden çıkar" : "Kaydet"}
-            title={isFav ? "Kaydedilenlerden çıkar" : "Kaydet"}
-          >
-            <Bookmark
-              size={20}
-              strokeWidth={1.5}
-              className={`transition-colors ${isFav ? "fill-black text-black" : "text-gray-400 hover:text-black"}`}
-            />
-          </button>
-
-          {/* Bedenler — hover'da görselin en altında, Mango usulü (ortalı, ferah aralık) */}
-          {sizeList.length > 0 && (
-            <>
-              {/* Bedenler — Mango birebir: alta sabit yarı saydam açık-gri dikdörtgen bar, bedenler ortalı (DOM'dan: rgba(250,250,250,0.898), gap 8px, 13px/600, #131313) */}
-              <div
-                className="absolute inset-x-0 bottom-0 z-10 hidden md:flex items-center justify-center gap-2 px-4 py-3.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200"
-                style={{ backgroundColor: "rgba(250,250,250,0.898)" }}
-              >
-                {sizeList.map((s) => (
-                  <button
-                    key={s.size}
-                    onClick={(e) => handleSizeAdd(e, s)}
-                    disabled={s.stock <= 0}
-                    className={`text-[13px] font-semibold leading-none px-2 py-2 transition-opacity ${
-                      s.stock <= 0
-                        ? "text-[#131313]/30 line-through cursor-not-allowed"
-                        : "text-[#131313] hover:opacity-60"
-                    }`}
-                    title={s.stock <= 0 ? `${s.size} · Tükendi` : `${s.size} · Sepete ekle`}
-                  >
-                    {s.size}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* Görsel göstergeleri — hover'da bedenlere yer açmak için gizlenir */}
-          {hasMultipleImages && !activeSib && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-0 md:group-hover:opacity-0 transition-opacity">
-              {images.map((_, i) => (
-                <div
-                  key={i}
-                  className={`transition-all ${
-                    i === currentImageIndex
-                      ? "w-5 h-1.5 bg-black rounded-full"
-                      : "w-1.5 h-1.5 bg-gray-300 rounded-full"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </Link>
-
-      {/* Product Info */}
-      <div className="mt-3">
-        <Link to={`/${targetSlug}`} onClick={handleSelect}>
-          {/* "3 AL 2 ÖDE" gibi adet kampanyası ibaresi — panelde aktif otomatik X-al-Y-öde
-              kampanyasının kapsamındaki ürünlerde sunucu (promo_badge) doldurur. */}
-          {product.promo_badge ? (
-            <p className="text-[11px] md:text-xs font-bold tracking-wide uppercase text-red-600 mb-1 line-clamp-1" data-testid={`promo-badge-${product.id}`}>
-              {product.promo_badge}
-            </p>
-          ) : null}
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm leading-snug flex-1 line-clamp-2">{product.name}</h3>
-            <button
-              onClick={handleQuickAdd}
-              disabled={isSoldOut}
-              className={`flex-shrink-0 p-1 md:mr-2 transition-opacity ${isSoldOut ? "opacity-30 cursor-not-allowed" : "hover:opacity-60"}`}
-              data-testid={`quick-add-${product.id}`}
-              aria-label={isSoldOut ? "Tükendi" : "Sepete ekle"}
-              title={isSoldOut ? "Tükendi" : "Sepete Ekle"}
-            >
-              <ShoppingBag size={18} strokeWidth={1.5} />
-            </button>
-          </div>
-
-          {/* Price */}
-          <div className="mt-1.5 flex items-center gap-2">
-            {hasDiscount ? (
-              <>
-                <span className="text-xs text-gray-400 line-through">{product.price.toFixed(2).replace('.', ',')} TL</span>
-                <span className="text-sm text-red-600 font-medium">{displayPrice.toFixed(2).replace('.', ',')} TL</span>
-              </>
-            ) : (
-              <span className="text-sm">{(displayPrice || 0).toFixed(2).replace('.', ',')} TL</span>
-            )}
-          </div>
-        </Link>
-
-        {/* Renk kutucukları (swatch) — aynı modelin diğer renkleri */}
-        {hasColors && (
-          <div
-            className="mt-2 flex flex-wrap items-center gap-1.5"
-            onMouseLeave={() => setActiveSib(null)}
-            data-testid={`color-swatches-${product.id}`}
-          >
-            {siblings.slice(0, 6).map((sib) => {
-              const isActive = sib.id === activeId;
-              const isSelf = sib.id === product.id;
-              const col = resolveColor(sib.color);
-              let bgStyle, fallback = false;
-              if (col?.type === "solid") bgStyle = { backgroundColor: col.value };
-              else if (col?.type === "multi") bgStyle = { background: MULTI_GRADIENT };
-              else fallback = true; // renk adı çözülemedi → görsele düş (varsa)
-              const lightBorder = col?.type === "solid" && needsBorder(col.value);
-              return (
-                <Link
-                  key={sib.id}
-                  to={`/${sib.slug || sib.id}`}
-                  onMouseEnter={() => setActiveSib(isSelf ? null : sib)}
-                  onClick={(e) => { if (isSelf) e.preventDefault(); }}
-                  className={`w-5 h-5 overflow-hidden flex-shrink-0 transition-all ${
-                    isActive
-                      ? "ring-1 ring-offset-1 ring-black border border-black"
-                      : lightBorder
-                        ? "border border-gray-300 hover:border-black"
-                        : "border border-transparent hover:ring-1 hover:ring-offset-1 hover:ring-black"
-                  }`}
-                  title={sib.color || ""}
-                  aria-label={sib.color || "Renk"}
-                >
-                  {fallback
-                      ? <span className="block w-full h-full bg-neutral-200" />
-                    : <span className="block w-full h-full" style={bgStyle} />}
-                </Link>
-              );
-            })}
-            {siblings.length > 6 && (
-              <span className="text-[11px] text-gray-400">+{siblings.length - 6}</span>
-            )}
-          </div>
-        )}
+function FooterLinks({ product, a, wishlistLabel = "Favorilere Ekle" }) {
+  return (
+    <div className="product-item__footer">
+      <div className="border-top pt-2 flex-center-between flex-wrap">
+        <a href="#karsilastir" onClick={a.cmp} className={`text-gray-6 font-size-13${a.inCompare ? " text-blue" : ""}`} data-testid={`compare-${product.id}`}>
+          <i className="ec ec-compare mr-1 font-size-15" /> Karşılaştır
+        </a>
+        <a href="#favori" onClick={a.fav} className={`text-gray-6 font-size-13${a.isFav ? " text-red" : ""}`}
+          data-testid={`favorite-${product.id}`} aria-label={a.isFav ? "Favorilerden çıkar" : "Favorilere ekle"} aria-pressed={a.isFav}>
+          <i className={`${a.isFav ? "fas fa-heart" : "ec ec-favorites"} mr-1 font-size-15`} /> {a.isFav ? "Favorilerde" : wishlistLabel}
+        </a>
       </div>
     </div>
+  );
+}
+
+function AddButton({ product, a }) {
+  return (
+    <div className="prodcut-add-cart">
+      <a href={a.href} onClick={a.add} className={`btn-add-cart btn-primary transition-3d-hover${a.soldOut ? " disabled" : ""}`}
+        data-testid={`quick-add-${product.id}`} aria-label={a.soldOut ? "Tükendi" : "Sepete ekle"} title={a.soldOut ? "Tükendi" : "Sepete Ekle"}>
+        <i className="ec ec-add-to-cart" />
+      </a>
+    </div>
+  );
+}
+
+export default function ProductCard({ product, listId = "", listName = "", index, variant = "grid", as: Tag = "div", className = "", innerClassName, wishlistLabel }) {
+  const a = useProductActions(product, { listId, listName, index });
+  const cat = useCategoryLabel(product);
+  const pv = priceOf(product);
+  const promo = product.promo_badge ? (
+    <div className="font-size-12 font-weight-bold text-red text-uppercase mb-1" data-testid={`promo-badge-${product.id}`}>{product.promo_badge}</div>
+  ) : null;
+  const catLink = cat.label ? (
+    <div className="mb-2">{cat.to ? <Link to={cat.to} className="font-size-12 text-gray-5">{cat.label}</Link> : <span className="font-size-12 text-gray-5">{cat.label}</span>}</div>
+  ) : <div className="mb-2 font-size-12">&nbsp;</div>;
+  const title = (cls = "mb-1 product-item__title") => (
+    <h5 className={cls}><Link to={a.href} onClick={a.select} className="text-blue font-weight-bold">{product.name}</Link></h5>
+  );
+
+  if (variant === "list") {
+    return (
+      <Tag className={`product-item product-item__list row no-gutters mb-6 remove-divider ${className}`} data-testid={`product-card-${product.id}`}>
+        <div className="col-auto">
+          <Link to={a.href} onClick={a.select} className="d-block width-75 text-center">
+            <CardImage product={product} w={150} boxClass="el-img-box el-img-box--sq" />
+          </Link>
+        </div>
+        <div className="col pl-4 d-flex flex-column">
+          {title("product-item__title mb-0")}
+          <CardPrice product={product} size="list" />
+        </div>
+      </Tag>
+    );
+  }
+
+  if (variant === "card") {
+    return (
+      <Tag className={`product-item product-item__card pb-2 mb-2 pb-md-0 mb-md-0 ${className}`} data-testid={`product-card-${product.id}`}>
+        <div className="product-item__outer h-100">
+          <div className={innerClassName || "product-item__inner p-md-3 row no-gutters"}>
+            <div className="col col-lg-auto product-media-left position-relative">
+              <Link to={a.href} onClick={a.select} className="max-width-150 d-block">
+                <CardImage product={product} w={300} />
+              </Link>
+              <Badges product={product} pv={pv} soldOut={a.soldOut} />
+            </div>
+            <div className="col product-item__body pl-2 pl-lg-3 mr-xl-2 mr-wd-1">
+              <div className="mb-4">
+                {catLink}
+                {promo}
+                {title("product-item__title")}
+              </div>
+              <div className="flex-center-between mb-3">
+                <CardPrice product={product} />
+                <div className="d-none d-xl-block"><AddButton product={product} a={a} /></div>
+              </div>
+              <FooterLinks product={product} a={a} wishlistLabel={wishlistLabel || "Favori"} />
+            </div>
+          </div>
+        </div>
+      </Tag>
+    );
+  }
+
+  if (variant === "listview") {
+    const desc = stripHtml(product.short_description || product.description).slice(0, 260);
+    return (
+      <Tag className={`product-item remove-divider ${className}`} data-testid={`product-card-${product.id}`}>
+        <div className="product-item__outer w-100">
+          <div className="product-item__inner remove-prodcut-hover py-4 row">
+            <div className="product-item__header col-6 col-md-4">
+              <div className="mb-2 position-relative">
+                <Link to={a.href} onClick={a.select} className="d-block text-center"><CardImage product={product} w={400} /></Link>
+                <Badges product={product} pv={pv} soldOut={a.soldOut} />
+              </div>
+            </div>
+            <div className="product-item__body col-6 col-md-5">
+              <div className="pr-lg-10">
+                {catLink}
+                {promo}
+                {title("product-item__title")}
+                <div className="prodcut-price mb-2 d-md-none"><CardPrice product={product} /></div>
+                {desc && <p className="font-size-14 text-gray-90 mb-0 d-none d-md-block">{desc}</p>}
+              </div>
+            </div>
+            <div className="product-item__footer col-md-3 d-md-block">
+              <div className="mb-3">
+                <div className="d-none d-md-block"><CardPrice product={product} /></div>
+                <div className="prodcut-add-cart mt-3">
+                  <a href={a.href} onClick={a.add} className="btn btn-sm btn-block btn-primary-dark btn-wide transition-3d-hover" data-testid={`quick-add-${product.id}`}>
+                    {a.soldOut ? "Tükendi" : "Sepete Ekle"}
+                  </a>
+                </div>
+              </div>
+              <div className="flex-horizontal-center justify-content-between justify-content-wd-center flex-wrap border-top pt-3">
+                <a href="#karsilastir" onClick={a.cmp} className="text-gray-6 font-size-13 mx-wd-3"><i className="ec ec-compare mr-1 font-size-15" /> Karşılaştır</a>
+                <a href="#favori" onClick={a.fav} className={`text-gray-6 font-size-13 mx-wd-3${a.isFav ? " text-red" : ""}`} data-testid={`favorite-${product.id}`} aria-pressed={a.isFav}>
+                  <i className={`${a.isFav ? "fas fa-heart" : "ec ec-favorites"} mr-1 font-size-15`} /> Favori
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Tag>
+    );
+  }
+
+  return (
+    <Tag className={`product-item ${className}`} data-testid={`product-card-${product.id}`}>
+      <div className="product-item__outer h-100">
+        <div className={innerClassName || "product-item__inner px-xl-4 p-3"}>
+          <div className="product-item__body pb-xl-2">
+            {catLink}
+            {promo}
+            {title()}
+            <div className="mb-2 position-relative">
+              <Link to={a.href} onClick={a.select} className="d-block text-center" aria-label={product.name}>
+                <CardImage product={product} />
+              </Link>
+              <Badges product={product} pv={pv} soldOut={a.soldOut} />
+            </div>
+            <div className="flex-center-between mb-1">
+              <CardPrice product={product} />
+              <AddButton product={product} a={a} />
+            </div>
+          </div>
+          <FooterLinks product={product} a={a} wishlistLabel={wishlistLabel} />
+        </div>
+      </div>
+    </Tag>
   );
 }

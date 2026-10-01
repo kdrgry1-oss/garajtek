@@ -3,7 +3,6 @@ Shared dependencies and utilities for all routes
 """
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
@@ -13,19 +12,16 @@ import re
 import uuid
 import random
 
-# Persistent database
-MONGO_URL = os.environ.get('MONGO_URL')
-if not MONGO_URL:
-    # Try unix socket first (works with OS sandbox), fallback to TCP
-    import pathlib
-    sock = pathlib.Path('/tmp/mongodb-27017.sock')
-    if sock.exists():
-        MONGO_URL = 'mongodb://%2Ftmp%2Fmongodb-27017.sock'
-    else:
-        MONGO_URL = 'mongodb://127.0.0.1:27017'
+# Persistent database — embedded localdb (Motor-compatible, single SQLite file at DB_PATH,
+# default backend/data/store.db). No MongoDB server is needed. Legacy Motor/MongoDB is used
+# ONLY when DB_BACKEND=mongo AND MONGO_URL are both set. localdb is single-process: run
+# uvicorn with ONE worker (see backend/localdb/__init__.py).
+from localdb import make_client as _make_db_client, backend_name as _db_backend_name
+
+DB_BACKEND = _db_backend_name()
 db_name = os.environ.get('DB_NAME', 'test_database')
 
-client = AsyncIOMotorClient(MONGO_URL)
+client = _make_db_client()
 db = client[db_name]
 
 # Security

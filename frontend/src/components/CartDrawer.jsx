@@ -1,50 +1,91 @@
+// Sepet paneli — Electro "u-sidebar" (sağdan açılan panel) görünümünde. Sepete ürün eklenince
+// (CartContext.addItem → setIsOpen(true)) ve mobil header'daki sepet ikonundan açılır.
+// İş mantığı aynen korunur: kampanya/kupon değerlendirme (/coupons/evaluate), ücretsiz kargo
+// eşiği (shippingQuote), kalem indirim görünümü (cartLineView), sepet paylaş, analitik.
 import { Link } from "react-router-dom";
-import { shippingQuote } from "../lib/shippingRules";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { shippingQuote } from "../lib/shippingRules";
 import { useShipping } from "../lib/shipping";
-import { X, Plus, Minus, ShoppingBag, Sparkles, Share2 } from "lucide-react";
 import { useCart } from "../context/CartContext";
-import { priceView, cartLineView, cartSummary } from "../lib/price";
+import { cartLineView, cartSummary } from "../lib/price";
 import { trackRemoveFromCart } from "../lib/dataLayer";
 import { shareCart } from "../lib/shareCart";
-
-// Çekmece öneri fiyatı — indirim varsa üstü çizili liste + indirimli (tutarlı).
-function MiniPrice({ p }) {
-  const pv = priceView(p);
-  if (pv.hasDiscount) {
-    return (
-      <p className="text-[10px] tabular-nums">
-        <span className="text-black/40 line-through mr-1">{pv.list.toFixed(0)}</span>
-        <span className="text-red-600">{pv.display.toFixed(0)} TL</span>
-      </p>
-    );
-  }
-  return <p className="text-[10px] tabular-nums text-black/70">{pv.display.toFixed(0)} TL</p>;
-}
+import { optimizeImg } from "../lib/img";
+import { fmtPrice } from "./electro/format";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+export function trackRemove(item) {
+  try {
+    trackRemoveFromCart({
+      product: { id: item.productId || item.product_id || item.id, name: item.name, sale_price: item.price, price: item.price },
+      variant: { size: item.size, color: item.color, price: item.price },
+      quantity: item.quantity || 1,
+    });
+  } catch (_) { /* silent */ }
+}
+
+/** Sepet kalemleri listesi — mini sepet (dropdown) ve panel ortak kullanır. */
+export function MiniCartList({ items, onNavigate, removeItem, updateQuantity, compact = false }) {
+  return (
+    <ul className="list-unstyled px-3 pt-3 mb-0">
+      {items.map((item) => {
+        const lv = cartLineView(item);
+        return (
+          <li key={item.id} className="border-bottom pb-3 mb-3" data-testid={`cart-line-${item.id}`}>
+            <ul className="list-unstyled row mx-n2 mb-0">
+              <li className="px-2 col-auto">
+                <Link to={`/${item.slug || item.productId}`} onClick={onNavigate} className="d-block el-mini-thumb">
+                  <img className="img-fluid" src={optimizeImg(item.image, 150) || "/placeholder.jpg"} alt={item.name} width="75" height="75" loading="lazy" />
+                </Link>
+              </li>
+              <li className="px-2 col">
+                <h5 className="text-blue font-size-14 font-weight-bold mb-1">
+                  <Link to={`/${item.slug || item.productId}`} onClick={onNavigate} className="text-blue">{item.name}</Link>
+                </h5>
+                {(item.color || item.size) && (
+                  <div className="font-size-12 text-gray-5 mb-1">{[item.color, item.size].filter(Boolean).join(" / ")}</div>
+                )}
+                <span className="font-size-14">
+                  {item.quantity} × {lv.hasDiscount && <del className="text-gray-9 font-size-12 mr-1">{fmtPrice(lv.listUnit)}</del>}
+                  <span className={lv.hasDiscount ? "text-red" : ""}>{fmtPrice(lv.unit)}</span>
+                </span>
+                {!compact && (
+                  <div className="d-flex align-items-center mt-2">
+                    <div className="border rounded-pill d-inline-flex align-items-center px-2 py-0 font-size-13">
+                      <button type="button" className="btn btn-xs btn-icon border-0 p-0 px-1" onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1} data-testid={`decrease-${item.id}`} aria-label="Azalt"><small className="fas fa-minus" /></button>
+                      <span className="px-2">{item.quantity}</span>
+                      <button type="button" className="btn btn-xs btn-icon border-0 p-0 px-1" onClick={() => updateQuantity(item.id, item.quantity + 1)} data-testid={`increase-${item.id}`} aria-label="Artır"><small className="fas fa-plus" /></button>
+                    </div>
+                  </div>
+                )}
+              </li>
+              <li className="px-2 col-auto">
+                <button type="button" className="btn btn-link p-0 text-gray-90" onClick={() => { trackRemove(item); removeItem(item.id); }} data-testid={`remove-${item.id}`} aria-label="Kaldır">
+                  <i className="ec ec-close-remove" />
+                </button>
+              </li>
+            </ul>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function CartDrawer() {
-  const { items, isOpen, setIsOpen, removeItem, updateQuantity, addItem, total, itemCount } = useCart();
+  const { items, isOpen, setIsOpen, removeItem, updateQuantity, total, itemCount } = useCart();
   const { shippingFee, freeShippingThreshold } = useShipping();
   const freeShippingLimit = freeShippingThreshold || 0;
-
-  const [suggestions, setSuggestions] = useState([]);
-  const [bestsellers, setBestsellers] = useState([]);
-  // Kampanya/kupon indirimi — Sepet SAYFASI ile AYNI motor (evaluate). Önceden çekmece
-  // indirimi hiç hesaplamıyor, ürünleri tam fiyatla gösteriyordu ("sepete ekleyince ilk fiyat").
   const [promoDiscount, setPromoDiscount] = useState(0);
 
-  // ÜCRETSİZ KARGO EŞİĞİ — sunucunun kararıyla AYNI taban: İNDİRİM SONRASI sepet tutarı
-  // (orders.create_order: (_subtotal - _server_discount) >= eşik). Eskiden indirimSİZ ara
-  // toplam baz alınıyordu; 3490 TL'lik sepette "510 TL daha" deniyor ama 510 TL'lik ürün
-  // eklenince indirim de büyüdüğü için net tutar eşiğin altında kalıp kargo yine ücretli
-  // çıkıyordu (müşteriye tutmayan söz). Artık bar ödenecek tutarı baz alır.
+  // Ücretsiz kargo eşiği — sunucuyla aynı taban (indirim SONRASI tutar).
   const netTotal = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee }).basis;
   const remaining = freeShippingThreshold != null ? Math.max(0, freeShippingThreshold - netTotal) : 0;
+
   useEffect(() => {
-    if (!isOpen || items.length === 0) { setPromoDiscount(0); return; }
+    if (!isOpen || items.length === 0) { setPromoDiscount(0); return undefined; }
     let cancel = false;
     axios.post(`${API}/coupons/evaluate`, {
       cart_total: total,
@@ -55,246 +96,84 @@ export default function CartDrawer() {
     return () => { cancel = true; };
   }, [isOpen, items, total]);
 
-  // Sepet ürünlerine göre kombin önerisi (cart-suggestions API)
   useEffect(() => {
-    if (!isOpen || items.length === 0) return;
-    // Y30: Sepet kalemleri camelCase `productId` taşır; `id` ise "productId-variantId" bileşiğidir.
-    // Önceden `i.product_id || i.id` bileşik id gönderiyor, hiçbir ürünle eşleşmiyordu. Ayrıca
-    // endpoint {items:[...]} döner (suggestions değil).
-    const productIds = items.map((i) => i.productId || i.product_id).filter(Boolean);
-    if (!productIds.length) return;
-    axios.post(`${API}/products/cart-suggestions`, { product_ids: productIds, limit: 4 })
-      .then((r) => setSuggestions((r.data?.items || r.data?.suggestions || []).slice(0, 4)))
-      .catch(() => setSuggestions([]));
-  }, [isOpen, items.length]);
-
-  // Bu ay en çok satan ürünler (sort=popular)
-  useEffect(() => {
-    if (!isOpen) return;
-    if (bestsellers.length > 0) return;
-    axios.get(`${API}/products?limit=6&sort=popular`)
-      .then((r) => setBestsellers((r.data?.products || []).slice(0, 6)))
-      .catch(() => setBestsellers([]));
-  }, [isOpen]);
+    if (!isOpen) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setIsOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, setIsOpen]);
 
   if (!isOpen) return null;
+  const close = () => setIsOpen(false);
+  const { listSum, grand, totalDisc } = cartSummary(items, promoDiscount);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
-        onClick={() => setIsOpen(false)}
-      />
-
-      {/* Drawer */}
-      <div
-        className="fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] bg-white shadow-2xl flex flex-col animate-slide-right"
-        data-testid="cart-drawer"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
-          <h2 className="text-[11px] tracking-[0.3em] uppercase text-black">
-            Sepetim ({itemCount})
-          </h2>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="p-2 -mr-2 hover:opacity-60 transition-opacity"
-            data-testid="close-cart"
-            aria-label="Kapat"
-          >
-            <X size={18} strokeWidth={1.4} />
-          </button>
-        </div>
-
-        {/* Free Shipping Progress */}
-        {remaining > 0 && items.length > 0 && (
-          <div className="px-5 py-3 bg-stone-50 border-b border-black/5">
-            <p className="text-[11px] text-center mb-2 text-black/70">
-              Ücretsiz kargo için <span className="font-semibold text-emerald-600">{remaining.toFixed(2)} TL</span> daha
-            </p>
-            <div className="h-[2px] bg-black/10 overflow-hidden">
-              <div
-                className="h-full bg-black transition-all duration-700 ease-out"
-                style={{ width: `${Math.min(100, (netTotal / freeShippingLimit) * 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Items */}
-        <div className="flex-1 overflow-y-auto px-5">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center py-16">
-              <ShoppingBag size={36} strokeWidth={1.2} className="text-black/30 mb-4" />
-              <p className="text-sm text-black/60 mb-6">Sepetiniz boş</p>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="px-6 h-10 border border-black text-xs uppercase tracking-[0.25em] hover:bg-black hover:text-white transition-colors"
-              >
-                Alışverişe başla
+    <div className="electro">
+      <div className="el-backdrop" onClick={close} aria-hidden="true" />
+      <aside className="u-sidebar u-sidebar__lg el-anim-right" data-testid="cart-drawer" role="dialog" aria-modal="true" aria-label="Sepetim">
+        <div className="u-sidebar__scroller">
+          <div className="u-sidebar__container d-flex flex-column">
+            <div className="d-flex align-items-center justify-content-between pt-4 px-4 pb-3 border-bottom">
+              <h3 className="font-size-18 mb-0">Sepetim ({itemCount})</h3>
+              <button type="button" className="close" onClick={close} data-testid="close-cart" aria-label="Kapat">
+                <i className="ec ec-close-remove" />
               </button>
             </div>
-          ) : (
-            <ul className="divide-y divide-black/10">
-              {items.map((item) => (
-                <li key={item.id} className="flex gap-4 py-5">
-                  <Link
-                    to={`/${item.slug || item.productId}`}
-                    onClick={() => setIsOpen(false)}
-                    className="flex-shrink-0"
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-20 h-28 object-cover bg-stone-100 hover:opacity-90 transition-opacity"
-                    />
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <Link
-                      to={`/${item.slug || item.productId}`}
-                      onClick={() => setIsOpen(false)}
-                      className="block hover:underline"
-                    >
-                      <h3 className="text-sm font-medium leading-tight line-clamp-2">{item.name}</h3>
-                    </Link>
-                    <div className="mt-1 space-y-0.5 text-[11px] text-black/55">
-                      {item.color && <p>Renk: {item.color}</p>}
-                      {item.size && <p>Beden: {item.size}</p>}
-                    </div>
-                    {(() => {
-                      const lv = cartLineView(item);
-                      return lv.hasDiscount ? (
-                        <div className="mt-2 flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] text-black/40 line-through tabular-nums">{lv.listUnit.toFixed(2)} TL</span>
-                          <span className="text-sm font-medium text-red-600 tabular-nums">{lv.unit.toFixed(2)} TL</span>
-                          <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                            %{lv.discountPct} İNDİRİM
-                          </span>
-                        </div>
-                      ) : (
-                        <p className="text-sm font-medium mt-2 tabular-nums">{lv.unit.toFixed(2)} TL</p>
-                      );
-                    })()}
 
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="inline-flex items-center border border-black/15">
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="p-1.5 hover:bg-black/5 transition-colors disabled:opacity-30"
-                          disabled={item.quantity <= 1}
-                          data-testid={`decrease-${item.id}`}
-                          aria-label="Azalt"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="px-3 text-xs tabular-nums">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="p-1.5 hover:bg-black/5 transition-colors"
-                          data-testid={`increase-${item.id}`}
-                          aria-label="Arttır"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => {
-                          try {
-                            trackRemoveFromCart({
-                              product: {
-                                id: item.productId || item.product_id || item.id,
-                                name: item.name,
-                                sale_price: item.price,
-                                price: item.price,
-                              },
-                              variant: { size: item.size, color: item.color, price: item.price },
-                              quantity: item.quantity || 1,
-                            });
-                          } catch (_) { /* silent */ }
-                          removeItem(item.id);
-                        }}
-                        className="text-[11px] text-black/55 hover:text-black underline"
-                        data-testid={`remove-${item.id}`}
-                      >
-                        Kaldır
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Footer */}
-        {items.length > 0 && (
-          <>
-            {/* NOT (mağaza sahibi isteği): "Stilini Tamamla" ve "Bu Ay En Çok Satanlar" önerileri çekmeceden
-                KALDIRILDI — çok yer kaplayıp sepetin kendisini gölgeliyordu. (Öneriler Sepet
-                sayfasında zaten var.) */}
-
-            <div className="border-t border-black/10 px-5 py-4 space-y-3">
-            {(() => {
-              // Ürün-seviyesi indirim (sale_price + otomatik kampanya) satırlardan hesaplanır →
-              // "Ara Toplam / İndirim / Toplam" kalemlerdeki üstü-çizili görünümle birebir tutarlı.
-              // Ortak hesap (lib/price cartSummary): evaluate indirimi indirimli-fiyat farkından
-              // DÜŞÜLMEZ (eskiden "3 Al 2 Öde" indirimli ürünlerde yutuluyordu).
-              const { listSum, grand, totalDisc: anyDisc } = cartSummary(items, promoDiscount);
-              return (
-                <>
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-xs tracking-[0.2em] uppercase text-black/60">Ara Toplam</span>
-                    <span className="text-base font-medium tabular-nums">{listSum.toFixed(2)} TL</span>
-                  </div>
-                  {anyDisc > 0.001 && (
-                    <div className="flex justify-between items-baseline text-emerald-700" data-testid="drawer-promo-discount">
-                      <span className="text-xs tracking-[0.15em] uppercase">İndirim</span>
-                      <span className="text-sm font-medium tabular-nums">-{anyDisc.toFixed(2)} TL</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-baseline pt-1 border-t border-black/10">
-                    <span className="text-xs tracking-[0.2em] uppercase text-black/70">Toplam</span>
-                    <span className="text-base font-semibold tabular-nums">{grand.toFixed(2)} TL</span>
-                  </div>
-                </>
-              );
-            })()}
-            {freeShippingThreshold != null && remaining <= 0 && (
-              <p className="text-[11px] text-emerald-700 text-center">
-                Mevcut sepet ücretsiz kargo eşiğinde. Kargo, ödeme adımında tüm indirimlerden sonra kesinleşir.
-              </p>
+            {remaining > 0 && items.length > 0 && (
+              <div className="px-4 py-3 border-bottom bg-gray-1">
+                <p className="font-size-13 text-center mb-2">
+                  Ücretsiz kargo için <strong className="text-green">{fmtPrice(remaining)}</strong> daha ekleyin
+                </p>
+                <div className="rounded-pill bg-gray-3 height-6 position-relative">
+                  <span className="position-absolute left-0 top-0 bottom-0 rounded-pill bg-primary" style={{ width: `${Math.min(100, freeShippingLimit ? (netTotal / freeShippingLimit) * 100 : 0)}%` }} />
+                </div>
+              </div>
             )}
-            <Link
-              to="/odeme"
-              className="flex items-center justify-center w-full h-12 bg-black text-white text-xs uppercase tracking-[0.25em] hover:bg-black/85 transition-colors"
-              onClick={() => setIsOpen(false)}
-              data-testid="go-to-checkout"
-            >
-              Ödemeye Geç
-            </Link>
-            {/* "Sepete Git" yerine "Alışverişe Devam Et" — çekmece zaten sepeti gösteriyor;
-                buton yalnız çekmeceyi kapatır → kullanıcı en son olduğu sayfada kalır. */}
-            <button
-              onClick={() => setIsOpen(false)}
-              className="flex items-center justify-center w-full h-11 border border-black text-xs uppercase tracking-[0.25em] hover:bg-black hover:text-white transition-colors"
-              data-testid="continue-shopping"
-            >
-              Alışverişe Devam Et
-            </button>
-            {/* Sepeti Paylaş — link üretip panoya kopyalar / mobil paylaşım menüsü açar */}
-            <button
-              onClick={() => shareCart(items)}
-              className="flex items-center justify-center gap-1.5 w-full pt-1 text-[11px] uppercase tracking-[0.2em] text-black/55 hover:text-black underline underline-offset-4 transition-colors"
-              data-testid="drawer-share-cart"
-            >
-              <Share2 size={12} />
-              Sepeti Paylaş
-            </button>
+
+            <div className="flex-grow-1 overflow-auto">
+              {items.length === 0 ? (
+                <div className="text-center py-10 px-4">
+                  <i className="ec ec-shopping-bag font-size-50 text-gray-5 d-block mb-3" />
+                  <p className="text-gray-90 mb-4">Sepetiniz boş</p>
+                  <button type="button" onClick={close} className="btn btn-primary-dark-w px-5 rounded-pill">Alışverişe Başla</button>
+                </div>
+              ) : (
+                <MiniCartList items={items} onNavigate={close} removeItem={removeItem} updateQuantity={updateQuantity} />
+              )}
             </div>
-          </>
-        )}
-      </div>
-    </>
+
+            {items.length > 0 && (
+              <div className="border-top px-4 py-3">
+                <div className="flex-center-between mb-1">
+                  <span className="font-size-14">Ara Toplam</span>
+                  <span className="font-size-14">{fmtPrice(listSum)}</span>
+                </div>
+                {totalDisc > 0.001 && (
+                  <div className="flex-center-between mb-1 text-green" data-testid="drawer-promo-discount">
+                    <span className="font-size-14">İndirim</span>
+                    <span className="font-size-14">-{fmtPrice(totalDisc)}</span>
+                  </div>
+                )}
+                <div className="flex-center-between border-top pt-2 mb-3">
+                  <strong className="font-size-16">Toplam</strong>
+                  <strong className="font-size-18">{fmtPrice(grand)}</strong>
+                </div>
+                {freeShippingThreshold != null && remaining <= 0 && (
+                  <p className="font-size-12 text-green text-center mb-3">Sepetiniz ücretsiz kargo eşiğinde. Kargo, ödeme adımında kesinleşir.</p>
+                )}
+                <div className="d-flex mb-2">
+                  <Link to="/sepet" onClick={close} className="btn btn-soft-secondary mb-3 mb-md-0 font-weight-normal px-4 px-md-5 flex-grow-1 mr-2" data-testid="continue-shopping">Sepeti Gör</Link>
+                  <Link to="/odeme" onClick={close} className="btn btn-primary-dark-w ml-md-2 px-4 px-md-5 flex-grow-1" data-testid="go-to-checkout">Ödemeye Geç</Link>
+                </div>
+                <button type="button" onClick={() => shareCart(items)} className="btn btn-link btn-block font-size-13 text-gray-90 p-0" data-testid="drawer-share-cart">
+                  <i className="fas fa-share-alt mr-1" /> Sepeti Paylaş
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+    </div>
   );
 }

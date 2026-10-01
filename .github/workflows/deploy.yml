@@ -1,0 +1,160 @@
+# garajtek → SNET VDS dağıtımı.
+# main'e her push'ta: frontend GitHub'da derlenir (2 GB'lık sunucu yorulmaz), backend + deploy/
+# betikleri + derlenmiş frontend rsync ile /opt/garajtek'e gönderilir, sunucuda update.sh çalışır.
+# İlk çalıştırmada sunucu kurulu değilse deploy/install.sh otomatik çalışır.
+#
+# Gerekli repo Secrets (Settings › Secrets and variables › Actions):
+#   VDS_HOST         sunucu IP'si (Cloudflare arkasındaki alan adı DEĞİL — SSH proxy'lenmez)
+#   VDS_USER         root (ya da şifresiz sudo yetkili kullanıcı)
+#   VDS_SSH_KEY      özel anahtar (ssh-keygen -t ed25519; açık anahtar sunucuda ~/.ssh/authorized_keys)
+#   VDS_SSH_PORT     (opsiyonel, varsayılan 22)
+#   VDS_KNOWN_HOSTS  (opsiyonel, önerilir) `ssh-keyscan -H <IP>` çıktısı; boşsa ilk bağlantıda alınır
+# Opsiyonel repo Variables:
+#   SITE_DOMAIN             garajtek.com
+#   ADMIN_EMAIL             ilk yönetici e-postası (yalnız ilk kurulumda; varsayılan admin@<alan>)
+#   REACT_APP_BACKEND_URL   https://garajtek.com  (Seçenek B: https://api.garajtek.com)
+#   REACT_APP_SITE_NAME     Garajtek
+#   REACT_APP_GOOGLE_CLIENT_ID, REACT_APP_CDN_URL
+#   FRONTEND_ON_PAGES       true → frontend Cloudflare Pages'te; burada yalnız backend dağıtılır
+name: Deploy (VDS)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SITE_DOMAIN: ${{ vars.SITE_DOMAIN || 'garajtek.com' }}
+  APP: /opt/garajtek
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check configuration
+        id: cfg
+        env:
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+        run: |
+          if [ -z "$VDS_HOST" ]; then
+            echo "::warning::VDS_HOST secret tanımlı değil — dağıtım atlandı (KURULUM.md §7)."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ vars.FRONTEND_ON_PAGES }}" = "true" ]; then
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.enabled == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.enabled == 'true' && steps.cfg.outputs.frontend == 'true'
+        with:
+          node-version: "20"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Build frontend
+        if: steps.cfg.outputs.enabled == 'true' && steps.cfg.outputs.frontend == 'true'
+        working-directory: frontend
+        env:
+          REACT_APP_BACKEND_URL: ${{ vars.REACT_APP_BACKEND_URL || format('https://{0}', vars.SITE_DOMAIN || 'garajtek.com') }}
+          REACT_APP_SITE_URL: ${{ format('https://{0}', vars.SITE_DOMAIN || 'garajtek.com') }}
+          REACT_APP_SITE_NAME: ${{ vars.REACT_APP_SITE_NAME || 'Garajtek' }}
+          REACT_APP_GOOGLE_CLIENT_ID: ${{ vars.REACT_APP_GOOGLE_CLIENT_ID }}
+          REACT_APP_CDN_URL: ${{ vars.REACT_APP_CDN_URL }}
+          GENERATE_SOURCEMAP: "false"
+          CI: "false"
+        run: |
+          yarn install --frozen-lockfile --network-timeout 600000
+          npx craco build
+          test -f build/index.html
+
+      - name: Configure SSH
+        if: steps.cfg.outputs.enabled == 'true'
+        env:
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+          VDS_USER: ${{ secrets.VDS_USER }}
+          VDS_SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
+          VDS_SSH_PORT: ${{ secrets.VDS_SSH_PORT }}
+          VDS_KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VDS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          PORT="${VDS_SSH_PORT:-22}"
+          if [ -n "$VDS_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$VDS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$PORT" -H "$VDS_HOST" > ~/.ssh/known_hosts 2>/dev/null
+          fi
+          cat > ~/.ssh/config <<EOF
+          Host vds
+            HostName $VDS_HOST
+            User ${VDS_USER:-root}
+            Port $PORT
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            ServerAliveInterval 30
+          EOF
+          ssh vds 'echo "SSH OK: $(hostname)"'
+
+      - name: Upload code
+        if: steps.cfg.outputs.enabled == 'true'
+        env:
+          VDS_USER: ${{ secrets.VDS_USER }}
+        run: |
+          SUDO=""; RSYNC_PATH="rsync"
+          if [ -n "$VDS_USER" ] && [ "$VDS_USER" != "root" ]; then SUDO="sudo -n"; RSYNC_PATH="sudo -n rsync"; fi
+          ssh vds "$SUDO mkdir -p $APP/backend $APP/deploy $APP/frontend-build"
+          git rev-parse HEAD > REVISION
+          # -rlptz: sahiplik aktarılmaz (update.sh garajtek'e verir). P = sunucudaki çalışma
+          # dosyaları (.env, veritabanı, yüklemeler) --delete ile SİLİNMEZ.
+          rsync -rlptz --delete --rsync-path="$RSYNC_PATH" \
+            --exclude '__pycache__/' --exclude '.pytest_cache/' \
+            --filter 'P /.env' --filter 'P /data/**' --filter 'P /uploads/' \
+            backend/ "vds:$APP/backend/"
+          rsync -rlptz --delete --rsync-path="$RSYNC_PATH" deploy/ "vds:$APP/deploy/"
+          rsync -rlptz --rsync-path="$RSYNC_PATH" REVISION "vds:$APP/REVISION"
+          if [ "${{ steps.cfg.outputs.frontend }}" = "true" ]; then
+            rsync -rlptz --delete --rsync-path="$RSYNC_PATH" frontend/build/ "vds:$APP/frontend-build/"
+          fi
+
+      - name: Install (first run) and update
+        if: steps.cfg.outputs.enabled == 'true'
+        env:
+          VDS_USER: ${{ secrets.VDS_USER }}
+          ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL }}
+        run: |
+          SUDO=""
+          if [ -n "$VDS_USER" ] && [ "$VDS_USER" != "root" ]; then SUDO="sudo -n"; fi
+          FRONT_ARG=""
+          if [ "${{ steps.cfg.outputs.frontend }}" = "true" ]; then FRONT_ARG="--frontend $APP/frontend-build"; fi
+          ssh vds "set -e
+            if [ ! -f /etc/garajtek/deploy.conf ]; then
+              echo '== İlk kurulum: install.sh =='
+              $SUDO bash $APP/deploy/install.sh $SITE_DOMAIN ${ADMIN_EMAIL:+--admin-email $ADMIN_EMAIL}
+            fi
+            $SUDO bash $APP/deploy/update.sh --no-pull $FRONT_ARG"
+
+      - name: Public health check
+        if: steps.cfg.outputs.enabled == 'true'
+        continue-on-error: true
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$SITE_DOMAIN/api/health" || true)
+          echo "https://$SITE_DOMAIN/api/health → HTTP $code"
+          [ "$code" = "200" ] || echo "::warning::Genel sağlık kontrolü $code döndü (DNS/Cloudflare henüz hazır olmayabilir)."

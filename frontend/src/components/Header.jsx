@@ -1,865 +1,739 @@
-import { useRef, useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Search, User, ShoppingBag, X, Bookmark } from "lucide-react";
+// Electro header (HTML template v2.0 — home-v1 ve shop sayfaları başlığı), React ile.
+//   • Topbar: hoş geldin metni + Sipariş Takibi / İletişim / Giriş-Hesabım
+//   • Logo + hamburger (mobil off-canvas) + arama (kategori seçimli, canlı öneri) + ikonlar
+//     (Karşılaştır, Favoriler, Sepet mini-dropdown + tutar)
+//   • Ana sayfa: "Tüm Kategoriler" dikey mega menü AÇIK + yatay menü (admin Menü Yönetimi sekmeleri)
+//   • Diğer sayfalar: logo satırında yatay menü + destek bloğu; altında sarı şerit
+//     ("Kategoriler" açılır dikey menü + arama + ikonlar)
+//   • Masaüstünde aşağı kaydırınca yapışkan (sticky) sarı şerit
+// Veri kaynakları korunur: kategori ağacı (/categories), admin header menüsü (page-blocks/header-menu),
+// SALE menüsü (/sale-menu), duyuru + sayaç barları (ana sayfa blokları), canlı arama (/products?search).
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useFavorites } from "../context/FavoritesContext";
-import CartDrawer from "./CartDrawer";
+import CartDrawer, { MiniCartList } from "./CartDrawer";
 import CountdownBar from "./CountdownBar";
-import { optimizeImg, firstImage } from "../lib/img";
-import { slugify } from "../lib/slug";
-import { fetchHeaderMenu, fetchTopBars, fetchSaleMenu, getCachedMenu, getCachedBars, slugFromLink, DEFAULT_MENU_TABS } from "../lib/headerMenu";
 import RotatingText from "./RotatingText";
-import { priceView } from "../lib/price";
-import axios from "axios";
+import { optimizeImg, firstImage } from "../lib/img";
+import { fetchHeaderMenu, fetchTopBars, fetchSaleMenu, getCachedMenu, getCachedBars, DEFAULT_MENU_TABS } from "../lib/headerMenu";
+import { cartSummary } from "../lib/price";
+import { useStoreInfo } from "../lib/storeInfo";
 import { SITE_NAME } from "../lib/brand";
+import useCategoryTree from "./electro/useCategoryTree";
+import CategoryIcon from "./electro/CategoryIcon";
+import Logo from "./electro/Logo";
+import { fmtPrice, priceOf } from "./electro/format";
+import { useCompare } from "./electro/compare";
 
-// Menü/öneri kartı fiyatı — indirim varsa üstü çizili liste + indirimli (tutarlı görünüm).
-function MegaPrice({ p }) {
-  const pv = priceView(p);
-  if (pv.hasDiscount) {
-    return (
-      <p className="text-[11px] tabular-nums">
-        <span className="text-black/40 line-through mr-1">{pv.list.toFixed(2)}</span>
-        <span className="text-red-600">{pv.display.toFixed(2)} TL</span>
-      </p>
-    );
-  }
-  return <p className="text-[11px] tabular-nums text-black/65">{pv.display.toFixed(2)} TL</p>;
-}
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const MAX_VERTICAL = 11; // dikey menüde gösterilecek en fazla kök kategori
 
-// Arama önizleme/öneri mini kartlarında görsel üzerine indirim oranı rozeti
-// (vitrin ProductCard ile aynı — sol üst köşe). priceView tek kaynağından.
-function MegaDiscountBadge({ p }) {
-  const pv = priceView(p);
-  if (!pv.hasDiscount || pv.discountPct <= 0) return null;
+/* ------------------------------------------------------------------ */
+/* Dikey "Tüm Kategoriler" menüsü (hs-mega-menu, 3 seviye)              */
+/* ------------------------------------------------------------------ */
+function VerticalMenu({ roots, open, variant, onNavigate }) {
+  const [hover, setHover] = useState(null);
+  const timer = useRef(null);
+  const enter = (id) => { clearTimeout(timer.current); setHover(id); };
+  const leave = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setHover(null), 120); };
+  const list = roots.slice(0, MAX_VERTICAL);
   return (
-    <div className="absolute top-0 left-0 z-10 bg-[#6b6b64] text-white text-[11px] font-normal px-2 py-1 leading-none">
-      %{pv.discountPct}
+    <div className={`collapse vertical-menu${variant === "shop" ? " v1" : ""}${open ? " show" : ""}`} data-testid="vertical-menu">
+      <div className="card-body p-0">
+        <nav className="js-mega-menu navbar navbar-expand-xl u-header__navbar u-header__navbar--no-space hs-menu-initialized hs-menu-vertical">
+          <div className="collapse navbar-collapse u-header__navbar-collapse show">
+            <ul className="navbar-nav u-header__navbar-nav">
+              <li className="nav-item u-header__nav-item" data-event="hover">
+                <Link to="/sale" className="nav-link u-header__nav-link font-weight-bold" onClick={onNavigate}>Günün Fırsatları</Link>
+              </li>
+              <li className="nav-item u-header__nav-item" data-event="hover">
+                <Link to="/en-yeniler" className="nav-link u-header__nav-link font-weight-bold" onClick={onNavigate}>Yeni Ürünler</Link>
+              </li>
+              {list.map((cat) => {
+                const kids = cat.children || [];
+                if (!kids.length) {
+                  return (
+                    <li key={cat.id} className="nav-item u-header__nav-item" data-event="hover">
+                      <Link to={`/${cat.slug}`} className="nav-link u-header__nav-link" onClick={onNavigate}>
+                        <span><CategoryIcon cat={cat} className="el-cat-icon mr-2" />{cat.name}</span>
+                      </Link>
+                    </li>
+                  );
+                }
+                // Alt kategorileri 2 kolona böl: torunu olanlar başlık + liste, olmayanlar ilk kolonda liste
+                const withKids = kids.filter((k) => (k.children || []).length);
+                const leafs = kids.filter((k) => !(k.children || []).length);
+                const cols = [];
+                if (leafs.length) cols.push({ title: cat.name, to: `/${cat.slug}`, items: leafs, all: true });
+                withKids.forEach((k) => cols.push({ title: k.name, to: `/${k.slug}`, items: k.children }));
+                const half = Math.ceil(cols.length / 2);
+                const colGroups = cols.length > 1 ? [cols.slice(0, half), cols.slice(half)] : [cols];
+                const opened = hover === cat.id;
+                return (
+                  <li key={cat.id} className={`nav-item hs-has-mega-menu u-header__nav-item${opened ? " hs-mega-menu-opened" : ""}`}
+                    data-event="hover" onMouseEnter={() => enter(cat.id)} onMouseLeave={leave}>
+                    <Link to={`/${cat.slug}`} className="nav-link u-header__nav-link u-header__nav-link-toggle" onClick={onNavigate} aria-haspopup="true" aria-expanded={opened}>
+                      <span><CategoryIcon cat={cat} className="el-cat-icon mr-2" />{cat.name}</span>
+                    </Link>
+                    <div className="hs-mega-menu vmm-tfw u-header__sub-menu el-anim-up" data-testid={`vmenu-panel-${cat.slug}`}>
+                      {(cat.image_url || cat.image) && (
+                        <div className="vmm-bg">
+                          <img className="img-fluid" src={optimizeImg(cat.image_url || cat.image, 500)} alt="" loading="lazy" />
+                        </div>
+                      )}
+                      <div className="row u-header__mega-menu-wrapper">
+                        {colGroups.map((group, gi) => (
+                          <div className="col mb-3 mb-sm-0" key={gi}>
+                            {group.map((col, ci) => (
+                              <div key={col.title + ci}>
+                                <Link to={col.to} className="u-header__sub-menu-title d-block" onClick={onNavigate}>{col.title}</Link>
+                                <ul className="u-header__sub-menu-nav-group mb-3">
+                                  {col.items.map((it) => (
+                                    <li key={it.id}><Link className="nav-link u-header__sub-menu-nav-link" to={`/${it.slug}`} onClick={onNavigate}>{it.name}</Link></li>
+                                  ))}
+                                  {col.all && (
+                                    <li>
+                                      <Link className="nav-link u-header__sub-menu-nav-link u-nav-divider border-top pt-2 flex-column align-items-start" to={col.to} onClick={onNavigate}>
+                                        <div>Tüm {cat.name}</div>
+                                        <div className="u-nav-subtext font-size-11 text-gray-30">Tüm ürünleri keşfedin</div>
+                                      </Link>
+                                    </li>
+                                  )}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+              {roots.length > MAX_VERTICAL && (
+                <li className="nav-item u-header__nav-item" data-event="hover">
+                  <Link to="/tum-urunler" className="nav-link u-header__nav-link font-weight-bold" onClick={onNavigate}>Tüm Kategoriler</Link>
+                </li>
+              )}
+            </ul>
+          </div>
+        </nav>
+      </div>
     </div>
   );
 }
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-
-// Menü — TEK KAYNAK panel (Admin > Tasarım > Menü Yönetimi → page-blocks/header-menu).
-// Sekmeler (ad/sıra/tip/stil) ve kolonlar TAMAMEN panelden gelir; fetch başarısızsa
-// DEFAULT_MENU_TABS (lib/headerMenu) kullanılır. Sabit GİYİM/AKSESUAR yapısı kaldırıldı —
-// panelde yapılan her değişiklik (sekme adı, yeni sekme, kolon/kategori) siteye birebir yansır.
-
-// Mağazada satılmayan alt kategoriler panelde tanımlı kalsa bile "aksesuar" sekmesinden
-// GİZLENEBİLİR (isim/slug listesi). Varsayılan boş — mağazaya göre doldurulur.
-const _AKSESUAR_HIDDEN = [];
-function _isHiddenAksesuar(name, slug) {
-  const n = String(name || "").toLocaleLowerCase("tr");
-  const s = String(slug || "").toLocaleLowerCase("tr");
-  return _AKSESUAR_HIDDEN.some((h) => n === h || s === h || n.startsWith(h + " ") || s.startsWith(h + "-"));
-}
-
-// Bir mega sekmenin kolonlarını render için normalize eder: başlık/link/slug + item listesi.
+/* ------------------------------------------------------------------ */
+/* Yatay menü — admin "Menü Yönetimi" sekmeleri (link / mega / SALE)    */
+/* ------------------------------------------------------------------ */
 function megaColumnsOf(tab) {
-  const cols = [];
-  for (const col of (tab?.columns || [])) {
-    if (!col || !col.title) continue;
-    let items = (col.items || [])
-      .filter((it) => it && it.name)
-      .map((it) => {
-        const slug = slugFromLink(it.link) || slugify(it.name);
-        return { name: it.name, slug, link: it.link || `/${slug}` };
-      });
-    if (tab?.id === "aksesuar") items = items.filter((it) => !_isHiddenAksesuar(it.name, it.slug));
-    const cslug = slugFromLink(col.link) || slugify(col.title);
-    cols.push({ title: col.title, slug: cslug, link: col.link || `/${cslug}`, items });
-  }
-  return cols;
+  return (tab?.columns || []).filter((c) => c && c.title).map((c) => ({
+    title: c.title,
+    link: c.link || "/",
+    items: (c.items || []).filter((it) => it && it.name).map((it) => ({ name: it.name, link: it.link || "/" })),
+  }));
 }
 
-// Mega menü sağ panel yedek görselleri (ürün gelmezse). Sekme id'si → görsel URL listesi.
-// Varsayılan boş: ürün yoksa panel boş kalır (mağazaya özel görsel koda gömülmez).
-const MENU_IMAGES = {};
-const MENU_IMAGES_FALLBACK = [];
-
-// Mega menü sağ panel — ürünler yüklenirken iskelet gösterir (eski/yanlış görsel flash'ını önler).
-// ── MEGA MENÜ ORTAK AYARLARI ─────────────────────────────────────────────
-// Tüm bölümler (GİYİM, AKSESUAR ve İLERİDE eklenecek her yeni bölüm) kolon
-// düzenini ve görsel kartını BURADAN alır — bölümler arası fark oluşmaz.
-const MEGA_LINK_GRID = "grid gap-x-14 gap-y-1";
-const megaCols = (n) => ({ gridTemplateColumns: `repeat(${n}, 180px)` });
-// Koleksiyonlar menüsünde "Full Look": kalın ve diğer başlıklardan ayrı (daha aşağıda) — kullanıcı isteği
-const _isFullLook = (s) => (s || "").toLocaleLowerCase("tr").replace(/\s+/g, " ").trim() === "full look";
-const MEGA_IMG_BOX = "w-52 aspect-[2/3] overflow-hidden";
-const MEGA_IMG = "w-full h-full object-cover object-top group-hover:scale-[1.04] transition-transform duration-500";
-
-function MegaProductsPanel({ products, loading, fallback, fallbackLink, onNavigate }) {
-  if (loading) {
-    return [0, 1, 2].map((i) => (
-      <div key={i} className="w-52" data-testid="mega-product-skeleton">
-        <div className="w-52 aspect-[2/3] bg-stone-100 animate-pulse" />
-        <div className="h-2.5 bg-stone-100 mt-2 w-3/4 animate-pulse" />
-        <div className="h-2.5 bg-stone-100 mt-1 w-1/3 animate-pulse" />
+function HorizontalNav({ tabs, saleMenu, freeShippingText, showLast }) {
+  const [open, setOpen] = useState(null);
+  const timer = useRef(null);
+  const enter = (id) => { clearTimeout(timer.current); setOpen(id); };
+  const leave = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setOpen(null), 150); };
+  const close = () => setOpen(null);
+  return (
+    <nav className="js-mega-menu navbar navbar-expand-md u-header__navbar u-header__navbar--no-space hs-menu-initialized hs-menu-horizontal">
+      <div className="collapse navbar-collapse u-header__navbar-collapse show">
+        <ul className="navbar-nav u-header__navbar-nav">
+          {tabs.map((tab) => {
+            const cls = `nav-link u-header__nav-link${tab.style === "sale" ? " text-sale" : ""}`;
+            const cols = tab.type === "mega" ? megaColumnsOf(tab) : [];
+            const hasSale = tab.style === "sale" && tab.type !== "mega" && saleMenu.length > 0;
+            if (cols.length) {
+              return (
+                <li key={tab.id} className={`nav-item hs-has-mega-menu u-header__nav-item${open === tab.id ? " hs-mega-menu-opened" : ""}`}
+                  onMouseEnter={() => enter(tab.id)} onMouseLeave={leave}>
+                  <Link to={tab.link || "#"} className={`${cls} u-header__nav-link-toggle`} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
+                  <div className="hs-mega-menu w-100 u-header__sub-menu el-anim-up">
+                    <div className="row u-header__mega-menu-wrapper">
+                      {cols.map((col) => (
+                        <div className="col-md-3" key={col.title}>
+                          <Link to={col.link} className="u-header__sub-menu-title d-block" onClick={close}>{col.title}</Link>
+                          <ul className="u-header__sub-menu-nav-group mb-3">
+                            {col.items.map((it) => (
+                              <li key={it.name}><Link to={it.link} className="nav-link u-header__sub-menu-nav-link" onClick={close}>{it.name}</Link></li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              );
+            }
+            if (hasSale) {
+              return (
+                <li key={tab.id} className={`nav-item hs-has-sub-menu u-header__nav-item${open === tab.id ? " hs-sub-menu-opened" : ""}`}
+                  onMouseEnter={() => enter(tab.id)} onMouseLeave={leave} data-testid="sale-menu">
+                  <Link to={tab.link || "/sale"} className={`${cls} u-header__nav-link-toggle`} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
+                  <ul className="hs-sub-menu u-header__sub-menu el-anim-up" style={{ minWidth: 230 }}>
+                    {saleMenu.map((it) => (
+                      <li key={`${it.url}-${it.label}`}><Link className="nav-link u-header__sub-menu-nav-link" to={it.url} onClick={close}>{it.label}</Link></li>
+                    ))}
+                    <li><Link className="nav-link u-header__sub-menu-nav-link font-weight-bold" to={tab.link || "/sale"} onClick={close}>Tümünü Gör</Link></li>
+                  </ul>
+                </li>
+              );
+            }
+            return (
+              <li key={tab.id} className="nav-item u-header__nav-item">
+                <Link to={tab.link || "#"} className={cls} data-testid={`nav-tab-${tab.id}`}>{tab.label}</Link>
+              </li>
+            );
+          })}
+          {showLast && freeShippingText && (
+            <li className="nav-item u-header__nav-last-item">
+              <Link className="text-gray-90" to="/sayfa/kargo-ve-teslimat">{freeShippingText}</Link>
+            </li>
+          )}
+        </ul>
       </div>
-    ));
-  }
-  if (products.length > 0) {
-    return products.map((p) => (
-      <Link
-        key={p.id}
-        to={`/${p.slug || p.id}`}
-        className="block w-52 group"
-        onClick={onNavigate}
-      >
-        <div className={MEGA_IMG_BOX}>
-          <img
-            src={optimizeImg(firstImage(p), 500)}
-            alt={p.name}
-            className={MEGA_IMG}
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-        <p className="text-[11px] mt-2 line-clamp-1 text-black/85">{p.name}</p>
-        <MegaPrice p={p} />
-      </Link>
-    ));
-  }
-  return fallback.map((img, i) => (
-    <Link key={i} to={fallbackLink} className="block w-52 aspect-[2/3] overflow-hidden" onClick={onNavigate}>
-      <img src={optimizeImg(img, 400)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-    </Link>
-  ));
+    </nav>
+  );
 }
 
-export default function Header({ hideMenu = false, announcement, announcementFirst = false }) {
-  // Duyuru barı: Home kendi bloklarından geçirir. Prop HİÇ verilmediyse (diğer tüm sayfalar)
-  // Header aynı ana-sayfa bloğunu kendisi çeker → üst şerit her sayfada ana sayfadaki gibi.
+/* ------------------------------------------------------------------ */
+/* Arama (kategori seçimli + canlı öneri)                               */
+/* ------------------------------------------------------------------ */
+function SearchBar({ roots, variant = "home", inputId = "searchproduct-item" }) {
+  const navigate = useNavigate();
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("");
+  const [results, setResults] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [focus, setFocus] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) { setResults([]); setTotal(0); return undefined; }
+    let alive = true;
+    const t = setTimeout(() => {
+      axios.get(`${API}/products?search=${encodeURIComponent(term)}&limit=6${cat ? `&category=${encodeURIComponent(cat)}` : ""}`)
+        .then((r) => { if (alive) { setResults(r.data?.products || []); setTotal(Number(r.data?.total || 0)); } })
+        .catch(() => {});
+    }, 280);
+    return () => { alive = false; clearTimeout(t); };
+  }, [q, cat]);
+
+  useEffect(() => {
+    const onDoc = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setFocus(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const term = q.trim();
+    if (!term) return;
+    setFocus(false);
+    navigate(`/arama?q=${encodeURIComponent(term)}${cat ? `&kategori=${encodeURIComponent(cat)}` : ""}`);
+  };
+  const catLabel = (roots.find((r) => r.slug === cat) || {}).name || "Tüm Kategoriler";
+  const shop = variant === "shop";
+  return (
+    <form className="js-focus-state position-relative" onSubmit={submit} ref={boxRef} role="search" data-testid="header-search">
+      <label className="sr-only" htmlFor={inputId}>Ara</label>
+      <div className="input-group">
+        <input type="search" id={inputId} value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocus(true)}
+          className={shop
+            ? "form-control py-2 pl-5 font-size-15 border-0 height-40 rounded-left-pill"
+            : "form-control py-2 pl-5 font-size-15 border-right-0 height-40 border-width-2 rounded-left-pill border-primary"}
+          placeholder="Ürün, marka veya kategori ara" aria-label="Ürün ara" autoComplete="off" data-testid="search-input" />
+        <div className="input-group-append">
+          <div className="dropdown bootstrap-select js-select dropdown-select custom-search-categories-select el-native-select">
+            <button type="button" tabIndex={-1} aria-hidden="true"
+              className={shop
+                ? "btn dropdown-toggle height-40 text-gray-60 font-weight-normal border-0 rounded-0 bg-white px-5 py-2"
+                : "btn dropdown-toggle height-40 text-gray-60 font-weight-normal border-top border-bottom border-left-0 rounded-0 border-primary border-width-2 pl-0 pr-5 py-2"}>
+              <div className="filter-option"><div className="filter-option-inner"><div className="filter-option-inner-inner">{catLabel}</div></div></div>
+            </button>
+            <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Kategori seçin" data-testid="search-category">
+              <option value="">Tüm Kategoriler</option>
+              {roots.map((r) => <option key={r.id} value={r.slug}>{r.name}</option>)}
+            </select>
+          </div>
+          <button className={`btn ${shop ? "btn-dark" : "btn-primary"} height-40 py-2 px-3 rounded-right-pill`} type="submit" aria-label="Ara" data-testid="search-btn">
+            <span className="ec ec-search font-size-24" />
+          </button>
+        </div>
+      </div>
+      {focus && q.trim().length >= 2 && (
+        <div className="el-search-results" data-testid="search-results">
+          {results.length === 0 ? (
+            <div className="px-4 py-3 font-size-14 text-gray-90">"{q}" için sonuç bulunamadı.</div>
+          ) : (
+            <>
+              <ul className="list-unstyled mb-0">
+                {results.map((p) => {
+                  const pv = priceOf(p);
+                  return (
+                    <li key={p.id}>
+                      <Link to={`/${p.slug || p.id}`} className="d-flex align-items-center px-3 py-2" onClick={() => { setFocus(false); setQ(""); }}>
+                        <span className="el-search-thumb mr-3"><img src={optimizeImg(firstImage(p), 120) || "/placeholder.jpg"} alt="" loading="lazy" /></span>
+                        <span className="flex-grow-1 font-size-14 text-blue font-weight-bold el-line-2">{p.name}</span>
+                        <span className="ml-3 font-size-14 text-nowrap">
+                          {pv.hasDiscount && <del className="font-size-12 text-gray-9 mr-1">{fmtPrice(pv.list)}</del>}
+                          <span className={pv.hasDiscount ? "text-red" : "text-gray-90"}>{fmtPrice(pv.display)}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              <button type="submit" className="btn btn-block btn-soft-secondary rounded-0 font-size-13">
+                {total > results.length ? `Tüm sonuçları gör (${total})` : "Tüm sonuçları gör"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Header ikonları + mini sepet                                         */
+/* ------------------------------------------------------------------ */
+function HeaderIcons({ variant, onMobileSearch, mobileSearchOpen }) {
+  const { items, itemCount, total, setIsOpen, removeItem, updateQuantity } = useCart();
+  const { user } = useAuth();
+  const { count: favCount } = useFavorites();
+  const compare = useCompare();
+  const [miniOpen, setMiniOpen] = useState(false);
+  const ref = useRef(null);
+  const location = useLocation();
+  useEffect(() => { setMiniOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    if (!miniOpen) return undefined;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setMiniOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [miniOpen]);
+  const shop = variant === "shop";
+  const sum = cartSummary(items, 0).effSum || total;
+  const badgeCls = shop
+    ? "width-22 height-22 bg-dark position-absolute d-flex align-items-center justify-content-center rounded-circle left-12 top-8 font-weight-bold font-size-12 text-white"
+    : "bg-lg-down-black width-22 height-22 bg-primary position-absolute d-flex align-items-center justify-content-center rounded-circle left-12 top-8 font-weight-bold font-size-12";
+
+  return (
+    <ul className="d-flex list-unstyled mb-0 align-items-center">
+      <li className="col d-xl-none px-2 px-sm-3 position-static">
+        <button type="button" className="btn btn-link p-0 font-size-22 text-gray-90 text-lh-1 btn-text-secondary" aria-label="Ara" aria-expanded={mobileSearchOpen} onClick={onMobileSearch} data-testid="mobile-search-btn">
+          <span className="ec ec-search" />
+        </button>
+      </li>
+      <li className="col d-none d-xl-block">
+        <Link to="/karsilastir" className="text-gray-90 position-relative d-inline-block" title="Karşılaştır" aria-label="Karşılaştır">
+          <i className="font-size-22 ec ec-compare" />
+          {compare.length > 0 && <span className="el-icon-count">{compare.length}</span>}
+        </Link>
+      </li>
+      <li className="col d-none d-xl-block">
+        <Link to="/favoriler" className="text-gray-90 position-relative d-inline-block" title="Favoriler" aria-label="Favoriler" data-testid="favorites-btn">
+          <i className="font-size-22 ec ec-favorites" />
+          {favCount > 0 && <span className="el-icon-count">{favCount}</span>}
+        </Link>
+      </li>
+      <li className="col d-xl-none px-2 px-sm-3">
+        <Link to={user ? "/hesabim" : "/giris"} className="text-gray-90" title={user ? "Hesabım" : "Giriş Yap"} aria-label="Hesap">
+          <i className="font-size-22 ec ec-user" />
+        </Link>
+      </li>
+      {/* Mobil/tablet: sepet paneli */}
+      <li className="col pr-xl-0 px-2 px-sm-3 d-xl-none">
+        <button type="button" onClick={() => setIsOpen(true)} className="btn btn-link p-0 text-gray-90 position-relative d-flex" aria-label="Sepet" data-testid="cart-btn-mobile">
+          <i className="font-size-22 ec ec-shopping-bag" />
+          <span className={badgeCls}>{itemCount}</span>
+        </button>
+      </li>
+      {/* Masaüstü: mini sepet açılır menüsü */}
+      <li className="col pr-xl-0 px-2 px-sm-3 d-none d-xl-block position-relative" ref={ref}>
+        <button type="button" onClick={() => setMiniOpen((v) => !v)} className="btn btn-link p-0 text-gray-90 position-relative d-flex align-items-center" title="Sepet" aria-haspopup="true" aria-expanded={miniOpen} data-testid="cart-btn">
+          <i className="font-size-22 ec ec-shopping-bag" />
+          <span className={badgeCls}>{itemCount}</span>
+          <span className="d-none d-xl-block font-weight-bold font-size-16 text-gray-90 ml-3" data-testid="header-cart-total">{fmtPrice(sum)}</span>
+        </button>
+        {miniOpen && (
+          <div className="cart-dropdown dropdown-menu dropdown-unfold show border-top border-top-primary mt-3 border-width-2 border-left-0 border-right-0 border-bottom-0 left-auto right-0 el-anim-up" data-testid="mini-cart">
+            {items.length === 0 ? (
+              <div className="px-3 py-4 text-center font-size-14">Sepetinizde ürün bulunmuyor.</div>
+            ) : (
+              <>
+                <MiniCartList items={items.slice(0, 5)} onNavigate={() => setMiniOpen(false)} removeItem={removeItem} updateQuantity={updateQuantity} compact />
+                {items.length > 5 && <div className="px-3 pb-2 font-size-13 text-gray-90">+{items.length - 5} ürün daha</div>}
+                <div className="flex-center-between px-4 pt-2">
+                  <Link to="/sepet" className="btn btn-soft-secondary mb-3 mb-md-0 font-weight-normal px-5 px-md-4 px-lg-5" onClick={() => setMiniOpen(false)}>Sepeti Gör</Link>
+                  <Link to="/odeme" className="btn btn-primary-dark-w ml-md-2 px-5 px-md-4 px-lg-5" onClick={() => setMiniOpen(false)}>Ödemeye Geç</Link>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </li>
+    </ul>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobil off-canvas menü (u-sidebar--left)                              */
+/* ------------------------------------------------------------------ */
+function MobileSidebar({ open, onClose, roots, tabs }) {
+  const [expanded, setExpanded] = useState(null);
+  const { user } = useAuth();
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <>
+      <div className="el-backdrop" onClick={onClose} aria-hidden="true" />
+      <aside id="sidebarHeader1" className="u-sidebar u-sidebar--left el-anim-left" role="dialog" aria-modal="true" aria-label="Menü" data-testid="mobile-menu">
+        <div className="u-sidebar__scroller">
+          <div className="u-sidebar__container">
+            <div className="u-header-sidebar__footer-offset">
+              <div className="position-absolute top-0 right-0 z-index-2 pt-4 pr-4 bg-white">
+                <button type="button" className="close ml-auto" onClick={onClose} aria-label="Kapat">
+                  <span aria-hidden="true"><i className="ec ec-close-remove text-gray-90 font-size-20" /></span>
+                </button>
+              </div>
+              <div className="u-sidebar__body">
+                <div id="headerSidebarContent" className="u-sidebar__content u-header-sidebar__content">
+                  <Logo className="navbar-brand u-header__navbar-brand u-header__navbar-brand-center mb-3" onClick={onClose} />
+                  <ul id="headerSidebarList" className="u-header-collapse__nav">
+                    <li><Link className="u-header-collapse__nav-link font-weight-bold" to="/sale" onClick={onClose}>Günün Fırsatları</Link></li>
+                    <li><Link className="u-header-collapse__nav-link font-weight-bold" to="/en-yeniler" onClick={onClose}>Yeni Ürünler</Link></li>
+                    {tabs.filter((t) => !/^\/(sale|en-yeniler)$/.test(t.link || "")).map((t) => (
+                      <li key={`tab-${t.id}`}><Link className={`u-header-collapse__nav-link font-weight-bold${t.style === "sale" ? " text-sale" : ""}`} to={t.link || "/"} onClick={onClose}>{t.label}</Link></li>
+                    ))}
+                    {roots.map((cat) => {
+                      const kids = cat.children || [];
+                      if (!kids.length) {
+                        return <li key={cat.id}><Link className="u-header-collapse__nav-link" to={`/${cat.slug}`} onClick={onClose}><CategoryIcon cat={cat} className="el-cat-icon mr-2" />{cat.name}</Link></li>;
+                      }
+                      const isOpen = expanded === cat.id;
+                      return (
+                        <li key={cat.id} className="u-has-submenu u-header-collapse__submenu">
+                          <button type="button" className={`u-header-collapse__nav-link u-header-collapse__nav-pointer btn btn-link p-0 text-left w-100${isOpen ? "" : " collapsed"}`}
+                            aria-expanded={isOpen} onClick={() => setExpanded(isOpen ? null : cat.id)}>
+                            <CategoryIcon cat={cat} className="el-cat-icon mr-2" />{cat.name}
+                          </button>
+                          <div className={`collapse${isOpen ? " show" : ""}`}>
+                            <ul className="u-header-collapse__nav-list">
+                              <li><Link className="u-header-collapse__submenu-nav-link font-weight-bold" to={`/${cat.slug}`} onClick={onClose}>Tüm {cat.name}</Link></li>
+                              {kids.map((k) => (
+                                <li key={k.id}>
+                                  {(k.children || []).length ? (
+                                    <>
+                                      <Link className="u-header-sidebar__sub-menu-title d-block" to={`/${k.slug}`} onClick={onClose}>{k.name}</Link>
+                                      {k.children.map((g) => (
+                                        <Link key={g.id} className="u-header-collapse__submenu-nav-link d-block" to={`/${g.slug}`} onClick={onClose}>{g.name}</Link>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <Link className="u-header-collapse__submenu-nav-link" to={`/${k.slug}`} onClick={onClose}>{k.name}</Link>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <ul className="list-unstyled border-top pt-3 mt-3 mb-0 font-size-14">
+                    <li className="mb-2"><Link to={user ? "/hesabim" : "/giris"} className="text-gray-90" onClick={onClose}><i className="ec ec-user mr-2" />{user ? "Hesabım" : "Giriş Yap / Üye Ol"}</Link></li>
+                    <li className="mb-2"><Link to="/favoriler" className="text-gray-90" onClick={onClose}><i className="ec ec-favorites mr-2" />Favorilerim</Link></li>
+                    <li className="mb-2"><Link to="/siparis-takip" className="text-gray-90" onClick={onClose}><i className="ec ec-transport mr-2" />Sipariş Takibi</Link></li>
+                    <li className="mb-2"><Link to="/iade-islemleri" className="text-gray-90" onClick={onClose}><i className="ec ec-returning mr-2" />İade Talebi</Link></li>
+                    <li className="mb-2"><Link to="/sayfa/iletisim" className="text-gray-90" onClick={onClose}><i className="ec ec-map-pointer mr-2" />İletişim</Link></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Header                                                              */
+/* ------------------------------------------------------------------ */
+export default function Header({ announcement, announcementFirst = false, variant: forcedVariant }) {
+  const location = useLocation();
+  const { user } = useAuth();
+  const info = useStoreInfo();
+  const tree = useCategoryTree();
+  const roots = tree.roots;
+  const isCheckout = location.pathname.includes("/odeme") || location.pathname.includes("/checkout");
+  const variant = forcedVariant || (location.pathname === "/" ? "home" : "shop");
+  const home = variant === "home";
+
+  // Duyuru + sayaç barları (Home kendi bloklarından geçirir; diğer sayfalar aynı bloğu kendisi çeker)
   const selfBars = announcement === undefined;
-  const [bars, setBars] = useState(() => (selfBars ? getCachedBars() : null));   // ilk karede önbellekten (titreme yok)
+  const [bars, setBars] = useState(() => (selfBars ? getCachedBars() : null));
   useEffect(() => {
     if (!selfBars) return undefined;
     let alive = true;
     fetchTopBars(API).then((b) => { if (alive) setBars(b); }).catch(() => {});
     return () => { alive = false; };
   }, [selfBars]);
-  const topAnnouncement = selfBars
-    ? (bars?.rotating ? <RotatingText block={bars.rotating} /> : null)
-    : announcement;
-  const topAnnouncementFirst = selfBars ? !!bars?.announcementFirst : announcementFirst;
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Üst menü: Admin > Tasarım > Menü Yönetimi'nden (page-blocks/header-menu) beslenir.
-  // Sekmeler dahil TÜM yapı panelden gelir; fetch gelene kadar varsayılan kullanılır.
-  // İlk karede SON bilinen menü (önbellek); hiç yoksa (ilk ziyaret) menü, gerçek menü gelene
-  // kadar GÖRÜNMEZ tutulur (yer kaplar, kayma olmaz) → yanlış/varsayılan menü hiç görünmez.
+  const topAnnouncement = selfBars ? (bars?.rotating ? <RotatingText block={bars.rotating} /> : null) : announcement;
+  const topFirst = selfBars ? !!bars?.announcementFirst : announcementFirst;
+
+  // Admin menü sekmeleri (Tasarım › Menü Yönetimi) + SALE menüsü
   const [menuTabs, setMenuTabs] = useState(() => getCachedMenu() || DEFAULT_MENU_TABS);
-  const [menuReady, setMenuReady] = useState(() => !!getCachedMenu());
   useEffect(() => {
     let alive = true;
-    fetchHeaderMenu(API).then((tabs) => {
-      if (alive && Array.isArray(tabs) && tabs.length) setMenuTabs(tabs);
-    }).catch(() => { /* varsayılan kalır */ })
-      .finally(() => { if (alive) setMenuReady(true); });
-    const t = setTimeout(() => { if (alive) setMenuReady(true); }, 2500);   // API çok yavaşsa yine göster
-    return () => { alive = false; clearTimeout(t); };
+    fetchHeaderMenu(API).then((tabs) => { if (alive && Array.isArray(tabs) && tabs.length) setMenuTabs(tabs); }).catch(() => {});
+    return () => { alive = false; };
   }, []);
-  const visibleTabs = menuTabs.filter((t) => t && t.active !== false && t.label);
-  // SALE sekmesinin açılır listesi (aktif kampanyalar) — Admin › Kampanyalar › SALE Menüsü.
+  const tabs = menuTabs.filter((t) => t && t.active !== false && t.label);
   const [saleMenu, setSaleMenu] = useState([]);
   useEffect(() => {
     let alive = true;
     fetchSaleMenu(API).then((items) => { if (alive) setSaleMenu(items || []); }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  const hasSaleMenu = (tab) => tab && tab.style === "sale" && tab.type !== "mega" && saleMenu.length > 0;
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchTotal, setSearchTotal] = useState(0);
-  const [popularSearches, setPopularSearches] = useState([]);
-  const [suggestedProducts, setSuggestedProducts] = useState([]);
-  const [activeMenu, setActiveMenu] = useState(null);
-  const [hoveredCategory, setHoveredCategory] = useState(null); // alt kategori slug (ceket, sort, ...)
-  const [megaProducts, setMegaProducts] = useState({}); // {slug: [products]}
-  
-  const { itemCount, setIsOpen } = useCart();
-  const { user } = useAuth();
-  const { count: favCount } = useFavorites();
-  const navigate = useNavigate();
-  const location = useLocation();
 
-  const isCheckout = location.pathname.includes('/odeme') || location.pathname.includes('/checkout');
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileSearch, setMobileSearch] = useState(false);
+  const [deptOpen, setDeptOpen] = useState(false);
+  const [stuck, setStuck] = useState(false);
+  const headerRef = useRef(null);
+  useEffect(() => { setMobileOpen(false); setMobileSearch(false); setDeptOpen(false); }, [location.pathname, location.search]);
 
-  // Hero-overlay: ana sayfada TAM EKRAN editorial hero varken ve sayfa en üstteyken header
-  // ŞEFFAF + logo/ikonlar BEYAZ; aşağı inince beyaz zemin + siyah. Home, hero varsa
-  // document.documentElement'e data-hero-overlay="1" bırakır; burada scroll'a göre hesaplanır.
-  // Hero-overlay: ana sayfada editorial hero VARKEN ve sayfa TAM EN ÜSTTEYKEN (kaydırılmamış) →
-  // ilk ekran: SİYAH duyuru barı YOK, görsel tam ekran, header ŞEFFAF + logo/ikon BEYAZ, görselin
-  // üzerinde biraz aşağıda yüzer. KAYDIRMA BAŞLAR BAŞLAMAZ (scrollY>0) → overlay kapanır: beyaz
-  // sticky header + siyah duyuru barı gelir. (Hero jest-slider'ı sayfayı kaydırmadığı için slaytlar
-  // arası overlay AÇIK kalır; ancak gerçek sayfa kaydırması başlayınca kapanır.)
-  const [heroOverlay, setHeroOverlay] = useState(false);
-  const [heroPage, setHeroPage] = useState(false);   // ana sayfa + editorial hero var mı (kaydırmadan bağımsız)
-  const barsRef = useRef(null);                       // sayaç + duyuru barı sarmalayıcısı
-  // ŞEFFAF-OVERLAY KALDIRILDI (kullanıcı kesin kararı — Option A): home dahil header HER ZAMAN
-  // SOLID + normal akış/sticky. Üstte [duyuru barı][sayaç][beyaz menü/logo header] solid şerit;
-  // hero doğal akışta bunların TAM ALTINDA başlar (fixed-overlay + marginTop offset YOK → örtme
-  // yok, üstü kesilmez, zıplama yok). heroPage/heroOverlay artık hiçbir yerde AÇILMAZ → tüm
-  // sayfalar (home + klasik) aynı sticky-solid davranışta. Kalıntı bayrak/değişkenler temizlenir.
+  // Masaüstü yapışkan şerit: header görünümden çıkınca üstte sabit sarı şerit belirir.
   useEffect(() => {
-    setHeroOverlay(false);
-    setHeroPage(false);
-    try { document.documentElement.removeAttribute("data-hero-overlay"); } catch (_) { /* noop */ }
-    try { document.documentElement.style.removeProperty("--fct-hero-offset"); } catch (_) { /* noop */ }
-  }, [location.pathname]);
-
-  // Mega menü: hoveredCategory veya activeMenu için en çok satan ürünleri lazy fetch (3 ürün).
-  // Kategori boş dönerse statik banner yerine genel popüler ürünlere düşülür → sağ panel her zaman dinamik.
-  const _activeTab = menuTabs.find((t) => t && t.id === activeMenu && (t.type === "mega" || hasSaleMenu(t))) || null;
-  const _tabSlug = (t) => (t ? (slugFromLink(t.link) || t.id) : null);
-  useEffect(() => {
-    const slug = hoveredCategory || _tabSlug(_activeTab);
-    if (slug && megaProducts[slug] === undefined) {
-      axios.get(`${API}/products?category=${slug}&limit=3&sort=popular`)
-        .then(async (r) => {
-          let list = r.data?.products || [];
-          if (list.length === 0) {
-            const r2 = await axios.get(`${API}/products?limit=3&sort=popular`).catch(() => null);
-            list = r2?.data?.products || [];
-          }
-          setMegaProducts((prev) => ({ ...prev, [slug]: list }));
-        })
-        .catch(() => setMegaProducts((prev) => ({ ...prev, [slug]: [] })));
-    }
-  }, [hoveredCategory, activeMenu, menuTabs]);
-
-  // Aktif olarak gösterilecek ürün listesi: önce alt kategori hover, yoksa ana kategori (3 ürün)
-  const activeMegaSlug = hoveredCategory || _tabSlug(_activeTab);
-  const activeMegaProducts = (megaProducts[activeMegaSlug] || []).slice(0, 3);
-  // Henüz fetch tamamlanmadıysa (undefined) yükleniyor → iskelet göster, fallback görsel flash etme
-  const megaLoading = Boolean(activeMegaSlug) && megaProducts[activeMegaSlug] === undefined;
-
-  // Mega menü kapanma timer'ı — REF tabanlı. Önceki state tabanlı sürümde scheduleClose
-  // mevcut timer'ı temizlemeden yenisini kuruyordu: tetikleyiciden panele geçerken sızan
-  // eski timer, imleç panelin ÜZERİNDEYKEN menüyü kapatıyordu ("kategoriye tıklayamadan
-  // kayboluyor"). Ref + her kurulumda temizlik yarışı bitirir; gecikme 1sn'ye çıkarıldı.
-  const closeTimerRef = useRef(null);
-  const openMenu = (m) => {
-    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
-    setActiveMenu(m);
-  };
-  const scheduleClose = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(() => {
-      setActiveMenu(null); setHoveredCategory(null); closeTimerRef.current = null;
-    }, 180);  // 1sn çok uzundu ("geç kayboluyor"); 180ms panele imleç taşımaya yeter, laggy değil
-  };
-  const cancelClose = () => {
-    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
-  };
-
-  useEffect(() => {
-    if (searchOpen && popularSearches.length === 0) {
-      fetchPopularSearches();
-    }
-    if (searchOpen && suggestedProducts.length === 0) {
-      axios.get(`${API}/products?limit=8&sort=popular`)
-        .then((r) => setSuggestedProducts(r.data?.products || []))
-        .catch(() => {});
-    }
-  }, [searchOpen]);
-
-  // Zara davranışı: overlay açıkken arka plan scroll kilidi + ESC ile kapat
-  useEffect(() => {
-    if (!searchOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => {
-      if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); }
+    const onScroll = () => {
+      const h = headerRef.current ? headerRef.current.offsetHeight : 0;
+      setStuck(window.scrollY > h + 40);
     };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [searchOpen]);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
-  useEffect(() => {
-    const q = searchQuery;
-    const timer = setTimeout(async () => {
-      if (q.length < 1) {
-        setSearchResults([]);
-        setSearchTotal(0);
-        return;
-      }
-      try {
-        // Önizleme 12'ye çıkarıldı (6 çok azdı → adında geçse bile ürünler "çıkmıyor" görünüyordu);
-        // toplam sonuç sayısı da alınır ki "Tüm sonuçları gör (N)" ile kalan ürünler belli olsun.
-        const res = await axios.get(`${API}/products?search=${encodeURIComponent(q)}&limit=12`);
-        setSearchResults(res.data?.products || []);
-        setSearchTotal(Number(res.data?.total || 0));
-      } catch (err) {
-        console.error(err);
-      }
-    }, q.length >= 1 ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  const welcome = `${info.name && info.name !== "Mağaza" ? info.name : SITE_NAME}'e Hoş Geldiniz — Oto Servis & Garaj Ekipmanları`;
+  const freeShip = "Ücretsiz Kargo Fırsatları";
+  const closeMobile = () => setMobileOpen(false);
 
-  const fetchPopularSearches = async () => {
-    try {
-      const res = await axios.get(`${API}/search/popular`);
-      setPopularSearches(res.data || []);
-    } catch (err) {
-      setPopularSearches([
-        { term: "elbise", count: 150 },
-        { term: "bluz", count: 120 },
-        { term: "pantolon", count: 100 },
-      ]);
-    }
-  };
+  // Ödeme sayfasında sade header (yalnız logo) — dikkat dağıtmaz.
+  if (isCheckout) {
+    return (
+      <div className="electro el-header-wrap">
+        <header id="header" className="u-header u-header-left-aligned-nav border-bottom">
+          <div className="u-header__section">
+            <div className="py-3">
+              <div className="container d-flex align-items-center justify-content-between">
+                <Logo className="navbar-brand u-header__navbar-brand" />
+                <span className="font-size-14 text-gray-90"><i className="fas fa-lock mr-1" /> Güvenli Ödeme</span>
+              </div>
+            </div>
+          </div>
+        </header>
+        <CartDrawer />
+      </div>
+    );
+  }
 
-  const submitSearch = () => {
-    const q = searchQuery.trim();
-    if (q) {
-      navigate(`/arama?q=${encodeURIComponent(q)}`);
-      setSearchOpen(false);
-      setSearchQuery("");
-    }
-  };
-
-  const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
+  const bar = (
+    <>
+      {topFirst ? <>{topAnnouncement}<CountdownBar /></> : <><CountdownBar />{topAnnouncement}</>}
+    </>
+  );
 
   return (
     <>
-      {/* Ana-sayfa-hero'da: SİYAH bar + header TEK fixed sarmalayıcıda (aralarında BOŞLUK/BEYAZ ÇİZGİ
-          YOK, bitişik). Hero arkada top-0'da → görsel tam ekran. İlk ekran (overlay): bar siyah + header
-          şeffaf/beyaz görselin üzerinde. Kaydırınca (overlay off): bar gizlenir, header beyaz sticky.
-          Diğer sayfalarda: bar akışta + header sticky (klasik). */}
-      <div className={heroPage ? "fixed inset-x-0 top-0 z-40" : ""}>
-        {/* Sayaç + Üst Duyuru Barı: SIRA, Sayfa Tasarımı'ndaki blok sırasına (sort_order) göre
-            gelir — koda gömülü DEĞİL. `announcementFirst` Home'dan sort_order karşılaştırmasıyla
-            geçer. Aralarında margin/boşluk YOK (bitişik). Ana-sayfa-hero'da yalnız EN ÜSTTE
-            (overlay) görünür; diğer sayfalarda sayaç hep görünür. Duyuru barı Home'dan prop ile, diğer sayfalarda
-            Header'ın kendi çektiği ana-sayfa bloğundan gelir (her sayfada aynı). */}
-        {(heroPage ? heroOverlay : true) && !isCheckout && (
-          <div ref={barsRef}>
-            {topAnnouncementFirst
-              ? <>{topAnnouncement}<CountdownBar /></>
-              : <><CountdownBar />{topAnnouncement}</>}
+      <div>{bar}</div>
+      <div className="electro el-header-wrap" data-header-variant={variant}>
+        <header id="header" className="u-header u-header-left-aligned-nav" ref={headerRef} data-testid="site-header">
+          <div className="u-header__section">
+            {/* Topbar */}
+            <div className="u-header-topbar py-2 d-none d-xl-block">
+              <div className="container">
+                <div className="d-flex align-items-center">
+                  <div className="topbar-left">
+                    <span className="text-gray-110 font-size-13 hover-on-dark">{welcome}</span>
+                  </div>
+                  <div className="topbar-right ml-auto">
+                    <ul className="list-inline mb-0">
+                      <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
+                        <Link to="/sayfa/iletisim" className="u-header-topbar__nav-link"><i className="ec ec-map-pointer mr-1" /> Mağazamız</Link>
+                      </li>
+                      <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
+                        <Link to="/siparis-takip" className="u-header-topbar__nav-link"><i className="ec ec-transport mr-1" /> Sipariş Takibi</Link>
+                      </li>
+                      <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
+                        <span className="u-header-topbar__nav-link"><i className="ec ec-dollar mr-1" /> Türk Lirası (₺)</span>
+                      </li>
+                      <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
+                        {user ? (
+                          <Link to="/hesabim" className="u-header-topbar__nav-link" data-testid="topbar-account"><i className="ec ec-user mr-1" /> Hesabım{user.first_name ? ` (${user.first_name})` : ""}</Link>
+                        ) : (
+                          <Link to="/giris" className="u-header-topbar__nav-link" data-testid="topbar-login"><i className="ec ec-user mr-1" /> Üye Ol <span className="text-gray-50">veya</span> Giriş Yap</Link>
+                        )}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Logo + arama/menü + ikonlar */}
+            <div className={`py-2 ${home ? "py-xl-5" : "py-xl-4"} bg-primary-down-lg`}>
+              <div className="container my-0dot5 my-xl-0">
+                <div className="row align-items-center">
+                  <div className="col-auto">
+                    <nav className="navbar navbar-expand u-header__navbar py-0 justify-content-xl-between max-width-270 min-width-270">
+                      <Logo className="order-1 order-xl-0 navbar-brand u-header__navbar-brand u-header__navbar-brand-center" />
+                      <button type="button" className="navbar-toggler d-block btn u-hamburger mr-3 mr-xl-0" aria-label="Menüyü aç" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)} data-testid="mobile-menu-btn">
+                        <span className="u-hamburger__box"><span className="u-hamburger__inner" /></span>
+                      </button>
+                    </nav>
+                  </div>
+                  {home ? (
+                    <div className="col d-none d-xl-block">
+                      <SearchBar roots={roots} variant="home" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="col d-none d-xl-block">
+                        <HorizontalNav tabs={tabs} saleMenu={saleMenu} />
+                      </div>
+                      <div className="d-none d-xl-block col-md-auto">
+                        <div className="d-flex">
+                          <i className="ec ec-support font-size-50 text-primary" />
+                          <div className="ml-2">
+                            <div className="phone"><strong>Destek</strong> {info.phone ? <a href={`tel:${info.phone.replace(/\s/g, "")}`} className="text-gray-90">{info.phone}</a> : <Link to="/sayfa/iletisim" className="text-gray-90">Bize ulaşın</Link>}</div>
+                            {info.email && <div className="email">E-posta: <a href={`mailto:${info.email}`} className="text-gray-90">{info.email}</a></div>}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <div className={`${home ? "" : "d-xl-none "}col col-xl-auto text-right text-xl-left pl-0 pl-xl-3 position-static`}>
+                    <div className="d-inline-flex">
+                      <HeaderIcons variant={variant} onMobileSearch={() => setMobileSearch((v) => !v)} mobileSearchOpen={mobileSearch} />
+                    </div>
+                  </div>
+                </div>
+                {mobileSearch && (
+                  <div className="d-xl-none pt-2 pb-1">
+                    <SearchBar roots={roots} variant="shop" inputId="searchproduct-mobile" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Ana sayfa: dikey menü (açık) + yatay menü */}
+            {home ? (
+              <div className="d-none d-xl-block container">
+                <div className="row">
+                  <div className="col-md-auto d-none d-xl-block">
+                    <div className="max-width-270 min-width-270">
+                      <div id="basicsAccordion">
+                        <div className="card border-0">
+                          <div className="card-header card-collapse border-0" id="basicsHeadingOne">
+                            <button type="button" className="btn-link btn-remove-focus btn-block d-flex card-btn py-3 text-lh-1 px-4 shadow-none btn-primary rounded-top-lg border-0 font-weight-bold text-gray-90"
+                              aria-expanded="true" onClick={() => setDeptOpen((v) => !v)} data-testid="all-departments-btn">
+                              <span className="ml-0 text-gray-90 mr-2"><span className="fa fa-list-ul" /></span>
+                              <span className="pl-1 text-gray-90">Tüm Kategoriler</span>
+                            </button>
+                          </div>
+                          <VerticalMenu roots={roots} open={!deptOpen} variant="home" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col">
+                    <HorizontalNav tabs={tabs} saleMenu={saleMenu} freeShippingText={freeShip} showLast />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <ShopBar roots={roots} deptOpen={deptOpen} setDeptOpen={setDeptOpen} />
+            )}
+          </div>
+        </header>
+
+        {/* Yapışkan şerit (masaüstü) */}
+        {stuck && (
+          <div className="el-sticky-bar d-none d-xl-block bg-primary el-anim-down" data-testid="sticky-header">
+            <div className="container">
+              <div className="row align-items-center min-height-50 py-1">
+                <div className="col-auto"><Logo className="navbar-brand u-header__navbar-brand py-0" width={130} height={32} /></div>
+                <div className="col"><SearchBar roots={roots} variant="shop" inputId="searchproduct-sticky" /></div>
+                <div className="col-md-auto">
+                  <div className="d-flex"><HeaderIcons variant="shop" /></div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        <header
-          className={`z-40 transition-colors duration-300 ${
-            heroOverlay
-              ? "bg-transparent text-white"
-              : heroPage
-                ? "bg-white/95 backdrop-blur-xl border-b border-black/5 text-black"
-                : "sticky top-0 bg-white/95 backdrop-blur-xl border-b border-black/5 text-black"
-          }`}
-        >
-          {/* Açık hero görselinde beyaz logo/ikonların okunması için üstte ince koyu gradient scrim */}
-          {heroOverlay && (
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent" aria-hidden="true" />
-          )}
-          {/* Overlay'de logo/ikonlar görselin üzerinde biraz AŞAĞIDA başlasın: ekstra üst boşluk */}
-          <div className={`relative max-w-[1800px] mx-auto px-3 md:px-8 ${heroOverlay ? "pt-6 md:pt-4" : ""}`}>
-          {/* Masaüstünde (lg) logo + menü + butonlar YALNIZ hero-overlay (üst/şeffaf) durumunda
-              biraz aşağıda dursun. STICKY (kaydırınca beyaz sabit header) devreye girince pt-6
-              KALKAR → içerik dikeyde ortalı kalır (aşağı kaymaz). Mobil/tablet aynı. */}
-          <div className={`relative flex items-center h-12 md:h-14 ${heroOverlay ? "lg:pt-6" : ""}`}>
-            {/* Left: Navigation Menu */}
-            <div className="flex-1 flex items-center gap-2.5">
-              {!isCheckout && (
-                <>
-                  <button
-                    className="lg:hidden p-2 -ml-2"
-                    onClick={() => setMobileMenuOpen(true)}
-                    aria-label="Menü"
-                    data-testid="mobile-menu-btn"
-                  >
-                    {/* Zara tarzı minimal hamburger — iki ince yatay çizgi */}
-                    <svg width="22" height="10" viewBox="0 0 22 10" fill="none" aria-hidden="true">
-                      <line x1="0" y1="1.5" x2="22" y2="1.5" stroke="currentColor" strokeWidth="1.1" />
-                      <line x1="0" y1="8.5" x2="22" y2="8.5" stroke="currentColor" strokeWidth="1.1" />
-                    </svg>
-                  </button>
-
-                  {/* Mobil logo — Mango tarzı: hamburger'ın hemen yanında, sol hizalı, küçük.
-                      Masaüstünde gizli; masaüstü logosu aşağıdaki ortalanmış Link'te. */}
-                  <Link to="/" className="lg:hidden flex-shrink-0" data-testid="header-logo-mobile" aria-label={SITE_NAME}>
-                    <img src="/logo.webp" alt={SITE_NAME} className={`h-4 ${heroOverlay ? "brightness-0 invert" : ""}`} />
-                  </Link>
-
-                  {/* iPad (lg, ~1024-1280px) sıkışması: sekmeler lg'de daha kompakt (küçük punto,
-                      dar tracking, dar gap), xl'de tam boy — logoya binme/overlap engellenir. */}
-                  <nav className="hidden lg:flex items-center gap-4 xl:gap-8 min-w-0 pr-3" style={menuReady ? undefined : { visibility: "hidden" }}>
-                    {/* Sekmeler TAMAMEN panelden (Tasarım > Menü Yönetimi): ad, sıra, tip (link/mega), stil.
-                        style=accent → elmas işaretli premium stil; style=sale → kırmızı. */}
-                    {visibleTabs.map((tab) => {
-                      const isAccent = tab.style === "accent";
-                      const isSale = tab.style === "sale";
-                      const cls = isAccent
-                        ? "group relative text-[11px] xl:text-xs font-bold tracking-[0.16em] xl:tracking-[0.28em] uppercase py-4 leading-none flex items-center gap-1.5 whitespace-nowrap"
-                        : `text-[11px] xl:text-xs font-semibold tracking-[0.1em] xl:tracking-[0.2em] uppercase py-4 leading-none flex items-center hover:opacity-60 whitespace-nowrap${isSale ? " text-red-700" : ""}`;
-                      const inner = (
-                        <>
-                          {isAccent && <span className="inline-block w-[5px] h-[5px] rotate-45 bg-current opacity-55 group-hover:opacity-100 transition-opacity duration-300" aria-hidden="true" />}
-                          {tab.label}
-                          {isAccent && <span className="pointer-events-none absolute left-0 bottom-2.5 h-px w-full bg-current origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ease-out" aria-hidden="true" />}
-                        </>
-                      );
-                      if (tab.type === "mega") {
-                        return (
-                          <div
-                            key={tab.id}
-                            className="relative"
-                            onMouseEnter={() => openMenu(tab.id)}
-                            onMouseLeave={scheduleClose}
-                          >
-                            <Link to={tab.link || "#"} className={cls} data-testid={`nav-tab-${tab.id}`}>{inner}</Link>
-                          </div>
-                        );
-                      }
-                      if (hasSaleMenu(tab)) {
-                        return (
-                          <div
-                            key={tab.id}
-                            className="relative"
-                            onMouseEnter={() => openMenu(tab.id)}
-                            onMouseLeave={scheduleClose}
-                          >
-                            <Link to={tab.link || "#"} className={cls} data-testid={`nav-tab-${tab.id}`}>{inner}</Link>
-                          </div>
-                        );
-                      }
-                      return (
-                        <Link key={tab.id} to={tab.link || "#"} className={cls} data-testid={`nav-tab-${tab.id}`}>{inner}</Link>
-                      );
-                    })}
-                  </nav>
-                </>
-              )}
-            </div>
-
-            {/* Center: Logo — sadece masaüstünde (mobil logo yukarıda, sol blokta) */}
-            <Link to="/" className="hidden lg:block flex-shrink-0 mx-4" data-testid="header-logo">
-              <img src="/logo.webp" alt={SITE_NAME} className={`h-5 xl:h-6 ${heroOverlay ? "brightness-0 invert" : ""}`} />
-            </Link>
-
-            {/* Right: Icons (mobile: search icon + account + favorites + cart, Mango tarzı; desktop: full set) */}
-            <div className="flex-1 flex items-center justify-end gap-0.5 md:gap-3">
-              {!isCheckout && (
-                <>
-                  <button onClick={() => setSearchOpen(true)} className="inline-flex flex-col items-center md:items-start justify-center p-2 md:p-0 md:py-1.5 md:pr-4 opacity-80 hover:opacity-100 transition-opacity" aria-label="Ara" data-testid="search-btn">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Search size={17} strokeWidth={1.4} />
-                      <span className="hidden md:inline text-[11px] tracking-[0.2em] uppercase leading-none">Ara</span>
-                    </span>
-                    <span className="hidden md:block mt-1.5 h-px bg-current w-36 md:w-48"></span>
-                  </button>
-                  {user && (
-                    <Link to="/hesabim?tab=favorites" className="inline-flex p-2 hover:opacity-60 relative" aria-label="Kaydedilenler" data-testid="favorites-btn">
-                      <Bookmark size={17} strokeWidth={1.4} />
-                      {favCount > 0 && (
-                        <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 bg-black text-white text-[8px] font-light rounded-full flex items-center justify-center">
-                          {favCount}
-                        </span>
-                      )}
-                    </Link>
-                  )}
-                  <Link to={user ? "/hesabim" : "/giris"} className="inline-flex p-2 hover:opacity-60" aria-label="Hesap">
-                    <User size={17} strokeWidth={1.4} />
-                  </Link>
-                  <button onClick={() => setIsOpen(true)} className="p-2 hover:opacity-60 relative" aria-label="Sepet" data-testid="cart-btn">
-                    <ShoppingBag size={17} strokeWidth={1.4} />
-                    {itemCount > 0 && (
-                      <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 bg-black text-white text-[8px] font-light rounded-full flex items-center justify-center">
-                        {itemCount}
-                      </span>
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Full Width Mega Menu Dropdown — aktif mega sekme panelden gelir (tüm sekmeler için TEK şablon) */}
-        {(() => {
-          // SALE menüsü: diğer menülerle AYNI tam genişlik panel — liste solda, sağda SALE ürünleri.
-          const saleTab = visibleTabs.find((t) => t.id === activeMenu && hasSaleMenu(t));
-          if (!saleTab) return null;
-          return (
-            <div
-              className="absolute left-0 right-0 top-full bg-white shadow-lg border-t z-50"
-              onMouseEnter={cancelClose}
-              onMouseLeave={scheduleClose}
-              data-testid="sale-menu"
-            >
-              <div className="max-w-[1800px] mx-auto px-8 py-6">
-                <div className="flex gap-12">
-                  <ul className="space-y-1">
-                    {saleMenu.map((it) => (
-                      <li key={`${it.url}-${it.label}`}>
-                        <Link
-                          to={it.url}
-                          className="block py-1 text-sm text-gray-700 hover:text-black transition-colors"
-                          onClick={() => setActiveMenu(null)}
-                        >
-                          {it.label}
-                        </Link>
-                      </li>
-                    ))}
-                    <li className="pt-1.5">
-                      <Link to={saleTab.link || "/sale"} className="text-xs font-medium underline hover:no-underline" onClick={() => setActiveMenu(null)}>
-                        Tümünü Gör
-                      </Link>
-                    </li>
-                  </ul>
-                  <div className="flex-shrink-0 flex gap-3 min-w-[564px] ml-auto">
-                    <MegaProductsPanel
-                      products={activeMegaProducts}
-                      loading={megaLoading}
-                      fallback={MENU_IMAGES[saleTab.id] || MENU_IMAGES_FALLBACK}
-                      fallbackLink={saleTab.link || "/sale"}
-                      onNavigate={() => setActiveMenu(null)}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-        {(() => {
-          const tab = visibleTabs.find((t) => t.id === activeMenu && t.type === "mega");
-          if (!tab) return null;
-          const cols = megaColumnsOf(tab);
-          if (!cols.length) return null;
-          return (
-          <div
-            className="absolute left-0 right-0 top-full bg-white shadow-lg border-t z-50"
-            onMouseEnter={cancelClose}
-            onMouseLeave={scheduleClose}
-          >
-            <div className="max-w-[1800px] mx-auto px-8 py-6">
-              <div className="flex gap-12">
-                {/* Kolonlar — panele girilen başlık + alt kategoriler (birbirine yakın, genişliğe yayılmaz).
-                    Hiçbir kolonda alt kategori yoksa (ör. koleksiyon listesi) başlıklar TEK kolonda ALT ALTA. */}
-                {cols.every((c) => !c.items.length) ? (
-                <ul className="space-y-1">
-                  {cols.map((col) => (
-                    <li key={col.title} className={_isFullLook(col.title) ? "mt-8 pt-1" : ""}>
-                      {/* Full Look: diğer başlıklardan belirgin aşağıda, üstünde KISA ayraç çizgi, kalın yazı
-                          (index.css .font-bold'u 600'e çekiyor → inline 700). */}
-                      {_isFullLook(col.title) && <span aria-hidden="true" className="block w-7 h-px bg-black/25 mb-3" />}
-                      <Link
-                        to={col.link}
-                        className={`block py-1 text-sm text-gray-700 hover:text-black transition-colors${_isFullLook(col.title) ? " nav-full-look text-black tracking-[0.08em]" : ""}`}
-                        onClick={() => setActiveMenu(null)}
-                        onMouseEnter={() => setHoveredCategory(col.slug)}
-                      >
-                        {col.title}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-                ) : (
-                <div className={MEGA_LINK_GRID} style={megaCols(cols.length || 3)}>
-                  {cols.map((col) => (
-                    // Kolon başlığına/alanına gelince o ana kategorinin ürünleri sağda çıksın
-                    // (item'sız kolonlar — ör. koleksiyon başlıkları — dahil). Alt ürün hover'ı override eder.
-                    <div key={col.title} onMouseEnter={() => setHoveredCategory(col.slug)}>
-                      <Link
-                        to={col.link}
-                        className={`block text-xs font-bold tracking-wider mb-3 text-gray-900 hover:underline cursor-pointer`}
-                        onClick={() => setActiveMenu(null)}
-                        onMouseEnter={() => setHoveredCategory(col.slug)}
-                      >
-                        {col.title}
-                      </Link>
-                      <ul className="space-y-1">
-                        {col.items.map((item) => (
-                          <li key={item.slug}>
-                            <Link
-                              to={item.link}
-                              className={`block py-1 text-sm text-gray-600 hover:text-black transition-colors`}
-                              onClick={() => setActiveMenu(null)}
-                              onMouseEnter={() => setHoveredCategory(item.slug)}
-                            >
-                              {item.name}
-                            </Link>
-                          </li>
-                        ))}
-                        <li className="pt-1.5">
-                          <Link
-                            to={col.link}
-                            className="text-xs font-medium underline hover:no-underline"
-                            onClick={() => setActiveMenu(null)}
-                          >
-                            Tümünü Gör
-                          </Link>
-                        </li>
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-                )}
-
-                {/* Right: Hover edilen kategorinin en çok satan 3 ürünü */}
-                <div className="flex-shrink-0 flex gap-3 min-w-[564px] ml-auto">
-                  <MegaProductsPanel
-                    products={activeMegaProducts}
-                    loading={megaLoading}
-                    fallback={MENU_IMAGES[tab.id] || MENU_IMAGES_FALLBACK}
-                    fallbackLink={tab.link || "/"}
-                    onNavigate={() => setActiveMenu(null)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          );
-        })()}
-
-        </header>
+        <MobileSidebar open={mobileOpen} onClose={closeMobile} roots={roots} tabs={tabs} />
+        <CartDrawer />
       </div>
-
-      {/* Mobile Menu */}
-      {!isCheckout && (
-        <div className={`mobile-menu ${mobileMenuOpen ? "open" : ""}`}>
-          <div className="flex items-center justify-between px-5 h-14 border-b border-black/5">
-            <Link to="/" onClick={() => setMobileMenuOpen(false)}>
-              <img src="/logo.webp" alt={SITE_NAME} className="h-5" />
-            </Link>
-            <button onClick={() => setMobileMenuOpen(false)} className="-mr-2 p-2" aria-label="Kapat">
-              <X size={20} strokeWidth={1.4} />
-            </button>
-          </div>
-          <nav className="overflow-y-auto h-[calc(100dvh-56px)] flex flex-col">
-            {/* Primary Categories — sekmeler panelden (Tasarım > Menü Yönetimi) */}
-            <div className="px-5 pt-6 pb-4">
-              {visibleTabs.map((tab, ti) => {
-                const isAccent = tab.style === "accent";
-                const isSale = tab.style === "sale";
-                const borderCls = ti === 0 ? "" : "border-t border-black/5";
-                if (tab.type === "mega") {
-                  const cols = megaColumnsOf(tab);
-                  return (
-                    <details key={tab.id} className={`group ${borderCls}`}>
-                      <summary className="flex items-center justify-between py-3 cursor-pointer list-none">
-                        <span className={`text-sm tracking-[0.15em] uppercase font-light${isSale ? " text-red-700" : ""}`}>{tab.label}</span>
-                        <span className="text-base font-thin transition-transform group-open:rotate-45">+</span>
-                      </summary>
-                      <div className="pb-3 pl-1 space-y-3">
-                        {cols.map((col) => (
-                          <div key={col.title} className={_isFullLook(col.title) ? "mt-6 pt-1" : ""}>
-                            {_isFullLook(col.title) && <span aria-hidden="true" className="block w-7 h-px bg-black/25 mb-2.5" />}
-                            {/* Alt kategorisi olmayan kolon (ör. koleksiyon) normal satır linki olarak ALT ALTA */}
-                            <Link
-                              to={col.link}
-                              className={_isFullLook(col.title)
-                                ? "nav-full-look block py-1.5 text-[13px] text-black tracking-[0.08em]"
-                                : `${col.items.length
-                                  ? "block text-[10px] tracking-[0.25em] uppercase text-black/40 mb-1.5 hover:underline"
-                                  : "block py-1.5 text-[13px] font-light text-black/75"}`}
-                              onClick={() => setMobileMenuOpen(false)}
-                            >
-                              {col.title}
-                            </Link>
-                            {col.items.map((item) => (
-                              <Link
-                                key={item.slug}
-                                to={item.link}
-                                className={`block py-1.5 text-[13px] font-light text-black/75`}
-                                onClick={() => setMobileMenuOpen(false)}
-                              >
-                                {item.name}
-                              </Link>
-                            ))}
-                          </div>
-                        ))}
-                        <Link
-                          to={tab.link || "/"}
-                          className="block py-1.5 mt-1 text-[13px] font-medium underline text-black/80"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          Tümünü Gör
-                        </Link>
-                      </div>
-                    </details>
-                  );
-                }
-                if (hasSaleMenu(tab)) {
-                  return (
-                    <details key={tab.id} className={`group ${borderCls}`} data-testid="sale-menu-mobile">
-                      <summary className="flex items-center justify-between py-3 cursor-pointer list-none">
-                        <span className="text-sm tracking-[0.15em] uppercase font-light text-red-700">{tab.label}</span>
-                        <span className="text-base font-thin transition-transform group-open:rotate-45">+</span>
-                      </summary>
-                      <div className="pb-3 pl-1">
-                        {saleMenu.map((it) => (
-                          <Link
-                            key={`${it.url}-${it.label}`}
-                            to={it.url}
-                            className="block py-1.5 text-[13px] font-light text-black/75"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            {it.label}
-                          </Link>
-                        ))}
-                        <Link
-                          to={tab.link || "/"}
-                          className="block py-1.5 mt-1 text-[13px] font-medium underline text-black/80"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          Tümünü Gör
-                        </Link>
-                      </div>
-                    </details>
-                  );
-                }
-                return (
-                  <Link
-                    key={tab.id}
-                    to={tab.link || "/"}
-                    className={`flex items-center gap-2 py-3 text-sm uppercase ${borderCls} ${isAccent ? "tracking-[0.18em] font-medium" : "tracking-[0.15em] font-light"}${isSale ? " text-red-700" : ""}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {isAccent && <span className="inline-block w-[5px] h-[5px] rotate-45 bg-black" aria-hidden="true" />}
-                    {tab.label}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Bottom: Account + Service — mobil tarayıcı alt çubuğunun ARKASINDA kalmasın diye
-                safe-area + ekstra alt boşlukla yukarı çekildi (100dvh ile birlikte). */}
-            <div className="mt-auto px-5 pt-6 pb-[calc(2rem+env(safe-area-inset-bottom))] bg-stone-50 border-t border-black/5 space-y-2.5">
-              <Link to={user ? "/hesabim" : "/giris"} className="block text-[13px] font-light text-black/85" onClick={() => setMobileMenuOpen(false)}>
-                {user ? "Hesabım" : "Giriş Yap / Üye Ol"}
-              </Link>
-              <Link to="/siparis-takip" className="block text-[13px] font-light text-black/85" onClick={() => setMobileMenuOpen(false)}>
-                Sipariş Takibi
-              </Link>
-              <Link to="/sayfa/iletisim" className="block text-[13px] font-light text-black/85" onClick={() => setMobileMenuOpen(false)}>
-                İletişim
-              </Link>
-              <Link to="/iade-islemleri" className="block text-[13px] font-light text-black/85" onClick={() => setMobileMenuOpen(false)}>
-                İade Talebi
-              </Link>
-            </div>
-          </nav>
-        </div>
-      )}
-
-      {/* Search Overlay */}
-      {searchOpen && (
-        <div className="fixed inset-x-0 top-0 h-[100dvh] bg-white z-[60] overflow-y-auto overscroll-contain" style={{ animation: "storeSearchIn .2s ease-out" }}>
-          {/* Mobil klavye düzeltmesi: 100dvh (dinamik viewport) — klavye açılınca kap
-              küçülür, içerik klavyenin arkasında kalmaz; overscroll-contain ile arka
-              sayfa kaymaz. Mobilde üst boşluklar kısaltıldı. */}
-          <style>{`@keyframes storeSearchIn{from{opacity:0}to{opacity:1}}@keyframes storeSearchUp{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}`}</style>
-          <div className="px-5 md:px-10 pt-4 md:pt-5 pb-40 md:pb-16" style={{ animation: "storeSearchUp .28s ease-out" }}>
-            {/* Üst bar: logo + kapat */}
-            <div className="flex items-center justify-between mb-4 md:mb-12">
-              <Link to="/" onClick={closeSearch} aria-label={SITE_NAME}><img src="/logo.webp" alt={SITE_NAME} className="h-5" /></Link>
-              <button onClick={closeSearch} className="inline-flex items-center gap-1.5 text-[11px] tracking-[0.18em] uppercase hover:opacity-60 transition-opacity" aria-label="Kapat">
-                Kapat <X size={18} strokeWidth={1.4} />
-              </button>
-            </div>
-
-            {/* 3 kolon: sol kategori | orta arama | sağ hesap (Zara düzeni) */}
-            <div className="grid grid-cols-1 md:grid-cols-[170px_1fr_170px] gap-8 md:gap-12 items-start mb-5 md:mb-16">
-              {/* SOL: kategoriler (desktop) */}
-              <nav className="hidden md:flex flex-col gap-3.5 text-[11px] tracking-[0.18em] uppercase">
-                {visibleTabs.map((t) => (
-                  <Link key={t.id} to={t.link || "/"} onClick={closeSearch} className={`hover:opacity-60 transition-opacity${t.style === "sale" ? " text-red-700" : ""}`}>{t.label}</Link>
-                ))}
-                <Link to="/" onClick={closeSearch} className="hover:opacity-60 transition-opacity">Ana Sayfa</Link>
-              </nav>
-
-              {/* ORTA: büyük arama girişi */}
-              <form onSubmit={(e) => { e.preventDefault(); submitSearch(); }} className="w-full">
-                <div className="relative border-b border-black max-w-2xl mx-auto md:max-w-4xl md:mx-0">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Ne arıyorsunuz?"
-                    className="w-full text-xl md:text-3xl font-light py-2.5 pr-10 bg-transparent focus:outline-none placeholder:text-gray-300 text-center md:text-left"
-                    autoFocus
-                  />
-                  {searchQuery ? (
-                    <button type="button" onClick={() => setSearchQuery("")} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors" aria-label="Temizle"><X size={20} strokeWidth={1.3} /></button>
-                  ) : (
-                    <Search size={22} strokeWidth={1.2} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400" />
-                  )}
-                </div>
-              </form>
-
-              {/* SAĞ: hesap / sepet (desktop) */}
-              <nav className="hidden md:flex flex-col gap-3.5 text-[11px] tracking-[0.18em] uppercase md:items-end">
-                <button onClick={() => { closeSearch(); setIsOpen(true); }} className="hover:opacity-60 transition-opacity">Sepet{itemCount > 0 ? ` (${itemCount})` : ""}</button>
-                <Link to={user ? "/hesabim" : "/giris"} onClick={closeSearch} className="hover:opacity-60 transition-opacity">{user ? "Hesabım" : "Giriş Yap"}</Link>
-                {user && (
-                  <Link to="/hesabim?tab=favorites" onClick={closeSearch} className="hover:opacity-60 transition-opacity">Kaydedilenler{favCount > 0 ? ` (${favCount})` : ""}</Link>
-                )}
-              </nav>
-
-              {/* Mobil: kategori + hesap linkleri yatay (md'de gizli) */}
-              <div className="md:hidden flex flex-wrap justify-center gap-x-5 gap-y-2.5 text-[11px] tracking-[0.15em] uppercase pt-1">
-                {visibleTabs.map((t) => (
-                  <Link key={t.id} to={t.link || "/"} onClick={closeSearch} className={t.style === "sale" ? "text-red-700" : ""}>{t.label}</Link>
-                ))}
-                <Link to={user ? "/hesabim" : "/giris"} onClick={closeSearch}>{user ? "Hesabım" : "Giriş"}</Link>
-                {user && <Link to="/hesabim?tab=favorites" onClick={closeSearch}>Kaydedilenler</Link>}
-              </div>
-            </div>
-
-            {/* ALT: ürünler — boş aramada öneri, yazınca canlı sonuç */}
-            {searchQuery.length === 0 ? (
-              suggestedProducts.length > 0 && (
-                <div>
-                  <h3 className="text-[10px] tracking-widest uppercase text-gray-400 mb-5">İlginizi çekebilecek diğer ürünler</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
-                    {suggestedProducts.map((p) => (
-                      <button key={p.id} onClick={() => { navigate(`/${p.slug}`); closeSearch(); }} className="text-left group">
-                        <div className="relative aspect-[2/3] bg-gray-50 mb-2.5 overflow-hidden">
-                          <MegaDiscountBadge p={p} />
-                          <img src={optimizeImg(firstImage(p), 500)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
-                        </div>
-                        <p className="text-xs font-light line-clamp-1 mb-0.5">{p.name}</p>
-                        <MegaPrice p={p} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )
-            ) : searchResults.length > 0 ? (
-              <div>
-                <h3 className="text-[10px] tracking-widest uppercase text-gray-400 mb-5">Ürünler</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
-                  {searchResults.map((p) => (
-                    <button key={p.id} onClick={() => { navigate(`/${p.slug}`); closeSearch(); }} className="text-left group">
-                      <div className="relative aspect-[2/3] bg-gray-50 mb-2.5 overflow-hidden">
-                        <MegaDiscountBadge p={p} />
-                        <img src={optimizeImg(firstImage(p), 500)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
-                      </div>
-                      <p className="text-xs font-light line-clamp-1 mb-0.5">{p.name}</p>
-                      <MegaPrice p={p} />
-                    </button>
-                  ))}
-                </div>
-                <button onClick={() => submitSearch()} className="mt-10 text-[11px] tracking-[0.18em] uppercase border-b border-black pb-1 hover:opacity-60 transition-opacity">
-                  {searchTotal > searchResults.length ? `Tüm sonuçları gör (${searchTotal})` : "Tüm sonuçları gör"}
-                </button>
-              </div>
-            ) : (
-              <p className="text-sm font-light text-gray-400">"{searchQuery}" için sonuç bulunamadı.</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      <CartDrawer />
     </>
+  );
+}
+
+/** İç sayfalar: sarı şerit — "Kategoriler" (açılır dikey menü) + arama + ikonlar. */
+function ShopBar({ roots, deptOpen, setDeptOpen }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!deptOpen) return undefined;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setDeptOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [deptOpen, setDeptOpen]);
+  return (
+    <div className="d-none d-xl-block bg-primary">
+      <div className="container">
+        <div className="row align-items-stretch min-height-50">
+          <div className="col-md-auto d-none d-xl-flex align-items-end">
+            <div className="max-width-270 min-width-270" ref={ref}>
+              <div id="basicsAccordion">
+                <div className="card border-0 rounded-0">
+                  <div className="card-header bg-primary rounded-0 card-collapse border-0" id="basicsHeadingOne">
+                    <button type="button" className="btn-link btn-remove-focus btn-block d-flex card-btn py-3 text-lh-1 px-4 shadow-none btn-primary rounded-top-lg border-0 font-weight-bold text-gray-90"
+                      aria-expanded={deptOpen} onClick={() => setDeptOpen((v) => !v)} data-testid="all-departments-btn">
+                      <span className="pl-1 text-gray-90">Kategoriler</span>
+                      <span className="text-gray-90 ml-3"><span className="ec ec-arrow-down-search" /></span>
+                    </button>
+                  </div>
+                  <VerticalMenu roots={roots} open={deptOpen} variant="shop" onNavigate={() => setDeptOpen(false)} />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="col align-self-center">
+            <SearchBar roots={roots} variant="shop" inputId="searchProduct" />
+          </div>
+          <div className="col-md-auto align-self-center">
+            <div className="d-flex"><HeaderIcons variant="shop" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

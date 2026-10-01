@@ -7,15 +7,23 @@ iletişim, alan adı ve entegrasyon kimlikleri ortam değişkenleri ve yönetim 
 
 Kurulum adımları: **[KURULUM.md](KURULUM.md)**
 
+## Barındırma (garajtek.com)
+
+Tek bir **SNET VDS** (2 vCPU / 2 GB RAM / Ubuntu 24.04) + **Cloudflare** (DNS, proxy, SSL). Mağaza,
+yönetim paneli ve API aynı adreste (`https://garajtek.com`, API `/api`) nginx arkasında çalışır;
+veritabanı sunucudaki SQLite dosyasıdır, görseller sunucu diskinde (`/media/`, Cloudflare önbellekli)
+veya isteğe bağlı Cloudflare R2'de durur. Her gece 03:30'da yedek alınır (isteğe bağlı şifreli R2 kopyası).
+`main`'e push → GitHub Actions frontend'i derler ve sunucuya dağıtır. Ayrıntılar: [`deploy/README.md`](deploy/README.md).
+
 ## Bileşenler
 
 | Katman | Teknoloji | Dizin |
 |---|---|---|
-| Backend API + zamanlayıcı | Python 3.11, FastAPI, MongoDB (motor), APScheduler | `backend/` |
+| Backend API + zamanlayıcı | Python 3.12, FastAPI, gömülü SQLite veritabanı (`backend/localdb`), APScheduler | `backend/` |
 | Vitrin + yönetim paneli | React (CRA + craco), Tailwind | `frontend/` |
-| Kenar (SEO/OG) katmanı | Cloudflare Pages Functions | `functions/` |
+| Kenar (SEO/OG) katmanı (yalnız frontend Cloudflare Pages'te ise) | Cloudflare Pages Functions | `frontend/functions/` |
 | Mobil (opsiyonel) | Capacitor | `frontend/ios`, `frontend/android`, `mobile-customer/` |
-| Sunucu kurulum betikleri (opsiyonel, VPS) | systemd + nginx | `deploy/` |
+| Sunucu kurulumu + yedek + güncelleme | Ubuntu 24.04, nginx, systemd, Cloudflare | `deploy/`, `.github/workflows/deploy.yml` |
 
 ## Başlıca modüller
 
