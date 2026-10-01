@@ -23,7 +23,8 @@ işlenmesi, saklanması, korunması ve imhasını kapsar.
 ## 4. Şifreleme
 - **İletimde (in transit):** Tüm trafik HTTPS/TLS üzerinden.
 - **Durağan (at rest):** Hassas kimlik bilgileri AES (Fernet/AES-128) ile şifreli vault'ta;
-  MongoDB bağlantısı şifreli.
+  veritabanı (SQLite) dosyası yalnız uygulama kullanıcısınca okunabilir (0600/0700); gece
+  yedekleri sunucu dışına isteğe bağlı olarak parola ile şifrelenmiş (AES-256) gönderilir.
 
 ## 5. Erişim Kontrolü
 - Rol bazlı erişim (RBAC): yalnızca yetkili admin/personel PII'ye erişir.

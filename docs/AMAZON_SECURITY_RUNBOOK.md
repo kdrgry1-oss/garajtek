@@ -20,10 +20,11 @@ sırasıyla:
       (`amazon_spapi.py::spapi_save_config` access-token cache'ini sıfırlar). Amazon tarafında
       Seller Central > Apps & Services'ten uygulama yetkisini geri çek.
 - [ ] **Credential rotation** — aşağıdaki §2 prosedürü.
-- [ ] **Etkilenen servisi izole et** — Railway'de ilgili servisi durdur/rollback; gerekirse
+- [ ] **Etkilenen servisi izole et** — VDS'te `systemctl stop garajtek-api` / önceki commit'e dönüp `deploy/update.sh`; gerekirse
       dış erişimi (Cloudflare) kısıtla.
-- [ ] **Logları koru** — `db.integration_logs`, `db.audit_logs`, Railway deployment/app logları
-      ve Atlas audit log'unu olay penceresi için dışa aktar/dondur (silme/rotasyonu durdur).
+- [ ] **Logları koru** — `db.integration_logs`, `db.audit_logs`, `journalctl -u garajtek-api`
+      ve nginx erişim logları (`/var/log/nginx/`) olay penceresi için dışa aktar/dondur; o anki
+      SQLite veritabanının kopyasını al (`deploy/backup.sh`).
 - [ ] **Root-cause için log topla** — SP-API çağrı logları (path/status/actor), auth başarısız
       girişleri (`register_failed_login`), vault reveal audit (`write_audit_log`).
 - [ ] **Şüpheli export tespiti** — anormal toplu okuma/indirme, olağandışı admin işlemleri.
@@ -35,8 +36,8 @@ sırasıyla:
 - `integration_logs` (SP-API çağrıları — PII'siz)
 - `audit_logs` (secret reveal/değişiklik, yetki değişiklikleri)
 - Auth: başarısız/başarılı giriş, lockout kayıtları
-- Railway: app + deployment logları
-- MongoDB Atlas: database audit log (etkin ise)
+- VDS: `journalctl -u garajtek-api` (uygulama) + `/var/log/nginx/*.log` (erişim)
+- Cloudflare: Security Events / WAF logları
 
 ---
 
@@ -57,7 +58,8 @@ sırasıyla:
 > Not: `crypto.py` primitive'i **Fernet (AES-128-CBC + HMAC-SHA256)** — AES-256-GCM değildir.
 
 ### 2.3 Diğer secret'lar (DB, e-fatura/kargo entegratör, JWT)
-- DB parolası: Atlas'ta rotate → Railway env güncelle → restart.
+- Veritabanı gömülü SQLite'tır (ayrı DB parolası yok); dosya erişimi yalnız `garajtek` kullanıcısı + root.
+  Sunucu erişimi şüpheliyse SSH anahtarlarını ve root parolasını değiştirin.
 - `JWT_SECRET`: rotate (tüm oturumları düşürür — planlı yap).
 - Entegratör credential'ları: ilgili panelde rotate → vault'ta güncelle.
 
@@ -69,7 +71,8 @@ sırasıyla:
 - Hesap kilidi: `is_active=False` → token kabul edilmez + login engellenir.
 
 ## 4. Service Isolation
-- Railway'de etkilenen servisi durdur / önceki sağlıklı deploy'a rollback.
+- VDS'te etkilenen servisi durdur (`systemctl stop garajtek-api`) / önceki sağlıklı commit'e dön
+  (`git checkout <sha>` + `deploy/update.sh --no-pull`).
 - Cloudflare'de gerekirse WAF/rate-limit ile erişimi daralt.
 - SP-API entegrasyonunu geçici kapat: `AMAZON_ALLOW_RESTRICTED=0` zaten kapalı; gerekirse
   config'i temizleyerek çağrıları durdur.
