@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { sanitizeHtml } from "../lib/sanitizeHtml";
-import { X, Bookmark, ChevronUp, ChevronDown, Check, Truck, Star, RotateCcw, CreditCard, Clock, Pencil, ZoomIn, Share2, Link2 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
 import Header from "../components/Header";
@@ -19,6 +18,13 @@ import { useAuth } from "../context/AuthContext";
 import { useShipping } from "../lib/shipping";
 import { trackViewContent, trackAddToCart } from "../utils/pixelEvents";
 import { sortLikeSize } from "../utils/sizeSort";
+import Breadcrumb from "../components/electro/Breadcrumb";
+import Carousel from "../components/electro/Carousel";
+import QuantityInput from "../components/electro/QuantityInput";
+import useCategoryTree, { categoryPath } from "../components/electro/useCategoryTree";
+import { toggleCompare } from "../components/electro/compare";
+import { fmtPrice } from "../components/electro/format";
+import NotFound from "./NotFound";
 import { isStandardSized, fitSizesText } from "../lib/fitSizes";
 import { SITE_NAME } from "../lib/brand";
 
@@ -146,6 +152,9 @@ export default function ProductDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { addItem, isOpen: cartOpen } = useCart();
+  const catTree = useCategoryTree();
+  const [pdpTab, setPdpTab] = useState("description");
+  const touchX = useRef(0);
   const { isFavorite, toggleFavorite } = useFavorites();
   const { freeShippingThreshold } = useShipping();
   const { user } = useAuth();
@@ -546,1019 +555,569 @@ export default function ProductDetail() {
 
   if (loading) {
     return (
-      <div className="sf-page min-h-screen">
+      <div className="sf-page">
         <Header />
-        <div className="max-w-screen-2xl mx-auto px-4 py-8">
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="aspect-[2/3] bg-gray-100 animate-pulse" />
-            <div className="space-y-4">
-              <div className="h-8 bg-gray-100 w-3/4 animate-pulse" />
-              <div className="h-6 bg-gray-100 w-1/3 animate-pulse" />
+        <main className="electro el-page">
+          <div className="container py-6">
+            <div className="row">
+              <div className="col-md-5 mb-4"><div className="el-skel" style={{ aspectRatio: "1 / 1" }} /></div>
+              <div className="col-md-7">
+                <div className="el-skel mb-3" style={{ height: 32, width: "70%" }} />
+                <div className="el-skel mb-3" style={{ height: 20, width: "30%" }} />
+                <div className="el-skel" style={{ height: 160 }} />
+              </div>
             </div>
           </div>
-        </div>
+        </main>
         <Footer />
       </div>
     );
   }
 
   if (!product) {
-    return (
-      <div className="sf-page min-h-screen">
-        <Header />
-        <div className="max-w-screen-2xl mx-auto px-4 py-16 text-center">
-          <p className="text-gray-500">Ürün bulunamadı</p>
-          <Link to="/" className="btn-primary mt-4 inline-block">Ana Sayfaya Dön</Link>
-        </div>
-        <Footer />
-      </div>
-    );
+    return <NotFound message="Aradığınız ürün bulunamadı veya artık satışta değil." />;
   }
 
-  // İndirim görünümü TEK KAYNAK (lib/price) — vitrin kartlarıyla BİREBİR aynı; ürün detayı
-  // ile kartlar arasında "kartta indirimli ama detayda liste fiyatı" tutarsızlığı olmaz.
+  // İndirim görünümü TEK KAYNAK (lib/price) — vitrin kartlarıyla birebir aynı.
   const _pv = priceView(product);
-  // Sepetle AYNI mantık: bir varyant price_adjustment taşıyıp price_diff taşımıyorsa
-  // PDP farksız fiyat gösterip sepete farklı (yüksek) fiyat ekliyordu → gösterilen=çekilen.
+  // Sepetle AYNI mantık: varyant fiyat farkı (price_diff / price_adjustment) gösterilen fiyata eklenir.
   const variantPriceDiff = selectedVariant?.price_diff || selectedVariant?.price_adjustment || 0;
   const hasDiscount = _pv.hasDiscount;
   const listUnit = _pv.list + variantPriceDiff;
   const displayPrice = _pv.display + variantPriceDiff;
 
-  // Remove duplicate images and hide size-table images from customer view
   const allImages = product.images || [];
   const uniqueImages = allImages.length > 1 && allImages[0] === allImages[1] ? allImages.slice(1) : allImages;
-  // Ölçü tablosu görseli: tablo VERİSİ girilmemiş ürünlerde modal bu görseli gösterir
-  // (aksi hâlde beden tablosuna hiçbir cihazdan erişilemiyordu).
   const sizeTableImg = (() => {
     for (const img of allImages) {
       if (typeof img === "object" && img !== null && img.is_size_table && img.url) return img.url;
     }
     return null;
   })();
-
-  // Ölçü tablosu görselleri {url, is_size_table:true} dict'i olarak işaretli — müşteriden gizle.
-  // Kalanları URL string'e normalize et (dict gelse bile <img src> kırılmasın).
   const displayImages = uniqueImages
-    .filter((img) => !(typeof img === 'object' && img !== null && img.is_size_table))
-    .map((img) => (typeof img === 'object' && img !== null ? (img.url || img.src || img.image || '') : img))
+    .filter((img) => !(typeof img === "object" && img !== null && img.is_size_table))
+    .map((img) => (typeof img === "object" && img !== null ? (img.url || img.src || img.image || "") : img))
     .filter(Boolean);
+  if (!displayImages.length) displayImages.push("/placeholder.jpg");
+  const curImg = displayImages[selectedImage] || displayImages[0];
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+  const hasVariants = (product.variants?.length || 0) > 0;
+  const productOOS = !hasVariants && (Number(product.stock) || 0) <= 0;
+  const oosSelected = (selectedVariant && Number(selectedVariant.stock) <= 0) || productOOS;
+  const stockNow = hasVariants ? Number(selectedVariant?.stock || 0) : Number(product.stock || 0);
+  const maxQty = Math.max(1, Math.min(Number(product.max_order_qty) || 9999, stockNow || 1));
+  const isFav = isFavorite(product.id);
+  const catNode = product.category_id != null ? catTree.byId.get(String(product.category_id)) : null;
+  const catPath = catNode ? categoryPath(catTree, catNode) : [];
+  const attrs = Array.isArray(product.attributes)
+    ? product.attributes.filter((a) => a && a.name && String(a.value ?? "").trim())
+    : product.attributes && typeof product.attributes === "object"
+      ? Object.entries(product.attributes).map(([name, v]) => ({ name, value: typeof v === "object" ? v?.value : v })).filter((a) => String(a.value ?? "").trim())
+      : [];
+  const specRows = [
+    product.brand && ["Marka", product.brand],
+    product.stock_code && ["Stok Kodu", product.stock_code],
+    product.barcode && ["Barkod", product.barcode],
+    product.product_weight && ["Ağırlık", `${product.product_weight} kg`],
+    (product.width || product.depth || product.height) && ["Boyutlar (G×D×Y)", [product.width, product.depth, product.height].map((x) => x || "—").join(" × ") + " cm"],
+    product.estimated_delivery && ["Tahmini Teslim", product.estimated_delivery],
+    ...attrs.map((a) => [a.name, String(a.value)]),
+  ].filter(Boolean);
+  const shortList = attrs.slice(0, 5);
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  const enc = encodeURIComponent;
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(shareUrl); toast.success("Bağlantı kopyalandı"); } catch { toast.error("Kopyalanamadı"); }
   };
+  const nativeShare = async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: product.name, url: shareUrl });
+      else { await navigator.clipboard.writeText(shareUrl); toast.success("Bağlantı kopyalandı"); }
+    } catch { /* iptal */ }
+  };
+  const tabs = [
+    comboProducts.length > 0 && shipCfg?.showCompleteLook !== false && ["accessories", "Birlikte Alınanlar"],
+    ["description", "Açıklama"],
+    specRows.length > 0 && ["specification", "Özellikler"],
+    ["shipping", "Kargo & İade"],
+    ["reviews", `Değerlendirmeler${reviewTotal > 0 ? ` (${reviewTotal})` : ""}`],
+  ].filter(Boolean);
+  const activeTab = tabs.some((t) => t[0] === pdpTab) ? pdpTab : (tabs.find((t) => t[0] === "description") || tabs[0])[0];
+  const comboTotal = comboProducts.reduce((s, p) => s + priceView(p).display, displayPrice);
+  const stars = (val, size = "") => [1, 2, 3, 4, 5].map((i) => (
+    <small key={i} className={`${i <= Math.round(val || 0) ? "fas fa-star" : "far fa-star text-muted"} ${size}`} />
+  ));
 
   return (
-    <div className="sf-page min-h-screen">
+    <div className="sf-page">
       <Header />
+      <main id="content" role="main" className="electro el-page">
+        <Breadcrumb testId="pdp-breadcrumb" items={[
+          ...(catPath.length ? catPath.map((c) => ({ label: c.name, to: `/${c.slug}` }))
+            : product.category_name ? [{ label: product.category_name, to: `/${slugify(product.category_name)}` }] : []),
+          { label: product.name },
+        ]} />
 
-      {/* Sticky Product Bar — mobile: bottom, desktop: top.
-          Sepet çekmecesi AÇIKKEN gizlenir: yoksa çekmecenin "Ödemeye Geç" butonunu örter. */}
-      {showStickyHeader && !cartOpen && (
-        <div className="fixed left-0 right-0 z-50 bg-white border-t md:border-t-0 md:border-b shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:shadow-sm bottom-0 md:top-0 md:bottom-auto pb-[env(safe-area-inset-bottom)]" data-testid="sticky-product-bar">
-          <div className="max-w-screen-2xl mx-auto px-3 md:px-4 py-2.5 md:py-2 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <img src={optimizeImg(displayImages[0], 150)} alt="" className="w-10 h-12 object-cover bg-stone-100" />
-              <div className="min-w-0">
-                <p className="text-[12px] md:text-sm font-light line-clamp-1">{product.name}</p>
-                <p className="text-[12px] md:text-sm tabular-nums">{displayPrice.toFixed(2).replace('.', ',')} TL</p>
+        {/* Mobil/masaüstü yapışkan ürün çubuğu — sepet paneli açıkken gizlenir */}
+        {showStickyHeader && !cartOpen && !oosSelected && (
+          <div className="el-sticky-atc d-xl-none" data-testid="sticky-product-bar">
+            <div className="d-flex align-items-center">
+              <img src={optimizeImg(displayImages[0], 150)} alt="" width="44" height="44" className="mr-2" style={{ objectFit: "contain" }} />
+              <div className="flex-grow-1 min-width-0 mr-2">
+                <div className="font-size-13 el-line-1">{product.name}</div>
+                <div className={`font-size-15 font-weight-bold${hasDiscount ? " text-red" : ""}`}>{fmtPrice(displayPrice)}</div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="hidden md:flex items-center gap-1.5">
-                {sizes.slice(0, 5).map((v, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSizeSelect(v)}
-                    className={`w-8 h-8 text-xs border transition-colors ${
-                      selectedSize === v.size ? "border-black bg-black text-white" : "border-gray-300 hover:border-black"
-                    }`}
-                  >
-                    {v.size}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={handleAddToCart}
-                className="bg-black text-white px-4 md:px-6 py-2.5 md:py-2 text-[11px] md:text-xs uppercase tracking-[0.2em] hover:bg-black/85"
-                data-testid="sticky-add-to-cart"
-              >
-                Sepete Ekle
-              </button>
+              <button type="button" onClick={handleAddToCart} className="btn btn-primary-dark-w px-4 py-2 rounded-pill font-size-14" data-testid="sticky-add-to-cart">Sepete Ekle</button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Breadcrumb */}
-      <div className="max-w-screen-2xl mx-auto px-4 py-3 border-b">
-        <nav className="text-[11px]">
-          <Link to="/" className="text-gray-500 hover:text-black">Ana Sayfa</Link>
-          <span className="mx-2 text-gray-300">/</span>
-          {product.category_name && (
-            <>
-              <Link to={`/${slugify(product.category_name)}`} className="text-gray-500 hover:text-black">
-                {product.category_name}
-              </Link>
-              <span className="mx-2 text-gray-300">/</span>
-            </>
-          )}
-          <span className="text-black">{product.name}</span>
-        </nav>
-      </div>
-
-      <div className="max-w-screen-2xl mx-auto px-4 py-6">
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-16 items-start">
-          {/* Image Gallery — mobile: swipe carousel, desktop: 2-col grid */}
-          <div className="lg:col-span-7 space-y-2 min-w-0">
-            {/* Mobile: full-width snap carousel with dots */}
-            <div className="lg:hidden -mx-4 relative">
-              {user?.is_admin && (
-                <Link
-                  to={`/admin/urunler/${product.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Ürünü düzenle (admin) — yeni sekmede açılır"
-                  data-testid="pdp-admin-edit-mobile"
-                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-black text-white rounded-full p-2.5 shadow-lg"
-                >
-                  <Pencil size={16} />
-                </Link>
-              )}
-              <div
-                className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-                onScroll={(e) => {
-                  const cw = e.currentTarget.clientWidth;
-                  if (!cw) return;
-                  const idx = Math.round(e.currentTarget.scrollLeft / cw);
-                  setMobileImageIdx(idx);
-                }}
-              >
-                {displayImages.map((img, index) => (
-                  <div
-                    key={index}
-                    className="snap-center shrink-0 w-screen aspect-[2/3] bg-stone-50 relative"
-                    style={{ scrollSnapStop: "always" }}
-                  >
-                    {hasDiscount && index === 0 && (
-                      <div className="absolute top-3 left-3 z-10 bg-[#6b6b64] text-white text-xs font-normal px-2.5 py-1.5 leading-none">
-                        %{Math.round(((product.price - displayPrice) / product.price) * 100)}
-                      </div>
-                    )}
-                    <img
-                      src={optimizeImg(img, 1200)}
-                      alt={`${product.name} ${index + 1}`}
-                      className="w-full h-full object-cover object-top"
-                      loading={index === 0 ? "eager" : "lazy"}
-                      fetchPriority={index === 0 ? "high" : "auto"}
-                      decoding="async"
-                    />
-                  </div>
-                ))}
-              </div>
-              {displayImages.length > 1 && (
-                <div className="flex items-center justify-center gap-1.5 py-3">
-                  {displayImages.map((_, i) => (
-                    <span
-                      key={i}
-                      className={`h-[2px] transition-all ${i === mobileImageIdx ? "w-6 bg-black" : "w-3 bg-black/25"}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Desktop: sol thumbnail şeridi + orta büyük görsel (Simon Miller usulü).
-                Küçük resimler 92px tek kolon, ana görsel 480px — 3-4 gün önceki düzene
-                geri dönüldü (kullanıcı isteği). */}
-            <div className="hidden lg:flex gap-4 justify-center">
-              {displayImages.length > 1 && (
-                // İlk anda 5 küçük resim görünür (5×138 + 4×8 = 722px ≈ ana görsel yüksekliği);
-                // daha fazlası ŞERİDİN İÇİNDE kaydırılır — sayfa aşağı doğru uzamaz.
-                <div className="flex flex-col gap-2 w-[92px] shrink-0 self-start max-h-[722px] overflow-y-auto overscroll-contain [scrollbar-width:thin]"
-                  data-testid="pdp-thumb-strip">
-                  {displayImages.map((img, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setSelectedImage(index)}
-                      onMouseEnter={() => setSelectedImage(index)}
-                      className={`relative shrink-0 aspect-[2/3] bg-stone-50 overflow-hidden border transition-colors ${
-                        index === selectedImage ? "border-black" : "border-transparent hover:border-gray-300"
-                      }`}
-                      aria-label={`Görsel ${index + 1}`}
-                      data-testid={`pdp-thumb-${index}`}
-                    >
-                      <img
-                        src={optimizeImg(img, 200)}
-                        alt=""
-                        className="w-full h-full object-cover object-top"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex-1 min-w-0 lg:max-w-[480px]">
-                <div
-                  className="relative aspect-[2/3] bg-stone-50 overflow-hidden cursor-zoom-in"
-                  onMouseEnter={() => setZoom((z) => ({ ...z, on: true }))}
-                  onMouseLeave={() => setZoom({ on: false, x: 50, y: 50 })}
-                  onMouseMove={(e) => {
-                    const r = e.currentTarget.getBoundingClientRect();
-                    const x = ((e.clientX - r.left) / r.width) * 100;
-                    const y = ((e.clientY - r.top) / r.height) * 100;
-                    setZoom({ on: true, x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) });
-                  }}
-                >
-                  {hasDiscount && (
-                    <div className="absolute top-3 left-3 z-10 bg-[#6b6b64] text-white text-xs font-normal px-2.5 py-1.5 leading-none">
-                      %{Math.round(((product.price - displayPrice) / product.price) * 100)}
-                    </div>
-                  )}
-                  {/* Büyüteç ipucu — hover ile büyür */}
-                  <div className="absolute bottom-3 right-3 z-10 bg-black/55 text-white rounded-full p-1.5 pointer-events-none opacity-80">
-                    <ZoomIn size={14} />
-                  </div>
-                  {/* ADMIN düzenle kalemi — yalnızca admin oturumunda, en solda. Ürünü müşteri
-                      gözüyle incelerken tıkla → admin ürün düzenleme sayfasına gider. */}
-                  {user?.is_admin && (
-                    <Link
-                      to={`/admin/urunler/${product.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      title="Ürünü düzenle (admin) — yeni sekmede açılır"
-                      data-testid="pdp-admin-edit"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-black text-white rounded-full p-2.5 shadow-lg hover:bg-gray-800 transition-colors"
-                    >
-                      <Pencil size={16} />
-                    </Link>
-                  )}
-                  {/* Görsele tıklayınca ORİJİNAL boyutuyla yeni sekmede açılır.
-                      YALNIZ MASAÜSTÜ: bu blok "hidden lg:flex" içinde; mobildeki kaydırmalı
-                      karusel (yukarıda) hiç değişmez — dokunmatikte tıklama kaydırmayı bozardı. */}
+        <div className="container">
+          <div className="mb-xl-14 mb-6">
+            <div className="row">
+              {/* Galeri */}
+              <div className="col-md-5 mb-4 mb-md-0" data-testid="pdp-gallery">
+                <div className="position-relative mb-2">
                   <a
-                    href={displayImages[selectedImage] || displayImages[0]}
+                    href={curImg}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Görseli yeni sekmede tam boyutta aç"
                     data-testid="pdp-image-fullsize"
-                    className="block w-full h-full"
+                    className="el-pdp-main d-flex"
+                    onMouseEnter={() => setZoom((z) => ({ ...z, on: true }))}
+                    onMouseLeave={() => setZoom({ on: false, x: 50, y: 50 })}
+                    onMouseMove={(e) => {
+                      if (window.innerWidth < 992) return;
+                      const r = e.currentTarget.getBoundingClientRect();
+                      setZoom({ on: true, x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 });
+                    }}
+                    onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+                    onTouchEnd={(e) => {
+                      const dx = e.changedTouches[0].clientX - (touchX.current || 0);
+                      if (Math.abs(dx) > 40) { e.preventDefault(); setSelectedImage((i) => (i + (dx < 0 ? 1 : -1) + displayImages.length) % displayImages.length); }
+                    }}
                   >
-                    <img
-                      src={optimizeImg(displayImages[selectedImage] || displayImages[0], 1400)}
-                      alt={product.name}
-                      className="w-full h-full object-cover object-top transition-transform duration-150 ease-out"
-                      style={zoom.on ? { transform: "scale(2.3)", transformOrigin: `${zoom.x}% ${zoom.y}%` } : undefined}
-                      loading="eager"
-                      fetchPriority="high"
-                      decoding="async"
-                    />
+                    <img src={optimizeImg(curImg, 1200)} alt={product.name} width="720" height="660" fetchPriority="high" loading="eager" decoding="async"
+                      style={zoom.on && window.innerWidth >= 992 ? { transform: "scale(2)", transformOrigin: `${zoom.x}% ${zoom.y}%` } : undefined} />
                   </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Product Info */}
-          <div className="lg:col-span-5 lg:sticky lg:top-24 min-w-0 lg:max-w-[420px] lg:mx-auto w-full">
-            {product.promo_badge ? (
-              <p className="text-sm font-bold tracking-wide uppercase text-red-600 mb-1.5" data-testid="promo-badge">
-                {product.promo_badge}
-              </p>
-            ) : null}
-            <h1 className="text-xl md:text-2xl font-light mb-2">{product.name}</h1>
-
-            {/* Price */}
-            <div className="mb-6">
-              <div className="flex items-center gap-3">
-                {hasDiscount && (
-                  <span className="text-base text-gray-400 line-through">{listUnit.toFixed(2).replace('.', ',')} TL</span>
-                )}
-                <span className={`text-lg ${hasDiscount ? "text-red-600 font-medium" : ""}`}>
-                  {displayPrice.toFixed(2).replace('.', ',')} TL
-                </span>
-              </div>
-
-            {/* Yıldız derecelendirme — fiyatın altında; tıkla → yorumlara git */}
-            <button
-              type="button"
-              onClick={() => document.getElementById("reviews")?.scrollIntoView({ behavior: "smooth" })}
-              className="mt-3 flex items-center gap-1.5 group"
-              data-testid="pdp-rating-jump"
-              aria-label="Değerlendirmeleri gör"
-            >
-              <span className="flex">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Star key={i} size={14} className={i <= Math.round(reviewAvg || 0) ? "fill-black text-black" : "text-gray-300"} />
-                ))}
-              </span>
-              <span className="text-xs text-gray-500 group-hover:text-black transition-colors underline-offset-2 group-hover:underline">
-                {reviewTotal > 0 ? `${(reviewAvg || 0).toFixed(1)} · ${reviewTotal} değerlendirme` : "İlk değerlendirmeyi yap"}
-              </span>
-            </button>
-
-
-            </div>
-
-
-            {/* Color Siblings (diğer renk) — varsa swatch'ler */}
-            <ColorSiblings productId={product.id} currentColor={
-              product.color
-              || product.variants?.find?.((v) => v.color)?.color
-              || product.attributes?.find?.((a) => (a.name || "").toLowerCase().includes("color") || (a.name || "").toLowerCase().includes("renk"))?.value
-            } />
-
-            {/* Size Selection */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs">
-                  {(() => {
-                    // "Beden Seçiniz" yerine KALIBA göre dinamik tavsiye (kullanıcı isteği).
-                    // Kaynak: ürün formundaki size_advice VEYA Özellikler'deki "Kalıp" değeri.
-                    // DİKKAT: attributes bazı (XML kaynaklı) ürünlerde LİSTE değil SÖZLÜK —
-                    // dizi varsayımı sayfayı çökertiyordu; iki format da desteklenir.
-                    // STANDART bedenli üründe kalıp tavsiyesi GÖSTERİLMEZ; panelde seçilen uyumlu
-                    // beden aralığı yazılır ("Bu ürün S – L bedenler arası uyumludur.").
-                    if (isStandardSized(product.variants)) {
-                      const _t = fitSizesText(product.fit_sizes);
-                      return _t ? <b className="font-bold" data-testid="std-fit-text">{_t}</b> : "Standart Beden";
-                    }
-                    const _attrs = product.attributes;
-                    let _attrFitRaw = "";
-                    if (Array.isArray(_attrs)) {
-                      _attrFitRaw = _attrs.find(
-                        (a) => ((a?.name || a?.type || "")).toLocaleLowerCase("tr").includes("kalıp"))?.value || "";
-                    } else if (_attrs && typeof _attrs === "object") {
-                      const _k = Object.keys(_attrs).find((k) => k.toLocaleLowerCase("tr").includes("kalıp"));
-                      const _v = _k ? _attrs[_k] : "";
-                      _attrFitRaw = (typeof _v === "object" ? _v?.value : _v) || "";
-                    }
-                    const _attrFit = String(_attrFitRaw).toLocaleLowerCase("tr");
-                    const _fit = product.size_advice
-                      || (_attrFit.includes("oversize") || _attrFit.includes("bol") ? "bol"
-                        : _attrFit.includes("slim") || _attrFit.includes("dar") ? "dar"
-                        : _attrFit.includes("regular") || _attrFit.includes("normal") ? "normal" : "");
-                    if (_fit === "normal") return <b className="font-bold">Müşteriler kendi bedeninizi almanızı tavsiye ediyor.</b>;
-                    if (_fit === "bol") return <b className="font-bold">Müşteriler bir beden küçük almanızı tavsiye ediyor.</b>;
-                    if (_fit === "dar") return <b className="font-bold">Müşteriler bir beden büyük almanızı tavsiye ediyor.</b>;
-                    return "Beden Seçiniz";
-                  })()}
-                  {selectedVariant && Number(selectedVariant.stock) <= 0 && (
-                    <span className="text-red-600 ml-2">Tükendi</span>
+                  {hasDiscount && _pv.discountPct > 0 && <span className="el-badge el-badge--sale" style={{ top: 8, left: 8 }}>-%{_pv.discountPct}</span>}
+                  {user?.is_admin && (
+                    <Link to={`/admin/urunler/${product.id}`} target="_blank" rel="noopener noreferrer" title="Ürünü düzenle (admin) — yeni sekmede açılır"
+                      data-testid="pdp-admin-edit" className="btn btn-dark btn-icon rounded-circle position-absolute" style={{ left: 8, bottom: 8 }}>
+                      <i className="fas fa-pen btn-icon__inner" />
+                    </Link>
                   )}
-                </span>
-              </div>
-              <div className="flex items-end justify-between gap-3">
-                <div className="flex flex-wrap gap-2">
-                {sizes.map((variant, index) => {
-                  const isSelected = selectedSize === variant.size;
-                  const isOOS = Number(variant.stock) <= 0;
-                  const isRec = recLetter && isRecommendedSize(variant.size, user?.height_cm, user?.weight_kg);
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleSizeSelect(variant)}
-                      data-testid={`size-btn-${variant.size}`}
-                      title={isRec ? "Boy/kilonuza göre sizin için öneriliyor" : undefined}
-                      className={`relative min-w-[44px] h-9 px-3 border text-xs transition-all ${
-                        isSelected
-                          ? isOOS
-                            ? "border-red-500 bg-red-50 text-red-600 line-through"
-                            : "border-black bg-black text-white"
-                          : isOOS
-                            ? "border-gray-200 text-gray-300 line-through bg-gray-50 hover:border-gray-400"
-                            : isRec
-                              ? "border-emerald-500 ring-1 ring-emerald-500 hover:border-emerald-600"
-                              : "border-gray-300 hover:border-black"
-                      }`}
-                    >
-                      {variant.size}
-                      {isRec && !isSelected && (
-                        <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white" />
-                      )}
-                    </button>
-                  );
-                })}
                 </div>
-                {/* Beden Tablosu — beden butonlarıyla aynı satırda, alt hizada sağda (İşletme Kuralları ile açılır/kapanır) */}
-                {(sizeTableData || sizeTableImg) && (shipCfg?.showSizeGuide !== false) && (
-                  <button onClick={() => setShowSizeChart(true)} className="text-xs underline underline-offset-2 hover:no-underline whitespace-nowrap shrink-0" data-testid="show-size-table-btn">
-                    Beden Tablosu
-                  </button>
+                {displayImages.length > 1 && (
+                  <div className="row mx-gutters-1" data-testid="pdp-thumb-strip">
+                    {displayImages.slice(0, 10).map((img, index) => (
+                      <div className="col-3 col-xl-2gdot4 mb-1" key={img + index} style={{ flex: "0 0 20%", maxWidth: "20%" }}>
+                        <button type="button" className={`el-pdp-thumb${index === selectedImage ? " active" : ""}`} onClick={() => setSelectedImage(index)} onMouseEnter={() => setSelectedImage(index)}
+                          aria-label={`Görsel ${index + 1}`} data-testid={`pdp-thumb-${index}`}>
+                          <img src={optimizeImg(img, 200)} alt="" loading="lazy" width="80" height="80" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              {/* Beden önerisi — üye boy/kilo girdiyse ve önerilen beden üründe varsa */}
-              {(() => {
-                const match = recLetter && sizes.find((v) => isRecommendedSize(v.size, user?.height_cm, user?.weight_kg));
-                if (!match) return null;
-                return (
-                  <p className="mt-2 text-xs text-emerald-700 flex items-center gap-1.5" data-testid="size-recommendation">
-                    <span className="inline-block w-2 h-2 bg-emerald-500 rounded-full" />
-                    <span><b>{match.size}</b> bedeni sizin için öneriliyor (boy/kilonuza göre)</span>
-                  </p>
-                );
-              })()}
-            </div>
 
-            {/* Quantity input removed by request — sepete her zaman 1 adet eklenir */}
-
-            {/* Stok aciliyet rozeti — seçili beden azaldıysa "Son X ürün!" (İşletme Kuralları) */}
-            {(shipCfg?.lowStockBadge !== false) && selectedVariant &&
-              Number(selectedVariant.stock) > 0 &&
-              Number(selectedVariant.stock) <= (shipCfg?.lowStockThreshold ?? 5) && (
-              <p className="mb-3 text-xs font-medium text-red-600 flex items-center gap-1.5" data-testid="pdp-low-stock">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                Son {Number(selectedVariant.stock)} ürün!
-              </p>
-            )}
-
-            {/* Add to Cart */}
-            {(() => {
-              const _hasVariants = (product.variants?.length || 0) > 0;
-              const _productOOS = !_hasVariants && (Number(product.stock) || 0) <= 0;
-              const oosSelected = (selectedVariant && Number(selectedVariant.stock) <= 0) || _productOOS;
-              return (
-                <div className="mb-6">
-                  <div className="flex gap-2">
-                    {oosSelected ? (
-                      <button
-                        onClick={() => setNotifyOpen((v) => !v)}
-                        data-testid="notify-toggle-btn"
-                        className="flex-1 py-2.5 sm:py-3 text-[11px] sm:text-xs uppercase tracking-normal sm:tracking-wider transition-colors border border-black bg-white text-black hover:bg-black hover:text-white"
-                      >
-                        Gelince Haber Ver
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleAddToCart}
-                        data-testid="add-to-cart-btn"
-                        disabled={product.variants?.length > 0 && !selectedVariant}
-                        className={`flex-1 py-2.5 sm:py-3 text-[11px] sm:text-xs uppercase tracking-normal sm:tracking-wider transition-colors ${
-                          product.variants?.length > 0 && !selectedVariant
-                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            : justAdded
-                              ? "bg-emerald-600 text-white"
-                              : "bg-black text-white hover:bg-gray-900"
-                        }`}
-                      >
-                        {product.variants?.length > 0 && !selectedVariant
-                          ? "Beden Seçiniz"
-                          : justAdded
-                            ? (<span className="inline-flex items-center justify-center gap-1.5"><Check size={15} strokeWidth={2.5} /> Eklendi</span>)
-                            : "Sepete Ekle"}
-                      </button>
+              {/* Ürün bilgisi */}
+              <div className="col-md-7 mb-md-6 mb-lg-0">
+                <div className="mb-2">
+                  <div className="border-bottom mb-3 pb-md-1 pb-3">
+                    {(catNode || product.category_name) && (
+                      <Link to={catNode ? `/${catNode.slug}` : `/${slugify(product.category_name)}`} className="font-size-12 text-gray-5 mb-2 d-inline-block">{catNode?.name || product.category_name}</Link>
                     )}
-                    <button
-                      onClick={() => toggleFavorite(product)}
-                      data-testid="pdp-favorite-btn"
-                      aria-label="Kaydet"
-                      title="Kaydet"
-                      className={`w-12 h-12 border flex items-center justify-center transition-colors ${
-                        isFavorite(product.id) ? "border-black bg-gray-50" : "border-gray-300 hover:border-black"
-                      }`}
-                    >
-                      <Bookmark size={18} strokeWidth={1.5} className={isFavorite(product.id) ? "fill-black text-black" : ""} />
+                    {product.promo_badge ? <div className="font-size-14 font-weight-bold text-red text-uppercase mb-1" data-testid="promo-badge">{product.promo_badge}</div> : null}
+                    <h1 className="font-size-25 text-lh-1dot2">{product.name}</h1>
+                    <div className="mb-2">
+                      <button type="button" className="btn btn-link p-0 d-inline-flex align-items-center small font-size-15 text-lh-1" data-testid="pdp-rating-jump"
+                        onClick={() => { setPdpTab("reviews"); document.getElementById("pdp-tabs")?.scrollIntoView({ behavior: "smooth" }); }} aria-label="Değerlendirmeleri gör">
+                        <div className="text-warning mr-2">{stars(reviewAvg)}</div>
+                        <span className="text-secondary font-size-13">{reviewTotal > 0 ? `(${reviewTotal} değerlendirme)` : "(İlk değerlendirmeyi siz yapın)"}</span>
+                      </button>
+                    </div>
+                    <div className="d-md-flex align-items-center">
+                      {product.brand && <span className="font-weight-bold font-size-15 mr-md-3 text-gray-90">{product.brand}</span>}
+                      <div className="text-gray-9 font-size-14">Stok Durumu: {oosSelected
+                        ? <span className="text-red font-weight-bold">Tükendi</span>
+                        : <span className="text-green font-weight-bold">{stockNow > 0 && stockNow <= 20 ? `${stockNow} adet stokta` : "Stokta"}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-horizontal-center flex-wrap mb-4">
+                    <button type="button" onClick={() => toggleFavorite(product)} className={`btn btn-link p-0 text-gray-6 font-size-13 mr-2${isFav ? " text-red" : ""}`} data-testid="pdp-favorite-btn" aria-pressed={isFav}>
+                      <i className={`${isFav ? "fas fa-heart" : "ec ec-favorites"} mr-1 font-size-15`} /> {isFav ? "Favorilerde" : "Favorilere Ekle"}
+                    </button>
+                    <button type="button" onClick={() => { const r = toggleCompare(product); toast.success(r.added ? "Karşılaştırma listesine eklendi" : "Karşılaştırma listesinden çıkarıldı"); }}
+                      className="btn btn-link p-0 text-gray-6 font-size-13 ml-2" data-testid="pdp-compare-btn">
+                      <i className="ec ec-compare mr-1 font-size-15" /> Karşılaştır
                     </button>
                   </div>
+                  {shortList.length > 0 && (
+                    <div className="mb-2">
+                      <ul className="font-size-14 pl-3 ml-1 text-gray-110">
+                        {shortList.map((a) => <li key={a.name}>{a.name}: {String(a.value)}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {product.short_description && <p>{String(product.short_description).replace(/<[^>]*>/g, "")}</p>}
+                  {(selectedVariant?.stock_code || product.stock_code) && <p><strong>Stok Kodu</strong>: {selectedVariant?.stock_code || product.stock_code}</p>}
 
-                  {/* Kargo geri sayımı — HER ZAMAN mesai saatlerine göre canlı; "bugün/yarın kargoda" yeşil.
-                      Kesim saati (varsayılan 12:00) İşletme Kuralları'ndan; şerit açılır/kapanır. */}
+                  <div className="mb-4" data-testid="pdp-price">
+                    <div className="d-flex align-items-baseline">
+                      <ins className={`font-size-36 text-decoration-none${hasDiscount ? " text-red" : ""}`}>{fmtPrice(displayPrice)}</ins>
+                      {hasDiscount && <del className="font-size-20 ml-2 text-gray-6">{fmtPrice(listUnit)}</del>}
+                    </div>
+                    {_pv.campaignLabel && <div className="font-size-13 text-green">{_pv.campaignLabel}</div>}
+                  </div>
+
+                  <ColorSiblings productId={product.id} currentColor={
+                    product.color
+                    || product.variants?.find?.((v) => v.color)?.color
+                    || (Array.isArray(product.attributes) ? product.attributes.find((a) => /color|renk/i.test(a?.name || ""))?.value : "")
+                  } />
+
+                  {hasVariants && (
+                    <div className="border-top border-bottom py-3 mb-4" data-testid="pdp-variants">
+                      <div className="d-flex align-items-center flex-wrap">
+                        <h6 className="font-size-14 mb-0 mr-3">
+                          {isStandardSized(product.variants) ? (fitSizesText(product.fit_sizes) || "Seçenek") : "Seçenek"}
+                          {selectedVariant && <span className="font-weight-normal text-gray-90">: {selectedVariant.size}</span>}
+                        </h6>
+                        <div className="d-flex flex-wrap">
+                          {sizes.map((variant, index) => {
+                            const isSelected = selectedSize === variant.size;
+                            const isOOS = Number(variant.stock) <= 0;
+                            const isRec = recLetter && isRecommendedSize(variant.size, user?.height_cm, user?.weight_kg);
+                            return (
+                              <button key={index} type="button" onClick={() => handleSizeSelect(variant)} data-testid={`size-btn-${variant.size}`}
+                                title={isOOS ? "Tükendi" : isRec ? "Boy/kilonuza göre öneriliyor" : undefined}
+                                className={`btn btn-sm border rounded-pill mr-2 mb-1 px-3 el-variant-btn${isSelected ? " active" : ""}${isOOS ? " oos" : ""}${isRec && !isSelected ? " border-success" : ""}`}>
+                                {variant.size}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {(sizeTableData || sizeTableImg) && (shipCfg?.showSizeGuide !== false) && (
+                          <button type="button" onClick={() => setShowSizeChart(true)} className="btn btn-link p-0 font-size-13 ml-auto text-blue" data-testid="show-size-table-btn">Ölçü Tablosu</button>
+                        )}
+                      </div>
+                      {(() => {
+                        const match = recLetter && sizes.find((v) => isRecommendedSize(v.size, user?.height_cm, user?.weight_kg));
+                        return match ? <p className="mt-2 mb-0 font-size-13 text-green" data-testid="size-recommendation"><b>{match.size}</b> sizin için öneriliyor.</p> : null;
+                      })()}
+                    </div>
+                  )}
+
+                  {(shipCfg?.lowStockBadge !== false) && stockNow > 0 && stockNow <= (shipCfg?.lowStockThreshold ?? 5) && (
+                    <p className="mb-3 font-size-14 font-weight-bold text-red" data-testid="pdp-low-stock"><i className="fas fa-fire mr-1" /> Son {stockNow} ürün!</p>
+                  )}
+
+                  <div className="d-md-flex align-items-end mb-3">
+                    {!oosSelected && (
+                      <div className="max-width-150 mb-4 mb-md-0">
+                        <h6 className="font-size-14">Adet</h6>
+                        <QuantityInput value={quantity} onChange={setQuantity} min={Math.max(1, Number(product.min_order_qty) || 1)} max={maxQty} testId="pdp-qty" />
+                      </div>
+                    )}
+                    <div className={oosSelected ? "" : "ml-md-3"}>
+                      {oosSelected ? (
+                        <button type="button" onClick={() => setNotifyOpen((v) => !v)} data-testid="notify-toggle-btn" className="btn px-5 btn-primary-dark transition-3d-hover">
+                          <i className="ec ec-mail mr-2 font-size-20" /> Gelince Haber Ver
+                        </button>
+                      ) : (
+                        <button type="button" onClick={handleAddToCart} data-testid="add-to-cart-btn" disabled={hasVariants && !selectedVariant}
+                          className={`btn px-5 transition-3d-hover ${justAdded ? "btn-success" : "btn-primary-dark"}`}>
+                          {hasVariants && !selectedVariant ? "Seçenek Seçiniz" : justAdded
+                            ? <><i className="fas fa-check mr-2" /> Sepete Eklendi</>
+                            : <><i className="ec ec-add-to-cart mr-2 font-size-20" /> Sepete Ekle</>}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {oosSelected && notifyOpen && (
+                    <div className="border rounded p-3 mb-3 bg-gray-1" data-testid="stock-notify-form">
+                      <p className="font-size-13 mb-2">{selectedVariant?.size ? <><strong>{selectedVariant.size}</strong> seçeneği</> : "Bu ürün"} tükendi. Stoğa girince e-posta ile haber verelim.</p>
+                      <div className="input-group">
+                        <input type="email" className="form-control" value={notifyEmail} onChange={(e) => setNotifyEmail(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleStockNotify(); }} placeholder="E-posta adresiniz" data-testid="stock-notify-email-input" />
+                        <div className="input-group-append">
+                          <button type="button" className="btn btn-dark" onClick={handleStockNotify} disabled={notifySubmitting} data-testid="stock-notify-submit-btn">{notifySubmitting ? "Gönderiliyor…" : "Gönder"}</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {(shipCfg?.showCountdown !== false) && (() => {
                     const c = shippingCutoff(shipCfg);
                     return (
-                      <p className="mt-3 text-xs flex items-center gap-1.5" data-testid="pdp-shipping-cutoff">
-                        <Clock size={14} strokeWidth={1.7} className="text-emerald-600" />
-                        <span className="text-gray-700">
-                          {c.prefix} <span className="font-semibold text-emerald-700">{c.green}</span>
-                        </span>
+                      <p className="font-size-14 mb-3" data-testid="pdp-shipping-cutoff">
+                        <i className="ec ec-transport mr-2 text-green" />{c.prefix} <strong className="text-green">{c.green}</strong>
                       </p>
                     );
                   })()}
 
-                  {/* Güven banner'ı — ücretsiz iade / hızlı teslimat / taksitli ödeme */}
-                  <div className="mt-4 grid grid-cols-3 gap-2 border-y border-black/10 py-3.5" data-testid="pdp-trust-badges">
-                    <div className="flex flex-col items-center text-center gap-1.5 px-1">
-                      <RotateCcw size={18} strokeWidth={1.4} className="text-black/75" />
-                      <span className="text-[10px] leading-tight text-black/65">Ücretsiz<br />İade</span>
-                    </div>
-                    <div className="flex flex-col items-center text-center gap-1.5 px-1 border-x border-black/10">
-                      <Truck size={18} strokeWidth={1.4} className="text-black/75" />
-                      <span className="text-[10px] leading-tight text-black/65">Hızlı<br />Teslimat</span>
-                    </div>
-                    <div className="flex flex-col items-center text-center gap-1.5 px-1">
-                      <CreditCard size={18} strokeWidth={1.4} className="text-black/75" />
-                      <span className="text-[10px] leading-tight text-black/65">Taksitli<br />Ödeme</span>
-                    </div>
+                  <div className="row text-center border-top border-bottom py-3 mx-0 mb-3" data-testid="pdp-trust-badges">
+                    <div className="col-4 border-right"><i className="ec ec-returning font-size-24 d-block mb-1" /><span className="font-size-12">Kolay İade</span></div>
+                    <div className="col-4 border-right"><i className="ec ec-transport font-size-24 d-block mb-1" /><span className="font-size-12">Hızlı Teslimat</span></div>
+                    <div className="col-4"><i className="ec ec-payment font-size-24 d-block mb-1" /><span className="font-size-12">Taksitli Ödeme</span></div>
                   </div>
 
-                  {/* Sosyal paylaşım — Web Share API + WhatsApp/X/Facebook + linki kopyala */}
-                  {(shipCfg?.showSocialShare !== false) && (() => {
-                    const shareUrl = typeof window !== "undefined" ? window.location.href : "";
-                    const shareTitle = product?.name || "";
-                    const enc = encodeURIComponent;
-                    const nativeShare = async () => {
-                      try {
-                        if (navigator.share) { await navigator.share({ title: shareTitle, url: shareUrl }); }
-                        else { await navigator.clipboard.writeText(shareUrl); toast.success("Bağlantı kopyalandı"); }
-                      } catch { /* kullanıcı iptal etti */ }
-                    };
-                    const copyLink = async () => {
-                      try { await navigator.clipboard.writeText(shareUrl); toast.success("Bağlantı kopyalandı"); }
-                      catch { toast.error("Kopyalanamadı"); }
-                    };
-                    return (
-                      <div className="mt-4 flex items-center gap-3 flex-wrap" data-testid="pdp-social-share">
-                        <span className="text-[11px] uppercase tracking-wider text-black/50 inline-flex items-center gap-1">
-                          <Share2 size={14} strokeWidth={1.5} /> Paylaş
-                        </span>
-                        <a href={`https://wa.me/?text=${enc(shareTitle + " " + shareUrl)}`} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-black/70 hover:text-black underline underline-offset-2" aria-label="WhatsApp'ta paylaş">WhatsApp</a>
-                        <a href={`https://twitter.com/intent/tweet?text=${enc(shareTitle)}&url=${enc(shareUrl)}`} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-black/70 hover:text-black underline underline-offset-2" aria-label="X'te paylaş">X</a>
-                        <a href={`https://www.facebook.com/sharer/sharer.php?u=${enc(shareUrl)}`} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-black/70 hover:text-black underline underline-offset-2" aria-label="Facebook'ta paylaş">Facebook</a>
-                        <button onClick={copyLink} className="text-xs text-black/70 hover:text-black inline-flex items-center gap-1" aria-label="Bağlantıyı kopyala">
-                          <Link2 size={13} /> Kopyala
-                        </button>
-                        {typeof navigator !== "undefined" && navigator.share && (
-                          <button onClick={nativeShare} className="text-xs text-black/70 hover:text-black underline underline-offset-2 md:hidden">Diğer…</button>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Stok bildirim formu */}
-                  {oosSelected && notifyOpen && (
-                    <div className="mt-3 border border-black/10 bg-gray-50 p-3" data-testid="stock-notify-form">
-                      <p className="text-[11px] text-black/60 mb-2">
-                        <span className="font-medium text-black">{selectedVariant.size}</span> bedeni tükendi. Stoğa girince e-posta ile haber verelim.
-                      </p>
-                      <div className="flex gap-2">
-                        <input
-                          type="email"
-                          value={notifyEmail}
-                          onChange={(e) => setNotifyEmail(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") handleStockNotify(); }}
-                          placeholder="E-posta adresiniz"
-                          data-testid="stock-notify-email-input"
-                          className="flex-1 h-10 px-3 border border-gray-300 text-xs focus:outline-none focus:border-black"
-                        />
-                        <button
-                          onClick={handleStockNotify}
-                          disabled={notifySubmitting}
-                          data-testid="stock-notify-submit-btn"
-                          className="px-4 h-10 text-xs uppercase tracking-wider bg-black text-white hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                          {notifySubmitting ? "Gönderiliyor..." : "Gönder"}
-                        </button>
-                      </div>
+                  {(shipCfg?.showSocialShare !== false) && (
+                    <div className="d-flex align-items-center flex-wrap font-size-13" data-testid="pdp-social-share">
+                      <span className="text-gray-90 mr-2"><i className="fas fa-share-alt mr-1" /> Paylaş:</span>
+                      <a className="btn btn-icon btn-soft-dark btn-xs rounded-circle mr-1" href={`https://wa.me/?text=${enc(product.name + " " + shareUrl)}`} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp'ta paylaş"><i className="fab fa-whatsapp btn-icon__inner" /></a>
+                      <a className="btn btn-icon btn-soft-dark btn-xs rounded-circle mr-1" href={`https://twitter.com/intent/tweet?text=${enc(product.name)}&url=${enc(shareUrl)}`} target="_blank" rel="noopener noreferrer" aria-label="X'te paylaş"><i className="fab fa-twitter btn-icon__inner" /></a>
+                      <a className="btn btn-icon btn-soft-dark btn-xs rounded-circle mr-1" href={`https://www.facebook.com/sharer/sharer.php?u=${enc(shareUrl)}`} target="_blank" rel="noopener noreferrer" aria-label="Facebook'ta paylaş"><i className="fab fa-facebook-f btn-icon__inner" /></a>
+                      <button type="button" className="btn btn-icon btn-soft-dark btn-xs rounded-circle mr-1" onClick={copyLink} aria-label="Bağlantıyı kopyala"><i className="fas fa-link btn-icon__inner" /></button>
+                      {typeof navigator !== "undefined" && navigator.share && <button type="button" className="btn btn-link p-0 font-size-13 d-md-none" onClick={nativeShare}>Diğer…</button>}
                     </div>
                   )}
                 </div>
-              );
-            })()}
-
-            {/* Stilini Tamamla — küçük resimler (sepete ekle ile açıklama arası) */}
-            {comboProducts.length > 0 && (shipCfg?.showCompleteLook !== false) && (
-              <div className="mb-6 pb-2" data-testid="product-combo-mini">
-                <p className="text-[10px] tracking-[0.25em] uppercase text-black/60 mb-3">Stilini Tamamla</p>
-                <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 lg:mx-0 lg:px-0">
-                  {comboProducts.slice(0, 6).map((p) => {
-                    const img = (p.images && p.images[0]) || p.image || "/placeholder.jpg";
-                    return (
-                      <Link
-                        key={p.id}
-                        to={`/${p.slug || p.id}`}
-                        className="shrink-0 w-[64px] group"
-                        data-testid={`combo-mini-${p.id}`}
-                        title={p.name}
-                      >
-                        <div className="relative w-16 h-20 bg-stone-100 overflow-hidden">
-                          <img src={optimizeImg(img, 200)} alt={p.name} className="w-full h-full object-cover object-top group-hover:scale-[1.05] transition-transform duration-500" loading="lazy" decoding="async" />
-                        </div>
-                        <p className="text-[9px] tabular-nums mt-1 truncate">
-                          {priceView(p).hasDiscount ? (
-                            <>
-                              <span className="text-black/35 line-through mr-1">{priceView(p).list.toFixed(0)}</span>
-                              <span className="text-red-600">{priceView(p).display.toFixed(0)} TL</span>
-                            </>
-                          ) : (
-                            <span className="text-black/50">{priceView(p).display.toFixed(0)} TL</span>
-                          )}
-                        </p>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Custom Accordion Details - No slider issues */}
-            <div className="border-t">
-              {/* Ürün Özellikleri */}
-              <div className="border-b">
-                <button 
-                  onClick={() => toggleSection('description')}
-                  className="w-full flex items-center justify-between py-3 text-xs hover:bg-gray-50"
-                >
-                  <span>Ürün Özellikleri</span>
-                  {expandedSections.description ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-                {expandedSections.description && (
-                  <div className="pb-3">
-                    <div className="text-xs text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) || "Ürün açıklaması bulunmamaktadır." }} />
-                    {/* Ürün ÖZELLİK tablosu (attributes: Materyal, Kumaş Tipi, Kalıp vb.) müşteri
-                        tarafında GÖSTERİLMEZ (merchant kararı). Admin ürün formunda görünmeye devam
-                        eder — bu yalnız storefront gösterimidir, veri silinmez. */}
-                  </div>
-                )}
-              </div>
-              
-              {/* Kargo ve Teslimat */}
-              <div className="border-b">
-                <button 
-                  onClick={() => toggleSection('shipping')}
-                  className="w-full flex items-center justify-between py-3 text-xs hover:bg-gray-50"
-                >
-                  <span>Kargo ve Teslimat</span>
-                  {expandedSections.shipping ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-                {expandedSections.shipping && (
-                  <div className="pb-3 text-xs text-gray-600 space-y-2.5 leading-relaxed">
-                    <div>
-                      <p className="font-semibold text-gray-800">Ücretsiz Kargo</p>
-                      <p>{(freeShippingThreshold != null ? Number(freeShippingThreshold) : 4000).toLocaleString("tr-TR")} TL ve üzeri tüm siparişlerinizde kargo ücretsizdir.</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">Sipariş Hazırlama &amp; Kargoya Teslim</p>
-                      <p>Siparişiniz, ödeme onayının ardından 1–2 iş günü içerisinde özenle hazırlanarak kargoya teslim edilir.</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">Güvenli Teslimat</p>
-                      <p>Gönderimlerimiz, güvenli ve hızlı teslimat süreçleri için anlaşmalı kargo firmamız ile gerçekleştirilir.</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">Kargo Takip</p>
-                      <p>Siparişiniz kargoya teslim edildiğinde, kargo takip numaranız SMS ve/veya e-posta yoluyla tarafınıza iletilir. Böylece siparişinizin teslimat sürecini kolayca takip edebilirsiniz.</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">Teslimat Süresi</p>
-                      <p>Teslimat süresi, teslimat adresine ve kargo firmasının operasyonel süreçlerine bağlı olarak değişiklik gösterebilir. Kargoya teslim edilen siparişlerin tahmini teslimat süresi, bulunduğunuz bölgeye göre farklılık gösterebilir.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* İade ve Değişim */}
-              <div className="border-b">
-                <button 
-                  onClick={() => toggleSection('returns')}
-                  className="w-full flex items-center justify-between py-3 text-xs hover:bg-gray-50"
-                >
-                  <span>İade ve Değişim</span>
-                  {expandedSections.returns ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-                {expandedSections.returns && (
-                  returnPolicyHtml
-                    ? <div className="pb-3 text-xs text-gray-600 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_li]:mb-0.5 [&_p]:mb-1.5 [&_h1]:font-semibold [&_h1]:text-gray-800 [&_h1]:mt-2 [&_h2]:font-semibold [&_h2]:text-gray-800 [&_h2]:mt-2 [&_h3]:font-semibold [&_h3]:text-gray-800 [&_h3]:mt-2 [&_strong]:font-semibold [&_a]:underline"
-                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(returnPolicyHtml) }} />
-                    : <p className="pb-3 text-xs text-gray-600">14 gün içinde iade ve değişim hakkınız bulunmaktadır.</p>
-                )}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Combo Products — mobile: yatay snap-scroll, desktop: 4-col grid (İşletme Kuralları ile açılır/kapanır) */}
-        {comboProducts.length > 0 && (shipCfg?.showCompleteLook !== false) && (
-          <section className="mt-12 md:mt-16 pt-8 md:pt-10 border-t border-black/10" data-testid="product-combo-section">
-            <h2 className="text-base md:text-xl font-light tracking-tight mb-5 md:mb-8 px-1">Stilini Tamamla</h2>
-            {/* Mobile horizontal scroll */}
-            <div className="md:hidden -mx-4 px-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-              <div className="flex gap-3" style={{ minWidth: "max-content" }}>
-                {comboProducts.map((p) => {
-                  const img = (p.images && p.images[0]) || p.image || "";
-                  const pv = priceView(p);
-                  return (
-                    <div
-                      key={p.id}
-                      className="snap-start shrink-0 w-[44vw]"
-                      data-testid={`combo-product-${p.id}`}
-                    >
-                      <Link to={`/${p.slug || p.id}`} className="block relative overflow-hidden bg-stone-100 aspect-[2/3]" aria-label={p.name}>
-                        <img src={optimizeImg(img, 700)} alt={p.name} className="w-full h-full object-cover object-top" loading="lazy" decoding="async" />
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center"
-                          aria-label="Favorilere ekle"
-                        >
-                          <Bookmark size={15} strokeWidth={1.4} className="text-black" />
-                        </button>
-                      </Link>
-                      <div className="mt-2">
-                        <Link to={`/${p.slug || p.id}`} className="block text-[12px] font-light text-black/85 line-clamp-1">
-                          {p.name}
-                        </Link>
-                        <div className="flex items-baseline gap-1.5 mt-0.5">
-                          {pv.hasDiscount ? (
-                            <>
-                              <span className="text-[11px] text-black/40 line-through tabular-nums">{pv.list.toFixed(2)} TL</span>
-                              <span className="text-[12px] font-medium text-red-600 tabular-nums">{pv.display.toFixed(2)} TL</span>
-                            </>
-                          ) : (
-                            <span className="text-[12px] font-light tabular-nums">{pv.display.toFixed(2)} TL</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            {/* Desktop grid */}
-            <div className="hidden md:grid grid-cols-4 gap-5">
-              {comboProducts.map((p) => {
-                const img = (p.images && p.images[0]) || p.image || "";
-                const pv = priceView(p);
-                return (
-                  <div key={p.id} className="group relative">
-                    <Link to={`/${p.slug || p.id}`} className="block relative overflow-hidden bg-stone-100 aspect-[2/3]" aria-label={p.name}>
-                      <img src={img} alt={p.name} className="w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.03]" loading="lazy" />
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-white/0 hover:bg-white/80 transition-colors"
-                        aria-label="Favorilere ekle"
-                      >
-                        <Bookmark size={16} strokeWidth={1.4} className="text-black/80" />
-                      </button>
-                    </Link>
-                    <div className="mt-2.5">
-                      <Link to={`/${p.slug || p.id}`} className="block text-sm font-light text-black/85 line-clamp-1 hover:underline">{p.name}</Link>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        {pv.hasDiscount ? (
-                          <>
-                            <span className="text-sm text-black/40 line-through tabular-nums">{pv.list.toFixed(2)} TL</span>
-                            <span className="text-sm font-medium text-red-600 tabular-nums">{pv.display.toFixed(2)} TL</span>
-                          </>
-                        ) : (
-                          <span className="text-sm font-light tabular-nums">{pv.display.toFixed(2)} TL</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Değerlendirmeler (yorum + puan) */}
-        <section id="reviews" className="mt-12 pt-12 border-t scroll-mt-24" data-testid="product-reviews">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-base font-light">Değerlendirmeler{reviewTotal > 0 ? ` (${reviewTotal})` : ""}</h2>
-            {reviewTotal > 0 && (
-              <div className="flex items-center gap-1.5 text-sm">
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} size={16} className={i <= Math.round(reviewAvg) ? "fill-black text-black" : "text-gray-300"} />
-                  ))}
-                </div>
-                <span className="text-gray-600">{reviewAvg.toFixed(1)} / 5</span>
-              </div>
-            )}
-          </div>
-
-          {reviews.length > 0 ? (
-            <div className="space-y-5 mb-10">
-              {reviews.map((r) => (
-                <div key={r.id} className="border-b border-black/5 pb-5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="flex">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <Star key={i} size={13} className={i <= r.rating ? "fill-black text-black" : "text-gray-300"} />
-                      ))}
-                    </div>
-                    <span className="text-xs font-medium">{r.user_name || "Müşteri"}</span>
-                    {(r.source === "trendyol" || r.verified) && (
-                      <span className="text-[9px] tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-1.5 py-0.5">
-                        Doğrulanmış Alışveriş
-                      </span>
-                    )}
-                    <span className="text-[11px] text-gray-400">
-                      {r.created_at ? new Date(r.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }) : ""}
-                    </span>
-                  </div>
-                  {r.title && <p className="text-sm font-medium mb-0.5">{r.title}</p>}
-                  {r.comment && <p className="text-sm text-gray-600 leading-relaxed">{r.comment}</p>}
-                  {r.admin_reply && (
-                    <div className="mt-2 ml-3 pl-3 border-l-2 border-black/10">
-                      <p className="text-[11px] font-medium text-gray-500 mb-0.5">{SITE_NAME}</p>
-                      <p className="text-xs text-gray-600">{r.admin_reply}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 mb-10">Bu ürün için henüz değerlendirme yok. İlk yorumu siz yapın.</p>
-          )}
-
-          {rvLoggedIn ? (
-            <div className="max-w-xl">
-              <h3 className="text-sm font-medium mb-3">Değerlendirme yaz</h3>
-              <div className="flex items-center gap-1 mb-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <button key={i} type="button" onClick={() => setRvRating(i)} className="p-0.5" aria-label={`${i} yıldız`}>
-                    <Star size={24} className={i <= rvRating ? "fill-black text-black" : "text-gray-300"} />
-                  </button>
+          {/* Sekmeler: Birlikte Alınanlar / Açıklama / Özellikler / Kargo & İade / Değerlendirmeler */}
+          <div className="mb-8" id="pdp-tabs">
+            <div className="position-relative position-md-static px-md-6">
+              <ul className="nav nav-classic nav-tab nav-tab-lg justify-content-xl-center flex-nowrap flex-xl-wrap overflow-auto overflow-xl-visble border-0 pb-1 pb-xl-0 mb-n1 mb-xl-0" role="tablist">
+                {tabs.map(([key, label]) => (
+                  <li className="nav-item flex-shrink-0 flex-xl-shrink-1 z-index-2" key={key}>
+                    <a href={`#${key}`} role="tab" aria-selected={activeTab === key} className={`nav-link${activeTab === key ? " active" : ""}`}
+                      onClick={(e) => { e.preventDefault(); setPdpTab(key); }} data-testid={`pdp-tab-${key}`}>{label}</a>
+                  </li>
                 ))}
-              </div>
-              <input
-                type="text" value={rvTitle} onChange={(e) => setRvTitle(e.target.value)}
-                placeholder="Başlık (opsiyonel)" maxLength={120}
-                className="w-full border border-black/15 px-3 py-2 text-sm mb-3 focus:outline-none focus:border-black"
-              />
-              <textarea
-                value={rvComment} onChange={(e) => setRvComment(e.target.value)}
-                placeholder="Deneyiminizi paylaşın…" rows={4} maxLength={2000}
-                className="w-full border border-black/15 px-3 py-2 text-sm mb-3 focus:outline-none focus:border-black resize-none"
-              />
-              <button
-                type="button" onClick={submitReview} disabled={rvSubmitting}
-                className="bg-black text-white text-sm px-6 py-2.5 hover:bg-gray-800 transition disabled:opacity-50"
-              >
-                {rvSubmitting ? "Gönderiliyor…" : "Gönder"}
-              </button>
-              <p className="text-[11px] text-gray-400 mt-2">Yorumunuz moderasyon sonrası yayınlanır.</p>
+              </ul>
             </div>
-          ) : (
-            <div className="text-sm text-gray-500">
-              Değerlendirme yapmak için <Link to="/giris" className="underline hover:text-black">giriş yapın</Link>.
-            </div>
-          )}
-        </section>
-
-        {/* Similar Products */}
-        {similarProducts.length > 0 && (
-          <section className="mt-12 pt-12 border-t">
-            <h2 className="text-base font-light mb-6">Benzer Ürünler</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="similar-grid">
-              {similarProducts.slice(0, simShown).map((p) => <ProductCard key={p.id} product={p} />)}
-            </div>
-            {similarProducts.length > simShown && (
-              <div className="flex justify-center mt-6">
-                <button
-                  type="button"
-                  onClick={() => setSimShown((n) => n + SIM_STEP)}
-                  data-testid="similar-load-more"
-                  className="px-8 py-3 border border-black text-sm tracking-wide hover:bg-black hover:text-white transition-colors"
-                >
-                  Daha Fazla Göster ({similarProducts.length - simShown})
-                </button>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Son Gezdiklerin — Benzer Ürünler ile aynı 4'lü grid (tek üründe sayfayı kaplamaz) */}
-        {recentItems.length > 0 && (
-          <section className="mt-12 pt-12 border-t" data-testid="recently-viewed">
-            <h2 className="text-base font-light mb-6">Son Gezdiklerin</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {recentItems.slice(0, 4).map((p) => {
-                const pv = priceView(p);
-                return (
-                  <Link key={p.id} to={`/${p.slug || p.id}`} className="group" data-testid={`recent-${p.id}`}>
-                    <div className="aspect-[2/3] bg-stone-100 overflow-hidden">
-                      <img src={optimizeImg(p.image, 500)} alt={p.name} className="w-full h-full object-cover object-top group-hover:scale-[1.03] transition-transform duration-500" loading="lazy" decoding="async" />
-                    </div>
-                    <p className="text-[12px] md:text-sm font-light text-black/85 line-clamp-1 mt-2">{p.name}</p>
-                    <p className="text-[12px] md:text-sm tabular-nums mt-0.5">
-                      {pv.hasDiscount ? (
-                        <>
-                          <span className="text-black/40 line-through mr-1">{pv.list.toFixed(2).replace('.', ',')}</span>
-                          <span className="text-red-600">{pv.display.toFixed(2).replace('.', ',')} TL</span>
-                        </>
-                      ) : (
-                        <span>{pv.display.toFixed(2).replace('.', ',')} TL</span>
-                      )}
-                    </p>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
-      </div>
-
-      {/* Size Chart Modal – HTML table */}
-      {showSizeChart && (sizeTableData || sizeTableImg) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowSizeChart(false)}>
-          <div className="bg-white max-w-3xl w-full max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white flex justify-between items-center px-6 py-4 border-b">
-              <h3 className="text-base font-semibold uppercase tracking-wider text-gray-800">Beden Kılavuzu</h3>
-              <button onClick={() => setShowSizeChart(false)} className="p-1"><X size={18} /></button>
-            </div>
-            {!sizeTableData && sizeTableImg && (
-              <div className="p-4 flex justify-center" data-testid="size-table-image">
-                {/* object-contain + max-yükseklik: orantı bozulmadan, gereksiz uzamadan sığar */}
-                <img src={optimizeImg(sizeTableImg, 1000)} alt="Beden Tablosu"
-                     className="max-w-full max-h-[75vh] w-auto h-auto object-contain" />
-              </div>
-            )}
-            {sizeTableData && (
-            /* KOMPAKT: küçük punto + dar boşluk → modal tek ekrana sığar, kaydırma gerekmez. */
-            <div className="p-4" data-testid="size-table-html">
-              {/* Üst blok: sol ürün görseli + sağda ad & Ürün Özellikleri (örnek düzen) */}
-              <div className="flex flex-row gap-4 mb-3">
-                {(product.images?.[0] || product.image) && (
-                  <img
-                    src={optimizeImg(product.images?.[0] || product.image, 500)}
-                    alt={product.name}
-                    className="w-28 sm:w-32 h-auto object-contain flex-shrink-0 self-start bg-gray-50"
-                    loading="lazy"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-medium text-gray-800 mb-1.5">{product.name}</h4>
-                  {product.description && (() => {
-                    // "Yıkama ve Bakım" bölümü SAĞDAKİ boş alana, Ürün Özellikleri ile
-                    // aynı hizada — açıklama HTML'i Yıkama başlığından ikiye bölünür.
-                    const _html = sanitizeHtml(product.description);
-                    const _m = _html.search(/Y[ıi]kama/i);
-                    let _left = _html, _right = "";
-                    if (_m > 0) {
-                      const _before = _html.slice(0, _m);
-                      const _cut = Math.max(_before.lastIndexOf("<p"), _before.lastIndexOf("<h"),
-                        _before.lastIndexOf("<div"), _before.lastIndexOf("<ul"),
-                        _before.lastIndexOf("<strong"), _before.lastIndexOf("<b"));
-                      const _idx = _cut > 0 ? _cut : _m;
-                      _left = _html.slice(0, _idx);
-                      _right = _html.slice(_idx);
-                    }
-                    const _cls = "text-[11px] text-gray-600 leading-snug [&_ul]:list-disc [&_ul]:pl-4 [&_li]:mb-0 [&_p]:mb-1";
-                    return (
-                      <div className="sm:grid sm:grid-cols-2 sm:gap-6">
-                        <div>
-                          <p className="text-[11px] font-semibold text-gray-800 mb-1">Ürün Özellikleri</p>
-                          <div className={_cls} dangerouslySetInnerHTML={{ __html: _left }} />
-                        </div>
-                        {_right && (
-                          <div className="mt-2 sm:mt-0">
-                            <div className={_cls} dangerouslySetInnerHTML={{ __html: _right }} />
+            <div className="borders-radius-17 border p-4 mt-4 mt-md-0 px-lg-10 py-lg-9">
+              <div className="tab-content">
+                {activeTab === "accessories" && (
+                  <div className="tab-pane fade active show" role="tabpanel" data-testid="product-combo-section">
+                    <div className="row no-gutters">
+                      <div className="col mb-6 mb-md-0">
+                        <ul className="row list-unstyled products-group no-gutters border-bottom border-md-bottom-0">
+                          <li className="col-4 col-md-4 col-xl-2gdot5 product-item remove-divider-sm-down border-0">
+                            <div className="product-item__outer h-100"><div className="remove-prodcut-hover product-item__inner px-xl-4 p-3"><div className="product-item__body pb-xl-2">
+                              <h5 className="mb-1 product-item__title d-none d-md-block"><span className="text-blue font-weight-bold">{product.name}</span></h5>
+                              <div className="mb-2 text-center"><span className="el-img-box"><img className="img-fluid" src={optimizeImg(displayImages[0], 300)} alt={product.name} loading="lazy" /></span></div>
+                            </div></div></div>
+                          </li>
+                          {comboProducts.slice(0, 4).map((p) => (
+                            <ProductCard key={p.id} product={p} as="li" className="col-4 col-md-4 col-xl-2gdot5 remove-divider-sm-down" innerClassName="remove-prodcut-hover add-accessories product-item__inner px-xl-4 p-3" />
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="col-md-auto">
+                        <div className="mr-xl-15">
+                          <div className="mb-3">
+                            <div className="text-red font-size-26 text-lh-1dot2">{fmtPrice(comboTotal)}</div>
+                            <div className="text-gray-6">{comboProducts.slice(0, 4).length + 1} ürün için</div>
                           </div>
+                          <button type="button" className="btn btn-sm btn-block btn-primary-dark btn-wide transition-3d-hover" onClick={() => {
+                            handleAddToCart();
+                            comboProducts.slice(0, 4).forEach((p) => {
+                              const vs = (p.variants || []).filter((v) => v && v.id && Number(v.stock) > 0);
+                              if ((p.variants || []).length > 1) return; // seçim gerektiren ürünler ürün sayfasından eklenir
+                              if (!vs.length && (Number(p.stock) || 0) <= 0) return;
+                              addItem(p, vs[0] || null, 1);
+                            });
+                          }}>Tümünü Sepete Ekle</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {activeTab === "description" && (
+                  <div className="tab-pane fade active show el-prose" role="tabpanel" data-testid="pdp-description"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) || "<p>Ürün açıklaması bulunmamaktadır.</p>" }} />
+                )}
+                {activeTab === "specification" && (
+                  <div className="tab-pane fade active show" role="tabpanel" data-testid="pdp-specification">
+                    <div className="mx-md-5 pt-1">
+                      <h3 className="font-size-18 mb-4">Teknik Özellikler</h3>
+                      <div className="table-responsive mb-4">
+                        <table className="table table-hover">
+                          <tbody>
+                            {specRows.map(([k, v], i) => (
+                              <tr key={k + i}><th className={`px-4 px-xl-5${i === 0 ? " border-top-0" : ""}`}>{k}</th><td className={i === 0 ? "border-top-0" : ""}>{v}</td></tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {activeTab === "shipping" && (
+                  <div className="tab-pane fade active show" role="tabpanel">
+                    <div className="row">
+                      <div className="col-md-6 mb-4">
+                        <h3 className="font-size-18 mb-3">Kargo ve Teslimat</h3>
+                        <p><strong>Ücretsiz Kargo:</strong> {(freeShippingThreshold != null ? Number(freeShippingThreshold) : 4000).toLocaleString("tr-TR")} ₺ ve üzeri siparişlerde kargo ücretsizdir.</p>
+                        <p><strong>Hazırlık:</strong> Siparişiniz ödeme onayının ardından 1–2 iş günü içinde kargoya teslim edilir. Büyük hacimli ekipmanlar (lift, kompresör vb.) anlaşmalı nakliye ile gönderilir.</p>
+                        <p><strong>Takip:</strong> Kargo takip numaranız SMS ve/veya e-posta ile iletilir.</p>
+                      </div>
+                      <div className="col-md-6 mb-4">
+                        <h3 className="font-size-18 mb-3">İade ve Değişim</h3>
+                        {returnPolicyHtml
+                          ? <div className="el-prose font-size-14" dangerouslySetInnerHTML={{ __html: sanitizeHtml(returnPolicyHtml) }} />
+                          : <p>14 gün içinde iade ve değişim hakkınız bulunmaktadır.</p>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {activeTab === "reviews" && (
+                  <div className="tab-pane fade active show" role="tabpanel" id="reviews" data-testid="product-reviews">
+                    <div className="row mb-8">
+                      <div className="col-md-6">
+                        <div className="mb-3">
+                          <h3 className="font-size-18 mb-6">{reviewTotal > 0 ? `${reviewTotal} değerlendirmeye göre` : "Henüz değerlendirme yok"}</h3>
+                          <h2 className="font-size-30 font-weight-bold text-lh-1 mb-0">{(reviewAvg || 0).toFixed(1)}</h2>
+                          <div className="text-lh-1">genel puan</div>
+                        </div>
+                        <ul className="list-unstyled">
+                          {[5, 4, 3, 2, 1].map((n) => {
+                            const cnt = reviews.filter((r) => Math.round(r.rating) === n).length;
+                            const pct = reviews.length ? Math.round((cnt / reviews.length) * 100) : 0;
+                            return (
+                              <li className="py-1" key={n}>
+                                <div className="row align-items-center mx-gutters-2 font-size-1">
+                                  <div className="col-auto mb-2 mb-md-0"><div className="text-warning text-ls-n2 font-size-16" style={{ width: 80 }}>{stars(n)}</div></div>
+                                  <div className="col-auto mb-2 mb-md-0"><div className="progress ml-xl-5" style={{ height: 10, width: 200, maxWidth: "50vw" }}><div className="progress-bar" role="progressbar" style={{ width: `${pct}%` }} aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100" /></div></div>
+                                  <div className="col-auto text-right"><span className={cnt ? "text-gray-90" : "text-muted"}>{cnt}</span></div>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                      <div className="col-md-6">
+                        <h3 className="font-size-18 mb-5">Değerlendirme Yazın</h3>
+                        {rvLoggedIn ? (
+                          <div>
+                            <div className="row align-items-center mb-4">
+                              <div className="col-md-4 col-lg-3"><span className="form-label mb-0">Puanınız</span></div>
+                              <div className="col-md-8 col-lg-9">
+                                <div className="text-warning text-ls-n2 font-size-20">
+                                  {[1, 2, 3, 4, 5].map((i) => (
+                                    <button key={i} type="button" className="btn btn-link p-0 text-warning mr-1" onClick={() => setRvRating(i)} aria-label={`${i} yıldız`}>
+                                      <i className={i <= rvRating ? "fas fa-star" : "far fa-star"} />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="form-group mb-3 row">
+                              <div className="col-md-4 col-lg-3"><label htmlFor="rvTitle" className="form-label">Başlık</label></div>
+                              <div className="col-md-8 col-lg-9"><input id="rvTitle" className="form-control" value={rvTitle} onChange={(e) => setRvTitle(e.target.value)} maxLength={120} placeholder="Opsiyonel" /></div>
+                            </div>
+                            <div className="form-group mb-3 row">
+                              <div className="col-md-4 col-lg-3"><label htmlFor="rvComment" className="form-label">Yorumunuz</label></div>
+                              <div className="col-md-8 col-lg-9"><textarea id="rvComment" className="form-control" rows={3} value={rvComment} onChange={(e) => setRvComment(e.target.value)} maxLength={2000} /></div>
+                            </div>
+                            <div className="row">
+                              <div className="offset-md-4 offset-lg-3 col-auto">
+                                <button type="button" onClick={submitReview} disabled={rvSubmitting} className="btn btn-primary-dark btn-wide transition-3d-hover">{rvSubmitting ? "Gönderiliyor…" : "Gönder"}</button>
+                                <p className="font-size-12 text-gray-90 mt-2 mb-0">Yorumunuz moderasyon sonrası yayınlanır.</p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p>Değerlendirme yapmak için <Link to={`/giris?redirect=${encodeURIComponent("/" + (product.slug || product.id))}`} className="text-blue">giriş yapın</Link>.</p>
                         )}
                       </div>
-                    );
-                  })()}
-                  {sizeTableData.product_size && (
-                    <p className="text-[11px] text-gray-700 mt-2"><span className="font-semibold text-gray-800">Ürün Bedeni:</span> {sizeTableData.product_size}</p>
-                  )}
-                  {sizeTableData.model_info && Object.keys(sizeTableData.model_info).length > 0 && (
-                    <p className="text-[11px] text-gray-700 mt-1">
-                      <span className="font-semibold text-gray-800">Manken:</span>{" "}
-                      {Object.entries(sizeTableData.model_info).filter(([, v]) => String(v).trim()).map(([k, v]) => `${k} ${v} cm`).join(", ")}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {/* Ölçü tablosu — TRANSPOZE: satır=ölçü (Göğüs/Bel/Boy), kolon=beden (34/36/38/40) */}
-              <div className="overflow-x-auto border border-gray-200">
-                <table className="w-full text-[11px] border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-3 py-1.5 font-semibold text-gray-800">Ölçüler</th>
-                      {sizeTableData.sizes.map(s => (
-                        <th key={s} className="text-center px-3 py-1.5 font-semibold text-gray-800 border-l border-gray-200">{s}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sizeTableData.columns.map((c, ri) => (
-                      <tr key={c} className={`border-b border-gray-100 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
-                        <td className="px-3 py-1.5 text-gray-700">{c}</td>
-                        {sizeTableData.sizes.map(s => (
-                          <td key={s} className="px-3 py-1.5 text-center text-gray-600 border-l border-gray-100">{sizeTableData.values?.[s]?.[c] || '—'}</td>
-                        ))}
-                      </tr>
+                    </div>
+                    {reviews.map((r) => (
+                      <div className="border-bottom pb-4 mb-4" key={r.id}>
+                        <div className="text-warning text-ls-n2 font-size-16 mb-2">{stars(r.rating)}</div>
+                        {r.title && <h4 className="font-size-15 mb-1">{r.title}</h4>}
+                        {r.comment && <p className="text-gray-90">{r.comment}</p>}
+                        <div className="mb-2">
+                          <strong>{r.user_name || "Müşteri"}</strong>
+                          {(r.source === "trendyol" || r.verified) && <span className="badge badge-success ml-2">Doğrulanmış Alışveriş</span>}
+                          <span className="font-size-13 text-gray-23 ml-2">- {r.created_at ? new Date(r.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }) : ""}</span>
+                        </div>
+                        {r.admin_reply && <div className="ml-3 pl-3 border-left"><div className="font-size-12 font-weight-bold">{SITE_NAME}</div><div className="font-size-13">{r.admin_reply}</div></div>}
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </div>
-              <p className="text-[10px] text-gray-400 mt-2">Tüm ölçüler cm cinsindendir; ± 1-2 cm tolerans taşıyabilir.</p>
             </div>
-            )}
           </div>
-        </div>
-      )}
 
+          {similarProducts.length > 0 && (
+            <div className="mb-6" data-testid="similar-grid">
+              <div className="d-flex justify-content-between align-items-center border-bottom border-color-1 flex-lg-nowrap flex-wrap mb-3">
+                <h3 className="section-title mb-0 pb-2 font-size-22">Benzer Ürünler</h3>
+              </div>
+              <ul className="row list-unstyled products-group no-gutters">
+                {similarProducts.slice(0, simShown).map((p, i) => (
+                  <ProductCard key={p.id} product={p} as="li" className="col-6 col-md-3 col-xl-2gdot4 col-wd-2" listName="similar" index={i} wishlistLabel="Favori" />
+                ))}
+              </ul>
+              {similarProducts.length > simShown && (
+                <div className="text-center mt-4">
+                  <button type="button" onClick={() => setSimShown((n) => n + SIM_STEP)} data-testid="similar-load-more" className="btn btn-soft-secondary px-6 rounded-pill">
+                    Daha Fazla Göster ({similarProducts.length - simShown})
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {recentItems.length > 0 && (
+            <div className="mb-6" data-testid="recently-viewed">
+              <div className="border-bottom border-color-1 mb-2"><h3 className="section-title mb-0 pb-2 font-size-22">Son Gezdikleriniz</h3></div>
+              <Carousel perView={{ base: 2, md: 3, lg: 4, xl: 5, wd: 7 }} className="position-static overflow-hidden u-slick-overflow-visble pb-7 pt-2 px-1"
+                dotsClassName="text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-3 mt-md-0">
+                {recentItems.map((p, i) => (
+                  <div className="js-slide products-group" key={p.id} data-testid={`recent-${p.id}`}>
+                    <ProductCard product={p} listName="recently_viewed" index={i} innerClassName="product-item__inner px-wd-4 p-2 p-md-3" wishlistLabel="Favori" />
+                  </div>
+                ))}
+              </Carousel>
+            </div>
+          )}
+        </div>
+
+        {/* Ölçü tablosu modalı */}
+        {showSizeChart && (sizeTableData || sizeTableImg) && (
+          <>
+            <div className="el-backdrop" onClick={() => setShowSizeChart(false)} aria-hidden="true" />
+            <div className="position-fixed bg-white rounded shadow-lg el-anim-up" role="dialog" aria-modal="true" aria-label="Ölçü tablosu"
+              style={{ zIndex: 1003, left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(760px, 94vw)", maxHeight: "90vh", overflow: "auto" }}>
+              <div className="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
+                <h3 className="font-size-18 mb-0">Ölçü Tablosu</h3>
+                <button type="button" className="close" onClick={() => setShowSizeChart(false)} aria-label="Kapat"><i className="ec ec-close-remove" /></button>
+              </div>
+              {!sizeTableData && sizeTableImg && (
+                <div className="p-4 text-center" data-testid="size-table-image"><img src={optimizeImg(sizeTableImg, 1000)} alt="Ölçü Tablosu" className="img-fluid" /></div>
+              )}
+              {sizeTableData && (
+                <div className="p-4" data-testid="size-table-html">
+                  {sizeTableData.product_size && <p className="font-size-13"><strong>Ürün Ölçüsü:</strong> {sizeTableData.product_size}</p>}
+                  <div className="table-responsive">
+                    <table className="table table-bordered table-sm font-size-13">
+                      <thead><tr><th>Ölçüler</th>{sizeTableData.sizes.map((s) => <th key={s} className="text-center">{s}</th>)}</tr></thead>
+                      <tbody>
+                        {sizeTableData.columns.map((c) => (
+                          <tr key={c}><td>{c}</td>{sizeTableData.sizes.map((s) => <td key={s} className="text-center">{sizeTableData.values?.[s]?.[c] || "—"}</td>)}</tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="font-size-12 text-gray-90 mb-0">Tüm ölçüler cm cinsindendir; ± 1-2 cm tolerans taşıyabilir.</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </main>
       <Footer />
     </div>
   );
@@ -1601,18 +1160,15 @@ function colorHexTR(name) {
 function ColorDot({ color, selected }) {
   const hex = colorHexTR(color) || "#e5e5e5";
   return (
-    <span
-      className={`inline-block w-8 h-8 rounded-full transition-transform ${selected ? "ring-2 ring-black ring-offset-2" : "ring-1 ring-gray-300 hover:ring-black"}`}
-      style={{ backgroundColor: hex }}
-      title={color || ""}
-    />
+    <span className="d-inline-block rounded-circle" title={color || ""}
+      style={{ width: 28, height: 28, backgroundColor: hex, boxShadow: selected ? "0 0 0 2px #fff, 0 0 0 4px #333e48" : "0 0 0 1px #ddd" }} />
   );
 }
 
 function ColorSiblings({ productId, currentColor }) {
   const [siblings, setSiblings] = useState([]);
   useEffect(() => {
-    if (!productId) return;
+    if (!productId) return undefined;
     let cancel = false;
     axios.get(`${API}/products/${productId}/color-siblings`)
       .then((r) => { if (!cancel) setSiblings(r.data?.siblings || []); })
@@ -1621,23 +1177,14 @@ function ColorSiblings({ productId, currentColor }) {
   }, [productId]);
   if (!siblings.length) return null;
   return (
-    <div className="mb-5" data-testid="color-siblings">
-      <p className="text-xs uppercase tracking-[0.18em] text-gray-700 mb-2">
-        Renk: <span className="text-black font-medium">{currentColor || "—"}</span>
-      </p>
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Mevcut ürün — seçili renk noktası */}
+    <div className="border-top py-3" data-testid="color-siblings">
+      <div className="d-flex align-items-center flex-wrap">
+        <h6 className="font-size-14 mb-0 mr-3">Renk: <span className="font-weight-normal text-gray-90">{currentColor || "—"}</span></h6>
         <ColorDot color={currentColor} selected />
         {siblings.map((s) => (
-          <a
-            key={s.id}
-            href={`/${s.slug || s.id}`}
-            title={`${s.color || s.name || ""}`}
-            data-testid={`color-sibling-${s.id}`}
-            className="inline-flex"
-          >
+          <Link key={s.id} to={`/${s.slug || s.id}`} title={`${s.color || s.name || ""}`} data-testid={`color-sibling-${s.id}`} className="d-inline-flex ml-2">
             <ColorDot color={s.color || s.name} />
-          </a>
+          </Link>
         ))}
       </div>
     </div>
