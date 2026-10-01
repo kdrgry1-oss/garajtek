@@ -22,14 +22,15 @@ const GUESS = [
   [/çekiç|cekic|hammer/i, "fas fa-hammer"],
 ];
 
-// Seed ağacındaki (backend/data/garajtek_categories.json) Lucide tarzı ikon adları → Font Awesome 5.
+// Seed ağacındaki (backend/data/garajtek_categories.json) Lucide tarzı ikon adları → Font Awesome 5
+// (yalnız public/electro/electro.css'teki alt kümede bulunan glifler).
 // Eskiden bilinmeyen ad olduğu gibi sınıf yapılıyordu → üst kategorilerde ikon BOŞ kalıyordu.
 const NAMED = {
   "arrow-up-from-line": "fas fa-car-side", gauge: "fas fa-tachometer-alt", disc: "fas fa-life-ring",
-  car: "fas fa-car", truck: "fas fa-truck-pickup", archive: "fas fa-toolbox", wrench: "fas fa-wrench",
+  car: "fas fa-cogs", truck: "fas fa-truck-pickup", archive: "fas fa-toolbox", wrench: "fas fa-wrench",
   hexagon: "fas fa-cog", "battery-charging": "fas fa-car-battery", flame: "fas fa-fire",
-  activity: "fas fa-heartbeat", droplet: "fas fa-oil-can", settings: "fas fa-cogs",
-  package: "fas fa-box-open", percent: "fas fa-percent", tools: "fas fa-tools", hammer: "fas fa-hammer",
+  activity: "fas fa-tachometer-alt", droplet: "fas fa-oil-can", settings: "fas fa-cog",
+  package: "fas fa-tools", percent: "fas fa-tags", tools: "fas fa-tools", hammer: "fas fa-hammer",
 };
 
 export function iconClassFor(cat) {

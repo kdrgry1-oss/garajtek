@@ -51,7 +51,7 @@
 .electro .el-hnav .u-header__nav-link, .electro .el-hnav .u-header__nav-last-item { white-space: nowrap; }
 .electro .navbar-expand-md.el-hnav .u-header__navbar-nav .u-header__nav-link { padding-left: .8rem; padding-right: .8rem; }
 .electro .navbar-expand-md.el-hnav .u-header__navbar-nav .u-header__nav-item:first-child .u-header__nav-link { padding-left: 0; }
-.electro .el-hnav button.u-header__nav-link { font: inherit; color: #333e48; cursor: pointer; }
+.electro .el-hnav button.u-header__nav-link { font-family: inherit; font-size: inherit; line-height: inherit; font-weight: 700; color: #333e48; cursor: pointer; }
 .electro .el-hnav__measure {
   position: absolute; top: 0; left: 0; width: max-content; height: 0; overflow: hidden;
   visibility: hidden; pointer-events: none; flex-wrap: nowrap;
@@ -160,6 +160,15 @@
 
 /* Banner kartları (bg-gray-1, min-height-132) */
 .electro .el-banner-img { width: 100%; aspect-ratio: 190 / 150; object-fit: contain; }
+/* Uzun kategori adları ("KOMPRESÖRLER") dar xl kartından taşmasın */
+.electro .el-banner-text { overflow-wrap: break-word; }
+@media (min-width: 1200px) { .electro .el-banner-text { font-size: .9375rem; line-height: 1.35; } }
+/* Görselsiz kategori banner'ı (boş katalog): büyük kategori ikonu */
+.electro .el-banner-icon {
+  display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 190 / 150;
+  font-size: 3rem; color: #333e48;
+}
+.electro .el-banner-icon i { background: var(--electro-primary); border-radius: 50%; width: 5.5rem; height: 5.5rem; display: inline-flex; align-items: center; justify-content: center; }
 
 /* --- Fiyat aralığı kaydırıcı (ion-rangeslider görünümü) --------------------- */
 .electro .el-range { padding: 14px 8px 6px; }

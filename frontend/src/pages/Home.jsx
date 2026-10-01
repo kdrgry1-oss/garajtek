@@ -18,6 +18,7 @@ import ProductCard, { CardPrice, useProductActions } from "../components/Product
 import Carousel from "../components/electro/Carousel";
 import Countdown from "../components/electro/Countdown";
 import useCategoryTree, { descendantIds } from "../components/electro/useCategoryTree";
+import CategoryIcon from "../components/electro/CategoryIcon";
 import { optimizeImg, firstImage, galleryImages } from "../lib/img";
 import { trackSelectPromotion } from "../lib/dataLayer";
 import { dedupeColorGroups } from "../lib/colorGroups";
@@ -218,10 +219,11 @@ function SmallBanners({ items }) {
               ) : (
                 <div className="min-height-132 py-1 d-flex bg-gray-1 align-items-center">
                   <div className="col-6 col-xl-5 col-wd-6 pr-0">
-                    {b.image ? <img className="img-fluid el-banner-img" src={optimizeImg(b.image, 380)} alt="" loading="lazy" width="190" height="150" /> : null}
+                    {b.image ? <img className="img-fluid el-banner-img" src={optimizeImg(b.image, 380)} alt="" loading="lazy" width="190" height="150" />
+                      : b.cat ? <span className="el-banner-icon"><CategoryIcon cat={b.cat} /></span> : null}
                   </div>
                   <div className="col-6 col-xl-7 col-wd-6">
-                    <div className="mb-2 pb-1 font-size-18 font-weight-light text-ls-n1 text-lh-23">
+                    <div className="mb-2 pb-1 font-size-18 font-weight-light text-ls-n1 text-lh-23 el-banner-text">
                       {b.pre} <strong>{b.strong}</strong> {b.post}
                     </div>
                     <div className="link text-gray-90 font-weight-bold font-size-15">
@@ -764,7 +766,7 @@ export default function Home() {
     banner4 = roots.slice(0, 4).map((c) => {
       const ids = descendantIds(c);
       const sample = newest.find((p) => ids.has(String(p.category_id))) || null;
-      return { image: c.image_url || c.image || (sample ? firstImage(sample) : ""), link: `/${c.slug}`, pre: "", strong: c.name.toLocaleUpperCase("tr"), post: "FIRSATLARI" };
+      return { image: c.image_url || c.image || (sample ? firstImage(sample) : ""), cat: c, link: `/${c.slug}`, pre: "", strong: c.name.toLocaleUpperCase("tr"), post: "FIRSATLARI" };
     });
   }
 
@@ -802,7 +804,7 @@ export default function Home() {
             <HeroSlider slides={heroSlides} />
             <div className="container">
               <SmallBanners items={banner4} />
-              {(special || feat.length) && (
+              {(special || feat.length > 0) && (
                 <div className="mb-5">
                   <div className="row">
                     {special && priceOf(special).hasDiscount && (
