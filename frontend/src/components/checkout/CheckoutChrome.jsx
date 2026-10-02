@@ -9,6 +9,7 @@ export const POLICY_LINKS = [
   { to: "/sayfa/mesafeli-satis", label: "Mesafeli Satış Sözleşmesi" },
   { to: "/sayfa/on-bilgilendirme", label: "Ön Bilgilendirme Formu" },
   { to: "/sayfa/kvkk", label: "KVKK Aydınlatma Metni" },
+  { to: "/sayfa/kullanim-kosullari", label: "Kullanım Koşulları" },
 ];
 
 const LockIcon = () => (

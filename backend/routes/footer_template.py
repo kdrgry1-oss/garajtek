@@ -27,23 +27,15 @@ _DEFAULT = {
     "mode": "structured",  # "html" | "structured"
     "custom_html": "",
     "columns": [
+        # Vitrin footer'ı (kategori menüsü varken) ilk İKİ sütunu gösterir → hukuki sayfalar önde.
         {
-            "title": "Alışveriş",
-            "links": [
-                {"to": "/en-yeniler", "label": "Yeni Ürünler"},
-                {"to": "/sale", "label": "İndirimli Ürünler"},
-                {"to": "/tum-urunler?sort=popular&order=desc", "label": "Çok Satanlar"},
-                {"to": "/tum-urunler", "label": "Tüm Ürünler"},
-                {"to": "/karsilastir", "label": "Ürün Karşılaştır"},
-            ],
-        },
-        {
-            "title": "Yardım",
+            "title": "Müşteri Hizmetleri",
             "links": [
                 {"to": "/siparis-takip", "label": "Sipariş Takibi"},
-                {"to": "/sayfa/uyelik-islemleri", "label": "Üyelik İşlemleri"},
                 {"to": "/iade-islemleri", "label": "İade Talebi"},
-                {"to": "/sayfa/iade-kosullari", "label": "İade İşlemleri"},
+                {"to": "/sayfa/iade-kosullari", "label": "İade ve Değişim Koşulları"},
+                {"to": "/sayfa/kargo-ve-teslimat", "label": "Teslimat ve Kargo"},
+                {"to": "/sayfa/garanti-kosullari", "label": "Garanti ve Teknik Servis"},
                 {"to": "/sikca-sorulan-sorular", "label": "Sıkça Sorulan Sorular"},
                 {"to": "/sayfa/iletisim", "label": "İletişim"},
             ],
@@ -53,9 +45,23 @@ _DEFAULT = {
             "links": [
                 {"to": "/sayfa/hakkimizda", "label": "Hakkımızda"},
                 {"to": "/sayfa/mesafeli-satis", "label": "Mesafeli Satış Sözleşmesi"},
+                {"to": "/sayfa/on-bilgilendirme", "label": "Ön Bilgilendirme Formu"},
                 {"to": "/sayfa/uyelik-sozlesmesi", "label": "Üyelik Sözleşmesi"},
+                {"to": "/sayfa/kullanim-kosullari", "label": "Kullanım Koşulları"},
                 {"to": "/sayfa/kvkk", "label": "KVKK Aydınlatma Metni"},
                 {"to": "/sayfa/gizlilik", "label": "Gizlilik Politikası"},
+                {"to": "/sayfa/cerez-politikasi", "label": "Çerez Politikası"},
+                {"to": "/sayfa/acik-riza-metni", "label": "Açık Rıza Metni"},
+            ],
+        },
+        {
+            "title": "Alışveriş",
+            "links": [
+                {"to": "/en-yeniler", "label": "Yeni Ürünler"},
+                {"to": "/sale", "label": "İndirimli Ürünler"},
+                {"to": "/tum-urunler?sort=popular&order=desc", "label": "Çok Satanlar"},
+                {"to": "/tum-urunler", "label": "Tüm Ürünler"},
+                {"to": "/karsilastir", "label": "Ürün Karşılaştır"},
             ],
         },
         {

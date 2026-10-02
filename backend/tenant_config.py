@@ -33,6 +33,8 @@ class CompanyLegalConfig(_Section):
     tax_office: str = ""
     tax_number: str = ""
     mersis_number: str = ""
+    kep_address: str = ""          # KEP adresi (KVKK başvuru kanalı / hizmet sağlayıcı bilgisi)
+    trade_registry_no: str = ""    # Ticaret sicil no
     iban: str = ""
     address: str = ""
     city: str = ""

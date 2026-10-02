@@ -209,6 +209,15 @@ async def lifespan(app: FastAPI):
         except Exception as _se:
             logger.error(f"[ozellik-seed] hata: {_se}")
 
+        # KURUMSAL / HUKUKİ SAYFALAR (KVKK, Mesafeli Satış, İade, Garanti …) + Şirket Bilgileri
+        # varsayılanları: İDEMPOTENT — yalnız eksik sayfa eklenir, yalnız el değmemiş sayfa
+        # yükseltilir, firma alanlarına yalnız boşsa ve bir kez yazılır (bkz. legal_pages.py).
+        try:
+            from legal_pages import run_startup as _legal_startup
+            await _legal_startup(db, logger)
+        except Exception as _lpe:
+            logger.error(f"[legal-pages] hata: {_lpe}")
+
         # Create indexes
         await db.products.create_index("slug")
         await db.products.create_index("stock_code")

@@ -44,6 +44,35 @@ function parseFaqHtml(html) {
   } catch { return null; }
 }
 
+// Zengin metin editöründen gelen sade yapı: <h3> = sekme, <h4> = soru, sonraki öğeler = yanıt.
+// (CMS › Sayfalar › SSS bu düzende düzenlenir; FaqTab sınıflı eski içerik yukarıda ayrıştırılır.)
+function parseHeadingFaq(html) {
+  try {
+    if (!html || !/<h3[\s>]/i.test(html) || !/<h4[\s>]/i.test(html)) return null;
+    const doc = new DOMParser().parseFromString(`<div id="faq-root">${html}</div>`, "text/html");
+    const root = doc.getElementById("faq-root");
+    const out = [];
+    let tab = null;
+    let item = null;
+    Array.from(root.children).forEach((el) => {
+      const tag = el.tagName.toLowerCase();
+      if (tag === "h3") {
+        const label = (el.textContent || "").trim();
+        tab = { id: `t${out.length}`, label, items: [] };
+        out.push(tab);
+        item = null;
+      } else if (tag === "h4" && tab) {
+        item = { q: (el.textContent || "").trim(), a: "" };
+        tab.items.push(item);
+      } else if (item) {
+        item.a += el.outerHTML;
+      }
+    });
+    const tabs = out.filter((t) => t.items.length);
+    return tabs.length ? tabs : null;
+  } catch { return null; }
+}
+
 // Gömülü yedek SSS — firmadan bağımsız, genel metin. Mağazaya özel bilgiler (kargo firması,
 // iade adresi, destek hattı, süreler) panelden (Sayfalar > SSS) girilir.
 const FAQ_DATA = [
@@ -105,7 +134,8 @@ export default function FAQ() {
     let alive = true;
     axios.get(`${API}/pages/sss`)
       .then((r) => {
-        const parsed = parseFaqHtml(r?.data?.content || "");
+        const html = r?.data?.content || "";
+        const parsed = parseFaqHtml(html) || parseHeadingFaq(html);
         if (alive && parsed && parsed.length) { setData(parsed); setActiveTab(parsed[0].id); }
       })
       .catch(() => { /* yedek gömülü veri kalır */ });

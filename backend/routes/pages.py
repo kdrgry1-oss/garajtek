@@ -15,92 +15,73 @@ router = APIRouter(prefix="/pages", tags=["Pages"])
 async def list_pages(current_user: dict = Depends(require_admin)):
     """Admin: tüm içerik sayfaları (aktif/pasif dahil)."""
     rows = await db.pages.find({}, {"_id": 0}).sort("title", 1).to_list(500)
+    try:
+        from legal_pages import is_pristine
+        from legal_content import LEGAL_SLUGS
+        for r in rows:
+            r["is_seed_page"] = r.get("slug") in LEGAL_SLUGS
+            r["is_default_content"] = bool(r["is_seed_page"] and is_pristine(r))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[pages] varsayılan durum hesaplanamadı: {e}")
     return rows
 
 
-async def _page_placeholders() -> dict:
-    """Varsayılan sayfa şablonlarının yer tutucu değerleri (Firma Bilgileri; boşsa "—")."""
-    try:
-        from tenant_config import get_tenant_config
-        cfg = await get_tenant_config(db)
-    except Exception:
-        cfg = {}
-    brand, legal = cfg.get("brand") or {}, cfg.get("company") or {}
-    contact, domains = cfg.get("contact") or {}, cfg.get("domains") or {}
-    site = (domains.get("storefront_url") or "").replace("https://", "").replace("http://", "").rstrip("/")
-    phone = contact.get("phone") or ""
-    addr = " ".join(x for x in [legal.get("address") or "", legal.get("district") or "",
-                                 legal.get("city") or ""] if x).strip()
-    raw = {
-        "store_name": brand.get("store_name") or "Mağaza",
-        "company_name": legal.get("legal_name") or brand.get("store_name") or "Mağaza",
-        "address": addr, "phone": phone,
-        "phone_tel": "".join(ch for ch in phone if ch.isdigit() or ch == "+"),
-        "email": contact.get("email") or "", "iban": legal.get("iban") or "",
-        "tax_office": legal.get("tax_office") or "", "tax_number": legal.get("tax_number") or "",
-        "mersis_number": legal.get("mersis_number") or "", "site": site or "web sitemiz",
+@router.get("/placeholders")
+async def page_placeholders_help(current_user: dict = Depends(require_admin)):
+    """Admin CMS editörü yardım kutusu: kullanılabilir yer tutucular + şu anki değerleri."""
+    from legal_pages import PLACEHOLDER_HELP, ORDER_PLACEHOLDER_HELP, placeholder_values
+    vals = await placeholder_values(db)
+    return {
+        "company": [{"key": k, "label": lbl, "value": vals.get(k, "")} for k, lbl in PLACEHOLDER_HELP],
+        "order": [{"key": k, "label": lbl} for k, lbl in ORDER_PLACEHOLDER_HELP],
     }
-    return {k: (v if v else "—") for k, v in raw.items()}
 
 
 @router.post("/seed-defaults")
-async def seed_default_pages(force: bool = False, slugs: str = "", current_user: dict = Depends(require_admin)):
-    """Varsayılan içerik sayfalarını yükler (Hakkımızda, KVKK, İade, SSS, Gizlilik,
-    Mesafeli Satış, Ön Bilgilendirme, İletişim).
-    force=false (varsayılan): yalnızca eksik slug'ları ekler, mevcut içeriği KORUR.
-    force=true: varsayılan sayfaların içeriğini yeniden yazar (üzerine yazar).
-    slugs: virgülle ayrılmış slug listesi verilirse SADECE o sayfalar işlenir
-           (örn. ?force=true&slugs=mesafeli-satis,on-bilgilendirme). Diğer sayfalara dokunulmaz.
-    """
-    try:
-        from page_seed_data import DEFAULT_PAGES
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Seed verisi yüklenemedi: {e}")
-    # BEYAZ ETİKET: şablondaki {{yer_tutucu}}'lar Firma Bilgileri'nden doldurulur.
-    _vals = await _page_placeholders()
-
-    def _fill(text: str) -> str:
-        import re as _re_ph
-        return _re_ph.sub(r"\{\{([a-z_]+)\}\}", lambda m: _vals.get(m.group(1), m.group(0)), text or "")
-    only = {s.strip() for s in slugs.split(",") if s.strip()}
-    created, updated, skipped = [], [], []
-    now = datetime.now(timezone.utc).isoformat()
-    for p in [{k: (_fill(v) if isinstance(v, str) else v) for k, v in _p.items()} for _p in DEFAULT_PAGES]:
-        if only and p["slug"] not in only:
-            continue
-        existing = await db.pages.find_one({"slug": p["slug"]})
-        doc = {
-            "title": p["title"], "slug": p["slug"], "content": p["content"],
-            "meta_title": p.get("meta_title", ""), "meta_description": p.get("meta_description", ""),
-            "is_active": True, "updated_at": now,
-        }
-        if existing:
-            if force:
-                await db.pages.update_one({"slug": p["slug"]}, {"$set": doc})
-                updated.append(p["slug"])
-            else:
-                skipped.append(p["slug"])
-        else:
-            doc["id"] = generate_id()
-            doc["created_at"] = now
-            await db.pages.insert_one(doc)
-            created.append(p["slug"])
+async def seed_default_pages(request: Request, force: bool = False, slugs: str = "",
+                             current_user: dict = Depends(require_admin)):
+    """Varsayılan kurumsal/hukuki sayfaları kurar veya günceller (legal_content.py).
+    force=false (varsayılan): eksik sayfaları ekler; yalnız EL DEĞMEMİŞ (varsayılan içerikli)
+           sayfaları yeni sürüme yükseltir — düzenlenmiş sayfalara DOKUNMAZ.
+    force=true: `slugs` ile verilen (boşsa tüm) varsayılan sayfaları varsayılan metne döndürür.
+    Firma bilgileri metne gömülmez; sayfa sunulurken Şirket Bilgileri'nden doldurulur."""
+    from legal_pages import ensure_legal_pages
+    from legal_content import LEGAL_SLUGS
+    only = {s.strip() for s in (slugs or "").split(",") if s.strip()}
+    force_slugs = (only or set(LEGAL_SLUGS)) if force else set()
+    before = await db.pages.find({"slug": {"$in": sorted(force_slugs)}}, {"_id": 0}).to_list(100) if force_slugs else []
+    res = await ensure_legal_pages(db, force_slugs=force_slugs)
+    if force_slugs:
+        await record_admin_audit(
+            db, action="page.reset_default", entity_type="page", entity_id=",".join(sorted(force_slugs)),
+            before={"pages": before}, after=res, current_user=current_user, request=request,
+            source="content.pages",
+        )
     return {
-        "ok": True, "created": created, "updated": updated, "skipped": skipped,
-        "message": f"{len(created)} eklendi, {len(updated)} güncellendi, {len(skipped)} atlandı",
+        "ok": True, **res,
+        "message": (f"{len(res['created'])} eklendi, {len(res['updated'])} güncellendi, "
+                    f"{len(res['kept_customized'])} düzenlenmiş sayfa korundu"),
     }
 
 
 @router.get("/{slug}")
-async def get_page(slug: str):
-    """Public: slug (veya id) ile aktif içerik sayfası. StaticPage.jsx kullanır."""
+async def get_page(slug: str, order_fields: bool = False):
+    """Public: slug (veya id) ile aktif içerik sayfası. StaticPage.jsx kullanır.
+    {{sirket.*}}/{{site.*}} yer tutucuları Şirket Bilgileri'nden doldurulur (DB'deki içerik ham
+    kalır). order_fields=1: {{alici.*}}/{{siparis.*}} korunur — ödeme ekranı penceresi doldurur.
+    Eski/alternatif adresler (ör. kvkk-aydinlatma-metni → kvkk) kanonik sayfaya çözülür."""
+    from legal_pages import canonical_slug, render_page
     page = await db.pages.find_one(
         {"$or": [{"slug": slug}, {"id": slug}], "is_active": {"$ne": False}},
         {"_id": 0},
     )
     if not page:
+        alt = canonical_slug(slug)
+        if alt != slug:
+            page = await db.pages.find_one({"slug": alt, "is_active": {"$ne": False}}, {"_id": 0})
+    if not page:
         raise HTTPException(status_code=404, detail="Sayfa bulunamadı")
-    return page
+    return await render_page(db, page, keep_order_fields=order_fields)
 
 
 @router.post("")

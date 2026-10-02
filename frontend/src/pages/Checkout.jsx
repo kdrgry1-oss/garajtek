@@ -47,6 +47,32 @@ const LEGAL_DOCS = {
   "on-bilgilendirme": "Ön Bilgilendirme Formu",
 };
 
+const PAYMENT_LABELS = {
+  credit_card: "Kredi / banka kartı",
+  bank_transfer: "Havale / EFT",
+  cash_on_delivery: "Kapıda ödeme",
+};
+
+// Sözleşme penceresindeki {{alici.*}}/{{siparis.*}} alanları için o anki sipariş özeti.
+function buildLegalOrderContext({ ship, bill, billSame, corporate, corp, items, subtotal, discountTotal,
+  shippingTotal, total, paymentMethod, installments }) {
+  const fullName = (a) => [a?.first_name, a?.last_name].filter(Boolean).join(" ").trim();
+  const addr = (a) => [a?.address, a?.address2, a?.district, a?.city, a?.postal_code].filter(Boolean).join(", ");
+  const b = billSame ? ship : bill;
+  const invoice = corporate && corp?.company_name
+    ? `Kurumsal: ${corp.company_name} — ${corp.tax_office || ""} / ${corp.tax_number || ""}`
+    : [fullName(b), addr(b)].filter(Boolean).join(" — ");
+  let pay = PAYMENT_LABELS[paymentMethod] || paymentMethod || "";
+  if (paymentMethod === "credit_card" && installments > 1) pay += ` (${installments} taksit)`;
+  return {
+    buyer: { name: fullName(ship), address: addr(ship), phone: ship?.phone || "", email: ship?.email || "", invoice },
+    order: {
+      date: new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }),
+      items: items || [], subtotal, discount: discountTotal, shipping: shippingTotal, total, payment: pay,
+    },
+  };
+}
+
 // Checkout'a özel kabuk: site menüsü/footer yok (Shopify tek-sayfa ödeme).
 function CheckoutShell({ children, testId = "checkout-page" }) {
   return (
@@ -1079,7 +1105,14 @@ export default function Checkout() {
       </form>
 
       {legalDoc && (
-        <LegalModal slug={legalDoc} fallbackTitle={LEGAL_DOCS[legalDoc]} onClose={() => setLegalDoc(null)} />
+        <LegalModal slug={legalDoc} fallbackTitle={LEGAL_DOCS[legalDoc]} onClose={() => setLegalDoc(null)}
+          orderContext={buildLegalOrderContext({
+            ship: shippingAddress, bill: billingAddress, billSame: billingSameAsShipping,
+            corporate: corporateInvoice, corp: corporateData, items, subtotal: total,
+            discountTotal: discount + bankTransferDiscount + paymentMethodDiscount + pointsDeduction + giftCardDeduction,
+            shippingTotal: shippingCost + codFee + giftWrapTotal, total: chargeTotal, paymentMethod,
+            installments: isInstallmentSelected ? selectedInstallment : 1,
+          })} />
       )}
     </CheckoutShell>
   );

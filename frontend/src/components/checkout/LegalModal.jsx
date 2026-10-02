@@ -1,19 +1,22 @@
 // Mesafeli Satış Sözleşmesi / Ön Bilgilendirme Formu — sayfadan ayrılmadan modalda okunur.
-// İçerik CMS'ten (/api/pages/{slug}) gelir ve sanitize edilir.
+// İçerik CMS'ten (/api/pages/{slug}?order_fields=1) gelir: firma bilgileri sunucuda doldurulur,
+// {{alici.*}}/{{siparis.*}} alanları burada o anki sipariş verisiyle (orderContext) doldurulur
+// ve sonuç sanitize edilir.
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { sanitizeHtml } from "../../lib/sanitizeHtml";
+import { fillOrderFields } from "../../lib/legalOrderFields";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-export default function LegalModal({ slug, fallbackTitle, onClose }) {
+export default function LegalModal({ slug, fallbackTitle, onClose, orderContext = null }) {
   const [page, setPage] = useState(null);
   const [state, setState] = useState("loading");
 
   useEffect(() => {
     let alive = true;
     setState("loading");
-    axios.get(`${API}/pages/${slug}`)
+    axios.get(`${API}/pages/${slug}`, { params: { order_fields: 1 } })
       .then((r) => { if (alive) { setPage(r.data || null); setState(r.data ? "ok" : "missing"); } })
       .catch(() => { if (alive) setState("missing"); });
     return () => { alive = false; };
@@ -43,7 +46,7 @@ export default function LegalModal({ slug, fallbackTitle, onClose }) {
             </p>
           )}
           {state === "ok" && (
-            <div className="gt-legal-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content || "") }} />
+            <div className="gt-legal-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(fillOrderFields(page.content || "", orderContext)) }} />
           )}
         </div>
         <div className="gt-modal-foot">

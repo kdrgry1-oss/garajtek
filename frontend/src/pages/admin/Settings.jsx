@@ -472,6 +472,8 @@ export default function AdminSettings() {
             <span className="w-2 h-6 bg-blue-500 rounded-full inline-block"></span>
             Şirket Bilgileri
           </h2>
+          <p className="text-xs text-gray-500 -mt-2 mb-4">Bu bilgiler KVKK, Mesafeli Satış, İade vb. CMS sayfalarına
+            <code className="mx-1">{"{{sirket.unvan}}"}</code> gibi yer tutucularla otomatik yansır (CMS › Sayfalar).</p>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Firma Ünvanı</label>
@@ -490,6 +492,24 @@ export default function AdminSettings() {
               <input type="text" value={tenant.company?.tax_office || ""}
                 onChange={(e) => setTenantField("company", "tax_office", e.target.value)}
                 className="w-full border px-3 py-2 rounded text-sm" placeholder="Vergi dairesi" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">MERSİS No</label>
+              <input type="text" value={tenant.company?.mersis_number || ""}
+                onChange={(e) => setTenantField("company", "mersis_number", e.target.value)}
+                className="w-full border px-3 py-2 rounded text-sm font-mono" placeholder="0000000000000000" data-testid="set-mersis" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">KEP Adresi</label>
+              <input type="text" value={tenant.company?.kep_address || ""}
+                onChange={(e) => setTenantField("company", "kep_address", e.target.value)}
+                className="w-full border px-3 py-2 rounded text-sm" placeholder="firma@hs01.kep.tr" data-testid="set-kep" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Ticaret Sicil No</label>
+              <input type="text" value={tenant.company?.trade_registry_no || ""}
+                onChange={(e) => setTenantField("company", "trade_registry_no", e.target.value)}
+                className="w-full border px-3 py-2 rounded text-sm font-mono" placeholder="Ticaret sicil numarası" data-testid="set-trade-registry" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Web Sitesi</label>

@@ -97,15 +97,21 @@ const DEFAULT_COLUMNS = [
     { to: "/siparis-takip", label: "Sipariş Takibi" },
     { to: "/favoriler", label: "Favorilerim" },
     { to: "/iade-islemleri", label: "İade Talebi" },
-    { to: "/sayfa/iade-kosullari", label: "İade & Değişim" },
+    { to: "/sayfa/iade-kosullari", label: "İade ve Değişim Koşulları" },
+    { to: "/sayfa/kargo-ve-teslimat", label: "Teslimat ve Kargo" },
+    { to: "/sayfa/garanti-kosullari", label: "Garanti ve Teknik Servis" },
     { to: "/sikca-sorulan-sorular", label: "Sıkça Sorulan Sorular" },
     { to: "/sayfa/iletisim", label: "İletişim" },
   ]},
   { title: "Kurumsal", links: [
     { to: "/sayfa/hakkimizda", label: "Hakkımızda" },
     { to: "/sayfa/mesafeli-satis", label: "Mesafeli Satış Sözleşmesi" },
+    { to: "/sayfa/on-bilgilendirme", label: "Ön Bilgilendirme Formu" },
+    { to: "/sayfa/uyelik-sozlesmesi", label: "Üyelik Sözleşmesi" },
+    { to: "/sayfa/kullanim-kosullari", label: "Kullanım Koşulları" },
     { to: "/sayfa/kvkk", label: "KVKK Aydınlatma Metni" },
     { to: "/sayfa/gizlilik", label: "Gizlilik Politikası" },
+    { to: "/sayfa/cerez-politikasi", label: "Çerez Politikası" },
   ]},
 ];
 
