@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { Fragment, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import axios from "axios";
 import { shareCart } from "../lib/shareCart";
@@ -18,6 +18,9 @@ import { fmtPrice } from "../components/electro/format";
 import { trackRemove } from "../components/CartDrawer";
 import { cartLineView, cartSummary } from "../lib/price";
 import { trackViewCart } from "../utils/pixelEvents";
+import { SetGroupHeaderRow, SetPendingRows, SetPendingNotice } from "../components/sets/SetCartParts";
+import { CartCodNote } from "../components/electro/CodInfo";
+import { setPayload } from "../lib/productSets";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const PLACEHOLDER = "/placeholder.jpg";
@@ -85,7 +88,7 @@ export default function Cart() {
     let cancel = false;
     axios.post(`${API}/coupons/evaluate`, {
       cart_total: total,
-      items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity })),
+      items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity, ...setPayload(it) })),
       user_id: user?.id || null,
       email: user?.email || "",
       code: "",
@@ -183,6 +186,7 @@ export default function Cart() {
             <div className="mb-4"><h1 className="text-center">Sepetim</h1></div>
             <div className="text-center mb-10">
               <i className="ec ec-shopping-bag font-size-50 text-gray-5 d-block mb-3" />
+              <SetPendingNotice />
               <p className="font-size-16 text-gray-90 mb-4">Sepetinizde ürün bulunmuyor.</p>
               <Link to="/" className="btn btn-primary-dark-w px-5" data-testid="empty-cart-shop-btn">Alışverişe Başla</Link>
             </div>
@@ -216,6 +220,7 @@ export default function Cart() {
             </div>
           )}
 
+          <SetPendingNotice />
           <div className="mb-10 cart-table">
             <table className="table" cellSpacing="0">
               <thead>
@@ -229,11 +234,13 @@ export default function Cart() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
+                {items.map((item, idx) => {
                   const lv = cartLineView(item);
                   const href = `/${item.slug || item.productId || ""}`;
                   return (
-                    <tr key={item.id} data-testid={`cart-item-${item.id}`}>
+                    <Fragment key={item.id}>
+                    <SetGroupHeaderRow item={item} prev={items[idx - 1]} />
+                    <tr data-testid={`cart-item-${item.id}`}>
                       <td className="text-center">
                         <button type="button" className="btn btn-link text-gray-32 font-size-26 p-0" onClick={() => { trackRemove(item); removeItem(item.id); }} data-testid={`remove-cart-${item.id}`} aria-label="Ürünü sepetten çıkar">×</button>
                       </td>
@@ -255,8 +262,11 @@ export default function Cart() {
                       </td>
                       <td data-title="Toplam"><span>{fmtPrice(lv.unit * item.quantity)}</span></td>
                     </tr>
+                    <SetPendingRows item={item} next={items[idx + 1]} />
+                    </Fragment>
                   );
                 })}
+                <SetPendingRows orphans />
                 <tr>
                   <td colSpan="6" className="border-top space-top-2 justify-content-center">
                     <div className="pt-md-3">
@@ -298,8 +308,9 @@ export default function Cart() {
                   </tbody>
                 </table>
                 {totalDisc > 0.001 && <p className="font-size-13 text-green mb-2">Bu siparişte toplam {fmtPrice(totalDisc)} tasarruf ediyorsunuz.</p>}
+                <CartCodNote items={items} total={total} />
                 <Link to="/odeme" className="btn btn-primary-dark-w ml-md-2 px-5 px-md-4 px-lg-5 w-100 w-md-auto d-md-none" data-testid="checkout-btn">Ödemeye Geç</Link>
-                <div className="text-center text-md-right mt-2"><Link to="/" className="font-size-13 text-gray-90">Alışverişe devam et</Link></div>
+                <div className="text-center text-md-right mt-2"><Link to="/" className="font-size-13 text-gray-90">Alışverişe devam et</Link><span className="text-gray-5 mx-2">·</span><Link to="/hizli-siparis" className="font-size-13 text-gray-90" data-testid="cart-quick-order-link">Hızlı Sipariş</Link></div>
               </div>
             </div>
           </div>

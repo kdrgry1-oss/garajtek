@@ -15,6 +15,7 @@ import { trackSelectItem } from "../lib/dataLayer";
 import { fmtPrice, productHref, priceOf, isSoldOut, needsVariantChoice } from "./electro/format";
 import { toggleCompare, useCompare } from "./electro/compare";
 import useCategoryTree from "./electro/useCategoryTree";
+import { CodBadge } from "./electro/CodInfo";
 
 function stripHtml(s) {
   return String(s || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -97,6 +98,7 @@ function Badges({ product, pv, soldOut }) {
         <span className="el-badge el-badge--sale" data-testid={`discount-badge-${product.id}`}>-%{pv.discountPct}</span>
       )}
       {soldOut && <span className="el-badge el-badge--soldout">Tükendi</span>}
+      {!soldOut && <CodBadge product={product} className="el-cod-badge--card" />}
     </>
   );
 }

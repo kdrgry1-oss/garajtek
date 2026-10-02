@@ -1,0 +1,124 @@
+/* Ürün Setleri + kapıda ödeme parçaları — Electro paleti (sarı #fed700, mürekkep #333e48). */
+.gt-set-badge {
+  display: inline-block; background: #fed700; color: #333e48; font-weight: 700; font-size: 11px;
+  letter-spacing: .04em; padding: 2px 7px; border-radius: 3px; line-height: 1.4; vertical-align: middle;
+}
+.gt-set-panel { border: 1px solid #e7eaf3; border-radius: 6px; padding: 16px; background: #fff; }
+.gt-set-panel.is-loading { color: #8c99a3; font-size: 14px; }
+.gt-set-panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.gt-set-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #eef0f4; }
+.gt-set-item:first-child { border-top: 0; }
+.gt-set-thumb img { width: 56px; height: 56px; object-fit: contain; border: 1px solid #eef0f4; border-radius: 4px; background: #fff; }
+.gt-set-info { flex: 1; min-width: 0; }
+.gt-set-name, .electro .gt-set-name, .electro a.gt-set-name { color: #0062bd; font-size: 14px; font-weight: 600; display: block; line-height: 1.3; }
+.gt-set-price { text-align: right; white-space: nowrap; font-size: 14px; }
+.gt-set-price del { display: block; color: #8c99a3; font-size: 12px; }
+.gt-stock { font-weight: 600; }
+.gt-stock.is-in { color: #2b9348; }
+.gt-stock.is-out { color: #df3737; }
+.gt-set-sum { background: #f5f5f5; border-radius: 4px; padding: 10px 12px; margin-top: 10px; }
+.gt-set-sum-row { display: flex; justify-content: space-between; font-size: 14px; padding: 2px 0; }
+.gt-set-sum-row del { color: #8c99a3; }
+.gt-set-sum-row.is-main { font-size: 18px; }
+.gt-set-sum-note { font-size: 12px; color: #b92c2c; margin: 6px 0 0; }
+.gt-set-add { font-weight: 600; }
+
+/* Sepet grupları */
+.gt-set-head-row td { background: #fffbe0; border-top: 2px solid #fed700 !important; padding: 8px 12px !important; }
+.gt-set-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.gt-set-title, .electro a.gt-set-title { font-weight: 700; color: #333e48; }
+.gt-set-note { font-size: 12px; margin-left: auto; }
+.gt-set-pending-row td { padding: 8px 12px !important; }
+.gt-set-pending {
+  display: flex; gap: 12px; align-items: flex-start; border: 2px dashed #df3737; background: #fff5f5;
+  border-radius: 6px; padding: 10px 12px; text-align: left;
+}
+.gt-set-pending img { width: 56px; height: 56px; object-fit: contain; opacity: .55; filter: grayscale(1); background: #fff; border-radius: 4px; }
+.gt-set-pending.is-compact img { width: 44px; height: 44px; }
+.gt-set-pending-body { flex: 1; min-width: 0; }
+.gt-set-pending-name { font-weight: 600; font-size: 14px; color: #333e48; text-decoration: line-through; text-decoration-color: rgba(51, 62, 72, .4); }
+.gt-set-pending-msg { color: #b92c2c; font-size: 13px; margin: 2px 0 6px; font-weight: 600; }
+.gt-set-pending-actions { display: flex; align-items: center; flex-wrap: wrap; }
+.gt-set-replace-btn { font-size: 13px; padding: 4px 12px; border-radius: 20px; }
+.gt-set-notice { background: #fff5f5; border: 1px solid #f3c2c2; color: #7a1f1f; border-radius: 4px; padding: 10px 14px; font-size: 14px; }
+.gt-set-mini-head { font-size: 13px; font-weight: 700; color: #333e48; background: #fffbe0; border-left: 3px solid #fed700; padding: 6px 10px; margin-bottom: 10px; }
+
+/* Değiştir bağlam şeridi */
+.gt-set-replace-banner {
+  position: sticky; top: 0; z-index: 1030; background: #333e48; color: #fff; font-size: 14px; padding: 9px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+}
+.gt-set-replace-banner .fa-exchange-alt { color: #fed700; }
+.gt-set-replace-link { color: #fed700; text-decoration: underline; }
+.gt-set-replace-cancel { background: transparent; border: 1px solid rgba(255, 255, 255, .5); color: #fff; border-radius: 20px; padding: 2px 12px; font-size: 13px; }
+
+/* Kasa */
+.gt-set-guard { border: 1px solid #f3c2c2; background: #fff5f5; border-radius: 8px; padding: 14px; margin-bottom: 18px; }
+.gt-set-guard .gt-set-pending { margin: 8px 0; }
+.gt-set-guard-title { margin: 0 0 4px; color: #7a1f1f; }
+.gt-set-guard-text { margin: 0 0 6px; font-size: 13px; color: #555; }
+.gt-set-guard-actions { display: flex; gap: 16px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.gt-line-set { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
+.gt-line-set .gt-set-badge { font-size: 10px; padding: 1px 5px; }
+
+/* Kapıda ödeme */
+.el-cod-row { background: #f5f5f5; border-radius: 4px; padding: 8px 12px; gap: 10px; }
+.el-cod-row.is-off { background: transparent; padding: 0; }
+.el-cod-ico { width: 32px; height: 32px; border-radius: 50%; background: #fed700; color: #333e48; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; }
+.el-cod-badge {
+  display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; color: #2b6b3f; background: #e8f6ec;
+  border-radius: 3px; padding: 1px 6px; line-height: 1.6; white-space: nowrap;
+}
+.el-cod-badge--card { position: absolute; right: 0; top: 0; z-index: 2; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+
+/* Tükenen ürün için öneriler (aynı alt kategori) */
+.gt-alt { margin-top: 10px; }
+.gt-alt-title { font-size: 12px; font-weight: 700; color: #333e48; margin-bottom: 6px; }
+.gt-alt-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x mandatory; }
+.gt-alt-card {
+  flex: 0 0 132px; scroll-snap-align: start; background: #fff; border: 1px solid #e7eaf3; border-radius: 6px;
+  padding: 8px; display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.gt-alt-card img { width: 64px; height: 64px; object-fit: contain; }
+.gt-alt-name { font-size: 12px; line-height: 1.3; height: 2.6em; overflow: hidden; color: #333e48; margin: 4px 0 2px; }
+.gt-alt-price { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.gt-alt-pick { font-size: 11px; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
+.gt-set-pending.is-compact .gt-alt-card { flex-basis: 112px; }
+
+/* Kapıda Ödeme ile Sipariş Ver (ürün sayfası) */
+.el-cod-btn, .electro .btn.el-cod-btn { background: #333e48; color: #fff; font-weight: 700; border-radius: 1.5rem; border: 0; }
+.el-cod-btn:hover, .el-cod-btn:focus, .electro .btn.el-cod-btn:hover, .electro .btn.el-cod-btn:focus { background: #1f262c; color: #fed700; }
+.el-cod-btn .fa-hand-holding-usd { color: #fed700; }
+.el-cod-btn--main, .electro .btn.el-cod-btn--main { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 100%; padding: 12px 16px; border-radius: 8px; box-shadow: 0 3px 10px rgba(51, 62, 72, .25); }
+.el-cod-btn-title { display: block; font-size: 19px; line-height: 1.3; }
+.el-cod-btn-sub { display: block; font-size: 12px; font-weight: 500; opacity: .85; margin-top: 2px; }
+.el-cod-btn:disabled { opacity: .55; }
+.el-cod-btn { white-space: nowrap; }
+.gt-codq-overlay { position: fixed; inset: 0; z-index: 1060; background: rgba(0, 0, 0, .5); display: flex; align-items: flex-start;
+  justify-content: center; overflow-y: auto; padding: 24px 12px; }
+.gt-codq { background: #fff; border-radius: 8px; width: 100%; max-width: 560px; box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
+.gt-codq-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #eef0f4; }
+.gt-codq-head h3 { font-size: 18px; margin: 0; flex: 1; font-weight: 700; }
+.gt-codq-x { background: none; border: 0; font-size: 26px; line-height: 1; color: #8c99a3; }
+.gt-codq-body { padding: 14px 18px 18px; }
+.gt-codq-product { display: flex; align-items: center; gap: 10px; background: #f5f5f5; border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; }
+.gt-codq-product img { width: 56px; height: 56px; object-fit: contain; background: #fff; border-radius: 4px; }
+.gt-codq-qty { display: inline-flex; align-items: center; border: 1px solid #dde2e6; border-radius: 20px; background: #fff; }
+.gt-codq-qty button { border: 0; background: none; width: 30px; height: 30px; font-size: 16px; }
+.gt-codq-qty input { width: 36px; border: 0; text-align: center; font-weight: 600; }
+.gt-codq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.gt-codq-f { display: block; font-size: 13px; font-weight: 600; color: #333e48; margin: 0; }
+.gt-codq-f.full { grid-column: 1 / -1; }
+.gt-codq-f input, .gt-codq-f textarea, .gt-codq-input { display: block; width: 100%; margin-top: 4px; border: 1px solid #dde2e6; border-radius: 4px;
+  padding: 8px 10px; font-size: 14px; font-weight: 400; background: #fff; }
+.gt-codq-label { display: block; font-size: 13px; font-weight: 600; color: #333e48; margin-bottom: 0; }
+.gt-codq-pds { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gt-codq-err { color: #df3737; font-size: 12px; font-weight: 600; margin-top: 2px; }
+.gt-codq-sum { background: #fffbe0; border: 1px solid #f3e39a; border-radius: 6px; padding: 10px 12px; margin: 12px 0; }
+.gt-codq-row { display: flex; justify-content: space-between; font-size: 14px; padding: 2px 0; }
+.gt-codq-row.is-total { border-top: 1px solid #f3e39a; margin-top: 4px; padding-top: 6px; font-size: 16px; }
+.gt-codq-check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin: 4px 0; }
+.gt-codq-check input { margin-top: 3px; }
+.gt-codq-submit { font-weight: 700; font-size: 16px; padding: 12px; border-radius: 1.5rem; margin-top: 6px; }
+@media (max-width: 575px) { .gt-codq-grid, .gt-codq-pds { grid-template-columns: 1fr; } .gt-codq-overlay { padding: 0; } .gt-codq { border-radius: 0; min-height: 100%; } }

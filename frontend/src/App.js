@@ -13,6 +13,7 @@ const Category = lazy(() => import("./pages/Category"));
 const CampaignProducts = lazy(() => import("./pages/CampaignProducts"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Cart = lazy(() => import("./pages/Cart"));
+const QuickOrder = lazy(() => import("./pages/QuickOrder"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Search = lazy(() => import("./pages/Search"));
 const StaticPage = lazy(() => import("./pages/StaticPage"));
@@ -32,6 +33,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 import MarketingPixelsInjector from "./components/MarketingPixelsInjector";
 import SlugRouter from "./components/SlugRouter";
+import SetReplaceBanner from "./components/sets/SetReplaceBanner";
 import MaintenanceGate from "./components/MaintenanceGate";
 import CookieConsent from "./components/CookieConsent";
 // DENETİM FIX (#35): admin Duyuru/Popup'larını storefront'ta gösteren bileşenler
@@ -148,12 +150,14 @@ function App() {
                 <WhatsAppButton />
               </HideOnCheckout>
             </Suspense>
+            <SetReplaceBanner />
             <MaintenanceGate>
               <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "#888" }}>Yükleniyor…</div>}>
                 <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/kategori/:slug" element={<Category />} />
                 <Route path="/sepet" element={<Cart />} />
+                <Route path="/hizli-siparis" element={<QuickOrder />} />
                 <Route path="/odeme" element={<Checkout />} />
                 <Route path="/arama" element={<Search />} />
                 <Route path="/sayfa/:slug" element={<StaticPage />} />

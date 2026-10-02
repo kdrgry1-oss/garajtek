@@ -61,6 +61,7 @@ import SearchableAttribute from "../../components/admin/product-form/SearchableA
 import SeoTab from "../../components/admin/product-form/SeoTab";
 import TechnicalSpecs, { VariantLabelsField } from "../../components/admin/product/TechnicalSpecs";
 import ProductDetailFields from "../../components/admin/product-form/ProductDetailFields";
+import CodExclusionField from "../../components/admin/product-form/CodExclusionField";
 import ProductFilters from "../../components/admin/ProductFilters";
 import { sanitizeHtml } from "../../lib/sanitizeHtml";
 import { SITE_NAME } from "../../lib/brand";
@@ -1381,6 +1382,7 @@ export default function AdminProducts() {
       max_order_qty: product.max_order_qty || 999,
       estimated_delivery: product.estimated_delivery || "2-3",
       is_free_shipping: product.is_free_shipping ?? false,
+      cod_disabled: !!product.cod_disabled,
       is_showcase: product.is_showcase ?? false,
       meta_title: product.meta_title || "",
       meta_description: product.meta_description || "",
@@ -2445,6 +2447,7 @@ export default function AdminProducts() {
                   </div>
 
                 </div>
+                <CodExclusionField value={formData.cod_disabled} onChange={(v) => setFormData((p) => ({ ...p, cod_disabled: v }))} />
                 {/* "Fiyatlandırma / Üye Tipi Fiyatları" akordeonu kullanıcı isteğiyle kaldırıldı */}
               </TabsContent>
 

@@ -32,6 +32,7 @@ export const navigationGroups = [
     icon: Package,
     children: [
       { label: "Tüm Ürünler", path: "/admin/urunler", icon: Package },
+      { label: "Ürün Setleri", path: "/admin/urun-setleri", icon: Package },
       { label: "Kategoriler", path: "/admin/kategoriler", icon: Tags },
       { label: "Kategori Sıralama", path: "/admin/kategori-siralama", icon: LayoutDashboard },
       { label: "Markalar", path: "/admin/markalar", icon: Store },

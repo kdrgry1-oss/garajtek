@@ -435,6 +435,10 @@ export default function AdminSettings() {
               />
               <span className="text-sm">Kapıda Ödeme</span>
             </label>
+            <p className="text-xs text-gray-500 ml-7" data-testid="cod-settings-help">
+              Açıkken ürün sayfalarında “Kapıda Ödeme ile Sipariş Ver” butonu, ürün kartlarında rozet ve kasada kapıda ödeme seçeneği görünür.
+              Hizmet bedeli ve alt/üst tutar: İşletme Kuralları › Kargo &amp; Teslimat. Ürün bazında kapatma: ürün formu › Fiyat; kategori bazında: Kategoriler.
+            </p>
           </div>
 
           {/* Yüzde indirimler — sunucu bu değerleri otoriter uygular (kasa ekranı aynısını gösterir) */}

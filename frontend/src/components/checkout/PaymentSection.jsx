@@ -72,7 +72,7 @@ function CardForm({
 }
 
 export default function PaymentSection(props) {
-  const { enabledPM, paymentMethod, onSelectMethod, bankPct, codFee, card } = props;
+  const { enabledPM, paymentMethod, onSelectMethod, bankPct, codFee, card, codNote } = props;
   const brand = detectCardBrand(card.number);
 
   const options = [];
@@ -126,6 +126,7 @@ export default function PaymentSection(props) {
       {options.length === 0
         ? <p className="gt-muted">Şu anda aktif bir ödeme yöntemi bulunmuyor.</p>
         : <RadioList name="payment" value={paymentMethod} onChange={onSelectMethod} options={options} testId="payment-methods" />}
+      {codNote ? <p className="gt-muted gt-cod-note" data-testid="checkout-cod-note">Kapıda ödeme: {codNote}</p> : null}
     </Section>
   );
 }

@@ -22,6 +22,9 @@ import {
   analyticsItems, estimateDelivery, foldCode, formatTRY, isValidTCKN, mergeAddressLine, validateAddress,
 } from "../components/checkout/utils";
 import "./checkout.css";
+import { SetPendingGuard } from "../components/sets/SetCartParts";
+import { setPayload } from "../lib/productSets";
+import { useCodCheck } from "../lib/cod";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -86,7 +89,7 @@ function CheckoutShell({ children, testId = "checkout-page" }) {
 export default function Checkout() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { items, total, clearCart } = useCart();
+  const { items, pendingItems = [], total, clearCart } = useCart();
   const { user } = useAuth();
 
   // UI durumu
@@ -207,6 +210,10 @@ export default function Checkout() {
   // Varsayılan: kart & havale AÇIK, kapıda ödeme KAPALI.
   const [enabledPM, setEnabledPM] = useState({ credit_card: true, bank_transfer: true, cash_on_delivery: false });
   const [bankPct, setBankPct] = useState(5); // Havale/EFT teşvik indirimi (%) — ayardan gelir
+  // Kapıda ödeme: kapalı ürün/kategori ve tutar sınırı (sunucu da aynı kuralla reddeder:
+  // backend/cod_rules.py) — uygun değilse seçenek gösterilmez, nedeni ödeme bölümünde yazar.
+  const codCheck = useCodCheck(enabledPM.cash_on_delivery ? items.map((it) => it.productId) : [], total);
+  const pmAvail = { ...enabledPM, cash_on_delivery: enabledPM.cash_on_delivery && codCheck.available !== false };
 
   // İşletme Kuralları (admin panelinden yönetilir) — kodda sabit değil.
   const [bizRules, setBizRules] = useState({});
@@ -377,11 +384,12 @@ export default function Checkout() {
   // Seçili ödeme yöntemi kapatılmışsa ilk aktif yönteme düş
   useEffect(() => {
     const order = ["credit_card", "bank_transfer", "cash_on_delivery"];
-    if (!enabledPM[paymentMethod]) {
-      const first = order.find((k) => enabledPM[k]);
+    if (!pmAvail[paymentMethod]) {
+      const first = order.find((k) => pmAvail[k]);
       if (first) setPaymentMethod(first);
     }
-  }, [enabledPM, paymentMethod]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pmAvail.credit_card, pmAvail.bank_transfer, pmAvail.cash_on_delivery, paymentMethod]);
 
   // Load saved addresses for logged-in users
   useEffect(() => {
@@ -422,7 +430,7 @@ export default function Checkout() {
     try {
       const res = await axios.post(`${API}/coupons/evaluate`, {
         cart_total: total,
-        items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity })),
+        items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity, ...setPayload(it) })),
         user_id: user?.id || null,
         // KRİTİK: Sunucu (create_order) uygunluğu shipping_address.email ile değerlendirir;
         // misafirin forma yazdığı e-posta gönderilerek iki taraf hizalanır.
@@ -746,6 +754,10 @@ export default function Checkout() {
     if (e?.preventDefault) e.preventDefault();
     setSubmitError("");
     if (items.length === 0) { setSubmitError("Sepetiniz boş"); return; }
+    if (pendingItems.length > 0) {
+      setSubmitError("Sepetinizdeki setlerde stokta olmayan ürün var. Değiştirin ya da setten çıkararak devam edin.");
+      return;
+    }
     const errs = validateAll();
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
@@ -765,6 +777,7 @@ export default function Checkout() {
           product_id: item.productId, variant_id: item.variantId, quantity: item.quantity,
           category_id: item.categoryId,
           price: item.price, name: item.name, image: item.image, size: item.size, color: item.color,
+          ...setPayload(item),
         })),
         shipping_address: shipAddr,
         billing_address: billAddr,
@@ -978,6 +991,7 @@ export default function Checkout() {
             {submitError && (
               <Banner title="Siparişiniz tamamlanamadı" testId="checkout-error-banner">{submitError}</Banner>
             )}
+            <SetPendingGuard />
 
             {/* Express checkout: backend'de cüzdan (Apple/Google Pay) desteği yok → bölüm gösterilmez. */}
 
@@ -1020,7 +1034,8 @@ export default function Checkout() {
             />
 
             <PaymentSection
-              enabledPM={enabledPM}
+              enabledPM={pmAvail}
+              codNote={enabledPM.cash_on_delivery && codCheck.available === false ? codCheck.reason : ""}
               paymentMethod={paymentMethod}
               onSelectMethod={onSelectMethod}
               bankPct={bankPct}

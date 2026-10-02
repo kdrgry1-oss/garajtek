@@ -24,6 +24,9 @@ import { toggleCompare } from "../components/electro/compare";
 import { fmtPrice } from "../components/electro/format";
 import NotFound from "./NotFound";
 import { SITE_NAME } from "../lib/brand";
+import ProductSetPanel from "../components/sets/ProductSetPanel";
+import { CodInfoRow } from "../components/electro/CodInfo";
+import CodQuickOrder from "../components/cod/CodQuickOrder";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -627,6 +630,7 @@ export default function ProductDetail() {
                 <div className="font-size-13 el-line-1">{product.name}</div>
                 <div className={`font-size-15 font-weight-bold${hasDiscount ? " text-red" : ""}`}>{fmtPrice(displayPrice)}</div>
               </div>
+              <span className="mr-2"><CodQuickOrder product={product} variant={selectedVariant} quantity={quantity} compact /></span>
               <button type="button" onClick={handleAddToCart} className="btn btn-primary-dark-w px-4 py-2 rounded-pill font-size-14" data-testid="sticky-add-to-cart">Sepete Ekle</button>
             </div>
           </div>
@@ -734,6 +738,7 @@ export default function ProductDetail() {
                     {_pv.campaignLabel && <div className="font-size-13 text-green">{_pv.campaignLabel}</div>}
                   </div>
 
+                  <ProductSetPanel product={product} />
 
                   {hasVariants && (
                     <div className="border-top border-bottom py-3 mb-4" data-testid="pdp-variants">
@@ -763,6 +768,7 @@ export default function ProductDetail() {
                     <p className="mb-3 font-size-14 font-weight-bold text-red" data-testid="pdp-low-stock"><i className="fas fa-fire mr-1" /> Son {stockNow} ürün!</p>
                   )}
 
+                  {!oosSelected && <CodQuickOrder product={product} variant={selectedVariant} quantity={quantity} />}
                   <div className="d-md-flex align-items-end mb-3">
                     {!oosSelected && (
                       <div className="max-width-150 mb-4 mb-md-0">
@@ -785,6 +791,8 @@ export default function ProductDetail() {
                       )}
                     </div>
                   </div>
+
+                  <CodInfoRow product={product} />
 
                   {oosSelected && notifyOpen && (
                     <div className="border rounded p-3 mb-3 bg-gray-1" data-testid="stock-notify-form">

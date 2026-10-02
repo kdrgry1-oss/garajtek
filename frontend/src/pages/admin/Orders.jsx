@@ -1934,6 +1934,11 @@ export default function AdminOrders({ unpaidView = false }) {
                             ) : (
                               <p className="font-medium">{_pname}</p>
                             )}
+                            {item.set_name && (
+                              <p className="inline-flex items-center gap-1 rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-semibold text-yellow-900" data-testid="admin-order-set-tag">
+                                SET · {item.set_name}{item.set_slot && item.set_slot !== item.product_id ? " — değiştirilen ürün" : ""}
+                              </p>
+                            )}
                             {item.size && <p className="text-sm text-gray-500">Beden: {item.size}</p>}
                             <p className="text-sm text-gray-500">Adet: {item.quantity}</p>
                             {item.brand && <p className="text-sm text-gray-500">Marka: {item.brand}</p>}

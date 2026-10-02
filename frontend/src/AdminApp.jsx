@@ -6,6 +6,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
+import ProductSets from "./pages/admin/ProductSets";
 import AdminOrders from "./pages/admin/Orders";
 import AdminCategories from "./pages/admin/Categories";
 import AdminVariants from "./pages/admin/Variants";
@@ -68,6 +69,7 @@ export default function AdminApp() {
         <Route index element={<AdminDashboard />} />
         <Route path="urunler" element={<AdminProducts />} />
         <Route path="urunler/:productId" element={<AdminProducts />} />
+        <Route path="urun-setleri" element={<ProductSets />} />
         <Route path="siparisler" element={<AdminOrders key="orders-all" />} />
         <Route path="odeme-bekleyen-siparisler" element={<AdminOrders key="orders-unpaid" unpaidView />} />
         <Route path="kategoriler" element={<AdminCategories />} />

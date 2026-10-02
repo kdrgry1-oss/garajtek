@@ -1,6 +1,7 @@
 // Sağ sütun (masaüstü) / üst açılır bar (mobil) — Shopify sipariş özeti.
 import { cartLineView } from "../../lib/price";
 import { formatTRY } from "./utils";
+import { SetLineTag } from "../sets/SetCartParts";
 
 const TagIcon = () => (
   <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M1 2.5A1.5 1.5 0 0 1 2.5 1h4.38a1.5 1.5 0 0 1 1.06.44l6.62 6.62a1.5 1.5 0 0 1 0 2.12l-4.38 4.38a1.5 1.5 0 0 1-2.12 0L1.44 7.94A1.5 1.5 0 0 1 1 6.88V2.5ZM4.5 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" /></svg>
@@ -18,6 +19,7 @@ function LineItem({ item }) {
       <div className="gt-line-info">
         <p className="gt-line-name">{item.name}</p>
         {variant && <p className="gt-line-variant">{variant}</p>}
+        <SetLineTag item={item} />
       </div>
       <div className="gt-line-price">
         {lv.hasDiscount && <s>{formatTRY(lv.listUnit * item.quantity)}</s>}

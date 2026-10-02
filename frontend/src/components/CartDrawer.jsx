@@ -3,7 +3,7 @@
 // İş mantığı aynen korunur: kampanya/kupon değerlendirme (/coupons/evaluate), ücretsiz kargo
 // eşiği (shippingQuote), kalem indirim görünümü (cartLineView), sepet paylaş, analitik.
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import axios from "axios";
 import { shippingQuote } from "../lib/shippingRules";
 import { useShipping } from "../lib/shipping";
@@ -13,6 +13,8 @@ import { trackRemoveFromCart } from "../lib/dataLayer";
 import { shareCart } from "../lib/shareCart";
 import { optimizeImg } from "../lib/img";
 import { fmtPrice } from "./electro/format";
+import { MiniSetHeader, MiniSetPending, SetPendingNotice } from "./sets/SetCartParts";
+import { setPayload } from "../lib/productSets";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -30,10 +32,12 @@ export function trackRemove(item) {
 export function MiniCartList({ items, onNavigate, removeItem, updateQuantity, compact = false }) {
   return (
     <ul className="list-unstyled px-3 pt-3 mb-0">
-      {items.map((item) => {
+      {items.map((item, idx) => {
         const lv = cartLineView(item);
         return (
-          <li key={item.id} className="border-bottom pb-3 mb-3" data-testid={`cart-line-${item.id}`}>
+          <Fragment key={item.id}>
+          <MiniSetHeader item={item} prev={items[idx - 1]} />
+          <li className="border-bottom pb-3 mb-3" data-testid={`cart-line-${item.id}`}>
             <ul className="list-unstyled row mx-n2 mb-0">
               <li className="px-2 col-auto">
                 <Link to={`/${item.slug || item.productId}`} onClick={onNavigate} className="d-block el-mini-thumb">
@@ -68,8 +72,11 @@ export function MiniCartList({ items, onNavigate, removeItem, updateQuantity, co
               </li>
             </ul>
           </li>
+          <MiniSetPending item={item} next={items[idx + 1]} />
+          </Fragment>
         );
       })}
+      <MiniSetPending orphans />
     </ul>
   );
 }
@@ -89,7 +96,7 @@ export default function CartDrawer() {
     let cancel = false;
     axios.post(`${API}/coupons/evaluate`, {
       cart_total: total,
-      items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity })),
+      items: items.map((it) => ({ product_id: it.productId, category_id: it.categoryId, price: it.price, qty: it.quantity, ...setPayload(it) })),
     })
       .then((r) => { if (!cancel) setPromoDiscount(Number(r.data?.total_discount || 0)); })
       .catch(() => { if (!cancel) setPromoDiscount(0); });
@@ -132,6 +139,7 @@ export default function CartDrawer() {
             )}
 
             <div className="flex-grow-1 overflow-auto">
+              <SetPendingNotice className="mx-3 mt-3 mb-0 font-size-13" />
               {items.length === 0 ? (
                 <div className="text-center py-10 px-4">
                   <i className="ec ec-shopping-bag font-size-50 text-gray-5 d-block mb-3" />

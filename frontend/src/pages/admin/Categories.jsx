@@ -98,6 +98,7 @@ export default function AdminCategories() {
       parent_id: category.parent_id || "",
       is_active: category.is_active,
       members_only: !!category.members_only,
+      cod_disabled: !!category.cod_disabled,
       sort_order: category.sort_order || 0,
     });
     setModalOpen(true);
@@ -346,6 +347,14 @@ export default function AdminCategories() {
                 onChange={(e) => setFormData({ ...formData, members_only: e.target.checked })}
               />
               <span className="text-sm">Sadece üyelere özel <span className="text-gray-400">(giriş yapmayan göremez)</span></span>
+            </label>
+            <label className="flex items-center gap-2" data-testid="cat-cod-disabled">
+              <input
+                type="checkbox"
+                checked={!!formData.cod_disabled}
+                onChange={(e) => setFormData({ ...formData, cod_disabled: e.target.checked })}
+              />
+              <span className="text-sm">Kapıda ödemeye kapalı <span className="text-gray-400">(bu kategori ve alt kategorilerindeki ürünler)</span></span>
             </label>
             <div className="flex justify-end gap-2 pt-4 border-t">
               <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 border rounded hover:bg-gray-50">
