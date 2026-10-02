@@ -31,6 +31,17 @@ describe("best_sellers", () => {
     unmount();
   });
 
+  test("başlıkta oklar (sağ taraf: oklar + karusel okları başlıkta)", async () => {
+    mockFetch(P);
+    const { container, unmount } = await renderBlock("best_sellers", { header: { title: "Çok Satanlar", right: "arrows", pills: [] }, carousel: { arrows: "header" } });
+    expect(container.querySelector('[data-testid="header-arrows"] button[aria-label="Sonraki"]')).toBeTruthy();
+    expect(container.querySelectorAll('[data-pd-field="header.title"]').length).toBe(1);
+    unmount();
+    const r2 = await renderBlock("best_sellers", { header: { title: "Çok Satanlar", right: "arrows", pills: [] }, carousel: { arrows: "none" } });
+    expect(r2.container.querySelector('[data-testid="header-arrows"]')).toBeFalsy();
+    r2.unmount();
+  });
+
   test("sayfa düzeni: mobil / tablet / geniş ekran", () => {
     const st = { columns: "3", columns_wide: "4", rows_per_slide: 2, mobile_per_slide: 3 };
     expect(pageLayout(st, 390).perPage).toBe(3);

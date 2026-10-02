@@ -8,3 +8,5 @@
 /* beyaz kart içi, kartlar arası ayırıcı yok */
 .electro .pcwi .product-item::after { content: none; }
 .electro .pcwi .product-item__inner { background-color: #fff; }
+/* yatay kart varyantı (v2_cards): ≥992'de görsel + gövde yan yana kalsın (başlık kırpma kutusu gövdeyi alta itmesin) */
+@media (min-width: 992px) { .electro .pcwi .product-item__card .product-item__body { min-width: 0; } }

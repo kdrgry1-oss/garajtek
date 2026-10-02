@@ -108,11 +108,12 @@ export default function Render({ settings, ctx }) {
 
   if (variant === "pill_header") {
     const title = header.title && header.tag !== "sr-only";
+    const TitleTag = header.tag === "h2" ? "h2" : "h3"; // şablon v2.0: h3
     return (
       <div className="pct pct--pill" data-testid="products-carousel-tabs">
         <div className="position-relative text-center z-index-2">
           <div className={`d-flex justify-content-between border-bottom border-color-1 flex-xl-nowrap flex-wrap border-md-down-top-0 border-lg-down-bottom-0 mb-3${header.align === "center" ? " justify-content-xl-center" : ""}`}>
-            {title ? <h3 className={`section-title${header.underline === false ? " pct-no-underline" : ""} mb-0 pb-2 font-size-22`} data-pd-field="header.title">{header.title}</h3>
+            {title ? <TitleTag className={`section-title${header.underline === false ? " pct-no-underline" : ""} mb-0 pb-2 font-size-22`} data-pd-field="header.title">{header.title}</TitleTag>
               : header.title ? <h2 className="sr-only" data-pd-field="header.title">{header.title}</h2> : null}
             <Tabs tabs={tabs} active={cur.i} onPick={pick} variant={variant} />
             {header.right === "link" && header.link?.label && (
@@ -126,11 +127,12 @@ export default function Render({ settings, ctx }) {
       </div>
     );
   }
+  const HTag = header.tag === "h3" ? "h3" : "h2";
   return (
     <div className={`pct pct--${variant}`} data-testid="products-carousel-tabs">
       {header.title ? (header.tag === "sr-only"
         ? <h2 className="sr-only" data-pd-field="header.title">{header.title}</h2>
-        : <h2 className={`section-title mb-3 pb-2 font-size-22 ${variant === "left" ? "" : "text-center"}`} data-pd-field="header.title">{header.title}</h2>) : null}
+        : <HTag className={`section-title${header.underline === false ? " pct-no-underline" : ""} mb-3 pb-2 font-size-22 ${variant === "left" ? "" : "text-center"}`} data-pd-field="header.title">{header.title}</HTag>) : null}
       <Tabs tabs={tabs} active={cur.i} onPick={pick} variant={variant} />
       {body}
     </div>

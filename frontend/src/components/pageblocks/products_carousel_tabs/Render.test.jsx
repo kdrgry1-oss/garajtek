@@ -54,6 +54,13 @@ describe("products_carousel_tabs", () => {
     unmount();
   });
 
+  test("başlık etiketi panelden: h3 seçilince h3", async () => {
+    mockFetch(P);
+    const { container, unmount } = await renderBlock("products_carousel_tabs", { header: { title: "Sekmeli", tag: "h3" } });
+    expect(container.querySelector('h3[data-pd-field="header.title"]').textContent).toBe("Sekmeli");
+    unmount();
+  });
+
   test("hiç ürün yok: vitrinde gizli", async () => {
     mockFetch([]);
     const { container, unmount } = await renderBlock("products_carousel_tabs", {});

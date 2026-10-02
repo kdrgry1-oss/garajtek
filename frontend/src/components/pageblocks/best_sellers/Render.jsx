@@ -4,7 +4,7 @@
 // u-slick--gutters-2 pt-3 pb-6, ul.row.products-group > li.col-wd-3.col-md-4.product-item__card, remove-divider-xl/wd).
 // Sayfa (slayt) boyutu ekran genişliğine göre: mobil = mobile_per_slide, ≥768 = columns × rows, ≥1480 = columns_wide × rows.
 // Haplar: “İlk 20” (ana kaynak) + kök kategorilerden otomatik N kategori; pills_as_tabs açıksa ürünleri değiştirir.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import SectionHeader from "../_shared/SectionHeader";
 import BlockCarousel from "../_shared/BlockCarousel";
 import ProductCard from "../_shared/ProductCard";
@@ -58,6 +58,8 @@ export default function Render({ settings, ctx }) {
   }, [st.header, auto.enabled, auto.max, roots, st.source, limit]); // eslint-disable-line react-hooks/exhaustive-deps
   const initial = Math.max(0, (header.pills || []).findIndex((p) => p.active));
   const [pill, setPill] = useState(initial);
+  // panelde "Başlangıçta seçili" hap değişince önizleme de o hapa geçsin
+  useEffect(() => { setPill(initial); }, [initial]);
   const p = (header.pills || [])[pill];
   const src = st.pills_as_tabs && p?.source && p.source.kind ? p.source : st.source;
   const list = useProductSource(src);
@@ -69,15 +71,21 @@ export default function Render({ settings, ctx }) {
   // ana kaynak boşsa (ilk sekme) bölüm vitrinde hiç çizilmez
   if (list && !list.length && src === st.source) return <EmptyNote preview={ctx?.preview} text="Çok satanlar: seçilen kaynakta ürün yok (vitrinde bu bölüm gizlenir)." />;
   const onPill = st.pills_as_tabs ? setPill : undefined;
+  // Sağ taraf "Oklar" + karusel okları "Başlıkta" → oklar başlık satırında (product_slider ile aynı davranış)
+  const headerArrows = header.right === "arrows" && st.carousel?.arrows === "header";
+  const right = header.right === "arrows" && !headerArrows ? "none" : header.right;
+  const head = (ctl) => <SectionHeader value={{ ...header, right }} activePill={pill} onPill={onPill} arrows={ctl} className="border-color-1 flex-md-nowrap border-sm-bottom-0" />;
+  const inCarousel = headerArrows && list && list.length > 0;
   return (
     <div className="space-top-2 pbs" data-testid="bestsellers">
-      <SectionHeader value={header} activePill={pill} onPill={onPill} className="border-color-1 flex-md-nowrap border-sm-bottom-0" />
+      {inCarousel ? null : head(null)}
       {!list ? (
         <div className="pt-3 pb-6"><Skeleton height={grid ? 330 : 260} count={Math.min(cols, 4)} /></div>
       ) : list.length === 0 ? (
         <div className="py-6 text-center text-gray-90" data-pd-field="empty_text">{st.empty_text}</div>
       ) : (
         <BlockCarousel key={`${pill}-${perPage}`} value={{ ...st.carousel, per_view: { 0: 1 }, rows: 1 }} ariaLabel={header.title || undefined}
+          header={inCarousel ? head : undefined}
           className="u-slick--gutters-2 overflow-hidden u-slick-overflow-visble pt-3 pb-6"
           dotsClassName="text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-4">
           {chunk(list, perPage).map((group, gi) => (

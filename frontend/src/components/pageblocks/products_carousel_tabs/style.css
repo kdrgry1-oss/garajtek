@@ -2,7 +2,8 @@
 .electro .pct .nav-tab { border-bottom: 1px solid #ddd; }
 .electro .pct .nav-tab .nav-item + .nav-item { margin-left: 4em; }
 .electro .pct .nav-tab .nav-link { font-size: 1.429em; line-height: .9em; padding: 0 0 1em; border-bottom: 0; color: #333e48; }
-@media (max-width: 767.98px) { .electro .pct .nav-tab .nav-item + .nav-item { margin-left: 1.25em; } .electro .pct .nav-tab .nav-link { font-size: 1rem; white-space: nowrap; } }
+@media (max-width: 767.98px) { .electro .pct .nav-tab .nav-item + .nav-item { margin-left: 1.25em; } .electro .pct .nav-tab .nav-link { font-size: 1rem; white-space: nowrap; line-height: 1.4; padding-top: .15em; } }
+/* mobilde sekme şeridi yatay kayar (overflow:auto) → .9em satır yüksekliği Ö/İ/Ş üst noktalarını kesiyordu */
 .electro .pct .nav-tab .nav-link.active::before { content: " "; border-bottom: 2px solid var(--electro-primary, #fed700); display: block; position: absolute; bottom: -1px; left: 0; width: 100%; }
 .electro .pct-no-underline::after { content: none; }
 /* ızgara görünümü: kırılım başına sütun = karusel “görünen adet” */

@@ -5,3 +5,9 @@
 /* blok düzeyinde indirim rozeti (genel kart ayarını ezer) */
 .electro .pcs-badge-on .product-item .el-badge--sale { display: inline-block !important; }
 .electro .pcs-badge-off .product-item .el-badge--sale { display: none !important; }
+/* Yatay kart (v2.0 product-item__card): ≥992'de görsel col-lg-auto + gövde col yan yana. Başlığın satır kırpma kutusu
+   (-webkit-box) min-content'i şişirip gövdeyi alt satıra itiyordu (992–1199'da görsel üstte kalıyordu) → şablondaki gibi yan yana. */
+@media (min-width: 992px) {
+  .electro .pbs .product-item__card .product-item__body,
+  .electro .pct .product-item__card .product-item__body { min-width: 0; }
+}
