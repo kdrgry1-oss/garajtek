@@ -15,6 +15,9 @@
   "autoplay": true,
   "muted": true,
   "loop": true,
+  "aspect": "16_9",
+  "text_align": "center",
+  "radius": 4,
   "_section": {
     "margin_bottom": {
       "desktop": 50,

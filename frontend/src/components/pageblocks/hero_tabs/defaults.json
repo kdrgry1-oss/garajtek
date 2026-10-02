@@ -1,1 +1,160 @@
-{}
+{
+  "background": null,
+  "tabs": [
+    {
+      "label": "Lift Sistemleri",
+      "title": "SEZON SONU<br>LİFTLER",
+      "offer_label": "SON FIRSAT",
+      "amount": "₺2.500",
+      "amount_suffix": "İNDİRİM!",
+      "button": {
+        "text": "Alışverişe Başla",
+        "link": {
+          "kind": "category",
+          "url": "/liftler",
+          "new_tab": false,
+          "slug": "liftler"
+        }
+      },
+      "image": null
+    },
+    {
+      "label": "Kompresör Fırsatı",
+      "title": "SESSİZ<br>KOMPRESÖRLER",
+      "offer_label": "SON FIRSAT",
+      "amount": "₺1.500",
+      "amount_suffix": "İNDİRİM!",
+      "button": {
+        "text": "Alışverişe Başla",
+        "link": {
+          "kind": "category",
+          "url": "/kompresorler",
+          "new_tab": false,
+          "slug": "kompresorler"
+        }
+      },
+      "image": null
+    },
+    {
+      "label": "Lastik Ekipmanı",
+      "title": "LASTİK<br>MAKİNELERİ",
+      "offer_label": "SON FIRSAT",
+      "amount": "₺3.000",
+      "amount_suffix": "İNDİRİM!",
+      "button": {
+        "text": "Alışverişe Başla",
+        "link": {
+          "kind": "category",
+          "url": "/lastik-ekipmanlari",
+          "new_tab": false,
+          "slug": "lastik-ekipmanlari"
+        }
+      },
+      "image": null
+    },
+    {
+      "label": "El Aletleri",
+      "title": "PROFESYONEL<br>EL ALETLERİ",
+      "offer_label": "SON FIRSAT",
+      "amount": "₺500",
+      "amount_suffix": "İNDİRİM!",
+      "button": {
+        "text": "Alışverişe Başla",
+        "link": {
+          "kind": "category",
+          "url": "/el-aletleri",
+          "new_tab": false,
+          "slug": "el-aletleri"
+        }
+      },
+      "image": null
+    },
+    {
+      "label": "Takım Arabaları -%25",
+      "title": "TAKIM<br>ARABALARI",
+      "offer_label": "SON FIRSAT",
+      "amount": "%25",
+      "amount_suffix": "İNDİRİM!",
+      "button": {
+        "text": "Alışverişe Başla",
+        "link": {
+          "kind": "category",
+          "url": "/takim-arabalari-ve-tezgahlar",
+          "new_tab": false,
+          "slug": "takim-arabalari-ve-tezgahlar"
+        }
+      },
+      "image": null
+    },
+    {
+      "label": "Arıza Tespit",
+      "title": "ARIZA TESPİT<br>CİHAZLARI",
+      "offer_label": "SON FIRSAT",
+      "amount": "₺750",
+      "amount_suffix": "İNDİRİM!",
+      "button": {
+        "text": "Alışverişe Başla",
+        "link": {
+          "kind": "category",
+          "url": "/test-ve-ariza-tespit-cihazlari",
+          "new_tab": false,
+          "slug": "test-ve-ariza-tespit-cihazlari"
+        }
+      },
+      "image": null
+    }
+  ],
+  "default_tab": 0,
+  "autoplay": 0,
+  "text_color": "#333e48",
+  "background_color": "#f5f5f5",
+  "title_size": 58,
+  "animation": "fadeInUp",
+  "products": {
+    "enabled": true,
+    "source": {
+      "kind": "featured",
+      "product_ids": [],
+      "category_ids": [],
+      "include_children": true,
+      "tag": "",
+      "brand_ids": [],
+      "limit": 9,
+      "sort": "default",
+      "exclude_out_of_stock": false,
+      "exclude_ids": [],
+      "fill_with": "none"
+    },
+    "carousel": {
+      "per_view": {
+        "0": 2,
+        "768": 2,
+        "992": 2,
+        "1200": 3,
+        "1400": 5,
+        "1480": 7
+      },
+      "slides_to_scroll": 1,
+      "rows": 1,
+      "gutter": 0,
+      "autoplay": false,
+      "interval": 5000,
+      "pause_on_hover": true,
+      "loop": false,
+      "rewind": false,
+      "transition": "slide",
+      "speed": 300,
+      "dots": true,
+      "arrows": "side",
+      "drag": true,
+      "last_active_divider": false
+    }
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 35,
+      "tablet": 35,
+      "mobile": 30
+    }
+  }
+}

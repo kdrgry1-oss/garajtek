@@ -1,8 +1,4 @@
 {
-  "columns": "3",
-  "ratio": "60_40",
-  "text_size": 1.286,
-  "card_background": "#f5f5f5",
   "items": [
     {
       "image": null,
@@ -27,7 +23,7 @@
       "action_text": "Hemen İncele",
       "action_prefix": "%'ye varan",
       "action_value": "20",
-      "action_suffix": "indirim",
+      "action_suffix": "",
       "currency": "₺",
       "link": {
         "kind": "category",
@@ -54,10 +50,22 @@
       "image_rotation": 0
     }
   ],
+  "columns": "3",
+  "ratio": "60_40",
+  "text_size": 1.286,
+  "letter_spacing": 0,
+  "card_background": "#f5f5f5",
+  "text_color": "#333e48",
+  "arrow_color": "",
+  "body_padding": {
+    "top": 3.286,
+    "bottom": 2.143
+  },
+  "gap_mobile": 20,
   "_section": {
     "margin_bottom": {
       "desktop": 74,
-      "tablet": 50,
+      "tablet": 60,
       "mobile": 40
     }
   }

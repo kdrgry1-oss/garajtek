@@ -2,11 +2,13 @@
   "key": "banner_two_columns",
   "version": 2,
   "title": "İki Kolonlu Görsel Banner",
-  "description": "",
+  "description": "Yan yana iki görsel banner, 690×150 (şablon v2.0 home-v3 / v7 'Banner 2 columns')",
   "category": "banner",
   "group": "A",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
+    "T2/html/home/home-v3.html#L6220",
+    "T2/html/home/home-v7.html#L1915",
     "T2/html/home/home-v2.html"
   ],
   "layout": "container",
@@ -23,7 +25,101 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Bannerlar",
+      "tab": "İçerik",
+      "min": 1,
+      "max": 2,
+      "item_label": "{{alt}}",
+      "item_noun": "Banner",
+      "sortable": true,
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            690,
+            150
+          ],
+          "allow_mobile": true,
+          "mobile_recommended": [
+            690,
+            250
+          ]
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        },
+        {
+          "name": "alt",
+          "type": "text",
+          "label": "Alternatif metin",
+          "help": "Görme engelliler ve arama motorları için kısa açıklama."
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "link": {
+          "kind": "url",
+          "url": "/sale",
+          "new_tab": false
+        },
+        "alt": "Kampanya"
+      }
+    },
+    {
+      "name": "gap",
+      "type": "number",
+      "label": "Bannerlar arası boşluk",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 80,
+      "width": "half"
+    },
+    {
+      "name": "stack_below",
+      "type": "select",
+      "label": "Alt alta geçiş",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "md",
+          "label": "768 px altında (şablon v3)"
+        },
+        {
+          "value": "lg",
+          "label": "992 px altında (şablon v7)"
+        }
+      ]
+    },
+    {
+      "name": "radius",
+      "type": "number",
+      "label": "Köşe yuvarlaklığı",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 40,
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

@@ -10,6 +10,7 @@
 //   d) bloğu şablon varsayılanına sıfırla
 //   e) geri al + revizyon geri yükleme
 //   f) data-pd-field denetimi: vitrindeki blok metinlerinin hepsi panelden ya da katalogdan gelir
+// Not: metinler textContent ile aranır — şablon gereği bazı bloklar (ör. reklam kutuları) CSS ile büyük harfe çevirir.
 const assert = require("assert");
 const { chromium } = require(process.env.PW_MODULE || "/opt/node22/lib/node_modules/playwright");
 
@@ -63,7 +64,7 @@ async function step(name, fn) {
     await rt.click();
     await page.keyboard.press("Control+A");
     await page.keyboard.type(MARK);
-    await frame().waitForFunction((m) => document.body.innerText.includes(m), MARK, { timeout: 5000 });
+    await frame().waitForFunction((m) => document.body.textContent.includes(m), MARK, { timeout: 5000 });
     const pub = await (await fetch(`${API}/page-blocks?page=home`)).text();
     assert(!pub.includes(MARK), "taslak vitrine sızmamalı");
     await page.waitForFunction(() => /otomatik kaydedildi/.test(document.querySelector('[data-testid="save-status"]').textContent), null, { timeout: 10000 });
@@ -74,7 +75,7 @@ async function step(name, fn) {
     await page.waitForFunction(() => /Yayındaki sürüm/.test(document.querySelector('[data-testid="save-status"]').textContent), null, { timeout: 15000 });
     const sf = await ctx.newPage();
     await sf.goto(`${BASE}/?pd-noanim=1`, { waitUntil: "networkidle" });
-    await sf.waitForFunction((m) => document.body.innerText.includes(m), MARK, { timeout: 10000 });
+    await sf.waitForFunction((m) => document.body.textContent.includes(m), MARK, { timeout: 10000 });
     await sf.close();
   });
 
@@ -111,20 +112,20 @@ async function step(name, fn) {
     await page.click(`[data-testid="block-row-${adsIndex}"] button.flex-1`);
     await page.click('[data-testid="reset-block"]');
     await page.click('[data-testid="app-confirm-ok"]');
-    await frame().waitForFunction((m) => !document.body.innerText.includes(m), MARK, { timeout: 5000 });
+    await frame().waitForFunction((m) => !document.body.textContent.includes(m), MARK, { timeout: 5000 });
     assert.strictEqual(await page.locator(`[data-testid="block-row-${adsIndex}"] [data-testid="modified-dot"]`).count(), 0);
   });
 
   await step("e) geri al + revizyon geri yükleme", async () => {
     await page.click('[data-testid="undo"]');
-    await frame().waitForFunction((m) => document.body.innerText.includes(m), MARK, { timeout: 5000 });
+    await frame().waitForFunction((m) => document.body.textContent.includes(m), MARK, { timeout: 5000 });
     await page.click('[data-testid="discard-draft"]');
     await page.click('[data-testid="app-confirm-ok"]');
     await page.waitForFunction(() => /Yayındaki sürüm/.test(document.querySelector('[data-testid="save-status"]').textContent), null, { timeout: 10000 });
     await page.click('[data-testid="open-revisions"]');
     await page.click(`[data-testid="restore-${startRev}"]`);
     await page.click('[data-testid="app-confirm-ok"]');
-    await frame().waitForFunction((m) => !document.body.innerText.includes(m), MARK, { timeout: 10000 });
+    await frame().waitForFunction((m) => !document.body.textContent.includes(m), MARK, { timeout: 10000 });
     await page.click('[data-testid="publish"]');
     await page.waitForFunction(() => /Yayındaki sürüm/.test(document.querySelector('[data-testid="save-status"]').textContent), null, { timeout: 15000 });
     const pub = await (await fetch(`${API}/page-blocks?page=home`)).text();

@@ -11,6 +11,9 @@
     "tablet": 60,
     "mobile": 20
   },
+  "mobile_font_scale": 71.43,
+  "radius": 0,
+  "dots_style": "v1",
   "slides": [
     {
       "background": null,
@@ -32,11 +35,39 @@
         }
       },
       "text_color": "#333e48",
+      "accent_color": "#34bcec",
       "text_align": "left",
       "animation": {
-        "effect": "fadeInDown",
-        "delay_step": 200,
-        "duration": 1000
+        "pretitle": {
+          "effect": "fadeInDown",
+          "delay": 500,
+          "duration": 800
+        },
+        "title": {
+          "effect": "fadeInDown",
+          "delay": 500,
+          "duration": 800
+        },
+        "subtitle": {
+          "effect": "fadeInDown",
+          "delay": 700,
+          "duration": 800
+        },
+        "price": {
+          "effect": "fadeInDown",
+          "delay": 1000,
+          "duration": 800
+        },
+        "button": {
+          "effect": "fadeInDown",
+          "delay": 1000,
+          "duration": 800
+        },
+        "product_image": {
+          "effect": "zoomIn",
+          "delay": 500,
+          "duration": 800
+        }
       }
     },
     {
@@ -59,11 +90,39 @@
         }
       },
       "text_color": "#333e48",
+      "accent_color": "#34bcec",
       "text_align": "left",
       "animation": {
-        "effect": "fadeInDown",
-        "delay_step": 200,
-        "duration": 1000
+        "pretitle": {
+          "effect": "fadeInDown",
+          "delay": 500,
+          "duration": 800
+        },
+        "title": {
+          "effect": "fadeInDown",
+          "delay": 700,
+          "duration": 800
+        },
+        "subtitle": {
+          "effect": "fadeInDown",
+          "delay": 700,
+          "duration": 800
+        },
+        "price": {
+          "effect": "fadeInDown",
+          "delay": 1000,
+          "duration": 800
+        },
+        "button": {
+          "effect": "fadeInDown",
+          "delay": 1000,
+          "duration": 800
+        },
+        "product_image": {
+          "effect": "zoomIn",
+          "delay": 500,
+          "duration": 800
+        }
       }
     },
     {
@@ -86,15 +145,79 @@
         }
       },
       "text_color": "#333e48",
+      "accent_color": "#34bcec",
       "text_align": "left",
       "animation": {
-        "effect": "fadeInLeft",
-        "delay_step": 200,
-        "duration": 1000
+        "pretitle": {
+          "effect": "fadeInLeft",
+          "delay": 500,
+          "duration": 800
+        },
+        "title": {
+          "effect": "fadeInRight",
+          "delay": 500,
+          "duration": 800
+        },
+        "subtitle": {
+          "effect": "fadeInLeft",
+          "delay": 700,
+          "duration": 800
+        },
+        "price": {
+          "effect": "fadeInLeft",
+          "delay": 700,
+          "duration": 800
+        },
+        "button": {
+          "effect": "fadeInLeft",
+          "delay": 700,
+          "duration": 800
+        },
+        "product_image": {
+          "effect": "fadeInRight",
+          "delay": 500,
+          "duration": 800
+        }
       }
     }
   ],
-  "side_banners": [],
+  "side_banners": [
+    {
+      "image": null,
+      "text": "Atölyeniz için <strong>BÜYÜK</strong> fırsatlar",
+      "cta": "Hemen Al",
+      "style": "gray",
+      "link": {
+        "kind": "url",
+        "url": "/sale",
+        "new_tab": false
+      }
+    },
+    {
+      "image": null,
+      "text": "Yeni <strong>lift</strong> modelleri",
+      "cta": "Hemen Al",
+      "style": "gray",
+      "link": {
+        "kind": "category",
+        "url": "/liftler",
+        "new_tab": false,
+        "slug": "liftler"
+      }
+    },
+    {
+      "image": null,
+      "text": "<strong>Kompresör</strong> kampanyası",
+      "cta": "Hemen Al",
+      "style": "gray",
+      "link": {
+        "kind": "category",
+        "url": "/kompresorler",
+        "new_tab": false,
+        "slug": "kompresorler"
+      }
+    }
+  ],
   "side_deals": {
     "source": {
       "kind": "discounted",
@@ -109,12 +232,13 @@
       "exclude_ids": [],
       "fill_with": "none"
     },
+    "left_label": "kaldı",
+    "show_discount": true,
     "countdown": {
       "enabled": true,
       "end": "",
       "rolling_days": 0,
       "units": [
-        "days",
         "hours",
         "minutes",
         "seconds"
@@ -126,13 +250,64 @@
         "minutes": "Dk",
         "seconds": "Sn"
       },
-      "heading": "",
+      "heading": "Bitimine:",
       "on_expire": "hide_timer",
       "expired_text": "Kampanya sona erdi",
       "pad": true
     }
   },
-  "category_strip": [],
+  "category_strip": [
+    {
+      "image": null,
+      "label": "Liftler",
+      "link": {
+        "kind": "category",
+        "url": "/liftler",
+        "new_tab": false,
+        "slug": "liftler"
+      }
+    },
+    {
+      "image": null,
+      "label": "Kompresörler",
+      "link": {
+        "kind": "category",
+        "url": "/kompresorler",
+        "new_tab": false,
+        "slug": "kompresorler"
+      }
+    },
+    {
+      "image": null,
+      "label": "Lastik Ekipmanları",
+      "link": {
+        "kind": "category",
+        "url": "/lastik-ekipmanlari",
+        "new_tab": false,
+        "slug": "lastik-ekipmanlari"
+      }
+    },
+    {
+      "image": null,
+      "label": "El Aletleri",
+      "link": {
+        "kind": "category",
+        "url": "/el-aletleri",
+        "new_tab": false,
+        "slug": "el-aletleri"
+      }
+    },
+    {
+      "image": null,
+      "label": "Takım Arabaları",
+      "link": {
+        "kind": "category",
+        "url": "/takim-arabalari-ve-tezgahlar",
+        "new_tab": false,
+        "slug": "takim-arabalari-ve-tezgahlar"
+      }
+    }
+  ],
   "carousel": {
     "per_view": {
       "0": 1

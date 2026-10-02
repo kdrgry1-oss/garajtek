@@ -1,0 +1,19 @@
+/* deal_slider — v2.0 home-v5 / v8. Geçiş: fade (üst üste) ya da slide (yatay kaydırma); --pd-deal-speed. */
+.electro .pd-deal__track { display: flex; transition: transform var(--pd-deal-speed, 400ms) ease; }
+.electro .pd-deal__item { flex: 0 0 100%; max-width: 100%; }
+.electro .pd-deal__track--fade { display: grid; }
+.electro .pd-deal__track--fade .pd-deal__item { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity var(--pd-deal-speed, 400ms) ease, visibility 0s linear var(--pd-deal-speed, 400ms); }
+.electro .pd-deal__track--fade .pd-deal__item.is-active { opacity: 1; visibility: visible; transition: opacity var(--pd-deal-speed, 400ms) ease; }
+.electro .pd-deal__bg { background-size: cover; background-position: center; }
+.electro .pd-deal__thumbs { justify-content: space-between; }
+.electro .pd-deal__thumbs .js-slick-thumb-progress { color: inherit; cursor: pointer; }
+.electro .pd-deal__thumbs .slick-current .js-slick-thumb-progress { font-weight: 700; }
+.electro .pd-deal-in, .electro .pd-deal-in-r, .electro .pd-deal-zoom { animation-duration: 800ms; animation-fill-mode: both; }
+.electro .pd-deal-in { animation-name: pdDealUp; }
+.electro .pd-deal-in-r { animation-name: pdDealRight; }
+.electro .pd-deal-zoom { animation-name: pdDealZoom; }
+@keyframes pdDealUp { from { opacity: 0; transform: translate3d(0, 30px, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdDealRight { from { opacity: 0; transform: translate3d(30px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdDealZoom { from { opacity: 0; transform: scale3d(.3, .3, .3); } 50% { opacity: 1; } to { opacity: 1; transform: none; } }
+html.pd-no-anim .electro .pd-deal-in, html.pd-no-anim .electro .pd-deal-in-r, html.pd-no-anim .electro .pd-deal-zoom { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .electro .pd-deal-in, .electro .pd-deal-in-r, .electro .pd-deal-zoom { animation: none !important; } }

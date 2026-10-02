@@ -1,5 +1,7 @@
 {
   "items": [],
+  "gap": 30,
+  "radius": 0,
   "_section": {
     "margin_bottom": {
       "desktop": 50,

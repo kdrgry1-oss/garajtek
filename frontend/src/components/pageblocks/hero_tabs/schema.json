@@ -2,12 +2,12 @@
   "key": "hero_tabs",
   "version": 2,
   "title": "Sekmeli Hero + Ürün Karuseli",
-  "description": "",
+  "description": "Arka plan görselli büyük kampanya alanı; sağdaki sekmelerle kampanya değişir, altında ürün karuseli (şablon v2.0 home-v6)",
   "category": "slider",
   "group": "A",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v6.html"
+    "T2/html/home/home-v6.html#L720"
   ],
   "layout": "full_bleed",
   "singleton": false,
@@ -23,7 +23,230 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "background",
+      "type": "image",
+      "label": "Arka plan görseli",
+      "tab": "İçerik",
+      "recommended": [
+        1920,
+        714
+      ],
+      "allow_mobile": true
+    },
+    {
+      "name": "tabs",
+      "type": "repeater",
+      "label": "Sekmeler",
+      "tab": "İçerik",
+      "min": 1,
+      "max": 6,
+      "item_label": "{{label}}",
+      "item_noun": "Sekme",
+      "item_schedule": true,
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Sekme adı"
+        },
+        {
+          "name": "title",
+          "type": "rich_text",
+          "label": "Başlık",
+          "marks": [
+            "strong",
+            "br"
+          ],
+          "max_length": 200,
+          "help": "İkinci satır için ↵ (şablonda daha küçük yazılır)."
+        },
+        {
+          "name": "offer_label",
+          "type": "text",
+          "label": "Teklif yazısı",
+          "width": "third"
+        },
+        {
+          "name": "amount",
+          "type": "text",
+          "label": "Tutar",
+          "width": "third"
+        },
+        {
+          "name": "amount_suffix",
+          "type": "text",
+          "label": "Tutar son eki",
+          "width": "third"
+        },
+        {
+          "name": "button",
+          "type": "group",
+          "label": "Düğme",
+          "fields": [
+            {
+              "name": "text",
+              "type": "text",
+              "label": "Düğme yazısı",
+              "width": "half"
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            724,
+            360
+          ]
+        }
+      ],
+      "item_default": {
+        "label": "Yeni sekme",
+        "title": "YENİ<br>KAMPANYA",
+        "offer_label": "SON FIRSAT",
+        "amount": "₺1.000",
+        "amount_suffix": "İNDİRİM!",
+        "button": {
+          "text": "Alışverişe Başla",
+          "link": {
+            "kind": "url",
+            "url": "/sale",
+            "new_tab": false
+          }
+        },
+        "image": null
+      }
+    },
+    {
+      "name": "default_tab",
+      "type": "number",
+      "label": "Açılışta seçili sekme",
+      "tab": "İçerik",
+      "min": 0,
+      "max": 5,
+      "help": "0 = ilk sekme."
+    },
+    {
+      "name": "autoplay",
+      "type": "number",
+      "label": "Sekmeleri otomatik değiştir",
+      "tab": "Görünüm",
+      "unit": "ms",
+      "min": 0,
+      "max": 20000,
+      "step": 500,
+      "help": "0 = kapalı (şablon). Örn. 6000 → 6 sn'de bir sonraki sekme."
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "background_color",
+      "type": "color",
+      "label": "Arka plan rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "title_size",
+      "type": "number",
+      "label": "Başlık boyutu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 20,
+      "max": 80,
+      "width": "half"
+    },
+    {
+      "name": "animation",
+      "type": "select",
+      "label": "Sekme geçiş animasyonu",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "fadeInUp",
+          "label": "Aşağıdan belir (şablon)"
+        },
+        {
+          "value": "fadeIn",
+          "label": "Belir"
+        },
+        {
+          "value": "zoomIn",
+          "label": "Yakınlaş"
+        },
+        {
+          "value": "none",
+          "label": "Yok"
+        }
+      ]
+    },
+    {
+      "name": "products",
+      "type": "group",
+      "label": "Ürün karuseli",
+      "tab": "Ürünler",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "label": "Göster"
+        },
+        {
+          "name": "source",
+          "type": "product_source",
+          "label": "Ürün kaynağı",
+          "allowed_kinds": [
+            "manual",
+            "category",
+            "discounted",
+            "newest",
+            "best_sellers",
+            "featured",
+            "top_rated",
+            "tag",
+            "brand",
+            "recently_viewed"
+          ],
+          "default_limit": 9,
+          "max_limit": 24
+        },
+        {
+          "name": "carousel",
+          "type": "carousel",
+          "label": "Karusel",
+          "hide": [
+            "rows",
+            "transition"
+          ]
+        }
+      ]
+    }
+  ],
   "common": [
     "section",
     "visibility",

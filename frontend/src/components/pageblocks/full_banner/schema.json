@@ -2,13 +2,14 @@
   "key": "full_banner",
   "version": 2,
   "title": "Tam Genişlik Banner",
-  "description": "Tek görsel bağlantılı geniş banner (şablon: home-banner)",
+  "description": "Kutulu genişlikte tek banner — görsel bağlantı ya da başlık + fiyat kutusu (şablon: home-banner)",
   "category": "banner",
   "group": "A",
   "status": "ready",
   "template_refs": [
     "T1/inc/blocks/homepage/home-banner.php",
-    "T1/inc/blocks/homepage/home-banner-v2.php"
+    "T1/inc/blocks/homepage/home-banner-v2.php",
+    "T2/html/home/index.html#L8038"
   ],
   "layout": "container",
   "singleton": false,
@@ -19,13 +20,21 @@
   "variants": [
     {
       "value": "image",
-      "label": "Yalnız görsel (v1)",
+      "label": "Görsel bağlantı (şablon v1, 1170×207)",
       "defaults_patch": {}
     },
     {
       "value": "text_overlay",
       "label": "Metin + fiyat kutulu (v2.0)",
-      "defaults_patch": {}
+      "defaults_patch": {
+        "_section": {
+          "margin_bottom": {
+            "desktop": 35,
+            "tablet": 35,
+            "mobile": 30
+          }
+        }
+      }
     }
   ],
   "tabs": [
@@ -49,13 +58,23 @@
       "mobile_recommended": [
         750,
         300
-      ]
+      ],
+      "help": "Şablon v1: 1170×207 tam genişlik görsel bağlantı. Metinli görünümde arka plan olarak (1400×206) kullanılır."
     },
     {
       "name": "link",
       "type": "link",
       "label": "Bağlantı",
-      "tab": "İçerik"
+      "tab": "İçerik",
+      "kinds": [
+        "category",
+        "product",
+        "page",
+        "brand",
+        "search",
+        "url",
+        "none"
+      ]
     },
     {
       "name": "title",
@@ -66,6 +85,7 @@
         "strong",
         "br"
       ],
+      "max_length": 200,
       "show_if": {
         "_variant": [
           "text_overlay"
@@ -75,7 +95,7 @@
     {
       "name": "price_label",
       "type": "text",
-      "label": "Fiyat etiketi",
+      "label": "Fiyat üst yazısı",
       "tab": "İçerik",
       "width": "half",
       "show_if": {
@@ -102,6 +122,65 @@
       "label": "Fiyat kutusu rengi",
       "tab": "Görünüm",
       "palette": "theme",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "text_overlay"
+        ]
+      }
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "text_overlay"
+        ]
+      }
+    },
+    {
+      "name": "background_color",
+      "type": "color",
+      "label": "Arka plan rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half",
+      "allow_transparent": true,
+      "show_if": {
+        "_variant": [
+          "text_overlay"
+        ]
+      },
+      "help": "Görsel yoksa ya da görsel şeffafsa görünür."
+    },
+    {
+      "name": "min_height",
+      "type": "number",
+      "label": "En az yükseklik",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 600,
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "text_overlay"
+        ]
+      }
+    },
+    {
+      "name": "title_size",
+      "type": "number",
+      "label": "Başlık boyutu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 14,
+      "max": 60,
+      "width": "half",
       "show_if": {
         "_variant": [
           "text_overlay"

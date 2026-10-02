@@ -1,0 +1,29 @@
+/* features_list — şablon v1 _features-list.scss (+ _sidebar.scss .widget_electro_features_block_widget, responsive
+   _screen-down-md: 992 altı kutular alt alta, alt çizgili). Ayarlar: --pd-feat-icon/-color/-bg/-isz/-py/-w. */
+.electro .pd-feat { color: var(--pd-feat-color, #333e48); letter-spacing: -.01em; }
+.electro .pd-feat__list { display: flex; flex-wrap: wrap; background-color: var(--pd-feat-bg, transparent); }
+.electro .pd-feat--border .pd-feat__list { border: 1px solid #ddd; border-radius: 8px; }
+.electro .pd-feat__item { flex: 0 0 var(--pd-feat-w, 20%); max-width: var(--pd-feat-w, 20%); padding: var(--pd-feat-py, 2.143em) 15px;
+  color: inherit; display: block; }
+.electro a.pd-feat__item:hover { color: inherit; text-decoration: none; }
+.electro .pd-feat--border .pd-feat__item + .pd-feat__item { border-left: 1px solid #ddd; }
+.electro .pd-feat__media { display: table; width: 150px; margin: 0 auto; }
+.electro .pd-feat__left, .electro .pd-feat__body { display: table-cell; vertical-align: middle; }
+.electro .pd-feat__left { padding-right: 10px; }
+.electro .pd-feat__body { text-align: center; font-size: 1.071em; line-height: 24px; }
+.electro .pd-feat__body strong { display: block; font-weight: 700; }
+.electro .pd-feat__i { font-size: var(--pd-feat-isz, 2.571em); color: var(--pd-feat-icon, #fed700); line-height: 1; display: inline-block; vertical-align: middle; }
+.electro .pd-feat__i--lg { font-size: calc(var(--pd-feat-isz, 2.571em) * 1.317); }
+.electro .pd-feat__img { width: 2.6em; height: auto; display: block; }
+.electro .pd-feat--v2 .pd-feat__i { color: var(--pd-feat-icon); font-size: 46px; }
+.electro .pd-feat--v2 .pd-feat__i--lg { font-size: 56px; }
+/* dikey (kenar çubuğu widget'ı) */
+.electro .pd-feat--vertical .pd-feat__list { display: block; padding: 30px; background-color: var(--pd-feat-bg, #fff); }
+.electro .pd-feat--vertical .pd-feat__item { max-width: none; padding: 1.786em 0; border-bottom: 1px solid #ddd; }
+.electro .pd-feat--vertical .pd-feat__item:last-child { border-bottom: 0; }
+.electro .pd-feat--vertical.pd-feat--border .pd-feat__item + .pd-feat__item { border-left: 0; }
+@media (max-width: 991.98px) {
+  .electro .pd-feat--v1:not(.pd-feat--vertical) .pd-feat__item { flex-basis: 100%; max-width: 100%; border-bottom: 1px solid #ddd; }
+  .electro .pd-feat--v1:not(.pd-feat--vertical) .pd-feat__item + .pd-feat__item { border-left: 0; }
+  .electro .pd-feat--v1:not(.pd-feat--vertical) .pd-feat__item:last-child { border-bottom: 0; }
+}

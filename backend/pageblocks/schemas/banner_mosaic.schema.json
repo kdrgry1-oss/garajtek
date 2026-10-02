@@ -2,12 +2,12 @@
   "key": "banner_mosaic",
   "version": 2,
   "title": "Banner Mozaiği (1 büyük + 6 küçük)",
-  "description": "",
+  "description": "Solda büyük 552×325, sağda 3×2 küçük 268×155 yuvarlak köşeli bannerlar (şablon v2.0 home-v9)",
   "category": "banner",
   "group": "A",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v9.html"
+    "T2/html/home/home-v9.html#L2146"
   ],
   "layout": "container",
   "singleton": false,
@@ -23,7 +23,120 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "big",
+      "type": "group",
+      "label": "Büyük banner",
+      "tab": "İçerik",
+      "fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            552,
+            325
+          ],
+          "allow_mobile": true
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        },
+        {
+          "name": "alt",
+          "type": "text",
+          "label": "Alternatif metin"
+        }
+      ]
+    },
+    {
+      "name": "small",
+      "type": "repeater",
+      "label": "Küçük bannerlar",
+      "tab": "İçerik",
+      "max": 6,
+      "item_label": "{{alt}}",
+      "item_noun": "Küçük banner",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            268,
+            155
+          ]
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        },
+        {
+          "name": "alt",
+          "type": "text",
+          "label": "Alternatif metin"
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "link": {
+          "kind": "url",
+          "url": "/tum-urunler",
+          "new_tab": false
+        },
+        "alt": "Kategori"
+      }
+    },
+    {
+      "name": "radius",
+      "type": "number",
+      "label": "Köşe yuvarlaklığı",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 40,
+      "width": "half"
+    },
+    {
+      "name": "small_columns",
+      "type": "select",
+      "label": "Küçük banner sütunu",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "3",
+          "label": "3 sütun (şablon)"
+        },
+        {
+          "value": "2",
+          "label": "2 sütun"
+        }
+      ]
+    }
+  ],
   "common": [
     "section",
     "visibility",

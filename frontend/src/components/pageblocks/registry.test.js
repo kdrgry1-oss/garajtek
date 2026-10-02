@@ -65,8 +65,11 @@ test("show_if: alan, _variant ve $parent", () => {
 test("galeri: hazırlanan (stub) bloklar varsayılan olarak gizli", () => {
   const ready = listBlocks().map((b) => b.key);
   expect(ready).toContain("hero_slider");
-  expect(ready).not.toContain("banner_mosaic");
-  expect(listBlocks({ includeStubs: true }).map((b) => b.key)).toContain("banner_mosaic");
+  // gruplar blokları bitirdikçe stub kalmayabilir → kalan her stub galeride gizli, includeStubs ile görünür
+  const stubs = Object.keys(BLOCKS).filter((k) => BLOCKS[k].schema.status === "stub");
+  stubs.forEach((k) => expect(ready).not.toContain(k));
+  const all = listBlocks({ includeStubs: true }).map((b) => b.key);
+  stubs.forEach((k) => expect(all).toContain(k));
 });
 
 test("global alanlar varsayılanla dolar", () => {

@@ -2,13 +2,13 @@
   "key": "deal_slider",
   "version": 2,
   "title": "Haftanın Fırsatı Slider",
-  "description": "",
+  "description": "Her slaytta bir fırsat ürünü: büyük başlık, ürün görseli, fiyat, geri sayım ve stok çubuğu; alt sekmelerle geçiş (şablon v2.0 home-v5 / v8)",
   "category": "firsat",
   "group": "A",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v5.html",
-    "T2/html/home/home-v8.html"
+    "T2/html/home/home-v5.html#L791",
+    "T2/html/home/home-v8.html#L1151"
   ],
   "layout": "full_bleed",
   "singleton": false,
@@ -16,7 +16,26 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "thumbs",
+      "label": "Arka plan görselli + alt sekmeler (v2.0 v5)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "primary_band",
+      "label": "Ana renk bant + 'Hemen Al' düğmesi (v2.0 v8)",
+      "defaults_patch": {
+        "_section": {
+          "margin_bottom": {
+            "desktop": 42,
+            "tablet": 42,
+            "mobile": 30
+          }
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -24,7 +43,263 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "slides",
+      "type": "repeater",
+      "label": "Fırsatlar",
+      "tab": "İçerik",
+      "min": 1,
+      "max": 6,
+      "item_label": "{{thumb_label}}",
+      "item_noun": "Fırsat",
+      "item_schedule": true,
+      "item_fields": [
+        {
+          "name": "kicker",
+          "type": "text",
+          "label": "Üst yazı",
+          "width": "third"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık",
+          "width": "third"
+        },
+        {
+          "name": "subtitle",
+          "type": "text",
+          "label": "Alt yazı",
+          "width": "third"
+        },
+        {
+          "name": "product",
+          "type": "product_picker",
+          "label": "Ürün",
+          "multiple": false,
+          "help": "Boş bırakılırsa 'Yedek ürün kaynağı'ndan sıradaki ürün kullanılır."
+        },
+        {
+          "name": "title_override",
+          "type": "text",
+          "label": "Ürün adı (özel)",
+          "help": "Boşsa ürünün kendi adı."
+        },
+        {
+          "name": "image_override",
+          "type": "image",
+          "label": "Ürün görseli (özel)",
+          "recommended": [
+            400,
+            400
+          ],
+          "help": "Boşsa ürünün ilk görseli."
+        },
+        {
+          "name": "countdown",
+          "type": "countdown",
+          "label": "Geri sayım"
+        },
+        {
+          "name": "stock",
+          "type": "group",
+          "label": "Stok çubuğu",
+          "show_if": {
+            "_variant": [
+              "thumbs"
+            ]
+          },
+          "fields": [
+            {
+              "name": "show",
+              "type": "bool",
+              "label": "Göster",
+              "width": "third"
+            },
+            {
+              "name": "available_label",
+              "type": "text",
+              "label": "Kalan yazısı",
+              "width": "third"
+            },
+            {
+              "name": "sold_label",
+              "type": "text",
+              "label": "Satılan yazısı",
+              "width": "third"
+            }
+          ]
+        },
+        {
+          "name": "thumb_label",
+          "type": "text",
+          "label": "Alt sekme yazısı",
+          "show_if": {
+            "_variant": [
+              "thumbs"
+            ]
+          }
+        },
+        {
+          "name": "button",
+          "type": "group",
+          "label": "Düğme",
+          "show_if": {
+            "_variant": [
+              "primary_band"
+            ]
+          },
+          "fields": [
+            {
+              "name": "text",
+              "type": "text",
+              "label": "Düğme yazısı",
+              "width": "half"
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı (boşsa ürün sayfası)",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            }
+          ]
+        }
+      ],
+      "item_default": {
+        "kicker": "SINIRLI",
+        "title": "HAFTANIN FIRSATI",
+        "subtitle": "KAMPANYA BİTMEDEN YETİŞİN",
+        "product": "",
+        "title_override": "",
+        "image_override": null,
+        "countdown": {
+          "enabled": true,
+          "end": "",
+          "rolling_days": 0,
+          "units": [
+            "hours",
+            "minutes",
+            "seconds"
+          ],
+          "hide_zero_days": true,
+          "labels": {
+            "days": "GÜN",
+            "hours": "SAAT",
+            "minutes": "DK",
+            "seconds": "SN"
+          },
+          "heading": "",
+          "on_expire": "zero",
+          "expired_text": "Kampanya sona erdi",
+          "pad": true
+        },
+        "stock": {
+          "show": true,
+          "available_label": "Kalan:",
+          "sold_label": "Satılan:"
+        },
+        "thumb_label": "YENİ FIRSAT",
+        "button": {
+          "text": "Hemen Al",
+          "link": {
+            "kind": "none",
+            "url": "",
+            "new_tab": false
+          }
+        }
+      }
+    },
+    {
+      "name": "fallback_source",
+      "type": "product_source",
+      "label": "Yedek ürün kaynağı",
+      "tab": "Ürünler",
+      "allowed_kinds": [
+        "manual",
+        "category",
+        "discounted",
+        "newest",
+        "best_sellers",
+        "featured",
+        "top_rated",
+        "tag",
+        "brand",
+        "recently_viewed"
+      ],
+      "default_limit": 6,
+      "max_limit": 12,
+      "help": "Ürün seçilmeyen slaytlar bu kaynaktan sırayla doldurulur."
+    },
+    {
+      "name": "background",
+      "type": "image",
+      "label": "Arka plan görseli",
+      "tab": "Görünüm",
+      "recommended": [
+        1400,
+        420
+      ],
+      "show_if": {
+        "_variant": [
+          "thumbs"
+        ]
+      }
+    },
+    {
+      "name": "background_color",
+      "type": "color",
+      "label": "Arka plan rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half",
+      "allow_transparent": true
+    },
+    {
+      "name": "band_color",
+      "type": "color",
+      "label": "Bant rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "primary_band"
+        ]
+      },
+      "help": "Boş = tema ana rengi."
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "hide": [
+        "per_view",
+        "rows",
+        "last_active_divider",
+        "gutter",
+        "slides_to_scroll",
+        "arrows"
+      ]
+    }
+  ],
   "common": [
     "section",
     "visibility",

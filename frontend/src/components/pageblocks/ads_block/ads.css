@@ -1,0 +1,44 @@
+/* ads_block — şablon v1 _ads.scss birebir (.ads-block .ad .media / .media-left / .media-body / .ad-text / .ad-action,
+   .upto/.from prefix-value-suffix, ::after ok yuvarlağı). Ayarlar CSS değişkenleriyle: --pd-ads-fs (metin em),
+   --pd-ads-ls (harf aralığı), --pd-ads-bg (kutu), --pd-ads-color, --pd-ads-pt/pb (metin alanı boşluğu), --pd-ads-arrow. */
+.electro .pd-ads { color: var(--pd-ads-color, #333e48); letter-spacing: -.01em; }
+.electro .pd-ads__ad, .electro .pd-ads__ad:hover, .electro .pd-ads__ad:focus { color: inherit; text-decoration: none; }
+.electro .pd-ads__media { display: table; width: 100%; table-layout: fixed; background-color: var(--pd-ads-bg, #f5f5f5); }
+.electro .pd-ads__left, .electro .pd-ads__body { display: table-cell; vertical-align: middle; }
+.electro .pd-ads__left { padding-right: 10px; }
+.electro .pd-ads__left img, .electro .pd-ads__left .pd-ads__img { display: block; width: 100%; height: auto; }
+.electro .pd-ads__left .el-ph { width: 100%; }
+.electro .pd-ads__body { padding: var(--pd-ads-pt, 3.286em) 0 var(--pd-ads-pb, 2.143em) 0; }
+.electro .pd-ads--v1 .pd-ads__body--num { padding-top: calc(var(--pd-ads-pt, 3.286em) * .947); }
+.electro .pd-ads--v3 .pd-ads__col:last-child .pd-ads__body { padding-left: 12px; }
+.electro .pd-ads__text { font-size: var(--pd-ads-fs, 1.286em); line-height: 1.278em; font-weight: 200; text-transform: uppercase;
+  margin-bottom: .357em; letter-spacing: var(--pd-ads-ls, -.01em); }
+.electro .pd-ads__text strong { font-weight: 700; }
+.electro .pd-ads__text--card { font-size: var(--pd-ads-fs, 1.286em); line-height: 1.278em; }
+.electro .pd-ads--cards .pd-ads__card { background-color: var(--pd-ads-bg, #f5f5f5); }
+.electro .pd-ads--cards .pd-ads__text { margin-bottom: .5rem; }
+/* .ad-action > a */
+.electro .pd-ads__action { font-size: 1.071em; font-weight: 700; line-height: 2em; color: inherit; }
+.electro .pd-ads--cards .pd-ads__action { font-size: 15px; }
+.electro .pd-ads__arrow { display: inline-block; width: 17px; height: 17px; border-radius: 50%; margin-left: 8px; text-align: center;
+  background-color: var(--pd-ads-arrow, var(--electro-primary, #fed700)); color: #fff; font-size: inherit; line-height: 17px; vertical-align: baseline; }
+.electro .pd-ads__arrow i { font-size: 14px; line-height: 17px; font-weight: 900; }
+.electro .pd-ads__upto, .electro .pd-ads__from { text-transform: uppercase; font-weight: 300; }
+.electro .pd-ads__prefix { font-size: .919em; line-height: .909em; display: inline-block; width: min-content; margin-right: 4px; }
+.electro .pd-ads__value { font-weight: 700; font-size: 2.173em; letter-spacing: -.025em; line-height: .592em; }
+.electro .pd-ads__value sup { top: -.25em; font-size: .5em; }
+.electro .pd-ads__suffix { top: -.5em; position: relative; font-weight: 700; vertical-align: top; margin-left: 2px; }
+.electro .pd-ads__from { position: relative; }
+.electro .pd-ads__from .pd-ads__prefix { width: auto; position: absolute; top: -1.714em; white-space: nowrap; }
+@media (max-width: 767.98px) {
+  .electro .pd-ads__col { margin-bottom: var(--pd-ads-gap-m, 20px); }
+  .electro .pd-ads__col:last-child { margin-bottom: 0; }
+}
+@media (min-width: 768px) and (max-width: 1199.98px) {
+  .electro .pd-ads--cards .pd-ads__col { margin-bottom: 1.5rem; }
+}
+/* şablon _screen-sm-md: 768–991 px arası görsel tam genişlik, metin ortalı */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .electro .pd-ads:not(.pd-ads--cards) .pd-ads__left { display: block; width: 100% !important; padding: 0; }
+  .electro .pd-ads:not(.pd-ads--cards) .pd-ads__body { display: block; width: 100% !important; text-align: center; padding: 1.25em 0; }
+}

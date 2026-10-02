@@ -2,11 +2,13 @@
   "key": "half_banners",
   "version": 2,
   "title": "İki Banner (eski)",
-  "description": "Yan yana iki görsel banner (eski blok)",
+  "description": "Yan yana iki (en fazla dört) görsel banner — eski blok, şemaya taşındı",
   "category": "banner",
   "group": "A",
   "status": "ready",
-  "template_refs": [],
+  "template_refs": [
+    "T1/inc/blocks/homepage/home-banner.php"
+  ],
   "layout": "container",
   "singleton": false,
   "allowed_pages": [
@@ -29,6 +31,7 @@
       "tab": "İçerik",
       "max": 4,
       "item_label": "{{alt}}",
+      "item_noun": "Banner",
       "item_fields": [
         {
           "name": "image",
@@ -37,12 +40,22 @@
           "recommended": [
             570,
             300
-          ]
+          ],
+          "allow_mobile": true
         },
         {
           "name": "link",
           "type": "link",
-          "label": "Bağlantı"
+          "label": "Bağlantı",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
         },
         {
           "name": "alt",
@@ -54,12 +67,31 @@
         "image": null,
         "link": {
           "kind": "url",
-          "url": "",
+          "url": "/sale",
           "new_tab": false
         },
         "alt": ""
-      },
-      "item_noun": "Öğe"
+      }
+    },
+    {
+      "name": "gap",
+      "type": "number",
+      "label": "Bannerlar arası boşluk",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 80,
+      "width": "half"
+    },
+    {
+      "name": "radius",
+      "type": "number",
+      "label": "Köşe yuvarlaklığı",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 40,
+      "width": "half"
     }
   ],
   "common": [

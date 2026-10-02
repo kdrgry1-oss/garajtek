@@ -2,13 +2,16 @@
   "key": "ads_block",
   "version": 2,
   "title": "Reklam Kutuları",
-  "description": "3'lü / 2'li / 4'lü görselli reklam kutuları (şablon: home-v1-ads-block)",
+  "description": "Görsel + büyük harfli metin + 'Hemen İncele ›' / '%20'ye varan' kutuları (şablon: home-v1-ads-block)",
   "category": "banner",
   "group": "A",
   "status": "ready",
   "template_refs": [
     "T1/inc/blocks/homepage/home-v1-ads-block.php",
-    "T1/inc/blocks/homepage/home-v2-ads-block.php"
+    "T1/inc/blocks/homepage/home-v2-ads-block.php",
+    "T1H/assets/sass/blocks/_ads.scss",
+    "T2/html/home/index.html",
+    "T2/html/home/home-v8.html"
   ],
   "layout": "container",
   "singleton": false,
@@ -19,36 +22,262 @@
   "variants": [
     {
       "value": "v1",
-      "label": "v1 – 3 sütun",
+      "label": "v1 – 3 kutu, %60/%40, 18 px metin (varsayılan)",
       "defaults_patch": {}
     },
     {
       "value": "v2",
-      "label": "v2 – 2 sütun",
+      "label": "v2 – 2 kutu, %60/%40, 22 px metin",
       "defaults_patch": {
         "columns": "2",
-        "text_size": 1.571
+        "text_size": 1.571,
+        "letter_spacing": -1,
+        "items": [
+          {
+            "image": null,
+            "text": "Atölyeniz için<br><strong>BÜYÜK</strong> fırsatlar",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "url",
+              "url": "/sale",
+              "new_tab": false
+            },
+            "image_rotation": 0
+          },
+          {
+            "image": null,
+            "text": "Lift ve<br><strong>Kompresörlerde</strong>",
+            "action_type": "upto",
+            "action_text": "Hemen İncele",
+            "action_prefix": "%'ye varan",
+            "action_value": "20",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "category",
+              "url": "/liftler",
+              "new_tab": false,
+              "slug": "liftler"
+            },
+            "image_rotation": 0
+          }
+        ]
       }
     },
     {
       "value": "v3",
-      "label": "v3 – 2 sütun (62/38)",
+      "label": "v3 – 2 kutu, %62/%38",
       "defaults_patch": {
         "columns": "2",
-        "ratio": "62_38"
+        "ratio": "62_38",
+        "text_size": 1.571,
+        "letter_spacing": -1,
+        "body_padding": {
+          "top": 2.857,
+          "bottom": 2.143
+        },
+        "items": [
+          {
+            "image": null,
+            "text": "Atölyeniz için<br><strong>BÜYÜK</strong> fırsatlar",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "url",
+              "url": "/sale",
+              "new_tab": false
+            },
+            "image_rotation": 0
+          },
+          {
+            "image": null,
+            "text": "Lift ve<br><strong>Kompresörlerde</strong>",
+            "action_type": "upto",
+            "action_text": "Hemen İncele",
+            "action_prefix": "%'ye varan",
+            "action_value": "20",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "category",
+              "url": "/liftler",
+              "new_tab": false,
+              "slug": "liftler"
+            },
+            "image_rotation": 0
+          }
+        ]
       }
     },
     {
       "value": "v2_cards",
-      "label": "4 sütun gri kartlar (v2.0)",
+      "label": "v2.0 – 4 gri kart (190×150 görsel)",
       "defaults_patch": {
-        "columns": "4"
+        "columns": "4",
+        "ratio": "50_50",
+        "text_size": 1.286,
+        "letter_spacing": -1,
+        "body_padding": {
+          "top": 0,
+          "bottom": 0
+        },
+        "_section": {
+          "margin_bottom": {
+            "desktop": 35,
+            "tablet": 35,
+            "mobile": 30
+          }
+        },
+        "items": [
+          {
+            "image": null,
+            "text": "Atölyeniz için <strong>BÜYÜK</strong> fırsatlar",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "url",
+              "url": "/sale",
+              "new_tab": false
+            },
+            "image_rotation": 0
+          },
+          {
+            "image": null,
+            "text": "Lift ve <strong>Kompresörlerde</strong> indirim",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "category",
+              "url": "/liftler",
+              "new_tab": false,
+              "slug": "liftler"
+            },
+            "image_rotation": 0
+          },
+          {
+            "image": null,
+            "text": "En <strong>Çok Satan</strong> ürünler",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "url",
+              "url": "/tum-urunler?sort=popular&order=desc",
+              "new_tab": false
+            },
+            "image_rotation": 0
+          },
+          {
+            "image": null,
+            "text": "<strong>Lastik</strong> ekipmanlarında yeni sezon",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "category",
+              "url": "/lastik-ekipmanlari",
+              "new_tab": false,
+              "slug": "lastik-ekipmanlari"
+            },
+            "image_rotation": 0
+          }
+        ]
       }
     },
     {
       "value": "wide_plus_two",
-      "label": "1 geniş + 2 (v2.0)",
-      "defaults_patch": {}
+      "label": "v2.0 v8 – 1 geniş + 2 kart",
+      "defaults_patch": {
+        "columns": "3",
+        "ratio": "50_50",
+        "text_size": 1.214,
+        "letter_spacing": -1,
+        "body_padding": {
+          "top": 0,
+          "bottom": 0
+        },
+        "_section": {
+          "margin_bottom": {
+            "desktop": 42,
+            "tablet": 42,
+            "mobile": 30
+          }
+        },
+        "items": [
+          {
+            "image": null,
+            "text": "<strong>#EVDEKAL</strong> ve atölyeniz için <strong>BÜYÜK</strong> fırsatları yakalayın",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "url",
+              "url": "/sale",
+              "new_tab": false
+            },
+            "image_rotation": 25
+          },
+          {
+            "image": null,
+            "text": "En <strong>Çok Satan</strong> ürünler",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "url",
+              "url": "/tum-urunler?sort=popular&order=desc",
+              "new_tab": false
+            },
+            "image_rotation": 0
+          },
+          {
+            "image": null,
+            "text": "<strong>Lastik</strong> ekipmanlarında yeni sezon",
+            "action_type": "link",
+            "action_text": "Hemen İncele",
+            "action_prefix": "",
+            "action_value": "",
+            "action_suffix": "",
+            "currency": "₺",
+            "link": {
+              "kind": "category",
+              "url": "/lastik-ekipmanlari",
+              "new_tab": false,
+              "slug": "lastik-ekipmanlari"
+            },
+            "image_rotation": 0
+          }
+        ]
+      }
     }
   ],
   "tabs": [
@@ -64,8 +293,10 @@
       "type": "repeater",
       "label": "Kutular",
       "tab": "İçerik",
+      "min": 1,
       "max": 4,
       "item_label": "{{text}}",
+      "item_noun": "Kutu",
       "item_fields": [
         {
           "name": "image",
@@ -74,7 +305,8 @@
           "recommended": [
             410,
             281
-          ]
+          ],
+          "help": "Şablon: 1. ve 2. kutu 410×281, 3. kutu 714×486 (v2.0 kartlar 190×150). Görsel sol %60'lık alanı doldurur."
         },
         {
           "name": "text",
@@ -82,27 +314,32 @@
           "label": "Metin",
           "marks": [
             "strong",
-            "em",
             "br"
           ],
-          "max_length": 200
+          "max_length": 200,
+          "help": "Büyük harfe çevrilir. Vurgulamak istediğiniz kelimeyi kalın (K) yapın, satır için ↵."
         },
         {
           "name": "action_type",
           "type": "select",
           "label": "Alt satır",
+          "width": "half",
           "options": [
             {
               "value": "link",
-              "label": "Bağlantı yazısı"
+              "label": "Bağlantı yazısı (Hemen İncele ›)"
             },
             {
               "value": "upto",
-              "label": "% indirime varan"
+              "label": "'%'ye varan' + büyük sayı"
             },
             {
               "value": "from_price",
-              "label": "Başlayan fiyat"
+              "label": "'başlayan' + fiyat"
+            },
+            {
+              "value": "none",
+              "label": "Gösterme"
             }
           ]
         },
@@ -110,6 +347,7 @@
           "name": "action_text",
           "type": "text",
           "label": "Bağlantı yazısı",
+          "width": "half",
           "show_if": {
             "action_type": [
               "link"
@@ -120,19 +358,20 @@
           "name": "action_prefix",
           "type": "text",
           "label": "Ön yazı",
-          "width": "half",
+          "width": "third",
           "show_if": {
             "action_type": [
               "upto",
               "from_price"
             ]
-          }
+          },
+          "help": "Sayının solunda iki satır küçük yazı (şablon: UP TO / FROM)."
         },
         {
           "name": "action_value",
           "type": "text",
-          "label": "Değer",
-          "width": "half",
+          "label": "Sayı / fiyat",
+          "width": "third",
           "show_if": {
             "action_type": [
               "upto",
@@ -144,13 +383,14 @@
           "name": "action_suffix",
           "type": "text",
           "label": "Son ek",
-          "width": "half",
+          "width": "third",
           "show_if": {
             "action_type": [
               "upto",
               "from_price"
             ]
-          }
+          },
+          "help": "Sayının sağ üstünde küçük yazı (ör. kuruş ,99 veya %)."
         },
         {
           "name": "currency",
@@ -166,16 +406,26 @@
         {
           "name": "link",
           "type": "link",
-          "label": "Bağlantı"
+          "label": "Bağlantı",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
         },
         {
           "name": "image_rotation",
           "type": "number",
-          "label": "Görsel açısı",
+          "label": "Görsel döndürme",
           "unit": "derece",
           "min": -45,
           "max": 45,
-          "tab": "Görünüm"
+          "width": "half",
+          "help": "v2.0 v8 geniş kutudaki eğik ürün görseli için (ör. 25)."
         }
       ],
       "item_default": {
@@ -193,8 +443,7 @@
           "new_tab": false
         },
         "image_rotation": 0
-      },
-      "item_noun": "Kutu"
+      }
     },
     {
       "name": "columns",
@@ -226,11 +475,11 @@
       "options": [
         {
           "value": "60_40",
-          "label": "%60 / %40"
+          "label": "%60 / %40 (şablon v1–v2)"
         },
         {
           "value": "62_38",
-          "label": "%62 / %38"
+          "label": "%62 / %38 (şablon v3)"
         },
         {
           "value": "50_50",
@@ -247,14 +496,83 @@
       "min": 0.8,
       "max": 3,
       "step": 0.001,
+      "width": "third",
+      "help": "Şablon v1: 1.286 em (18 px), v2/v3: 1.571 em."
+    },
+    {
+      "name": "letter_spacing",
+      "type": "number",
+      "label": "Harf aralığı",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": -3,
+      "max": 3,
+      "step": 0.1,
       "width": "third"
     },
     {
       "name": "card_background",
       "type": "color",
-      "label": "Kart arka planı",
+      "label": "Kutu arka planı",
       "tab": "Görünüm",
-      "palette": "theme"
+      "palette": "theme",
+      "width": "third",
+      "allow_transparent": true
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "third"
+    },
+    {
+      "name": "arrow_color",
+      "type": "color",
+      "label": "Ok yuvarlağı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "third",
+      "help": "Boş = tema ana rengi."
+    },
+    {
+      "name": "body_padding",
+      "type": "group",
+      "label": "Metin alanı boşluğu",
+      "tab": "Görünüm",
+      "collapsible": true,
+      "fields": [
+        {
+          "name": "top",
+          "type": "number",
+          "label": "Üst",
+          "unit": "em",
+          "min": 0,
+          "max": 6,
+          "step": 0.001,
+          "width": "half"
+        },
+        {
+          "name": "bottom",
+          "type": "number",
+          "label": "Alt",
+          "unit": "em",
+          "min": 0,
+          "max": 6,
+          "step": 0.001,
+          "width": "half"
+        }
+      ]
+    },
+    {
+      "name": "gap_mobile",
+      "type": "number",
+      "label": "Mobilde kutular arası",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 80
     }
   ],
   "common": [

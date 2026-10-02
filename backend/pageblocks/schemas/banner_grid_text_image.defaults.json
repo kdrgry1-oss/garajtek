@@ -1,1 +1,71 @@
-{}
+{
+  "rows": [
+    {
+      "wide_side": "left",
+      "wide": {
+        "background": "#ecedf2",
+        "text_color": "#333e48",
+        "title": "Profesyonel Lastik Sökme Makineleri",
+        "text": "ve en hızlı balans çözümleri",
+        "specs": "",
+        "price_prefix": "başlayan",
+        "price": "₺24.900",
+        "image": null,
+        "link": {
+          "kind": "category",
+          "url": "/lastik-ekipmanlari",
+          "new_tab": false,
+          "slug": "lastik-ekipmanlari"
+        }
+      },
+      "small": {
+        "image": null,
+        "link": {
+          "kind": "category",
+          "url": "/kompresorler",
+          "new_tab": false,
+          "slug": "kompresorler"
+        },
+        "alt": ""
+      }
+    },
+    {
+      "wide_side": "right",
+      "wide": {
+        "background": "#f5f5f5",
+        "text_color": "#333e48",
+        "title": "<strong>Hidrolik Kriko</strong><br> 3 ton profesyonel seri",
+        "text": "",
+        "specs": "3 TON | ÇİFT PİSTON | 2 YIL GARANTİ",
+        "price_prefix": "başlayan",
+        "price": "₺4.990",
+        "image": null,
+        "link": {
+          "kind": "category",
+          "url": "/kaldirma-ekipmanlari",
+          "new_tab": false,
+          "slug": "kaldirma-ekipmanlari"
+        }
+      },
+      "small": {
+        "image": null,
+        "link": {
+          "kind": "category",
+          "url": "/el-aletleri",
+          "new_tab": false,
+          "slug": "el-aletleri"
+        },
+        "alt": ""
+      }
+    }
+  ],
+  "title_size": 28,
+  "price_size": 46,
+  "_section": {
+    "margin_bottom": {
+      "desktop": 42,
+      "tablet": 42,
+      "mobile": 30
+    }
+  }
+}

@@ -1,14 +1,109 @@
-/* hero_slider — yükseklik (responsive) ve açıklama üst boşluğu. --el-hero-h: açık dikey menü hero'dan uzunsa. */
-.electro .pd-hero .el-hero-v1__slide, .electro .pd-hero .el-hero-v1__row { min-height: var(--el-hero-h, var(--pd-hero-h-d, 485px)); }
-.electro .pd-hero .pd-hero__caption { padding-top: var(--pd-hero-pt-d, 0); }
+/* hero_slider — şablon v1 _sliders.scss birebir (.home-v1-slider, #owl-main .item, .hero-1, .hero-2, .hero-subtitle,
+   .hero-subtitle-v2, .hero-v2-price, .hero-action-btn) + electro.js katman animasyonları. Değerler ayarlardan CSS
+   değişkeniyle gelir: --pd-hero-h-* (yükseklik), --pd-hero-pt-* (açıklama üst boşluğu), --pd-hero-fs-m (mobil ölçek). */
+.electro .pd-hero { position: relative; background-color: var(--pd-hero-bg, #f9f9f9); letter-spacing: -.01em; }
+.electro .pd-hero--boxed { background-color: transparent; }
+.electro .pd-hero--band { background-color: var(--pd-hero-bg, #f5f5f5); padding-bottom: 1.5rem; }
+.electro .pd-hero__box { position: relative; overflow: hidden; border-radius: var(--pd-hero-radius, 0); background-color: var(--pd-hero-bg, #f9f9f9); }
+.electro .pd-hero--band .pd-hero__box { background-color: #f9f9f9; }
+.electro .pd-hero .pd-carousel--fade, .electro .pd-hero .pd-fade-track { position: relative; }
+
+.electro .pd-hero__slide {
+  position: relative; overflow: hidden; font-size: 14px; color: #333e48;
+  height: var(--el-hero-h, var(--pd-hero-h-d, 485px));
+}
+.electro .pd-hero--boxed .pd-hero__slide { height: var(--pd-hero-h-d, 410px); }
+.electro .pd-hero__bg { position: absolute !important; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 55%; margin: 0; }
+.electro picture.pd-hero__bg img, .electro .pd-hero__bg img { width: 100%; height: 100%; object-fit: cover; }
+.electro .pd-hero__bg.el-ph { border-radius: 0; }
+.electro .pd-hero__container, .electro .pd-hero__inner { position: relative; height: 100%; z-index: 1; }
+.electro .pd-hero__inner { padding: 0 2.5rem; }
+.electro .pd-hero__row { height: 100%; }
+.electro .pd-hero__col { position: relative; }
+.electro .pd-hero__media { position: relative; height: 100%; }
+.electro .pd-hero__media img { max-height: 100%; }
+.electro .pd-hero__caption { padding-top: var(--pd-hero-pt-d, 85px); position: relative; }
+.electro .pd-hero__caption > * { position: relative; }
+
+/* .hero-1 / .hero-2 */
+.electro .pd-hero__title { color: inherit; font-weight: 300; text-transform: uppercase; letter-spacing: inherit; margin: 0; }
+.electro .pd-hero__title--1 { font-size: 4.125em; line-height: .788em; margin-bottom: 10px; }
+.electro .pd-hero__title--2 { font-size: 3em; line-height: 1em; margin-bottom: 30px; }
+.electro .pd-hero__title strong { font-weight: 700; }
+/* .hero-subtitle */
+.electro .pd-hero__subtitle { font-size: .938em; font-weight: 800; line-height: 1.467em; margin-bottom: 40px; text-transform: uppercase; }
+/* .hero-subtitle-v2 */
+.electro .pd-hero__pretitle { color: #34bcec; font-size: 1.125em; font-weight: 600; line-height: 1.222em; margin-bottom: 20px; text-transform: uppercase; }
+/* .hero-v2-price */
+.electro .pd-hero__price { font-weight: 300; margin-bottom: 20px; text-transform: uppercase; line-height: 24px; }
+.electro .pd-hero__price-value { font-size: 3.5em; line-height: .929em; font-weight: 700; }
+/* .hero-action-btn */
+.electro .pd-hero__action { display: block; }
+.electro .pd-hero__btn {
+  display: inline-block; position: relative; z-index: 2; font-size: 1.286em; line-height: 1.3em; padding: .611em 3.172em;
+  border-radius: .714em; font-weight: 300; text-align: center; white-space: nowrap; border: 0; transition: all .2s ease-in-out;
+}
+.electro .pd-hero__btn:hover, .electro .pd-hero__btn:focus { text-decoration: none; }
+.electro .pd-hero__btn--primary { background-color: var(--electro-primary, #fed700); color: #333e48; }
+.electro .pd-hero__btn--primary:hover { background-color: #333e48; color: #fff; }
+.electro .pd-hero__btn--dark { background-color: #333e48; color: #fff; }
+.electro .pd-hero__btn--dark:hover { background-color: var(--electro-primary, #fed700); color: #333e48; }
+.electro .pd-hero__btn--outline { background-color: transparent; color: inherit; box-shadow: inset 0 0 0 2px currentColor; }
+.electro .pd-hero__btn--outline:hover { background-color: var(--electro-primary, #fed700); color: #333e48; box-shadow: none; }
+.electro .pd-hero__hit { position: absolute; inset: 0; z-index: 1; }
+
+/* Owl noktaları (v1): etkin 30×8 r3 ana renk, diğerleri 8×8 #bcbcbc, aralık 14px, alttan 20px */
+.electro .pd-hero__dots { position: absolute; left: 0; right: 0; bottom: 20px; height: 24px; margin: 0; padding: 0; list-style: none;
+  display: flex; align-items: center; justify-content: center; z-index: 3; }
+.electro .pd-hero__dots li { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #bcbcbc; margin: 0 0 0 14px; cursor: pointer; transition: all .2s; }
+.electro .pd-hero__dots li:first-child { margin-left: 0; }
+.electro .pd-hero__dots li span { display: block; width: 100%; height: 100%; }
+.electro .pd-hero__dots li.slick-active { width: 30px; border-radius: 3px; background-color: var(--electro-primary, #fed700); }
+/* v2.0 noktaları: uzun ince çizgiler, sola yaslı (açıklama hizası) */
+.electro .pd-hero__dots--v2 li { width: 13px; height: 4px; border-radius: 4px; margin-left: 6px; background-color: #d1d1d1; }
+.electro .pd-hero__dots--v2 li.slick-active { width: 32px; height: 4px; border-radius: 4px; }
+.electro .pd-hero__arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; width: 40px; height: 40px; border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .8); color: #333e48; font-size: 1.25rem; }
+.electro .pd-hero__arrow--l { left: 1rem; }
+.electro .pd-hero__arrow--r { right: 1rem; }
+
+/* Yan bannerlar / kategori şeridi / fırsat kartları (v2.0) */
+.electro .pd-hero__side { background-color: #f5f5f5; }
+.electro .pd-hero__side--white_rotated { background-color: #fff; }
+.electro .pd-hero__side--white_rotated img { transform: rotate(-12deg); }
+.electro .pd-hero__strip-img { display: inline-block; width: 60px; flex-shrink: 0; }
+.electro .pd-hero__deals-skel { min-height: 340px; background: #f5f5f5; }
+
+/* Katman animasyonları — electro.js: başlangıç 15 px kayık + opaklık 0 → yerine (easeOutCubic, 800 ms) */
+.electro .pd-hero-layer { animation-fill-mode: both; animation-duration: 800ms; }
+.electro .pd-hero-anim-fadeIn { animation-name: pdHeroFadeIn; }
+.electro .pd-hero-anim-fadeInDown { animation-name: pdHeroFadeInDown; }
+.electro .pd-hero-anim-fadeInUp { animation-name: pdHeroFadeInUp; }
+.electro .pd-hero-anim-fadeInLeft { animation-name: pdHeroFadeInLeft; }
+.electro .pd-hero-anim-fadeInRight { animation-name: pdHeroFadeInRight; }
+.electro .pd-hero-anim-zoomIn { animation-name: pdHeroZoomIn; }
+.electro .pd-hero-anim-slideInLeft { animation-name: pdHeroSlideInLeft; }
+.electro .pd-hero-anim-slideInRight { animation-name: pdHeroSlideInRight; }
+@keyframes pdHeroFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pdHeroFadeInDown { from { opacity: 0; transform: translate3d(0, -15px, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdHeroFadeInUp { from { opacity: 0; transform: translate3d(0, 15px, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdHeroFadeInLeft { from { opacity: 0; transform: translate3d(15px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdHeroFadeInRight { from { opacity: 0; transform: translate3d(-15px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdHeroZoomIn { from { opacity: 0; transform: scale3d(.3, .3, .3); } 50% { opacity: 1; } to { opacity: 1; transform: none; } }
+@keyframes pdHeroSlideInLeft { from { transform: translate3d(-100%, 0, 0); visibility: visible; } to { transform: none; } }
+@keyframes pdHeroSlideInRight { from { transform: translate3d(100%, 0, 0); visibility: visible; } to { transform: none; } }
+html.pd-no-anim .electro .pd-hero-layer { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .electro .pd-hero-layer { animation: none !important; } }
+
 @media (max-width: 1199.98px) {
-  .electro .pd-hero .el-hero-v1__slide, .electro .pd-hero .el-hero-v1__row { min-height: var(--pd-hero-h-t, var(--pd-hero-h-d, 400px)); }
-  .electro .pd-hero .pd-hero__caption { padding-top: var(--pd-hero-pt-t, 0); }
+  .electro .pd-hero__slide { height: var(--pd-hero-h-t, 400px); }
+  .electro .pd-hero--boxed .pd-hero__slide { height: var(--pd-hero-h-t, 400px); }
+  .electro .pd-hero__caption { padding-top: var(--pd-hero-pt-t, 60px); }
 }
 @media (max-width: 767.98px) {
-  .electro .pd-hero .el-hero-v1__slide, .electro .pd-hero .el-hero-v1__row { min-height: var(--pd-hero-h-m, var(--pd-hero-h-t, 300px)); }
-  .electro .pd-hero .pd-hero__caption { padding-top: var(--pd-hero-pt-m, 0); }
+  .electro .pd-hero__slide, .electro .pd-hero--boxed .pd-hero__slide { height: var(--pd-hero-h-m, 300px); font-size: var(--pd-hero-fs-m, 10px); }
+  .electro .pd-hero__caption { padding-top: var(--pd-hero-pt-m, 20px); }
+  .electro .pd-hero__inner { padding: 0 1rem; }
+  /* şablon: #owl-main .item mobilde de 485 px kalır, 300 px'te kırpılır (görsel ölçeği masaüstüyle aynı) */
+  .electro .pd-hero--bleed .pd-hero__slide:not(.pd-hero__slide--mimg) .pd-hero__bg { height: max(100%, var(--pd-hero-h-d, 485px)); bottom: auto; }
 }
-.electro .pd-hero .el-hero-v1__img { object-fit: cover; }
-.electro .pd-hero .pd-hero__pretitle { color: #34bcec; font-size: 1.125em; font-weight: 600; text-transform: uppercase; }
-.electro .pd-hero .pd-hero__title strong { font-weight: 700; }

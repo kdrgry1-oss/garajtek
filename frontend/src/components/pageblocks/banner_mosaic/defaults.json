@@ -1,1 +1,82 @@
-{}
+{
+  "big": {
+    "image": null,
+    "link": {
+      "kind": "url",
+      "url": "/sale",
+      "new_tab": false
+    },
+    "alt": "Haftanın kampanyası"
+  },
+  "small": [
+    {
+      "image": null,
+      "link": {
+        "kind": "category",
+        "url": "/liftler",
+        "new_tab": false,
+        "slug": "liftler"
+      },
+      "alt": "Liftler"
+    },
+    {
+      "image": null,
+      "link": {
+        "kind": "category",
+        "url": "/kompresorler",
+        "new_tab": false,
+        "slug": "kompresorler"
+      },
+      "alt": "Kompresörler"
+    },
+    {
+      "image": null,
+      "link": {
+        "kind": "category",
+        "url": "/lastik-ekipmanlari",
+        "new_tab": false,
+        "slug": "lastik-ekipmanlari"
+      },
+      "alt": "Lastik ekipmanları"
+    },
+    {
+      "image": null,
+      "link": {
+        "kind": "category",
+        "url": "/el-aletleri",
+        "new_tab": false,
+        "slug": "el-aletleri"
+      },
+      "alt": "El aletleri"
+    },
+    {
+      "image": null,
+      "link": {
+        "kind": "category",
+        "url": "/lokma-takimlari",
+        "new_tab": false,
+        "slug": "lokma-takimlari"
+      },
+      "alt": "Lokma takımları"
+    },
+    {
+      "image": null,
+      "link": {
+        "kind": "category",
+        "url": "/test-ve-ariza-tespit-cihazlari",
+        "new_tab": false,
+        "slug": "test-ve-ariza-tespit-cihazlari"
+      },
+      "alt": "Arıza tespit cihazları"
+    }
+  ],
+  "radius": 10,
+  "small_columns": "3",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 16,
+      "tablet": 16,
+      "mobile": 16
+    }
+  }
+}

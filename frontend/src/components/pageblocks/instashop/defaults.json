@@ -4,6 +4,28 @@
   "follow_text": "Takip Edin",
   "items": [],
   "columns": "6",
+  "radius": 4,
+  "carousel": {
+    "per_view": {
+      "0": 2,
+      "768": 4,
+      "1200": 6
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 10,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": true,
+    "arrows": "none",
+    "drag": true,
+    "last_active_divider": false
+  },
   "_section": {
     "margin_bottom": {
       "desktop": 50,

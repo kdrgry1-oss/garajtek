@@ -1,1 +1,34 @@
-{}
+{
+  "items": [
+    {
+      "image": null,
+      "link": {
+        "kind": "category",
+        "url": "/liftler",
+        "new_tab": false,
+        "slug": "liftler"
+      },
+      "alt": "Lift kampanyası"
+    },
+    {
+      "image": null,
+      "link": {
+        "kind": "category",
+        "url": "/kompresorler",
+        "new_tab": false,
+        "slug": "kompresorler"
+      },
+      "alt": "Kompresör kampanyası"
+    }
+  ],
+  "gap": 30,
+  "stack_below": "md",
+  "radius": 0,
+  "_section": {
+    "margin_bottom": {
+      "desktop": 56,
+      "tablet": 48,
+      "mobile": 40
+    }
+  }
+}

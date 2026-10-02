@@ -1,1 +1,262 @@
-{}
+{
+  "slides": [
+    {
+      "kicker": "SINIRLI",
+      "title": "HAFTANIN FIRSATI",
+      "subtitle": "KAMPANYA BİTMEDEN YETİŞİN",
+      "product": "",
+      "title_override": "",
+      "image_override": null,
+      "countdown": {
+        "enabled": true,
+        "end": "",
+        "rolling_days": 0,
+        "units": [
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "hide_zero_days": true,
+        "labels": {
+          "days": "GÜN",
+          "hours": "SAAT",
+          "minutes": "DK",
+          "seconds": "SN"
+        },
+        "heading": "",
+        "on_expire": "zero",
+        "expired_text": "Kampanya sona erdi",
+        "pad": true
+      },
+      "stock": {
+        "show": true,
+        "available_label": "Kalan:",
+        "sold_label": "Satılan:"
+      },
+      "thumb_label": "4 TON İKİ SÜTUNLU LİFT",
+      "button": {
+        "text": "Hemen Al",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      }
+    },
+    {
+      "kicker": "SINIRLI",
+      "title": "HAFTANIN FIRSATI",
+      "subtitle": "KAMPANYA BİTMEDEN YETİŞİN",
+      "product": "",
+      "title_override": "",
+      "image_override": null,
+      "countdown": {
+        "enabled": true,
+        "end": "",
+        "rolling_days": 0,
+        "units": [
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "hide_zero_days": true,
+        "labels": {
+          "days": "GÜN",
+          "hours": "SAAT",
+          "minutes": "DK",
+          "seconds": "SN"
+        },
+        "heading": "",
+        "on_expire": "zero",
+        "expired_text": "Kampanya sona erdi",
+        "pad": true
+      },
+      "stock": {
+        "show": true,
+        "available_label": "Kalan:",
+        "sold_label": "Satılan:"
+      },
+      "thumb_label": "SESSİZ KOMPRESÖRLER",
+      "button": {
+        "text": "Hemen Al",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      }
+    },
+    {
+      "kicker": "SINIRLI",
+      "title": "HAFTANIN FIRSATI",
+      "subtitle": "KAMPANYA BİTMEDEN YETİŞİN",
+      "product": "",
+      "title_override": "",
+      "image_override": null,
+      "countdown": {
+        "enabled": true,
+        "end": "",
+        "rolling_days": 0,
+        "units": [
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "hide_zero_days": true,
+        "labels": {
+          "days": "GÜN",
+          "hours": "SAAT",
+          "minutes": "DK",
+          "seconds": "SN"
+        },
+        "heading": "",
+        "on_expire": "zero",
+        "expired_text": "Kampanya sona erdi",
+        "pad": true
+      },
+      "stock": {
+        "show": true,
+        "available_label": "Kalan:",
+        "sold_label": "Satılan:"
+      },
+      "thumb_label": "SINIRLI FIRSAT – LASTİK SÖKME",
+      "button": {
+        "text": "Hemen Al",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      }
+    },
+    {
+      "kicker": "SINIRLI",
+      "title": "HAFTANIN FIRSATI",
+      "subtitle": "KAMPANYA BİTMEDEN YETİŞİN",
+      "product": "",
+      "title_override": "",
+      "image_override": null,
+      "countdown": {
+        "enabled": true,
+        "end": "",
+        "rolling_days": 0,
+        "units": [
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "hide_zero_days": true,
+        "labels": {
+          "days": "GÜN",
+          "hours": "SAAT",
+          "minutes": "DK",
+          "seconds": "SN"
+        },
+        "heading": "",
+        "on_expire": "zero",
+        "expired_text": "Kampanya sona erdi",
+        "pad": true
+      },
+      "stock": {
+        "show": true,
+        "available_label": "Kalan:",
+        "sold_label": "Satılan:"
+      },
+      "thumb_label": "İKİNCİ ÜRÜNDE %40 İNDİRİM",
+      "button": {
+        "text": "Hemen Al",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      }
+    },
+    {
+      "kicker": "SINIRLI",
+      "title": "HAFTANIN FIRSATI",
+      "subtitle": "KAMPANYA BİTMEDEN YETİŞİN",
+      "product": "",
+      "title_override": "",
+      "image_override": null,
+      "countdown": {
+        "enabled": true,
+        "end": "",
+        "rolling_days": 0,
+        "units": [
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "hide_zero_days": true,
+        "labels": {
+          "days": "GÜN",
+          "hours": "SAAT",
+          "minutes": "DK",
+          "seconds": "SN"
+        },
+        "heading": "",
+        "on_expire": "zero",
+        "expired_text": "Kampanya sona erdi",
+        "pad": true
+      },
+      "stock": {
+        "show": true,
+        "available_label": "Kalan:",
+        "sold_label": "Satılan:"
+      },
+      "thumb_label": "1.000 TL ALTI EL ALETLERİ",
+      "button": {
+        "text": "Hemen Al",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      }
+    }
+  ],
+  "fallback_source": {
+    "kind": "discounted",
+    "product_ids": [],
+    "category_ids": [],
+    "include_children": true,
+    "tag": "",
+    "brand_ids": [],
+    "limit": 6,
+    "sort": "default",
+    "exclude_out_of_stock": false,
+    "exclude_ids": [],
+    "fill_with": "none"
+  },
+  "background": null,
+  "background_color": "#f5f5f5",
+  "band_color": "",
+  "text_color": "#333e48",
+  "carousel": {
+    "per_view": {
+      "0": 1
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 6000,
+    "pause_on_hover": true,
+    "loop": true,
+    "rewind": false,
+    "transition": "fade",
+    "speed": 400,
+    "dots": "mobile",
+    "arrows": "none",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 56,
+      "tablet": 48,
+      "mobile": 40
+    }
+  }
+}

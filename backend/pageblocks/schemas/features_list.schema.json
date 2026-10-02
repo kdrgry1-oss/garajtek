@@ -2,12 +2,15 @@
   "key": "features_list",
   "version": 2,
   "title": "Özellikler / Avantajlar Şeridi",
-  "description": "",
+  "description": "Kargo, iade, güvenli ödeme gibi avantajları ikonlu kutularda gösterir (şablon: homepage-3/features-list)",
   "category": "icerik",
   "group": "A",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/homepage-3/features-list.php"
+    "T1/inc/blocks/homepage/homepage-3/features-list.php",
+    "T1H/assets/sass/blocks/_features-list.scss",
+    "T1/inc/components/sidebar/home-v2/electro-features.php",
+    "T2/html/home/home-v3.html#L1550"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,7 +18,26 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1 – Çerçeveli şerit, ikon solda (şablon v3 ana sayfa)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2",
+      "label": "v2.0 – Ortalı metin, ana renk ikon, mobilde kaydırılır",
+      "defaults_patch": {
+        "_section": {
+          "margin_bottom": {
+            "desktop": 42,
+            "tablet": 42,
+            "mobile": 30
+          }
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -23,7 +45,168 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Özellikler",
+      "tab": "İçerik",
+      "min": 1,
+      "max": 6,
+      "item_label": "{{strong_text}}",
+      "item_noun": "Özellik",
+      "item_fields": [
+        {
+          "name": "icon",
+          "type": "icon",
+          "label": "İkon",
+          "set": "electro",
+          "allow_upload": true
+        },
+        {
+          "name": "strong_text",
+          "type": "text",
+          "label": "Kalın yazı",
+          "width": "half"
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "label": "Açıklama",
+          "width": "half"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı (isteğe bağlı)",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "icon": {
+          "icon": "ec ec-tag"
+        },
+        "strong_text": "Yeni",
+        "text": "avantaj",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      }
+    },
+    {
+      "name": "layout",
+      "type": "select",
+      "label": "Yerleşim",
+      "tab": "Görünüm",
+      "width": "third",
+      "options": [
+        {
+          "value": "horizontal",
+          "label": "Yatay şerit"
+        },
+        {
+          "value": "vertical",
+          "label": "Dikey liste (kenar çubuğu)"
+        }
+      ]
+    },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Sütun",
+      "tab": "Görünüm",
+      "width": "third",
+      "show_if": {
+        "layout": [
+          "horizontal"
+        ]
+      },
+      "options": [
+        {
+          "value": "3",
+          "label": "3"
+        },
+        {
+          "value": "4",
+          "label": "4"
+        },
+        {
+          "value": "5",
+          "label": "5"
+        },
+        {
+          "value": "6",
+          "label": "6"
+        }
+      ]
+    },
+    {
+      "name": "border",
+      "type": "bool",
+      "label": "Çerçeve ve ayraçlar",
+      "tab": "Görünüm",
+      "width": "third",
+      "help": "1 px #ddd çerçeve, 8 px köşe, kutular arası çizgi."
+    },
+    {
+      "name": "icon_color",
+      "type": "color",
+      "label": "İkon rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "third",
+      "help": "Boş = tema ana rengi (şablon)."
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "third"
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "label": "Arka plan",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "third",
+      "allow_transparent": true
+    },
+    {
+      "name": "icon_size",
+      "type": "number",
+      "label": "İkon boyutu",
+      "tab": "Görünüm",
+      "unit": "em",
+      "min": 1,
+      "max": 5,
+      "step": 0.001,
+      "width": "half"
+    },
+    {
+      "name": "padding_y",
+      "type": "number",
+      "label": "Kutu dikey boşluğu",
+      "tab": "Görünüm",
+      "unit": "em",
+      "min": 0,
+      "max": 5,
+      "step": 0.001,
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

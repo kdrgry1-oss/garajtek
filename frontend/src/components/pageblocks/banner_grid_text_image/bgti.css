@@ -1,0 +1,10 @@
+/* banner_grid_text_image — v2.0 home-v5: h2.font-size-28.font-size-20-lg, strong.font-size-36.font-size-24-lg.semi-bold,
+   fiyat .font-size-46.font-size-30-lg (768–1199 px arası küçük boyutlar). Boyutlar ayarlardan (--pd-bgti-ts / -ps). */
+.electro .pd-bgti__title { font-size: var(--pd-bgti-ts, 28px); }
+.electro .pd-bgti__title strong { font-size: 1.286em; font-weight: 600; }
+.electro .pd-bgti__price { font-size: var(--pd-bgti-ps, 46px); }
+.electro .pd-bgti__wide, .electro .pd-bgti__wide:hover { color: inherit; text-decoration: none; }
+@media (min-width: 768px) and (max-width: 1199.98px) {
+  .electro .pd-bgti__title { font-size: calc(var(--pd-bgti-ts, 28px) * .714); }
+  .electro .pd-bgti__price { font-size: calc(var(--pd-bgti-ps, 46px) * .652); }
+}

@@ -9,6 +9,10 @@
   "price_label": "BAŞLAYAN FİYATLARLA",
   "price": "₺7.999",
   "price_box_color": "var(--primary)",
+  "text_color": "#333e48",
+  "background_color": "#f5f5f5",
+  "min_height": 206,
+  "title_size": 32,
   "_section": {
     "margin_bottom": {
       "desktop": 70,

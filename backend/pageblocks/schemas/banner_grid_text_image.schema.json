@@ -2,12 +2,13 @@
   "key": "banner_grid_text_image",
   "version": 2,
   "title": "Metinli/Görselli Banner Izgarası",
-  "description": "",
+  "description": "Her satırda geniş metinli banner (başlık + açıklama + fiyat + 446×262 görsel) ve küçük görsel banner (şablon v2.0 home-v5/v7)",
   "category": "banner",
   "group": "A",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v5.html"
+    "T2/html/home/home-v5.html#L6819",
+    "T2/html/home/home-v7.html#L3856"
   ],
   "layout": "container",
   "singleton": false,
@@ -23,7 +24,195 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "rows",
+      "type": "repeater",
+      "label": "Satırlar",
+      "tab": "İçerik",
+      "min": 1,
+      "max": 3,
+      "item_label": "{{wide.title}}",
+      "item_noun": "Satır",
+      "item_fields": [
+        {
+          "name": "wide_side",
+          "type": "select",
+          "label": "Geniş banner yeri",
+          "options": [
+            {
+              "value": "left",
+              "label": "Solda (görsel sağda)"
+            },
+            {
+              "value": "right",
+              "label": "Sağda (görsel solda)"
+            }
+          ]
+        },
+        {
+          "name": "wide",
+          "type": "group",
+          "label": "Geniş metinli banner",
+          "fields": [
+            {
+              "name": "background",
+              "type": "color",
+              "label": "Arka plan",
+              "palette": "theme",
+              "width": "half",
+              "allow_transparent": true
+            },
+            {
+              "name": "text_color",
+              "type": "color",
+              "label": "Yazı rengi",
+              "palette": "theme",
+              "width": "half"
+            },
+            {
+              "name": "title",
+              "type": "rich_text",
+              "label": "Başlık",
+              "marks": [
+                "strong",
+                "br"
+              ],
+              "max_length": 200
+            },
+            {
+              "name": "text",
+              "type": "text",
+              "label": "Açıklama"
+            },
+            {
+              "name": "specs",
+              "type": "text",
+              "label": "Özellik listesi",
+              "help": "Özellikleri | ile ayırın (ör. 3 TON | ÇİFT PİSTON). Boşsa gizlenir."
+            },
+            {
+              "name": "price_prefix",
+              "type": "text",
+              "label": "Fiyat ön yazısı",
+              "width": "half"
+            },
+            {
+              "name": "price",
+              "type": "text",
+              "label": "Fiyat",
+              "width": "half"
+            },
+            {
+              "name": "image",
+              "type": "image",
+              "label": "Görsel",
+              "recommended": [
+                446,
+                262
+              ]
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "small",
+          "type": "group",
+          "label": "Küçük görsel banner",
+          "fields": [
+            {
+              "name": "image",
+              "type": "image",
+              "label": "Görsel",
+              "recommended": [
+                446,
+                262
+              ]
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            },
+            {
+              "name": "alt",
+              "type": "text",
+              "label": "Alternatif metin"
+            }
+          ]
+        }
+      ],
+      "item_default": {
+        "wide_side": "left",
+        "wide": {
+          "background": "#ecedf2",
+          "text_color": "#333e48",
+          "title": "Yeni <strong>kampanya</strong>",
+          "text": "kısa açıklama",
+          "specs": "",
+          "price_prefix": "başlayan",
+          "price": "₺999",
+          "image": null,
+          "link": {
+            "kind": "url",
+            "url": "/sale",
+            "new_tab": false
+          }
+        },
+        "small": {
+          "image": null,
+          "link": {
+            "kind": "url",
+            "url": "/sale",
+            "new_tab": false
+          },
+          "alt": ""
+        }
+      }
+    },
+    {
+      "name": "title_size",
+      "type": "number",
+      "label": "Başlık boyutu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 14,
+      "max": 48,
+      "width": "half"
+    },
+    {
+      "name": "price_size",
+      "type": "number",
+      "label": "Fiyat boyutu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 14,
+      "max": 72,
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

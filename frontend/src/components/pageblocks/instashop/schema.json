@@ -2,7 +2,7 @@
   "key": "instashop",
   "version": 2,
   "title": "Atölyemizden (görsel ızgara)",
-  "description": "Instagram tarzı görsel ızgarası",
+  "description": "Instagram tarzı kare görsel karuseli + 'Takip Edin' bağlantısı",
   "category": "icerik",
   "group": "A",
   "status": "ready",
@@ -33,7 +33,8 @@
       "type": "bool",
       "label": "“Takip Edin” bağlantısını göster",
       "tab": "İçerik",
-      "width": "half"
+      "width": "half",
+      "help": "Bağlantı adresi Mağaza Bilgileri › Instagram alanından gelir."
     },
     {
       "name": "follow_text",
@@ -54,6 +55,7 @@
       "tab": "İçerik",
       "max": 12,
       "item_label": "{{alt}}",
+      "item_noun": "Görsel",
       "item_fields": [
         {
           "name": "image",
@@ -67,7 +69,16 @@
         {
           "name": "link",
           "type": "link",
-          "label": "Bağlantı"
+          "label": "Bağlantı",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
         },
         {
           "name": "alt",
@@ -83,14 +94,14 @@
           "new_tab": false
         },
         "alt": ""
-      },
-      "item_noun": "Öğe"
+      }
     },
     {
       "name": "columns",
       "type": "select",
-      "label": "Sütun",
+      "label": "Masaüstü sütun",
       "tab": "Görünüm",
+      "width": "half",
       "options": [
         {
           "value": "4",
@@ -101,6 +112,28 @@
           "label": "6"
         }
       ]
+    },
+    {
+      "name": "radius",
+      "type": "number",
+      "label": "Köşe yuvarlaklığı",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 40,
+      "width": "half"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "hide": [
+        "rows",
+        "transition",
+        "last_active_divider"
+      ],
+      "help": "Masaüstü (≥1200) sütun sayısı yukarıdaki 'Masaüstü sütun' alanından gelir."
     }
   ],
   "common": [
