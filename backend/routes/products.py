@@ -842,7 +842,7 @@ async def _build_products_query(
         elif cat_slug in EN_YENILER:
             # "En Yeniler" GERÇEK kategori üyeliğiyle filtrelenir (tüm ürünler DEĞİL).
             # Yerel "En Yeniler" kategorisinin id'sini bulup category_ids ile eşleştir.
-            # (Ticimax En Yeniler eşitlemesi bu kategoriye üyelik yazar.)
+            # (eski altyapı En Yeniler eşitlemesi bu kategoriye üyelik yazar.)
             _en_id = None
             async for _c in db.categories.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1}):
                 _sl = (_c.get("slug") or "").strip().lower()
@@ -962,7 +962,7 @@ async def _build_products_query(
             query["price"] = {"$lte": max_price}
 
     # ============================================================
-    # GELİŞMİŞ FİLTRELER (Ticimax paneli)
+    # GELİŞMİŞ FİLTRELER (eski altyapı paneli)
     # ============================================================
     # --- Metin (regex) filtreleri ---
     if category_id:
@@ -979,27 +979,27 @@ async def _build_products_query(
         ge = re.escape(gtip.strip())
         and_clauses.append({"$or": [
             {"gtip_code": {"$regex": ge, "$options": "i"}},
-            {"ticimax_fields.GTIPKODU": {"$regex": ge, "$options": "i"}},
+            {"catalog_fields.GTIPKODU": {"$regex": ge, "$options": "i"}},
         ]})
     if breadcrumb:
         be = re.escape(breadcrumb.strip())
         and_clauses.append({"$or": [
             {"breadcrumb": {"$regex": be, "$options": "i"}},
             {"breadcrumb_category": {"$regex": be, "$options": "i"}},
-            {"ticimax_fields.BREADCRUMBKAT": {"$regex": be, "$options": "i"}},
+            {"catalog_fields.BREADCRUMBKAT": {"$regex": be, "$options": "i"}},
         ]})
     if supplier:
         se = re.escape(supplier.strip())
         and_clauses.append({"$or": [
             {"supplier": {"$regex": se, "$options": "i"}},
-            {"ticimax_fields.TEDARIKCI": {"$regex": se, "$options": "i"}},
+            {"catalog_fields.TEDARIKCI": {"$regex": se, "$options": "i"}},
         ]})
     if tag:
         te = re.escape(tag.strip())
         and_clauses.append({"$or": [
             {"keywords": {"$regex": te, "$options": "i"}},
             {"tags": {"$regex": te, "$options": "i"}},
-            {"ticimax_fields.ANAHTARKELIME": {"$regex": te, "$options": "i"}},
+            {"catalog_fields.ANAHTARKELIME": {"$regex": te, "$options": "i"}},
         ]})
 
     # --- Varlık (Var/Yok) filtreleri ---
@@ -1024,7 +1024,7 @@ async def _build_products_query(
         if _bool_flag(discounted):
             and_clauses.append({"$or": [
                 {"sale_price": {"$gt": 0}},
-                {"ticimax_fields.INDIRIMLIFIYAT": {"$gt": 0}},
+                {"catalog_fields.INDIRIMLIFIYAT": {"$gt": 0}},
             ]})
 
     # --- Teknik detay (attributes) filtresi ---
@@ -1034,17 +1034,17 @@ async def _build_products_query(
         else:
             and_clauses.append({f"attributes.{attr_key}": {"$exists": True}})
 
-    # --- Yayın tarihi aralığı (ticimax_fields.YAYINTARIHI, metinsel ISO karşılaştırma) ---
+    # --- Yayın tarihi aralığı (catalog_fields.YAYINTARIHI, metinsel ISO karşılaştırma) ---
     if pub_date_from or pub_date_to:
         pub_q = {}
         if pub_date_from:
             pub_q["$gte"] = pub_date_from
         if pub_date_to:
             pub_q["$lte"] = pub_date_to + "T23:59:59"
-        and_clauses.append({"ticimax_fields.YAYINTARIHI": pub_q})
+        and_clauses.append({"catalog_fields.YAYINTARIHI": pub_q})
 
-    # --- Dinamik ticimax_fields parametreleri (tf_ / tfmin_ / tfmax_) ---
-    # DENETİM (injection F5): ticimax_fields MALİYET/tedarikçi gibi GİZLİ iç alanlar içerir.
+    # --- Dinamik catalog_fields parametreleri (tf_ / tfmin_ / tfmax_) ---
+    # DENETİM (injection F5): catalog_fields MALİYET/tedarikçi gibi GİZLİ iç alanlar içerir.
     # Public'te bunlarla filtreleme, tfmin_/tfmax_ aralık taramasıyla ürün MALİYETİNİN
     # binary-search ile sızdırılmasına yol açıyordu → YALNIZ admin görünümünde uygulanır.
     range_acc: dict = {}
@@ -1067,7 +1067,7 @@ async def _build_products_query(
                 pass
         elif pkey.startswith("tf_"):
             col = pkey[3:]
-            field = f"ticimax_fields.{col}"
+            field = f"catalog_fields.{col}"
             if pval == "__nonempty__":
                 and_clauses.append({field: {"$nin": ["", None, 0]}})
             elif pval == "__empty__":
@@ -1080,7 +1080,7 @@ async def _build_products_query(
             else:
                 and_clauses.append({field: {"$regex": re.escape(str(pval).strip()), "$options": "i"}})
     for col, rng in range_acc.items():
-        and_clauses.append({f"ticimax_fields.{col}": rng})
+        and_clauses.append({f"catalog_fields.{col}": rng})
 
     # --- Storefront beden filtresi (variants.size; çoklu seçim = OR) ---
     if sizes:
@@ -1160,7 +1160,7 @@ async def get_products(
     barcode: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    # --- Gelişmiş Ticimax tarzı filtreler ---
+    # --- Gelişmiş eski altyapı tarzı filtreler ---
     urun_karti_id: Optional[str] = None,
     varyasyon_id: Optional[str] = None,
     name: Optional[str] = None,
@@ -1184,13 +1184,13 @@ async def get_products(
 ):
     """Get products with filtering and pagination.
 
-    Gelişmiş filtreler (Ticimax paneli ile birebir): yukarıdaki açık parametrelerin
-    yanı sıra `ticimax_fields` ham verisi üzerinde çalışan dinamik parametreler de
+    Gelişmiş filtreler (eski altyapı paneli ile birebir): yukarıdaki açık parametrelerin
+    yanı sıra `catalog_fields` ham verisi üzerinde çalışan dinamik parametreler de
     kabul edilir:
-      - tf_<KOLON>=deger        → ticimax_fields.<KOLON> (BOOL ise eşitlik, değilse regex)
+      - tf_<KOLON>=deger        → catalog_fields.<KOLON> (BOOL ise eşitlik, değilse regex)
       - tf_<KOLON>=__nonempty__ → alan dolu (Var)
       - tf_<KOLON>=__empty__    → alan boş (Yok)
-      - tfmin_<KOLON> / tfmax_<KOLON> → sayısal aralık (ticimax_fields.<KOLON>)
+      - tfmin_<KOLON> / tfmax_<KOLON> → sayısal aralık (catalog_fields.<KOLON>)
     Veri henüz yoksa bile yapı hazırdır; senkron aktifleşince otomatik sorgulanır.
     """
     skip = (page - 1) * limit
@@ -1229,7 +1229,7 @@ async def get_products(
 
     sort_order = -1 if order == "desc" else 1
     # DENETİM (injection F5): public'te YALNIZ güvenli alanlarla sıralama — aksi halde
-    # sort=ticimax_fields.MALIYET ile ürünler maliyete göre sıralanıp gizli maliyet sızardı.
+    # sort=catalog_fields.MALIYET ile ürünler maliyete göre sıralanıp gizli maliyet sızardı.
     _SAFE_SORT = {"created_at", "updated_at", "price", "sale_price", "member_price_1",
                   "name", "stock", "popularity", "sales_count", "order", "discount_percentage"}
     if not _admin_view and sort not in _SAFE_SORT:
@@ -1360,14 +1360,13 @@ async def get_products(
         products = [_strip_internal_fields(p) for p in products]
     else:
         # PANEL LİSTESİ PERFORMANSI: admin_view tüm belgeyi döndürüyordu. Ölçüm: tek ürünün
-        # ~11 KB'ının %63'ü liste tablosunda HİÇ kullanılmayan özellik blobları
-        # (attributes 3,9 KB + hepsiburada 1,8 KB + temu 1,5 KB). 50 satırlık sayfada
+        # büyük kısmı liste tablosunda HİÇ kullanılmayan özellik blobları (attributes,
+        # açıklama, ek katalog alanları). 50 satırlık sayfada
         # ~350 KB, 200 satırda ~1,4 MB boşuna aktarılıyor → "filtre sonucu geç geliyor".
         # Bu alanların TEK tüketicisi düzenleme modalı; o da ürünü GET /products/{id} ile
         # tek tek taze çekiyor (Products.jsx openEditModal) → listede gerekmiyor.
         for _p in products:
-            for _k in ("attributes", "trendyol_attributes", "hepsiburada_attributes",
-                       "temu_attributes", "description", "ticimax_fields"):
+            for _k in ("attributes", "description", "catalog_fields"):
                 _p.pop(_k, None)
 
     return {
@@ -1458,9 +1457,9 @@ async def slider_feed(
     return {"products": prods, "source": source}
 
 
-@router.get("/meta/ticimax-schema")
-async def get_ticimax_schema(current_user: dict = Depends(require_admin)):
-    """Ürün kartında tüm Ticimax (113) alanını gruplu render etmek için şema."""
+@router.get("/meta/catalog-schema")
+async def get_catalog_schema(current_user: dict = Depends(require_admin)):
+    """Ürün kartında tüm eski altyapı (113) alanını gruplu render etmek için şema."""
     from product_schema import build_schema
     return {"groups": build_schema()}
 
@@ -1541,11 +1540,11 @@ async def get_filter_options(current_user: dict = Depends(require_admin)):
     brands = [b for b in await db.products.distinct("brand", base) if b]
     suppliers = sorted(set(
         [s for s in await db.products.distinct("supplier", base) if s]
-        + [s for s in await db.products.distinct("ticimax_fields.TEDARIKCI", base) if s]
+        + [s for s in await db.products.distinct("catalog_fields.TEDARIKCI", base) if s]
     ))
     currencies = sorted(set(
         [c for c in await db.products.distinct("currency", base) if c]
-        + [c for c in await db.products.distinct("ticimax_fields.PARABIRIMI", base) if c]
+        + [c for c in await db.products.distinct("catalog_fields.PARABIRIMI", base) if c]
     ))
     # Teknik detay grupları: attributes anahtarları + label'ları
     attr_groups: dict = {}
@@ -1675,7 +1674,7 @@ _STOCK_MOVE_REASONS = {
     "new_order": "Sipariş — stok düştü",
     "order_created": "Sipariş — stok düştü",
     "manual_decrement": "Manuel sipariş — stok düştü",
-    "order_imported": "Pazaryeri siparişi — stok düştü",
+    "order_imported": "İçe aktarılan sipariş — stok düştü",
     "backfill_decrement": "Geçmiş düzeltme (backfill)",
     "order_cancelled": "İptal — stok geri eklendi",
     "return_approved": "İade onaylandı — stok geri eklendi",
@@ -1686,8 +1685,8 @@ _STOCK_MOVE_REASONS = {
     "production": "Üretim — stok girişi",
     "product_created": "Ürün oluşturuldu — başlangıç stoğu",
     "manufacturing_delivered": "İmalat teslimi — stok girişi",
-    "marketplace_stock_sync": "Pazaryeri stok senkronu",
-    "marketplace_stock_imported": "Pazaryerinden stok güncellendi",
+    "marketplace_stock_sync": "Harici stok senkronu",
+    "marketplace_stock_imported": "Harici kaynaktan stok güncellendi",
     "bulk_stock_adjusted": "Toplu varyant stok düzeltmesi",
     "negative_stock_fixed": "Negatif stok sıfırlandı",
     "reconcile_redecrement": "Ödeme sonradan onaylandı — stok yeniden düşüldü",
@@ -1874,7 +1873,7 @@ async def get_product_stock_movements(product_id: str, limit: int = Query(300, g
 _PRODUCT_INTERNAL_FIELDS = (
     "cost_price", "purchase_price", "alis_fiyati", "buy_price", "supplier", "tedarikci",
     "supplier_code", "member_price_1", "member_price_2", "member_price_3", "member_price",
-    "margin", "profit", "profit_margin", "kar", "kar_marji", "ticimax_fields",
+    "margin", "profit", "profit_margin", "kar", "kar_marji", "catalog_fields",
     "markup_rate", "use_default_markup",
     "admin_notes", "internal_notes", "vendor", "vendor_id",
 )
@@ -2186,182 +2185,6 @@ async def _sort_variants_by_pool(variants: list) -> list:
     return sorted(variants, key=_k)
 
 
-@router.post("/{product_id}/copy-attributes-to-siblings")
-async def copy_attributes_to_siblings(product_id: str, current_user: dict = Depends(require_admin)):
-    """Bu rengin ürün ÖZELLİKLERİNİ (Kol Tipi, Yaka Stili, Kumaş, Kalıp... + HB/Temu map'leri)
-    AYNI modelin diğer renk kartlarına (csv_card_id) kopyalar. RENK/BEDEN'e DOKUNMAZ:
-    Renk/Web Color özellikleri ve her kartın kendi bedenleri/varyant urun_id/barkod/stok korunur.
-    Tekten bölünen renk kartlarının özelliklerini tek tıkla birebir eşitlemek için."""
-    src = await db.products.find_one({"id": product_id}, {"_id": 0})
-    if not src:
-        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
-    card_id = src.get("csv_card_id")
-    if not card_id:
-        return {"updated": 0, "siblings": 0, "detail": "Renk kardeşi yok (csv_card_id boş)."}
-
-    COLOR_NAMES = {"renk", "web color", "color"}
-    def _n(s): return (s or "").strip().lower()
-
-    src_attrs_nc = [a for a in (src.get("attributes") or []) if _n(a.get("name")) not in COLOR_NAMES]
-    src_hb_nc = {k: v for k, v in (src.get("hepsiburada_attributes") or {}).items() if _n(k) not in COLOR_NAMES}
-    src_temu_nc = {k: v for k, v in (src.get("temu_attributes") or {}).items() if _n(k) not in COLOR_NAMES}
-
-    # VERİ KORUMASI: kaynak üründe kopyalanacak (renk-dışı) ÖZELLİK yoksa, kardeşlerin dolu
-    # özelliklerini BOŞLA ezme — kaza eseri boş kaynaktan tüm renk grubu silinmesin.
-    if not src_attrs_nc and not src_hb_nc and not src_temu_nc:
-        return {"updated": 0, "siblings": 0, "sibling_ids": [],
-                "detail": "Kaynak üründe kopyalanacak özellik yok — kardeşler korundu (boş ezme engellendi)."}
-
-    updated, sib_ids = 0, []
-    cursor = db.products.find({"csv_card_id": card_id, "id": {"$ne": src["id"]}}, {"_id": 0})
-    async for s in cursor:
-        s_color = [a for a in (s.get("attributes") or []) if _n(a.get("name")) in COLOR_NAMES]
-        s_hb_color = {k: v for k, v in (s.get("hepsiburada_attributes") or {}).items() if _n(k) in COLOR_NAMES}
-        s_temu_color = {k: v for k, v in (s.get("temu_attributes") or {}).items() if _n(k) in COLOR_NAMES}
-        await db.products.update_one(
-            {"id": s["id"]},
-            {"$set": {
-                "attributes": src_attrs_nc + s_color,            # renk hariç özellikler kaynakla aynı
-                "hepsiburada_attributes": {**src_hb_nc, **s_hb_color},
-                "temu_attributes": {**src_temu_nc, **s_temu_color},
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }})
-        updated += 1
-        sib_ids.append(s["id"])
-    return {"updated": updated, "siblings": updated, "sibling_ids": sib_ids}
-
-
-@router.get("/{product_id}/color-siblings")
-async def get_color_siblings(product_id: str, request: Request):
-    """Aynı modelin (csv_card_id) farklı renk varyantlarını getir.
-    Ürün detay sayfasında "Diğer Renkler" swatch listesi için kullanılır.
-    """
-    import re as _re
-    p = await db.products.find_one(
-        {"$or": [{"id": product_id}, {"slug": product_id}]},
-        {"_id": 0, "id": 1, "csv_card_id": 1, "urun_karti_id": 1, "name": 1, "color": 1,
-         "stock_code": 1, "variants": 1, "attributes": 1,
-         "category_name": 1}  # variants/attributes: model-guard renk çözümü
-    )
-    if not p:
-        return {"siblings": []}
-    _PROJ = {"_id": 0, "id": 1, "slug": 1, "name": 1, "thumbnail": 1, "images": 1,
-             "variants": 1, "attributes": 1, "color": 1, "category_name": 1}
-
-    def _row(s):
-        color = (s.get("color") or "").strip()
-        if not color and s.get("variants"):
-            for v in s["variants"]:
-                if v.get("color"):
-                    color = v["color"]; break
-        if not color and isinstance(s.get("attributes"), list):
-            for a in s["attributes"]:
-                if (a.get("name") or "").strip().lower() in ("web color", "renk", "color"):
-                    color = a.get("value") or ""; break
-        if not color:  # son çare: addan sondaki renk kelimesi
-            color = _trailing_color(s.get("name") or "")
-        return {
-            "id": s["id"], "slug": s.get("slug") or s["id"],
-            "name": s.get("name") or "", "color": color,
-            "image": (s.get("images") or [s.get("thumbnail")] or [None])[0],
-        }
-
-    siblings = []
-    seen_ids = {p["id"]}
-
-    # ÜRÜN TİPİ GUARD'I (işletme, W-bildirimi): bir rengin "kardeşi" AYNI ÜRÜN TİPİ olmalıdır.
-    # Ceketin renk seçeneği gömlek olamaz. Tip, ürün adından (Ceket/Gömlek/Elbise…), yoksa
-    # kategori adından çözülür; iki taraf da çözülebiliyor ve FARKLIYSA aday elenir.
-    def _type_key(x) -> str:
-        _nm = _cnorm(x.get("name") or "")
-        for _kw, _canon in _TYPE_KEYWORDS:
-            if _kw in _nm:
-                return _cnorm(_canon)
-        return _cnorm(x.get("category_name") or "")
-
-    _self_type = _type_key(p)
-
-    def _type_ok(cand) -> bool:
-        _ct = _type_key(cand)
-        return not (_self_type and _ct and _ct != _self_type)
-
-    # 1) AÇIK ANAHTAR: urun_karti_id ve csv_card_id — AMA HER ALAN KENDİ KARŞILIĞIYLA.
-    #    KÖK SEBEP (bildirilen hata): eskiden ürünün urun_karti_id'si KARŞI TARAFIN
-    #    csv_card_id'siyle de eşleştiriliyordu. Bu iki numara AYRI dizilerdir ve pratikte
-    #    birbirine göre kaymış olabiliyor (ör. Ceket: urun_karti_id=2992/csv_card_id=2991,
-    #    Gömlek: 2993/2992) → alakasız ürünler birbirinin "rengi" gibi görünüyordu
-    #    (Bond Pötikare Ceket'in renk swatch'ında Silva Gömlek açılıyordu).
-    def _id_cands(v):
-        c = {v, str(v)}
-        try:
-            c.add(int(v))
-        except Exception:
-            pass
-        return list(c)
-
-    _card_ors = []
-    if p.get("urun_karti_id") not in (None, ""):
-        _card_ors.append({"urun_karti_id": {"$in": _id_cands(p.get("urun_karti_id"))}})
-    if p.get("csv_card_id") not in (None, ""):
-        _card_ors.append({"csv_card_id": {"$in": _id_cands(p.get("csv_card_id"))}})
-    if _card_ors:
-        cur = db.products.find(
-            {"$or": _card_ors, "id": {"$ne": p["id"]}, "is_active": True}, _PROJ).limit(20)
-        async for s in cur:
-            if s["id"] in seen_ids or not _type_ok(s):
-                continue
-            seen_ids.add(s["id"]); siblings.append(_row(s))
-
-    # 2) STOK KODU ile de eşleştir — renk varyantları AYNI stok kodunu paylaşır (ör. FCFW1300005).
-    #    DENETİM FIX: anchor (kart id) TUTARSIZ olabilir (ör. Beyaz=2698 ama Acı Kahve/Siyah=2696)
-    #    → yalnız kart id ile gruplayınca Beyaz DÜŞÜYORDU. Artık stok kodu + model adı eşleşmesini
-    #    anchor ile BİRLİKTE kullanıp birleştiriyoruz (seen_ids dedup) → 3 renk de görünür.
-    #    İSİM GUARD (işletme): aynı stock_code'u FARKLI modeller paylaşabiliyor (ör.
-    #    "Siyah Bermuda Şort" ile "Mini Bermuda Şort" ikisi de FCSS2700004). Bu yüzden
-    #    stock_code eşleşmesi TEK BAŞINA yeterli değil — adayın "tüm renkler soyulmuş model
-    #    adı", mevcut ürününkiyle EŞLEŞMELİ (renk konumdan bağımsız). Böylece farklı model
-    #    aynı SKU'da olsa bile renk swatch'ına KARIŞMAZ; gerçek renk aileleri korunur.
-    #    Not: color-siblings YALNIZ ürün-seviyesi stock_code kullanır (varyant-seviyesi merge yok).
-    _sc = str(p.get("stock_code") or "").strip()
-    if _sc:
-        _self_model = _model_key(p)
-        cur = db.products.find(
-            {"stock_code": _sc, "id": {"$ne": p["id"]}, "is_active": True}, _PROJ).limit(20)
-        async for s in cur:
-            if s["id"] in seen_ids:
-                continue
-            # Her iki taraf da anlamlı model kimliğine indirgenebiliyorsa VE farklıysa →
-            # aynı SKU olsa da FARKLI ürün → renk swatch'ına katma.
-            if not _type_ok(s):
-                continue
-            if _self_model:
-                _cand_model = _model_key(s)
-                if _cand_model and _cand_model != _self_model:
-                    continue
-            seen_ids.add(s["id"]); siblings.append(_row(s))
-
-    # 3) MODEL ADI ile eşleştir (renk kelimesi soyulmuş taban ad) — kart id VE stok kodu farklı
-    #    eklenmiş renkleri de yakalar. Yalnız fallback DEĞİL: her zaman çalışır ve birleşir.
-    base = _strip_trailing_color(p.get("name") or "")
-    if base and len(base) >= 6:
-        rx = "^" + _re.escape(base) + r"(\s|$)"
-        cur = db.products.find(
-            {"name": {"$regex": rx, "$options": "i"}, "id": {"$ne": p["id"]},
-             "is_active": True}, _PROJ).limit(20)
-        async for s in cur:
-            if s["id"] in seen_ids or not _type_ok(s):
-                continue
-            seen_ids.add(s["id"]); siblings.append(_row(s))
-
-    # ÜYELERE ÖZEL: misafire üyelere özel renk kardeşi gösterilmez; kaynak ürün üyelere
-    # özelse hiç kardeş dönmez.
-    if not request_is_member(request):
-        if await product_id_is_members_only(product_id):
-            return {"siblings": []}
-        siblings = await strip_members_only(request, siblings)
-    return {"siblings": siblings}
-
-
 # ── BENZER ÜRÜNLER (similar) — promo/sanal kategorileri HARİÇ tutup GERÇEK ürün-tipini kullanır.
 # Kök promo kategorileri (İNDİRİM/KOLEKSİYONLAR/EN YENİLER…) ve tüm alt ağaçları benzerlik
 # temeli OLAMAZ; ürünün en spesifik GERÇEK tip kategorisi (Şort/Etek/Elbise…) esas alınır.
@@ -2546,116 +2369,6 @@ async def get_similar_products(product_id: str, request: Request, limit: int = 4
     return {"similar": out, "basis": basis}
 
 
-# Türkçe moda renk sözlüğü — ad-tabanlı renk-kardeşi eşleştirmesi için (sondaki renk sözcüğü).
-_TR_COLOR_WORDS = {
-    "siyah", "beyaz", "ekru", "krem", "krem rengi", "bej", "kahverengi", "kahve", "vizon",
-    "camel", "taş", "tas", "gri", "antrasit", "füme", "fume", "lacivert", "mavi", "açık mavi",
-    "koyu mavi", "bebe mavi", "buz mavi", "petrol", "petrol mavisi", "mint", "su yeşili",
-    "yeşil", "yesil", "haki", "koyu yeşil", "açık yeşil", "zümrüt", "benetton", "kırmızı",
-    "kirmizi", "bordo", "pembe", "açık pembe", "koyu pembe", "pudra", "gül kurusu", "fuşya",
-    "fusya", "somon", "mor", "lila", "leylak", "turuncu", "sarı", "sari", "hardal", "altın",
-    "altin", "gold", "gümüş", "gumus", "silver", "metalik", "leopar", "zebra", "yılan",
-    "çok renkli", "desenli", "ebru", "koyu gri", "açık gri", "menekşe", "nar çiçeği",
-    # Ek yaygın renkler (color-siblings model-guard'ı için — eksik renk aileyi BÖLMESİN).
-    # SADECE net renkler; tip/kumaş sözcükleri (kot, jean…) EKLENMEZ.
-    "acı kahve", "aci kahve", "koyu kahve", "açık kahve", "acik kahve", "mürdüm", "murdum",
-    "vişne", "visne", "indigo", "kiremit", "tarçın", "tarcin", "bakır", "bakir",
-    "fıstık", "fistik", "gece mavisi", "koyu bordo", "bronz",
-}
-
-
-def _strip_trailing_color(name: str) -> str:
-    """Ad sonundaki renk sözcüğünü (1-2 kelime) soyup taban model adını döndürür."""
-    words = (name or "").strip().split()
-    if not words:
-        return ""
-    last1 = words[-1].lower()
-    last2 = " ".join(words[-2:]).lower() if len(words) >= 2 else ""
-    if last2 and last2 in _TR_COLOR_WORDS:
-        return " ".join(words[:-2]).strip()
-    if last1 in _TR_COLOR_WORDS:
-        return " ".join(words[:-1]).strip()
-    return ""  # renk sözcüğü bulunamadı → ada göre gruplama yapma (yanlış eşleşme riski)
-
-
-def _trailing_color(name: str) -> str:
-    """Ad sonundaki renk sözcüğünü (etiket için) döndürür."""
-    words = (name or "").strip().split()
-    if not words:
-        return ""
-    last2 = " ".join(words[-2:]).lower() if len(words) >= 2 else ""
-    if last2 and last2 in _TR_COLOR_WORDS:
-        return " ".join(words[-2:])
-    if words[-1].lower() in _TR_COLOR_WORDS:
-        return words[-1]
-    return ""
-
-
-def _strip_all_colors(name: str) -> str:
-    """Addaki TÜM renk sözcüklerini (KONUMDAN BAĞIMSIZ — başta/sonda/ortada; çok-kelimeli
-    renkler dahil) çıkarıp Türkçe-duyarsız normalize eder → model kimliği.
-
-    color-siblings adım (2) guard'ı için: aynı stock_code'u paylaşan ama FARKLI model olan
-    ürünler (ör. "Siyah Bermuda Şort" vs "Mini Bermuda Şort Siyah") birbirine karışmasın.
-      "Siyah Bermuda Şort"       → "bermuda sort"
-      "Mini Bermuda Şort Siyah"  → "mini bermuda sort"   (eşleşmez → ayrılır)
-    Ad tamamen renkten ibaretse '' döner → çağıran guard'ı UYGULAMAZ (yanlış boş-eşleşme yok)."""
-    words = (name or "").strip().split()
-    if not words:
-        return ""
-    low = [w.lower() for w in words]
-    n = len(words)
-    keep = [True] * n
-    i = 0
-    while i < n:
-        # Önce 2-kelimeli renkler ("Açık Mavi", "Gül Kurusu", "Krem Rengi"…).
-        if i + 1 < n and f"{low[i]} {low[i + 1]}" in _TR_COLOR_WORDS:
-            keep[i] = keep[i + 1] = False
-            i += 2
-            continue
-        if low[i] in _TR_COLOR_WORDS:
-            keep[i] = False
-        i += 1
-    base = " ".join(w for w, k in zip(words, keep) if k)
-    return _cnorm(base)  # küçük harf + Türkçe-duyarsız + boşluk normalize
-
-
-def _resolve_prod_color(prod: dict) -> str:
-    """Ürünün rengini bulur: color alanı → varyant color → 'Web Color'/'Renk' attribute →
-    son çare addaki sondaki renk sözcüğü. (Statik sözlükten BAĞIMSIZ — asıl renk verisi.)"""
-    c = (prod.get("color") or "").strip()
-    if c:
-        return c
-    for v in (prod.get("variants") or []):
-        if isinstance(v, dict) and (v.get("color") or "").strip():
-            return v["color"].strip()
-    for a in (prod.get("attributes") or []):
-        if isinstance(a, dict) and (a.get("name") or a.get("type") or "").strip().lower() in (
-                "web color", "renk", "color"):
-            if (a.get("value") or "").strip():
-                return str(a["value"]).strip()
-    return _trailing_color(prod.get("name") or "")
-
-
-def _model_key(prod: dict) -> str:
-    """Ürünün RENK-BAĞIMSIZ model kimliği — color-siblings adım (2) guard'ı için.
-
-    SAĞLAM: önce ürünün KENDİ rengini (color/variant/attribute) addan çıkarır (statik
-    sözlük eksikse bile Acı Kahve/Mürdüm gibi renkler doğru soyulur), sonra kalanı statik
-    renk sözlüğüyle de temizler (renk-önde 'Siyah X' gibi durumlar). Böylece aynı SKU'yu
-    paylaşan FARKLI modeller ('Siyah Bermuda Şort' vs 'Mini Bermuda Şort') ayrılır; gerçek
-    çok-renkli aileler ('...Ceket Bej' / '...Ceket Mürdüm') AYNI kimliğe iner → bozulmaz."""
-    name = prod.get("name") or ""
-    if not name.strip():
-        return ""
-    color = _resolve_prod_color(prod)
-    base = name
-    if color:
-        cwords = set(_cnorm(color).split())
-        if cwords:
-            base = " ".join(w for w in name.split() if _cnorm(w) not in cwords)
-    return _strip_all_colors(base)
-
 async def _expand_category_ids(selected_ids):
     """Seçilen kategori id'lerini atalarıyla birlikte düzleştirir (vitrin category_ids için)."""
     sel = [str(c) for c in (selected_ids or []) if c]
@@ -2682,10 +2395,6 @@ def _distinct_variant_colors(variants):
     return seen
 
 
-def _variants_for_color(variants, color):
-    """Verilen renge ait varyantları (beden vb.) döndürür."""
-    cl = (color or "").strip().lower()
-    return [v for v in (variants or []) if (v.get("color") or "").strip().lower() == cl]
 
 
 def _size_tables_last(images):
@@ -2696,9 +2405,6 @@ def _size_tables_last(images):
     normal = [im for im in images if not (isinstance(im, dict) and im.get("is_size_table"))]
     tables = [im for im in images if isinstance(im, dict) and im.get("is_size_table")]
     return normal + tables
-
-
-
 
 
 _SPEC_PASSTHRU_NUM = ("width", "depth", "height", "product_weight", "cargo_weight")
@@ -2772,19 +2478,19 @@ async def create_product(
             product_data["barcode"] = barcode
 
     _pid = await generate_short_id("products")
-    # Urun Kart ID: form "Kimlik & Kodlar > Urun Kart ID" (ticimax_fields.URUNKARTIID)
+    # Urun Kart ID: form "Kimlik & Kodlar > Urun Kart ID" (catalog_fields.URUNKARTIID)
     # veya ust-seviye urun_karti_id; ikisi de bossa SON kart id + 1 otomatik atanir.
     # ÖNEMLİ: csv_card_id'ye FALLBACK YOK — yoksa renk kardesleri AYNI kart id'yi alirdi.
     # Renk kardesligi ayri bir grup anahtariyla (csv_card_id) tutulur.
-    _tf_in = product_data.get("ticimax_fields") or {}
+    _tf_in = product_data.get("catalog_fields") or {}
     urun_karti_id = str(_tf_in.get("URUNKARTIID") or product_data.get("urun_karti_id") or "").strip()
     if not urun_karti_id:
         urun_karti_id = await generate_urun_karti_id()
     # Renk-kardesi gruplama anahtari: gelen csv_card_id (coklu-renk POST'larinda PAYLASILIR)
     # yoksa bu urunun kendi kart id'si. Storefront "Diger Renkler" swatch'i bununla baglar.
     group_card_id = str(product_data.get("csv_card_id") or "").strip() or urun_karti_id
-    # liste/etiket (urun_karti_id) ile form (ticimax_fields.URUNKARTIID) senkron
-    product_data["ticimax_fields"] = {**_tf_in, "URUNKARTIID": urun_karti_id}
+    # liste/etiket (urun_karti_id) ile form (catalog_fields.URUNKARTIID) senkron
+    product_data["catalog_fields"] = {**_tf_in, "URUNKARTIID": urun_karti_id}
     _card = urun_karti_id
     _sel_cats = product_data.get("categories")
     if not _sel_cats and product_data.get("category_id"):
@@ -2804,7 +2510,7 @@ async def create_product(
     product = {
         "id": _pid,
         "urun_karti_id": urun_karti_id,
-        "ticimax_fields": product_data.get("ticimax_fields", {}),
+        "catalog_fields": product_data.get("catalog_fields", {}),
         "name": product_data.get("name", ""),
         # Slug HER ZAMAN {ad}-{ürün kart id} (işletme: "ürün kart id olması gerekir"). Eskiden admin
         # formu {ad}-{Date.now()} gönderiyordu (ör. ...-1788251144324) ve olduğu gibi kabul ediliyordu.
@@ -2846,19 +2552,12 @@ async def create_product(
         "vat_rate": product_data.get("vat_rate", default_vat),
         "use_default_markup": product_data.get("use_default_markup", True),
         "markup_rate": float(product_data.get("markup_rate", 0)),
-        "trendyol_attributes": product_data.get("trendyol_attributes", {}),
-        "hepsiburada_attributes": product_data.get("hepsiburada_attributes", {}),
-        "temu_attributes": product_data.get("temu_attributes", {}),
-        "hepsiburada_category_id": product_data.get("hepsiburada_category_id", ""),
-        "hepsiburada_category_name": product_data.get("hepsiburada_category_name", ""),
-        "temu_category_id": product_data.get("temu_category_id", ""),
-        "temu_category_name": product_data.get("temu_category_name", ""),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     await _apply_spec_fields(product, product_data)
-    # Ekipman kataloğu: renkler AYRI ürüne bölünmez — tüm varyantlar tek kartta kalır.
     
+    # Ekipman kataloğu: renkler AYRI ürüne bölünmez — tüm varyantlar tek kartta kalır.
     _all_variants = product.get("variants") or []
     _colors = _distinct_variant_colors(_all_variants)
     # Kardeş gruplama anahtarı (eski veriyle uyum için) her zaman yazılır
@@ -2880,7 +2579,6 @@ async def create_product(
     return {"id": product["id"], "message": "Ürün oluşturuldu"}
 
 
-
 @router.post("/{product_id}/duplicate", dependencies=[Depends(require_admin)])
 async def duplicate_product(product_id: str):
     """Bir ürünü BAĞIMSIZ kopya olarak çoğaltır.
@@ -2889,7 +2587,7 @@ async def duplicate_product(product_id: str):
       aynı kart id'yi ALMAZ). Böylece "farklı ürün = farklı kart id" sağlanır.
     - Tüm varyantlara aralıktan YENİ benzersiz barkod üretilir → orijinalin
       barkodlarıyla çakışmaz (eski 'duplicate'in patlama sebebi buydu).
-    - Varyant id'leri yenilenir; Ticimax varyant id'si (urun_id) temizlenir.
+    - Varyant id'leri yenilenir; eski altyapı varyant id'si (urun_id) temizlenir.
     - stock_code AYNI bırakılır (aynı modelin başka rengini açmak için pratik;
       gerekiyorsa kopyada elle değiştirilir).
     Kopya orijinalin renk-kardeşi DEĞİLDİR (csv_card_id yeni kart id'ye eşitlenir).
@@ -2908,16 +2606,16 @@ async def duplicate_product(product_id: str):
     clone["urun_karti_id"] = new_card
     clone["csv_card_id"] = new_card          # bağımsız kart (renk-kardeşi değil)
     clone["urun_id"] = ""
-    _tf = dict(clone.get("ticimax_fields") or {})
+    _tf = dict(clone.get("catalog_fields") or {})
     _tf["URUNKARTIID"] = new_card
     _tf["URUNID"] = ""
-    clone["ticimax_fields"] = _tf
+    clone["catalog_fields"] = _tf
 
     base_name = p.get("name") or ""
     clone["name"] = f"{base_name} (Kopya)"
     clone["slug"] = slug_with_card_id(clone["name"], new_card)
 
-    # Varyantlar: yeni id + yeni barkod, Ticimax varyant id'si temizlenir
+    # Varyantlar: yeni id + yeni barkod, eski altyapı varyant id'si temizlenir
     new_vars = []
     for v in (p.get("variants") or []):
         nv = dict(v)
@@ -2942,7 +2640,7 @@ async def duplicate_product(product_id: str):
 
 @router.post("/assign-variant-ids", dependencies=[Depends(require_admin)])
 async def assign_variant_ids(payload: dict):
-    """Varyantlara BEDEN bazında Ticimax varyant id'si (urun_id) atar.
+    """Varyantlara BEDEN bazında eski altyapı varyant id'si (urun_id) atar.
 
     Beden id'si eksik ürünler için tek seferlik düzeltme (ör. siyah bermuda şort).
     Body:
@@ -3087,7 +2785,7 @@ async def update_product(
         # Mevcut ürüne SONRADAN eklenen varyantlara da id + urun_id (beden ID) ata.
         # Önceden yalnızca create_product atıyordu; update_product yalnız barkod üretip
         # id/urun_id'yi BOŞ bırakıyordu → yeni varyantlar id'siz kalıyor, varyant eşleşmesi
-        # (sepet/HB/Trendyol) ve stok işlemleri bozuluyordu.
+        # (sepet/harici kanal) ve stok işlemleri bozuluyordu.
         used_uid_set = await build_used_urun_id_set()
         for v in variants:
             if not v.get("barcode") or v.get("barcode") == "":
@@ -3143,8 +2841,8 @@ async def update_product(
             product_data["category_slug"] = ""
             product_data["breadcrumb"] = ""
 
-    # Form "Urun Kart ID" alani ticimax_fields.URUNKARTIID'e yazar -> ust-seviye ile senkronla
-    _tf_u = product_data.get("ticimax_fields") or {}
+    # Form "Urun Kart ID" alani catalog_fields.URUNKARTIID'e yazar -> ust-seviye ile senkronla
+    _tf_u = product_data.get("catalog_fields") or {}
     _kid = str(_tf_u.get("URUNKARTIID") or product_data.get("urun_karti_id") or "").strip()
     if _kid:
         product_data["urun_karti_id"] = _kid
@@ -3169,12 +2867,11 @@ async def update_product(
     # veri doluyken boş gelirse o alan $set'ten ÇIKARILIR (mevcut korunur). Gerçek temizlik
     # nadir ve ayrı bir işlem olmalı; kaza eseri boş kayıt veri kaybı yapmasın.
     _guard_keys = ("variants", "images", "attributes", "description",
-                   "hepsiburada_attributes", "temu_attributes",
-                   # Panel listesi bu iki ağır alanı ARTIK GÖNDERMİYOR (liste kırpması).
+                   # Panel listesi bu ağır alanı ARTIK GÖNDERMİYOR (liste kırpması).
                    # Düzenleme modalı ürünü tek tek yeniden çekiyor; o çekim başarısız
                    # olup listedeki kırpılmış nesneye düşülürse boş {} ile kaydetmek
                    # mevcut veriyi silerdi — kalkana eklendi.
-                   "trendyol_attributes", "ticimax_fields")
+                   "catalog_fields", "specs")
     _maybe_blank = [k for k in _guard_keys if k in product_data and not product_data.get(k)]
     if _maybe_blank:
         _ex = await db.products.find_one(
@@ -3252,50 +2949,6 @@ async def update_product(
             current_user=current_user,
             request=request,
         )
-
-    # RENK KARDEŞİ OTOMATİK SENKRONU (kullanıcı isteği): stok kodu AYNI olan kartlarda
-    # model-düzeyi alanlar bu kayıtla birlikte eşitlenir — Sezon, Beden Önerisi (Kalıp)
-    # ve Özellikler (Renk/Web Color HARİÇ; kardeşin kendi rengi korunur). Varyantlar,
-    # stok, fiyat, görseller, isim/slug ASLA kopyalanmaz.
-    try:
-        _scode = str((product_data.get("stock_code") if "stock_code" in product_data
-                      else existing.get("stock_code")) or "").strip()
-        COLOR_NAMES = {"renk", "web color", "color"}
-        def _cn(s): return (s or "").strip().lower()
-        # ══ VERİ KORUMASI (ölçü tablosu SİLİNME bugının ikizi) ══════════════════════════════
-        # Kardeşe YALNIZ DOLU değer yansıtılır. Boş liste/dict/string yansıtılırsa (panel
-        # yüklenmeden/boşken Kaydet) aynı stok kodlu TÜM renk kardeşlerinin Özellikleri/Sezonu
-        # tek hamlede silinir. Bu yüzden boş değerler senkron dışı bırakılır (tek üründe temizlik
-        # istenirse o üründe yapılır; kardeşlere boşluk YAYILMAZ).
-        _sib_base = {}
-        if str(product_data.get("season") or "").strip():
-            _sib_base["season"] = product_data.get("season")
-        if str(product_data.get("size_advice") or "").strip():
-            _sib_base["size_advice"] = product_data.get("size_advice")
-        _has_attrs = isinstance(product_data.get("attributes"), list) and len(product_data["attributes"]) > 0
-        _mp_keys = [k for k in ("hepsiburada_attributes", "temu_attributes")
-                    if isinstance(product_data.get(k), dict) and len(product_data.get(k)) > 0]
-        if _scode and (_sib_base or _has_attrs or _mp_keys):
-            _src_attrs_nc = ([a for a in product_data["attributes"]
-                              if isinstance(a, dict) and _cn(a.get("name") or a.get("type")) not in COLOR_NAMES]
-                             if _has_attrs else None)
-            async for s in db.products.find(
-                    {"stock_code": _scode, "id": {"$ne": product_id}, "is_deleted": {"$ne": True}},
-                    {"_id": 0, "id": 1, "attributes": 1, "hepsiburada_attributes": 1, "temu_attributes": 1}):
-                _set = dict(_sib_base)
-                if _src_attrs_nc is not None:
-                    _s_color = [a for a in (s.get("attributes") or [])
-                                if isinstance(a, dict) and _cn(a.get("name") or a.get("type")) in COLOR_NAMES]
-                    _set["attributes"] = _src_attrs_nc + _s_color
-                for _k in _mp_keys:
-                    _src_map = {k: v for k, v in product_data[_k].items() if _cn(k) not in COLOR_NAMES}
-                    _s_map_color = {k: v for k, v in (s.get(_k) or {}).items() if _cn(k) in COLOR_NAMES}
-                    _set[_k] = {**_src_map, **_s_map_color}
-                if _set:
-                    _set["updated_at"] = product_data["updated_at"]
-                    await db.products.update_one({"id": s["id"]}, {"$set": _set})
-    except Exception as _sib_e:
-        logger.error(f"[renk-kardeşi senkron {product_id}] {_sib_e}")
 
     await record_admin_audit(
         db, action="product.update", entity_type="product", entity_id=product_id,
@@ -3513,7 +3166,7 @@ async def import_attributes_from_xlsx(
 async def save_attributes_bulk(payload: dict, current_user: dict = Depends(require_admin)):
     """
     Save attributes to multiple products.
-    Payload: { updates: [{product_id, attributes: [{type, value, trendyol_attr_id, trendyol_attr_value_id}]}] }
+    Payload: { updates: [{product_id, attributes: [{type, value, harici kanal}]}] }
     """
     updates = payload.get("updates", [])
     if not updates:
@@ -3749,7 +3402,7 @@ async def reconcile_stock_desync(
       • phantom_sold_out (parent>0 ama Σvaryant=0): admin'de "stok var" görünür, STOREFRONT
         efektif stoğu (=Σvaryant) 0 hesaplayıp **TÜKENDİ** gösterir. (WhatsApp'ta bildirilen durum.)
       • phantom_stock (parent=0 ama Σvaryant>0): tersi.
-    Save/sipariş DIŞI yollardan (ör. pazaryeri/Ticimax stok senkronu) gelen drift burada yakalanır.
+    Save/sipariş DIŞI yollardan (ör. pazaryeri/eski altyapı stok senkronu) gelen drift burada yakalanır.
 
     dry_run=True (VARSAYILAN): yalnız RAPOR — hiçbir şey YAZILMAZ.
     dry_run=False: parent := Σvaryant olarak sabitler. OVERSELL RİSKİ YOK (parent türetilmiş alandır;
@@ -3899,7 +3552,6 @@ _PID_REFS = [
     ("favorites", "scalar", "product_id"),
     ("reviews", "scalar", "product_id"),
     ("product_reviews", "scalar", "product_id"),
-    ("trendyol_review_sync_products", "scalar", "product_id"),
     ("stock_notifications", "scalar", "product_id"),
     ("stock_alerts", "scalar", "product_id"),
     ("product_costs", "scalar", "product_id"),
@@ -4399,14 +4051,14 @@ async def export_products_excel(
             pub_date_from=pub_date_from, pub_date_to=pub_date_to,
             sizes=sizes, colors=colors,
         )
-        # PERF: Excel için yalnızca KULLANILAN alanları çek (ticimax_fields, pazaryeri
+        # PERF: Excel için yalnızca KULLANILAN alanları çek (catalog_fields, pazaryeri
         # attribute blob'ları, images vb. ÇEKİLMEZ) → büyük katalogda bellek/süre düşer,
         # Railway timeout/OOM riski azalır.
         _proj = {
             "_id": 0, "id": 1, "name": 1, "category_name": 1, "brand": 1,
             "stock_code": 1, "barcode": 1, "price": 1, "sale_price": 1, "stock": 1,
             "description": 1, "is_active": 1, "variants": 1, "attributes": 1, "season": 1,
-            # #71: alış fiyatı (ALISFIYATI) + pazaryeri taban fiyatı (Trendyol fiyatı hesabı için)
+            # #71: alış fiyatı (ALISFIYATI) + pazaryeri taban fiyatı (harici kanal fiyatı hesabı için)
             "purchase_price": 1, "cost_price": 1, "member_price_1": 1,
             # Liste ekranındaki "Ürün Kart ID" ve "Eklenme Tarihi" sütunları Excel'de de olsun.
             "urun_karti_id": 1, "created_at": 1, "updated_at": 1,
@@ -4458,7 +4110,7 @@ async def export_products_excel(
         
         # ── ÖZELLİKLERİ BİÇİMDEN BAĞIMSIZ OKU ───────────────────────────────────────
         # Ürün özellikleri katalogda BİRDEN ÇOK biçimde duruyor (panel kaydı, Excel içe
-        # aktarımı, XML/Ticimax açıklama ayrıştırması, pazaryeri eşlemeleri). Dışa aktarma
+        # aktarımı, XML/eski altyapı açıklama ayrıştırması, pazaryeri eşlemeleri). Dışa aktarma
         # eskiden YALNIZ [{name|type, value}] biçimini tanıyordu; diğerleri Excel'e HİÇ
         # yazılmıyordu — "özellik alanını doldurduk ama Excel'de yok" şikâyetinin kaynağı.
         # Ayrıca `if attr.get("value")` kullanıldığı için 0 / False / [] gibi FALSY ama
@@ -5178,9 +4830,9 @@ async def cleanup_ghost_duplicates(
     """Aynı `id` değerine sahip BİRDEN ÇOK products dökümanını bulur; en sağlıklı
     KOPYAYI KORUR, diğer (hayalet/iskelet) kopyaları siler.
 
-    NEDEN VAR: Ticimax migrasyonundan aynı `id`'li ikiz dökümanlar kaldı. Liste
+    NEDEN VAR: eski altyapı migrasyonundan aynı `id`'li ikiz dökümanlar kaldı. Liste
     endpoint'i `is_active: True` filtresiyle hayaleti GİZLİYOR, ama filtresiz
-    `find_one({"id": ...})` çağrıları (HB motoru, debug-payload) İLK eşleşen olarak
+    `find_one({"id": ...})` çağrıları (harici kanal motoru, debug-payload) İLK eşleşen olarak
     HAYALETİ buluyor → ürün kartına yazılan özellikler motor tarafında GÖRÜNMÜYOR
     ("Kalıp eksik" hatasının kökü). update_one ile find_one aynı id'de FARKLI
     dökümanlara gidebildiği için yazma-okuma tutarsızlığı oluşuyor.

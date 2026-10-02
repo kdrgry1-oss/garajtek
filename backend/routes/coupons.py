@@ -466,7 +466,7 @@ async def diagnose_coupon_for_user(code: str, email: str = "",
 
 @public_router.post("/available")
 async def available_coupons(payload: dict, current_user: dict = Depends(get_current_user)):
-    """Trendyol Go benzeri: bu sepet için kullanıcının kullanabileceği aktif kuponları döner.
+    """harici kanal Go benzeri: bu sepet için kullanıcının kullanabileceği aktif kuponları döner.
     Hesaplanmış discount değerlerini de içerir (tıklanınca sepete direkt uygulanır).
     Payload: {cart_total, items}
     GÜVENLİK (DENETİM SEC-2 F1): kimlik yalnız JWT'den (istemci user_id/email'ine güvenilmez);

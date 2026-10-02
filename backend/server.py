@@ -176,7 +176,7 @@ async def lifespan(app: FastAPI):
         except Exception as _de:
             logger.error(f"[guvenlik] customer-admin temizligi hatasi: {_de}")
 
-        # TELAFİ: bozuk/eksik XML feed yüzünden pasife alınmış ("ticimax_xml_missing") ürünleri
+        # TELAFİ: bozuk/eksik XML feed yüzünden pasife alınmış ("eski altyapı") ürünleri
         # TEK SEFER geri aktif et — "bazı ürünler yok oldu" sorununu otomatik onarır (bayrakla 1 kez).
         try:
             from routes.integrations_common import restore_xml_missing_products_once
@@ -262,13 +262,8 @@ async def lifespan(app: FastAPI):
             partialFilterExpression={"partial_cancel_amount": {"$gt": 0}},
             name="partial_cancel_updated_at")
         # İADE / GİDER PUSULASI performansı (Atlas "Scanned/Returned > 1000" uyarısı):
-        # bu koleksiyonlar order_number/claim_id/return_id/status ile SÜREKLİ sorgulanıyordu
+        # bu koleksiyonlar order_number/return_id/status ile SÜREKLİ sorgulanıyordu
         # ama index YOKTU → her sorgu tam koleksiyon taraması. Sık filtre alanlarını indeksle.
-        await db.trendyol_claims.create_index("order_number")
-        await db.trendyol_claims.create_index([("platform", 1), ("claim_status", 1)])
-        await db.trendyol_claims.create_index([("claim_status", 1)])
-        await db.trendyol_claims.create_index([("created_date", -1)])
-        await db.trendyol_claims.create_index("has_gider_pusulasi")
         await db.customer_returns.create_index("order_id")
         await db.customer_returns.create_index("order_number")
         await db.customer_returns.create_index([("status", 1), ("created_at", -1)])
@@ -450,6 +445,9 @@ async def lifespan(app: FastAPI):
     # Tek seferlik migrasyon: kapida odemeyi varsayilan olarak KAPAT.
     # Admin panelinden (Ayarlar > Odeme Yontemleri) tekrar acilabilir; bu blok
     # _cod_default_off_v1 isaretiyle korundugu icin SADECE BIR KEZ calisir ve
+        # Eski ek katalog alanı anahtarı → catalog_fields (tek seferlik, bayraklı, veri silmez)
+        from legacy_migrations import migrate_catalog_fields_once as _mig_cf
+        _asyncio.create_task(_mig_cf(db))
     # admin sonradan tekrar acarsa bir daha kapatmaz.
     try:
         _cfg = await db.settings.find_one({"id": "main"}, {"_id": 0}) or {}
@@ -566,7 +564,7 @@ _docs_enabled = os.environ.get("ENABLE_API_DOCS", "").strip() == "1" or \
 app = FastAPI(
     title="E-Commerce API",
     version="3.0",
-    description="Modular E-Commerce API with Iyzico, Trendyol, MNG Kargo, GIB integrations",
+    description="Modular E-Commerce API with Iyzico, MNG/Aras/PTT Kargo and e-invoice integrations",
     lifespan=lifespan,
     docs_url="/docs" if _docs_enabled else None,
     redoc_url="/redoc" if _docs_enabled else None,
@@ -780,7 +778,7 @@ api_router.include_router(reviews_public_router)
 api_router.include_router(reviews_admin_router)
 api_router.include_router(seo_public_router)
 api_router.include_router(seo_admin_router)
-# Ticimax P1 — catalog extras, ops, reports, communications
+# eski altyapı P1 — catalog extras, ops, reports, communications
 for _r in (
     brands_router, tags_router, member_groups_router, announcements_router, popups_router,
     storefront_extras_router,
@@ -823,7 +821,7 @@ from routes.email_marketing import admin_router as email_mkt_admin_router, publi
 api_router.include_router(email_mkt_admin_router)
 api_router.include_router(email_mkt_public_router)
 api_router.include_router(rooftr_returns_router)
-# Site iadeleri — toplu gider pusulası (eski /integrations/trendyol/claims/gp-bulk-range yerine)
+# Site iadeleri — toplu gider pusulası (eski /integrations/harici kanal/claims/gp-bulk-range yerine)
 from routes.returns import router as returns_router
 api_router.include_router(returns_router)
 # Toplu fiyat/stok Excel ops + stok uyarı + yeniden sipariş önerisi
@@ -990,7 +988,7 @@ async def audit_unpaid_confirmed_card_orders_once() -> None:
                 {"_id": 0, "order_number": 1, "status": 1, "payment_status": 1, "total": 1,
                  "created_at": 1, "iyzico_payment_id": 1, "needs_reconciliation": 1,
                  "imported_from": 1, "platform": 1}).limit(2000):
-            # AKTARILMIŞ GEÇMİŞ (Ticimax/pazaryeri) siparişleri kusur DEĞİL: bu sistemde hiç
+            # AKTARILMIŞ GEÇMİŞ (eski altyapı/pazaryeri) siparişleri kusur DEĞİL: bu sistemde hiç
             # ödeme akışından geçmediler, payment_status aktarımda hiç 'paid' yazılmadı.
             if o.get("imported_from") or (o.get("platform") and o.get("platform") != "site"):
                 imported += 1
@@ -1504,7 +1502,7 @@ async def _stock_trace_block(q: str = "") -> dict:
                     _dl = it.get("delta")
                     # BAZI YAZICILAR 'qty' KULLANIYOR: pazaryeri iade (claim) geri-stok
                     # satırları delta yerine qty yazıyor (integrations_common.py:2198,
-                    # integrations_trendyol.py:7037). $inc GERÇEKTEN çalışmış ama defter
+                    # (kaldırılan entegrasyon)). $inc GERÇEKTEN çalışmış ama defter
                     # satırı 'delta' okuyan her yere 0 görünüyor. Burada doğru okunur;
                     # kaynaktaki alan adı ayrıca düzeltilmelidir.
                     if _dl is None and it.get("qty") is not None:
@@ -1685,9 +1683,9 @@ async def _order_lookup(nos: str = "") -> dict:
 async def _iade_listesi(start_date: str = "", end_date: str = "") -> dict:
     """SALT OKUNUR: dönemdeki iade belgelerimizin KOMPAKT dökümü.
 
-    Trendyol'un "İadeleriniz" Excel'iyle iade iade kıyas için iki kaynak:
+    harici kanal "İadeleriniz" Excel'iyle iade iade kıyas için iki kaynak:
       • gider_pusulasi — raporun İADE saydığı otantik belge (numaralı = kesinleşmiş)
-      • trendyol_claims — Trendyol'dan senkronlanan iade talepleri ve kalem statüleri
+      • harici kanal — harici kanal senkronlanan iade talepleri ve kalem statüleri
     Aralık, pusulanın kesildiği / talebin açıldığı / onaylandığı tarihlerden HERHANGİ
     biri aralıktaysa kaydı içerir (haziran talebinin pusulası temmuzda kesilmiş olabilir).
     Müşteri kişisel verisi DÖNMEZ; yalnız sipariş no, tarih, tutar, barkod, adet.
@@ -1708,24 +1706,7 @@ async def _iade_listesi(start_date: str = "", end_date: str = "") -> dict:
                        [[str((i or {}).get("barcode") or ""), (i or {}).get("quantity")]
                         for i in (g.get("items") or [])],
                        g.get("source") or ""])
-        cl = []
-        async for c in db.trendyol_claims.find(
-                {"$or": [{"created_date": {"$gte": s, "$lte": e}},
-                         {"return_approved_at": {"$gte": s, "$lte": e}}]},
-                {"_id": 0, "order_number": 1, "claim_id": 1, "claim_status": 1,
-                 "claim_type": 1, "created_date": 1, "return_approved_at": 1,
-                 "refund_amount": 1, "items": 1}):
-            _it = []
-            for i in (c.get("items") or []):
-                i = i or {}
-                _it.append([str(i.get("barcode") or ""),
-                            i.get("quantity") or 1,
-                            i.get("status") or i.get("claim_item_status") or ""])
-            cl.append([str(c.get("order_number") or ""), str(c.get("claim_id") or ""),
-                       c.get("claim_status") or "", c.get("claim_type") or "",
-                       str(c.get("created_date") or "")[:19],
-                       str(c.get("return_approved_at") or "")[:19],
-                       c.get("refund_amount"), _it])
+        cl = []   # site dışı kanal iade talepleri bu mağazada tutulmaz
         return {"aralik": [s, e],
                 "pusula_alanlar": ["siparis", "kocan_no", "tarih", "net", "kalemler", "kaynak"],
                 "pusulalar": gp,
@@ -1883,7 +1864,7 @@ async def _rapor_sorgu(q: str, start_date: str = "", end_date: str = "", source:
     from routes.report_assistant import _cagir, _temizle
     from routes.report_dedup import load_dup_order_numbers as _ldc_rq
     from fastapi.routing import APIRoute
-    # Uçlar router bağımlılığı (load_dup_dep) OLMADAN doğrudan çağrılıyor: Ticimax kopya
+    # Uçlar router bağımlılığı (load_dup_dep) OLMADAN doğrudan çağrılıyor: eski altyapı kopya
     # elemesi yüklenmezse soğuk süreçte ay rakamları şişik çıkıyordu. Önce yükle.
     try:
         await _ldc_rq()
@@ -2083,27 +2064,24 @@ async def _destek_teshis(mod: str = "", eposta: str = "") -> dict:
     if mod == "siparis":
         # Tek sipariş PARA teşhisi (PII YOK): kalemler, tutar alanları, fatura alanları.
         q = (eposta or "").strip()
-        ors = [{"order_number": q}, {"hepsiburada_order_number": q}, {"hepsiburada_package_number": q},
-               {"marketplace_order_id": q}, {"package_number": q}, {"id": q},
-               {"hepsiburada_package_numbers": q}]
+        ors = [{"order_number": q}, {"marketplace_order_id": q}, {"package_number": q}, {"id": q}]
         docs = []
         _money_keys = ("order_number", "platform", "status", "payment_status", "created_at",
                        "marketplace_order_date", "subtotal", "discount", "discount_total", "total",
-                       "total_amount", "shipping_cost", "marketplace_total", "hepsiburada_order_number",
-                       "hepsiburada_package_number", "hepsiburada_package_numbers", "package_number",
+                       "total_amount", "shipping_cost", "marketplace_total", "package_number",
                        "invoice_issued", "invoice_number", "invoice_type", "invoice_total",
                        "invoice_amount", "invoice_created_at", "invoice_lines_total",
-                       "invoice_payable", "invoice_items_count", "hepsiburada_invoice_uploaded",
-                       "hb_merged_packages", "merged_from", "split_from", "cancelled_items",
+                       "invoice_payable", "invoice_items_count",
+                       "merged_from", "split_from", "cancelled_items",
                        "partial_cancel", "updated_at")
         async for o in db.orders.find({"$or": ors}, {"_id": 0}).limit(10):
             its = []
             for it in (o.get("items") or []):
                 its.append({k: it.get(k) for k in (
                     "name", "sku", "barcode", "stock_code", "quantity", "price", "unit_price",
-                    "list_price", "sale_price", "discount_amount", "discount", "hb_discount",
+                    "list_price", "sale_price", "discount_amount", "discount",
                     "merchant_discount", "total", "line_total", "kdv_rate", "vat_rate", "status",
-                    "line_status", "package_number", "hb_line_id", "cancelled", "is_cancelled")
+                    "line_status", "package_number", "cancelled", "is_cancelled")
                     if it.get(k) not in (None, "")})
             d = {k: o.get(k) for k in _money_keys if o.get(k) not in (None, "")}
             d["kalem_sayisi"] = len(its)
@@ -2119,11 +2097,8 @@ async def _destek_teshis(mod: str = "", eposta: str = "") -> dict:
             docs.append(d)
         out["siparisler"] = docs
         try:
-            _fl = await db.settings.find_one({"id": "hb4153_fatura_yeniden_v1"}, {"_id": 0})
-            if _fl:
-                out["yeniden_kesim_is_sonucu"] = _fl
             import re as _re_fk
-            _fl2 = await db.settings.find({"id": {"$regex": "^fatura_yeniden_kesim:.*" + _re_fk.escape(q.replace("HB", ""))}},
+            _fl2 = await db.settings.find({"id": {"$regex": "^fatura_yeniden_kesim:.*" + _re_fk.escape(q)}},
                                           {"_id": 0}).to_list(5)
             if _fl2:
                 out["iptal_sonrasi_kesim"] = _fl2
@@ -2509,7 +2484,7 @@ async def _sales_audit_block(start_date: str = "", end_date: str = "",
     """Bağımsız satış denetimi (routes.reports.sales_audit_summary). Tarih verilmezse
     içinde bulunulan TÜRKİYE ayının 1'inden bugüne. Hata sağlık ucunu BOZMAZ.
 
-    `source` verilirse (trendyol/site/hepsiburada/temu) denetim o kanala daraltılır —
+    `source` verilirse (harici kanal/site/harici kanal) denetim o kanala daraltılır —
     "pazaryeri panelindeki rakam bizimkiyle tutuyor mu" sorusu ancak kanal kanal
     ölçülerek cevaplanabilir."""
     try:

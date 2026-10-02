@@ -67,7 +67,7 @@ RULE_CATALOG = [
      "help": "Açıkken müşteri iade/iptal sebebini doldurmadan talebi gönderemez."},
     {"group": "Sipariş & İptal", "key": "order.block_oversell", "label": "Stok yetersizse siparişi engelle (oversell koruması)",
      "type": "toggle", "default": True, "options": [True, False],
-     "help": "Açıkken sepetteki bir üründen stokta kalandan fazlası sipariş edilemez; stok yetmezse sipariş oluşturulmaz. Kapatılırsa ön-sipariş/backorder olur (stok eksiye düşebilir). Pazaryeri (Trendyol/Hepsiburada) siparişleri her hâlükârda engellenmez."},
+     "help": "Açıkken sepetteki bir üründen stokta kalandan fazlası sipariş edilemez; stok yetmezse sipariş oluşturulmaz. Kapatılırsa ön-sipariş/backorder olur (stok eksiye düşebilir)."},
     {"group": "Sipariş & İptal", "key": "order.max_qty_per_item", "label": "Kalem başı azami sipariş adedi",
      "type": "number", "default": 50, "unit": "adet", "options": [10, 20, 50, 100, 500],
      "help": "Tek bir üründen tek siparişte istenebilecek azami adet. Kötü niyetli dev miktarlı siparişlere karşı koruma; aşılırsa sipariş reddedilir."},
@@ -135,7 +135,7 @@ RULE_CATALOG = [
      "help": "AÇIK: 4000 TL+ (eşik) veya kupon ile kargo bedava verilen SİTE siparişlerinde faturaya "
              "(e-Arşiv + e-Fatura) 'Kargo Bedeli' + eşit 'Ücretsiz Kargo Kampanyası' iskonto satırı "
              "eklenir; net 0, toplam/matrah/KDV DEĞİŞMEZ (satır-seviyesi iskonto, GİB-güvenli). "
-             "Pazaryeri siparişlerine uygulanmaz. GİB reddederse ANINDA KAPATIN (deploy gerekmez)."},
+             "Yalnız site siparişlerine uygulanır. GİB reddederse ANINDA KAPATIN (deploy gerekmez)."},
     {"group": "İade & Değişim", "key": "return.presume_delivered_after_days", "label": "Varsayılan teslim (kargo durumu gelmezse)",
      "type": "number", "default": 5, "unit": "gün", "options": [3, 4, 5, 7, 10],
      "help": "Kargo firması teslimat durumunu raporlamazsa (MNG/DHL statü takılırsa), kargoya "
@@ -288,7 +288,7 @@ RULE_CATALOG = [
      "label": "Satış raporu neti: dönem siparişlerinin SONRADAN kesinleşen iade/iptalleri de düşülsün",
      "type": "toggle", "default": True,
      "help": "Açık: Seçili dönemin siparişlerine dönem bittikten sonra (bugüne kadar) kesilen iade ve iptaller de "
-             "o dönemin netinden düşülür (Trendyol paneliyle aynı). Kapalı: yalnız seçili tarih aralığının sonuna "
+             "o dönemin netinden düşülür. Kapalı: yalnız seçili tarih aralığının sonuna "
              "kadar kesinleşenler düşülür. Geçmiş ayların net rakamı açıkken daha düşük görünür."},
 ]
 

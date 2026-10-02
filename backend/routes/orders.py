@@ -25,8 +25,7 @@ def _order_search_or(search: str) -> list:
     rx = {"$regex": _search_tr_regex(s), "$options": "i"}
     fields = [
         "order_number", "invoice_number", "cargo_tracking", "id",
-        # Pazaryeri kimlikleri: müşteri/panel bunları da arayabilir (TY paket no ≠ order_number).
-        "trendyol_package_id", "hepsiburada_order_number", "hb_claim_number",
+        # Paket / harici sipariş kimlikleri (eski içe aktarılmış kayıtlarda bulunabilir).
         "package_number", "shipment_package_id", "marketplace_order_id",
         "cargo_tracking_number", "return_request.return_code",
         "shipping_address.first_name", "shipping_address.last_name",
@@ -46,15 +45,14 @@ def _order_search_or(search: str) -> list:
         "lines.product_name", "lines.name", "lines.barcode",
     ]
     ors = [{f: rx} for f in fields]
-    # Pazaryeri paket/no alanları INT saklanabilir → regex tutmaz. Arama tamamen rakamsa
-    # bu alanlarda hem int hem string olarak TAM eşleşme ekle (TY paket no vb. bulunur).
+    # Paket/no alanları INT saklanabilir → regex tutmaz. Arama tamamen rakamsa
+    # bu alanlarda hem int hem string olarak TAM eşleşme ekle.
     if s.isdigit():
         try:
             _n = int(s)
         except Exception:
             _n = None
-        for f in ("trendyol_package_id", "package_number", "shipment_package_id",
-                  "marketplace_order_id", "hepsiburada_order_number"):
+        for f in ("package_number", "shipment_package_id", "marketplace_order_id"):
             ors.append({f: s})
             if _n is not None:
                 ors.append({f: _n})
@@ -78,9 +76,8 @@ def _order_search_or(search: str) -> list:
 
 
 def _platform_display(order) -> str:
-    p = (str(order.get("platform") or order.get("marketplace") or "")).strip().lower()
-    return {"trendyol": "Trendyol", "hepsiburada": "Hepsiburada"}.get(
-        p, "Site" if p in ("", "web", "site") else p.title())
+    from sales_channels import channel_of, SITE_LABEL, OTHER_LABEL, SITE
+    return SITE_LABEL if channel_of(order) == SITE else OTHER_LABEL
 
 
 async def _log_order_event(order_id: str, event_type: str, description: str,
@@ -636,8 +633,8 @@ async def get_orders(
     
     # Ödeme kaydı bulunmayan (web kart denemesi, hiç ödenmemiş) ayrımı
     # 'Web siparişi' = platform web/boş VE marketplace alanı da boş. Eskiden yalnız
-    # platform'a bakılıyordu; platform'u yazılmamış ama marketplace=trendyol olan pazaryeri
-    # siparişleri "web" sayılıp junk süzgecine takılabiliyordu.
+    # platform'a bakılıyordu; platform'u yazılmamış ama marketplace alanı dolu (site dışı)
+    # kayıtlar "web" sayılıp junk süzgecine takılabiliyordu.
     _web_cond = {"$and": [
         {"$or": [{"platform": "web"}, {"platform": {"$in": [None, ""]}},
                  {"platform": {"$exists": False}}]},
@@ -696,43 +693,28 @@ async def get_orders(
     async def _do_find():
         # created_at KARIŞIK TİPTE olabilir: bazı eski/migrasyon kayıtları BSON Date,
         # çoğu ISO string. MongoDB karışık tipte önce TİP'e göre sıralar → tüm Date tipli
-        # kayıtlar (ör. Ticimax'tan taşınanlar) string tarihlerin üstüne çıkar ve liste
+        # kayıtlar (ör. eski içe aktarılanlar) string tarihlerin üstüne çıkar ve liste
         # gerçek tarih sırasını kaybeder. Bu yüzden created_at'i $convert ile Date'e
         # normalize edip ona göre sıralarız (EN YENİ EN ÜSTTE), tip ne olursa olsun.
-        # TZ TUTARLILIĞI (sıralama = ekrandaki TR saati): Pazaryeri (Trendyol/HB/Temu/N11/Amazon)
-        # siparişlerinin created_at'i TR duvar-saatiyle "+00:00" etiketli saklanıyor; site
-        # siparişleri ise GERÇEK UTC. Ham UTC'ye göre sıralayınca site siparişi olduğundan eski
-        # sanılıp yanlış yere (aşağı) düşüyordu. Sıralamayı ekranla aynı TR çerçevesine getiririz:
-        # pazaryeri olduğu gibi, site siparişine +3 saat → liste görünen saate göre "en yeni en üstte".
-        _mkt_platforms = ["trendyol", "hepsiburada", "temu", "n11", "amazon"]
+        # TZ TUTARLILIĞI (sıralama = ekrandaki TR saati): site dışı (eski içe aktarılmış) kanal
+        # kayıtlarının created_at'i TR duvar-saatiyle "+00:00" etiketli saklanıyor; site
+        # siparişleri ise GERÇEK UTC. Sıralamayı ekranla aynı TR çerçevesine getiririz:
+        # diğer kanal olduğu gibi, site siparişine +3 saat → "en yeni en üstte".
+        from sales_channels import SITE_VALUES as _site_vals
         _pipe = [
             {"$match": query},
             {"$addFields": {"_sort_dt": {"$let": {
                 "vars": {
                     "d": {"$convert": {"input": "$created_at", "to": "date", "onError": None, "onNull": None}},
-                    "mkt": {"$in": [
+                    "mkt": {"$not": [{"$in": [
                         {"$toLower": {"$ifNull": ["$platform", {"$ifNull": ["$marketplace", ""]}]}},
-                        _mkt_platforms,
-                    ]},
-                    # Trendyol API siparişi: marketplace_order_date artık GERÇEK UTC
-                    # (ty_date_utc_fix + _ms_to_iso). Site siparişi gibi +3 ile TR'ye
-                    # alınır; yoksa yeni Trendyol siparişleri 3 saat eski sanılıp
-                    # daha önce gelmiş web siparişlerinin ALTINA düşüyordu.
-                    "tyd": {"$cond": [
-                        {"$eq": [{"$toLower": {"$ifNull": ["$platform", ""]}}, "trendyol"]},
-                        {"$convert": {"input": {"$ifNull": ["$marketplace_order_date", None]},
-                                      "to": "date", "onError": None, "onNull": None}},
-                        None,
-                    ]},
+                        list(_site_vals),
+                    ]}]},
                 },
                 "in": {"$cond": [
-                    {"$ne": ["$$tyd", None]},
-                    {"$add": ["$$tyd", 3 * 60 * 60 * 1000]},
-                    {"$cond": [
-                        {"$or": ["$$mkt", {"$eq": ["$$d", None]}]},
-                        "$$d",
-                        {"$add": ["$$d", 3 * 60 * 60 * 1000]},
-                    ]},
+                    {"$or": ["$$mkt", {"$eq": ["$$d", None]}]},
+                    "$$d",
+                    {"$add": ["$$d", 3 * 60 * 60 * 1000]},
                 ]},
             }}}},
             {"$sort": {"_sort_dt": -1, "created_at": -1, "_id": -1}},
@@ -753,9 +735,8 @@ async def get_orders(
             _oldest = min(_ORDERS_COUNT_CACHE.items(), key=lambda kv: kv[1][1])[0]
             _ORDERS_COUNT_CACHE.pop(_oldest, None)
 
-    # Pazaryeri (Trendyol vb.) kalemlerinde görsel yoksa barkodla yerel üründen eşle.
-    # Barkodlar Trendyol ile aynı olduğundan doğrudan eşleşir; mevcut siparişler için
-    # re-sync gerekmez (okuma anında zenginleştirilir).
+    # İçe aktarılmış kalemlerde görsel yoksa barkodla yerel üründen eşle (okuma anında
+    # zenginleştirilir; kayıt değişmez).
     try:
         _need = set()
         for _o in orders:
@@ -903,7 +884,7 @@ async def get_order_by_number(order_number: str, request: Request):
                 "cargo_tracking_number", "tracking_number", "billing_info", "customer_ip"):
         order.pop(_pk, None)
     # GÜVENLİK (denetim 2026-09-29, HIGH): numara sıralı → herkes tarayabilir. Kara listede olmayan
-    # hassas alanlar da sızıyordu: iade IBAN'ı, fatura linki (ad/adres/TCKN), Trendyol TCKN, ödeme
+    # hassas alanlar da sızıyordu: iade IBAN'ı, fatura linki (ad/adres/TCKN), harici kanal TCKN, ödeme
     # token'ı, notlar. Anahtar adına göre temizlenir (sayfaların kullandığı alanlar korunur).
     _SENS = ("iban", "refund_bank", "identity", "tckn", "vkn", "tax_number", "invoice_pdf", "invoice_link",
              "invoice_url", "invoice_provider", "invoice_web_key", "iyzico", "token", "reconcile", "receipt",
@@ -944,7 +925,7 @@ async def list_deleted_orders(
     q = {}
     if search:
         # Ana sipariş aramasıyla AYNI kapsam (pazaryeri paket no, fatura, kargo, ad-soyad,
-        # telefon, ürün vb.) → silinen bir Trendyol siparişi paket no ile de bulunur.
+        # telefon, ürün vb.) → silinen bir harici kanal siparişi paket no ile de bulunur.
         _ors = _order_search_or(search)
         if _ors:
             q["$or"] = _ors
@@ -1288,8 +1269,8 @@ async def order_customer_journey(order_id: str, current_user: dict = Depends(req
                           "via": order.get("influencer_via")}
 
     # Reklam mı? (gclid/fbc/ttclid tıklama kimliği VEYA ücretli medium)
-    _mkt = ["trendyol", "hepsiburada", "temu", "n11", "amazon"]
-    is_marketplace = (order.get("platform") in _mkt) or (order.get("marketplace") in _mkt)
+    from sales_channels import channel_of as _ch_of, OTHER as _OTHER
+    is_marketplace = _ch_of(order) == _OTHER
     medium = (attr.get("medium") or "").lower()
     is_ad = bool(clicks.get("gclid") or clicks.get("fbc") or clicks.get("ttclid") or clicks.get("fbclid")
                  or medium in ("cpc", "ppc", "paid", "paid_social", "display", "paidsocial"))
@@ -1973,11 +1954,12 @@ async def create_order(
     # A2.5b — OVERSELL ENGELLE (kullanıcı kararı). Sipariş insert'inden ÖNCE stok koşullu
     # atomik düşülür: bir kalem bile yetmezse düşürülenler geri alınır ve 409 ile reddedilir
     # (karşılanamayacak sipariş HİÇ oluşmaz). Ayar block_oversell=false ise (backorder/ön-sipariş
-    # isteyen firma) eski davranışa döner: düşüm insert SONRASI koşulsuz yapılır. Pazaryeri
-    # (trendyol/hepsiburada/temu) siparişi dışarıda satıldığından bu kapıya girse de engellenmez.
+    # isteyen firma) eski davranışa döner: düşüm insert SONRASI koşulsuz yapılır. Site dışı
+    # kanal kaydı dışarıda satıldığından bu kapıya girse de engellenmez.
     _oversell_moves = None
     _plat_lc = str(order.get("platform") or "").lower()
-    _is_marketplace = _plat_lc in ("trendyol", "hepsiburada", "temu", "n11", "amazon")
+    from sales_channels import is_site_value as _is_site_val
+    _is_marketplace = not _is_site_val(_plat_lc)
 
     # DENETİM (2026-09-29, Y1): puan/hediye çeki bu noktada REZERVE edildi. Sipariş aşağıdaki
     # herhangi bir nedenle AÇILMAZSA (pasif ürün, stok yetersiz, eşzamanlı çift istek, insert
@@ -2018,7 +2000,7 @@ async def create_order(
     # OVERSELL: SİTE siparişinde 0/yetersiz stok HER ZAMAN engellenir — 'order.block_oversell'
     # ayarına BAKILMAZ. (Ayar yanlışlıkla kapatılınca stoğu biten üründen sipariş geçiyordu →
     # para/stok kaybı. Firma kararı: site oversell KESİNLİKLE yasak.) Yalnız pazaryeri
-    # (trendyol/hb/temu) siparişi dışarıda satıldığı için bu kapıya girse de engellenmez.
+    # (harici kanal/hb/harici kanal) siparişi dışarıda satıldığı için bu kapıya girse de engellenmez.
     if not _is_marketplace:
         _dec = await _decrement_stock_atomic(order)
         if not _dec.get("success"):
@@ -2566,7 +2548,7 @@ async def update_order_status(
     if status in ("refunded", "partial_refunded"):
         _set["refund_paid_at"] = _now
     # ELLE (admin) bir İADE durumuna çekilen sipariş: 'manuel öncelik' bayrağı → pazaryeri
-    # siparişi olsa bile İadeler sayfasında görünür (aksi halde Trendyol/HB filtrelenip kayboluyordu).
+    # siparişi olsa bile İadeler sayfasında görünür (aksi halde harici kanal filtrelenip kayboluyordu).
     _RETURN_STS = {"return_requested", "return_approved", "return_rejected",
                    "return_in_transit", "returned", "refunded", "partial_refunded"}
     if status in _RETURN_STS:
@@ -2604,7 +2586,7 @@ async def update_order_status(
             elif (_pm in _CARD_PMS
                   and str(_od_pre.get("payment_status") or "").lower() not in _SETTLED_PAY
                   and not _od_pre.get("paid_with_gift_card_only")
-                  # Aktarılmış geçmiş (Ticimax) / pazaryeri siparişleri bu sistemin ödeme akışından
+                  # Aktarılmış geçmiş (eski altyapı) / pazaryeri siparişleri bu sistemin ödeme akışından
                   # geçmedi; onların statüsü serbestçe düzeltilebilir olmalı.
                   and not _od_pre.get("imported_from")
                   and (_od_pre.get("platform") or "site") == "site"):
@@ -3415,7 +3397,7 @@ async def _order_was_deducted(order: dict) -> bool:
 async def _log_restock_skip(order: dict, move_type: str, source: str = "") -> None:
     """Hayalet iade ENGELLENDİĞİNDE görünür iz bırak (stok DEĞİŞMEZ).
 
-    SİPARİŞ BAŞINA BİR KEZ. Bu izi bırakan yolların bir kısmı cron'dur (Trendyol
+    SİPARİŞ BAŞINA BİR KEZ. Bu izi bırakan yolların bir kısmı cron'dur (harici kanal
     iptal taraması her 5 dk, claim senkronu dakikalar) ve engelleme stoğa hareket
     yazmadığı için guard'lara takılmaz; idempotent olmasaydı aynı sipariş için her
     turda yeni bir kayıt yazılıp defter şişerdi.
@@ -3487,7 +3469,7 @@ async def _restock_authoritative(order: dict, move_type: str, want: dict = None)
         # DENETİM (stok-sync #1 KRİTİK): pazaryeri düşümleri (order_imported) deltaları "moves"
         # anahtarında yazıyor; buradaki reader yalnız "items"a bakıyordu → pazaryeri düşümleri
         # otoriter restock'a GÖRÜNMEZ olup çağıran tam-adet iadeye düşüyordu (hayalet +stok →
-        # Amazon'a push → oversell). İki anahtarı da oku.
+        # harici kanal push → oversell). İki anahtarı da oku.
         for it in (mv.get("items") or mv.get("moves") or []):
             d = int(it.get("delta") or 0)
             if d >= 0:
@@ -3616,8 +3598,8 @@ async def _restock_return_items_once(rec: dict, order: dict = None) -> int:
     order = order or await db.orders.find_one({"id": rec.get("order_id")}, {"_id": 0})
     if not order:
         return 0
-    _plat = str(order.get("platform") or order.get("marketplace") or "").lower()
-    if _plat in ("trendyol", "hepsiburada", "temu", "n11", "amazon"):
+    from sales_channels import channel_of as _ch_of, OTHER as _OTHER
+    if _ch_of(order) == _OTHER:
         return 0
     # Atomik guard: yalnız henüz restock edilmemişse ilerle (yarış/çift-çağrı koruması).
     _claim = await db.customer_returns.update_one(
@@ -3765,7 +3747,7 @@ async def apply_stock_for_order(
 
 @router.post("/reconcile-stock")
 async def reconcile_stock_backfill(
-    platform: str = Query("trendyol"),
+    platform: str = Query("web"),
     start_date: str = Query(...),
     action: str = Query("decrement"),
     skip_status: str = Query("cancelled,returned,refunded"),
@@ -3774,7 +3756,7 @@ async def reconcile_stock_backfill(
     """İdempotent stok mutabakatı: platform + start_date sonrası siparişlerden HENÜZ
     stok-düşümü yapılmamış olanlara delta uygular. Daha önce düşüm hareketi olan siparişi
     atlar (manual_decrement / order_imported / backfill_decrement). Tekrar çalıştırılabilir.
-    Ticimax stok senkronu ile ALAKASI YOKTUR — sadece sipariş bazlı stok düşer/ekler."""
+    Harici stok senkronu ile ALAKASI YOKTUR — sadece sipariş bazlı stok düşer/ekler."""
     skips = set(s.strip() for s in (skip_status or "").split(",") if s.strip())
     delta = -1 if action == "decrement" else 1
     # B10: guard'ı action'a göre seç. DÜŞÜMde site siparişleri 'order_created' tipiyle
@@ -4095,7 +4077,7 @@ async def add_order_note(
 # FAZ 5 — Kargo durum güncellemeleri (ship / undeliver / deliver)
 # =============================================================================
 VALID_CARGO_COMPANIES = {
-    "MNG", "DHL", "Yurtici", "Aras", "PTT", "UPS", "HepsiJet", "Trendyol", "Other"
+    "MNG", "DHL", "Yurtici", "Aras", "PTT", "UPS", "Other"
 }
 
 
@@ -4565,7 +4547,7 @@ async def print_invoice_html(order_id: str, current_user: dict = Depends(require
 
 
 # ─── e-Fatura PDF public link (e-Arşiv WEB_KEY karşılığı) ───────────────────────
-# e-Arşiv'de Doğan hazır bir WEB_KEY URL'i döner ve Trendyol/HB'ye o gönderilir.
+# e-Arşiv'de Doğan hazır bir WEB_KEY URL'i döner ve harici kanal'ye o gönderilir.
 # e-Fatura'da böyle bir URL DÖNMEZ → faturanın resmî PDF'i Doğan'dan çekilip BİZİM
 # sunucumuzdan imzalı (order'a özel HMAC) bir link ile sunulur. Böylece e-Fatura da
 # e-Arşiv gibi OTOMATİK linke kavuşur; kullanıcıdan hiçbir şey istenmez.
@@ -4612,7 +4594,7 @@ async def stock_diag(q: str = Query(...), key: str = Query(""), days: int = Quer
         "variants": [{"size": v.get("size"), "color": v.get("color"),
                       "barcode": v.get("barcode"), "stock": v.get("stock")}
                      for v in (prod.get("variants") or [])],
-        "stock_synced_at": prod.get("stock_synced_at"),  # dolu+güncel ise Ticimax senkronu ezmiş olabilir
+        "stock_synced_at": prod.get("stock_synced_at"),  # dolu+güncel ise eski altyapı senkronu ezmiş olabilir
         "updated_at": prod.get("updated_at"),
         "movements_last_days": days,
         "movements": out_moves,
@@ -4841,7 +4823,7 @@ async def create_cargo_barcode(
             tel_cep=phone,
             email=ship.get("email") or order.get("user_email") or "",
             kapida_odeme=kapida,
-            platform_adi="",  # Pazaryeri değil — boş geç (N11/GG/TRND aksi takdirde)
+            platform_adi="",  # Pazaryeri değil — boş geç (harici kanal/GG/TRND aksi takdirde)
             platform_kodu="",
         )
     except Exception as _mng_exc:
@@ -5039,8 +5021,8 @@ async def create_cargo_barcode(
 async def refresh_cargo_tracking(order_id: str, current_user: dict = Depends(require_admin)):
     """Kargo takip durumunu yeniler — anlaşılır mesajla.
 
-    - Pazaryeri (Trendyol/Hepsiburada) siparişi → takip no pazaryeri senkronundan gelir,
-      MNG'de SORGULANMAZ (yanlış 'bulunamadı' hatası önlenir).
+    - Diğer kanal (eski içe aktarılmış) kaydı → MNG'de SORGULANMAZ (yanlış 'bulunamadı'
+      hatası önlenir); mevcut takip no gösterilir.
     - Site siparişi → MNG FaturaSiparisListesi'nden gönderi no/durum çekilir.
     Hiçbir durumda kuru 'yenilenemedi' dönmez: MNG'de kayıt yok / gönderi no henüz atanmadı /
     yetki-IP whitelist hatası ayrı ayrı, ne yapılacağını söyleyen mesajla döner.
@@ -5056,20 +5038,16 @@ async def refresh_cargo_tracking(order_id: str, current_user: dict = Depends(req
     cargo = order.get("cargo") or {}
     siparis_no = str(order.get("order_number") or order_id)
 
-    # ── Pazaryeri siparişi: MNG'de aranmaz (takip no pazaryerinden gelir) ──
-    _platform = str(order.get("platform") or order.get("marketplace") or "").lower()
-    _is_marketplace = (_platform in ("trendyol", "hepsiburada")
-                       or (order.get("payment_method") == "marketplace"))
-    if _is_marketplace:
+    # ── Diğer kanal kaydı: MNG'de aranmaz ──
+    from sales_channels import channel_of as _ch_of, OTHER as _OTHER
+    if _ch_of(order) == _OTHER or order.get("payment_method") == "marketplace":
         _tn = order.get("cargo_tracking_number") or cargo.get("tracking_number") or ""
-        _label = ("Trendyol" if "trendyol" in _platform else
-                  "Hepsiburada" if "hepsi" in _platform else "Pazaryeri")
         return {
             "success": True,
             "tracking_number": _tn,
             "message": (
-                f"{_label} siparişi — kargo takip no pazaryeri senkronuyla güncellenir, MNG sorgusu yapılmaz. "
-                + (f"Mevcut takip: {_tn}" if _tn else "Takip no pazaryeri tarafından atandığında senkronla gelecek.")
+                "Diğer kanal kaydı — MNG sorgusu yapılmaz. "
+                + (f"Mevcut takip: {_tn}" if _tn else "Kayıtta takip numarası yok.")
             ),
         }
 
@@ -5177,7 +5155,7 @@ async def backfill_cargo_tracking(
     - since boş → TÜM ZAMANLAR (tarih sınırı yok). Tarih verilirse (YYYY-MM-DD) o tarihten sonrası.
     - force=False → yalnız takip no'su EKSİK olanları sorgular (verimli); force=True → hepsini yeniden.
     - all_statuses=True → durum filtresi uygulamaz (varsayılan: yalnız kargo durumundaki siparişler).
-    - site_only=True → pazaryeri (TY/HB önekli) siparişleri ATLAR; yalnız site siparişlerini sorgular
+    - site_only=True → pazaryeri (harici kanal önekli) siparişleri ATLAR; yalnız site siparişlerini sorgular
       (MNG/DHL'de zaten pazaryeri siparişi yok → boşuna sorgu/yanlış 'bulunamadı' önlenir).
     - get_mng_shipment_status (SALT OKUMA) → yeni kargo OLUŞTURMAZ, bildirim göndermez.
     - MNG sorgusu thread'de (event loop bloklanmaz); sıralı → MNG'yi hammer'lamaz.
@@ -5221,7 +5199,7 @@ async def backfill_cargo_tracking(
         on = str(o.get("order_number") or "")
         _is_site = bool(on and (on.startswith("W") or on.startswith("IW")))
         if site_only and not _is_site:
-            continue  # SADECE site siparişleri (W / IW); TY/HB ve diğerleri atlanır
+            continue  # SADECE site siparişleri (W / IW); harici kanal ve diğerleri atlanır
         if _is_site:
             site_taranan += 1
         existing = o.get("cargo_tracking_number") or (o.get("cargo") or {}).get("tracking_number")
@@ -5331,14 +5309,12 @@ async def bulk_mark_refunded_silent(payload: dict, current_user: dict = Depends(
     """
     order_ids = payload.get("order_ids") or []
     # all_approved=true → WEB SİTESİ tarafındaki ONAYLANAN (return_approved) tüm iadeleri seç.
-    # Pazaryeri (Trendyol/HB) siparişleri hariç tutulur; yalnız site siparişleri.
+    # Site dışı kanal kayıtları hariç tutulur; yalnız site siparişleri.
     if payload.get("all_approved"):
-        _MP = ["trendyol", "hepsiburada", "temu", "n11", "ciceksepeti", "amazon", "pazarama", "trendyol-ihracat"]
         _q = {"status": "return_approved",
               "$and": [
                   {"$or": [{"platform": "web"}, {"platform": {"$in": [None, ""]}}, {"platform": {"$exists": False}}]},
                   {"$or": [{"marketplace": {"$in": [None, "", "web"]}}, {"marketplace": {"$exists": False}}]},
-                  {"$or": [{"platform": {"$nin": _MP}}, {"platform": {"$exists": False}}]},
               ]}
         order_ids = await db.orders.distinct("id", _q)
     if not isinstance(order_ids, list) or not order_ids:
@@ -5364,7 +5340,7 @@ async def bulk_mark_refunded_silent(payload: dict, current_user: dict = Depends(
 async def relink_cargo_dhl(current_user: dict = Depends(require_admin)):
     """Eski/yanlis kargo takip linklerini DHL deep-link formatina cevirir:
     kargotakip.dhlecommerce.com.tr/?takipNo={no} (no ile direkt takip, form/CAPTCHA yok).
-    Sadece MNG/DHL linki olan siparisleri etkiler (Trendyol/HB kendi linkine dokunulmaz).
+    Sadece MNG/DHL linki olan siparisleri etkiler (harici kanal kendi linkine dokunulmaz).
     No bos olan kayitlarda manuel takip sayfasina dusulur. Bildirimsiz; MNG API cagirmaz."""
     now = datetime.now(timezone.utc).isoformat()
     DEEP = "https://kargotakip.dhlecommerce.com.tr/?takipNo="
@@ -6919,7 +6895,7 @@ async def update_return_status(return_id: str, payload: dict, current_user: dict
         await db.orders.update_one({"id": rec["order_id"]}, {"$set": _oset})
         # OTOMATİK STOK GERİ (site iadesi): iade tamamlanınca/onaylanınca iade edilen kalemleri
         # ADET kadar stoğa ekle (kısmi dahil). İade-başına idempotent. Eskiden site iadesinde stok
-        # HİÇ geri gelmiyordu (Trendyol'da GP kesiminde geliyordu — asimetri kapatıldı).
+        # HİÇ geri gelmiyordu (harici kanal GP kesiminde geliyordu — asimetri kapatıldı).
         if order_status in ("returned", "refunded", "partial_refunded", "return_approved"):
             try:
                 await _restock_return_items_once(rec)
@@ -8172,7 +8148,7 @@ async def reject_return(return_id: str, payload: dict,
 async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = Body(default=None),
                                      preview: bool = Query(False),
                                      current_user: dict = Depends(require_permission("returns.expense_note"))):
-    """Site iadesi için gider pusulası verisi üretir. Trendyol tarafıyla AYNI koleksiyonu
+    """Site iadesi için gider pusulası verisi üretir. harici kanal tarafıyla AYNI koleksiyonu
     (db.gider_pusulasi) ve AYNI numara serisini kullanır (numaralar sürekli).
 
     preview=True: veriyi HESAPLAR ama NUMARA ATAMAZ / KAYDETMEZ (ekranda önizleme). Numara
@@ -8255,7 +8231,7 @@ async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = B
     def _q(it):
         return int(it.get("quantity", 1) or 1)
 
-    # KDV-DAHİL TABAN DÜZELTMESİ (Ali Al 398MD4734D): bazı içe-aktarılan (Ticimax) siparişlerde
+    # KDV-DAHİL TABAN DÜZELTMESİ (Ali Al 398MD4734D): bazı içe-aktarılan (eski altyapı) siparişlerde
     # item.price KDV-HARİÇ saklanmış, oysa subtotal/total KDV-DAHİL. Faktör = KDV-DAHİL LİSTE
     # (indirim ÖNCESİ subtotal) / KDV-HARİÇ LİSTE (Σ item.price). İNDİRİM ÇIKARILMAZ: indirim
     # ayrı order-seviyesi kalemdir, item.price'a yansımaz ve aşağıda _disc_ratio ile AYRICA
@@ -8438,7 +8414,7 @@ async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = B
     vat_amount = round(net_total * vat_rate / (100 + vat_rate), 2)
     net_without_vat = round(net_total - vat_amount, 2)
 
-    # ORTAK numara serisi (Trendyol + site). İDEMPOTENT: bu iade için pusula ZATEN varsa
+    # ORTAK numara serisi (harici kanal + site). İDEMPOTENT: bu iade için pusula ZATEN varsa
     # numarayı KORU (yeniden hesaplama yeni numara YAKMAZ) → mevcut pusulaları düzeltebiliriz.
     _existing_gp = await db.gider_pusulasi.find_one(
         {"return_id": return_id}, {"_id": 0, "number": 1, "display_number": 1})
@@ -8587,7 +8563,7 @@ async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = B
 async def export_gider_pusulasi_excel(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    source: Optional[str] = None,   # site | trendyol | hepsiburada | amazon | all(None) → TÜMÜ (varsayılan)
+    source: Optional[str] = None,   # site | other | all(None) → TÜMÜ (varsayılan)
     only_refunded: bool = False,    # False=TÜM iade durumları; True=yalnız iade bedeli ödenmiş
     only_with_gp: bool = False,     # True=YALNIZ pusulası kesilmiş (seri no'lu) satırlar (kullanıcı isteği)
     current_user: dict = Depends(require_permission("returns.expense_note")),
@@ -8607,9 +8583,7 @@ async def export_gider_pusulasi_excel(
     # ── Kaynak süzgeci (varsayılan: TÜMÜ) ──────────────────────────────
     _src = (source or "").lower().strip()
     want_site = _src in ("", "all", "site")
-    want_ty = _src in ("", "all", "trendyol")
-    want_hb = _src in ("", "all", "hepsiburada")
-    want_amz = _src in ("", "all", "amazon")
+    want_other = _src in ("", "all", "other")
 
     # Tarih aralığı → UTC sınırları. Koleksiyonlar farklı tarih alanı/formatı kullandığından
     # (voucher.date, claim.created_date, return.created_at) Python'da parse edip karşılaştırırız.
@@ -8639,28 +8613,19 @@ async def export_gider_pusulasi_excel(
             return False
         return True
 
-    # ── Tüm iade taleplerini (Trendyol + Hepsiburada — ikisi de trendyol_claims'te,
-    #    HB platform="hepsiburada") ve site iadelerini çekeriz. Kesilmiş pusula VARSA onu
-    #    (doğru seri no + düzeltilmiş tutar) kullanırız; YOKSA talepten satır sentezleriz.
-    #    Böylece pusula kesilmemiş iadeler de Excel'e girer ("658 tümünü çekmiyor" düzeltmesi)
-    #    ve ileride eklenen her iade kaynağı otomatik dahil olur.
-    all_claims = await db.trendyol_claims.find(
-        {}, {"_id": 0, "raw_data": 0}).to_list(None)
-    claim_by_id = {str(c.get("claim_id")): c for c in all_claims if c.get("claim_id")}
-
-    def _claim_platform(c):
-        _cp = str(c.get("platform") or "").lower()
-        return _cp if _cp in ("hepsiburada", "amazon") else "trendyol"
+    # Site dışı kanal iade talepleri bu mağazada tutulmaz; claim_id taşıyan eski pusulalar
+    # "Diğer kanal" kaynağı sayılır.
+    claim_by_id: dict = {}
 
     # ── DURUM SÜZGECİ (kullanıcı talebi): Excel'e SADECE onaylanan/tamamlanan/ödenen iadeler girer.
     # DAHİL: iade onaylandı, iade tamamlandı, (kısmi) iade tamamlandı/ödendi, iade bedeli ödendi,
-    #        onay sonrası kargoda/teslim alındı + Trendyol/HB "Accepted".
+    #        onay sonrası kargoda/teslim alındı.
     # HARİÇ: reddedilenler, iptal edilenler, sadece "iade talebi oluşturuldu" / henüz işlemde olanlar.
     _DENY_STATUS = {
         "return_requested", "created", "pending", "preparing", "shipped",
         "return_rejected", "rejected", "cancelled", "canceled", "expired",
         "error", "exception", "undelivered",
-        "waitinginaction", "inanalysis", "unresolved",  # TY/HB: onaylanmamış/işlemde
+        "waitinginaction", "inanalysis", "unresolved",  # eski kayıt: onaylanmamış/işlemde
     }
     def _status_ok(st):
         return str(st or "").strip().lower() not in _DENY_STATUS
@@ -8684,12 +8649,11 @@ async def export_gider_pusulasi_excel(
             ret_reqdate_by_num.setdefault(str(_r["order_number"]), _rqd)
             ret_apprdate_by_num.setdefault(str(_r["order_number"]), _apd)
 
-    # ── TARİH ESASI: TÜM satırlar İADE TALEP TARİHİ'ne göre süzülür (Trendyol claimDate /
-    #    site created_at). Böylece "son 30 gün" export'u iadeler sayfasındaki "Tarih" sütunu
+    # ── TARİH ESASI: TÜM satırlar İADE TALEP TARİHİ'ne göre süzülür (site created_at). Böylece "son 30 gün" export'u iadeler sayfasındaki "Tarih" sütunu
     #    (claim.created_date) ile BİREBİR aynı olur → tutarsızlık biter. Kesilmiş pusulalar da
     #    kendi kesim tarihine göre DEĞİL, bağlı iadenin TALEP tarihine göre süzülür.
-    # İADE ONAY TARİHİ çözücü (işletme: 'iade onay tarihine göre filtrele'): TY/HB → claim
-    # return_approved_at (yoksa created_date); site → customer_returns approval.at (yoksa created_at).
+    # İADE ONAY TARİHİ çözücü (işletme: 'iade onay tarihine göre filtrele'):
+    # site → customer_returns approval.at (yoksa created_at).
     def _appr_date_for(gp):
         cid = str(gp.get("claim_id") or "")
         if cid and claim_by_id.get(cid):
@@ -8715,15 +8679,10 @@ async def export_gider_pusulasi_excel(
         # (Filtre = "Fatura Tarihi" kolonuyla AYNI alan → gp.date/created_at.)
         if not _in_range(gp.get("date") or gp.get("created_at")):
             continue
-        # kaynak süzgeci: site pusulası source=site; TY/HB pusulasında claim_id var → platform claim'den
+        # kaynak süzgeci: site pusulası source=site; claim_id taşıyan eski pusula = diğer kanal
         cid = str(gp.get("claim_id") or "")
         if cid:
-            plat = _claim_platform(claim_by_id.get(cid, {}))
-            if plat == "hepsiburada" and not want_hb:
-                continue
-            if plat == "amazon" and not want_amz:
-                continue
-            if plat == "trendyol" and not want_ty:
+            if not want_other:
                 continue
             seen_claim.add(cid)
         else:
@@ -8762,43 +8721,6 @@ async def export_gider_pusulasi_excel(
                    if str(gp.get("return_id")) in paid_returns
                    or str(gp.get("order_number")) in paid_orders]
     else:
-        # ── 2) Pusulası kesilmemiş Trendyol/HB iadeleri → satır sentezle ──
-        for c in all_claims:
-            cid = str(c.get("claim_id") or "")
-            if not cid or cid in seen_claim:
-                continue
-            plat = _claim_platform(c)
-            if plat == "hepsiburada" and not want_hb:
-                continue
-            if plat == "trendyol" and not want_ty:
-                continue
-            cdate = c.get("return_approved_at") or c.get("created_date") or c.get("created_at") or ""
-            if not _in_range(cdate):
-                continue
-            syn_items = []
-            for ci in (c.get("items") or []):
-                syn_items.append({
-                    "name": ci.get("productName") or ci.get("name") or "",
-                    "barcode": str(ci.get("barcode") or "").strip(),
-                    "quantity": int(ci.get("quantity", 1) or 1),
-                    "net_price": ci.get("price", 0),
-                    "reason": ci.get("reason", ""),
-                })
-            _net = c.get("refund_amount")
-            records.append({
-                "date": cdate,
-                # Koçan/seri no SADECE gerçekten atanmışsa yazılır. Atanmamışsa BOŞ bırakılır —
-                # invoice_number / order_number / claim_id gibi BAŞKA bir numara ÇEKİLMEZ
-                # (muhasebe "atanmamış pusulaya yanlış no geliyor" düzeltmesi).
-                "display_number": (c.get("gider_pusulasi_no") or ""),
-                "number": 0,
-                "customer": {"name": c.get("customer_name", "")},
-                "order_number": c.get("order_number", ""),
-                "items": syn_items,
-                "totals": {"net": _net if _net not in (None, "") else 0, "vat_rate": 10},
-                "_status": c.get("claim_status", ""),
-            })
-
         # ── 3) Pusulası kesilmemiş SİTE iadeleri → satır sentezle ──
         if want_site:
             site_rets = await db.customer_returns.find(
@@ -9022,7 +8944,7 @@ async def recompute_site_vouchers(payload: Optional[dict] = Body(default=None),
 async def set_voucher_number(payload: dict = Body(...),
                              current_user: dict = Depends(require_permission("returns.expense_note"))):
     """Kesilmiş bir gider pusulasının SERİ/TAKİP numarasını elle değiştirir.
-    Anahtar: return_id (site) | claim_id (Trendyol/HB) | order_number (site fallback).
+    Anahtar: return_id (site) | claim_id (eski kayıt) | order_number (site fallback).
     Numara idempotenttir; bağlı sipariş/claim üzerindeki gider_pusulasi_no da güncellenir."""
     return_id = str(payload.get("return_id") or "").strip()
     claim_id = str(payload.get("claim_id") or "").strip()
@@ -9048,8 +8970,6 @@ async def set_voucher_number(payload: dict = Body(...),
         _r = await db.customer_returns.find_one({"id": _rid}, {"_id": 0, "order_id": 1})
         if _r and _r.get("order_id"):
             await db.orders.update_one({"id": _r["order_id"]}, {"$set": {"gider_pusulasi_no": new_no}})
-    if gp.get("claim_id"):
-        await db.trendyol_claims.update_one({"claim_id": gp["claim_id"]}, {"$set": {"gider_pusulasi_no": new_no}})
     if gp.get("order_number"):
         await db.orders.update_one({"order_number": gp["order_number"]}, {"$set": {"gider_pusulasi_no": new_no}})
     return {"success": True, "display_number": new_no}
@@ -9081,10 +9001,6 @@ async def clear_gider_pusulasi_numbers(payload: dict = Body(default={}),
         await db.gider_pusulasi.update_one({"_id": g["_id"]}, upd)
         cleared += 1
     # Bağlı kayıtlardaki numara/bayrakları da sıfırla → panel tutarlı, havuz yeniden dolar.
-    r1 = await db.trendyol_claims.update_many(
-        {"$or": [{"has_gider_pusulasi": True},
-                 {"gider_pusulasi_no": {"$exists": True, "$nin": ["", None]}}]},
-        {"$unset": {"has_gider_pusulasi": "", "gider_pusulasi_no": ""}})
     r2 = await db.customer_returns.update_many(
         {"$or": [{"has_gider_pusulasi": True},
                  {"gider_pusulasi_no": {"$exists": True, "$nin": ["", None]}}]},
@@ -9093,7 +9009,6 @@ async def clear_gider_pusulasi_numbers(payload: dict = Body(default={}),
         {"gider_pusulasi_no": {"$exists": True, "$nin": ["", None]}},
         {"$unset": {"gider_pusulasi_no": ""}})
     return {"success": True, "pusula_temizlenen": cleared,
-            "claim_temizlenen": r1.modified_count,
             "site_iade_temizlenen": r2.modified_count,
             "siparis_temizlenen": r3.modified_count}
 
