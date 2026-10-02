@@ -461,7 +461,12 @@
                   "step": 50,
                   "width": "third"
                 }
-              ]
+              ],
+              "show_if": {
+                "$parent.layout": [
+                  "promo"
+                ]
+              }
             },
             {
               "name": "title",
@@ -533,7 +538,13 @@
                   "step": 50,
                   "width": "third"
                 }
-              ]
+              ],
+              "show_if": {
+                "$parent.layout": [
+                  "price",
+                  "promo"
+                ]
+              }
             },
             {
               "name": "subtitle",
@@ -605,7 +616,12 @@
                   "step": 50,
                   "width": "third"
                 }
-              ]
+              ],
+              "show_if": {
+                "$parent.layout": [
+                  "price"
+                ]
+              }
             },
             {
               "name": "price",
@@ -677,7 +693,12 @@
                   "step": 50,
                   "width": "third"
                 }
-              ]
+              ],
+              "show_if": {
+                "$parent.layout": [
+                  "price"
+                ]
+              }
             },
             {
               "name": "button",
@@ -1019,7 +1040,10 @@
         {
           "name": "countdown",
           "type": "countdown",
-          "label": "Geri sayım"
+          "label": "Geri sayım",
+          "hide": [
+            "labels"
+          ]
         }
       ]
     },

@@ -82,7 +82,13 @@
       "type": "section_header",
       "label": "Başlık",
       "tab": "İçerik",
-      "help": "Kartlar görünümünde “Sağ taraf: Tümünü gör bağlantısı” başlığın sağında bağlantı gösterir."
+      "help": "Kartlar görünümünde “Sağ taraf: Tümünü gör bağlantısı” başlığın sağında bağlantı gösterir.",
+      "right_options": [
+        "none",
+        "arrows",
+        "pills",
+        "link"
+      ]
     },
     {
       "name": "prev_label",
@@ -387,7 +393,10 @@
         "_variant": [
           "cards"
         ]
-      }
+      },
+      "hide": [
+        "labels"
+      ]
     },
     {
       "name": "border_color",

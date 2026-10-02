@@ -73,3 +73,29 @@ test("backend hatası satır içinde gösterilir ve sekmede işaretlenir", () =>
   const { container } = setup("full_banner", {}, { errors: [{ path: "settings.link", message: "Bağlantı geçersiz" }] });
   expect(container.querySelector('[data-field-path="link"]').textContent).toContain("Bağlantı geçersiz");
 });
+
+const openItem = (container, name, i = 0) => {
+  const rep = container.querySelector(`[data-testid="repeater-${name}"]`);
+  click(rep.querySelectorAll("button[aria-expanded]")[i]);
+};
+
+test("$parent show_if repeater öğesindeki grupta öğeyi okur (hero animasyon katmanları düzenle uyumlu)", () => {
+  const { container } = setup("hero_slider");
+  openItem(container, "slides", 0); // 1. slayt: fiyat düzeni
+  expect(container.querySelector('[data-field-path="slides.0.animation.subtitle"]')).toBeTruthy();
+  expect(container.querySelector('[data-field-path="slides.0.animation.pretitle"]')).toBeNull();
+});
+
+test("ikon alanı allow_upload ise görsel yükleme alanı da gösterilir", () => {
+  const { container } = setup("features_list");
+  openItem(container, "items", 0);
+  expect(container.querySelector('[data-field-path="items.0.icon"] [data-testid="icon-upload"]')).toBeTruthy();
+});
+
+test("başlık satırı 'Sağ taraf' yalnız bloğun desteklediği seçenekleri sunar", () => {
+  const { container } = setup("product_grid");
+  const sel = container.querySelector('[data-field-path="header.right"] select');
+  const vals = sel ? [...sel.options].map((o) => o.value) : [...container.querySelectorAll('[data-field-path="header.right"] button')].map((b) => b.textContent);
+  expect(vals.length).toBeGreaterThan(1);
+  expect(vals.join(",")).not.toMatch(/countdown|Geri sayım|arrows|Oklar/);
+});

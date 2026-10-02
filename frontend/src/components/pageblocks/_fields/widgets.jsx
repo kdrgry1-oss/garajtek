@@ -358,14 +358,20 @@ const COUNTDOWN_FIELDS = [
   { name: "expired_text", type: "text", label: "Bitiş yazısı", show_if: { on_expire: ["show_text"] } },
 ];
 
-export function CountdownInput({ value, onChange, renderFields, path }) {
+// Şemada `hide: ["labels","heading","pad",…]` → bloğun kullanmadığı alt alanlar panelde gösterilmez.
+export function CountdownInput({ field = {}, value, onChange, renderFields, path }) {
   const v = isObj(value) ? value : {};
+  const hide = new Set(field.hide || []);
+  const unitsSel = Array.isArray(v.units) && v.units.length ? v.units : ["days", "hours", "minutes", "seconds"];
+  // birim etiketleri yalnız seçili birimler için gösterilir
+  const F = COUNTDOWN_FIELDS.filter((f) => !hide.has(f.name))
+    .map((f) => (f.name === "labels" ? { ...f, fields: f.fields.filter((x) => unitsSel.includes(x.name)) } : f));
   const units = Array.isArray(v.units) ? v.units : ["days", "hours", "minutes", "seconds"];
   const U = [["days", "Gün"], ["hours", "Saat"], ["minutes", "Dakika"], ["seconds", "Saniye"]];
   return (
     <div className="space-y-2">
-      {renderFields(COUNTDOWN_FIELDS.slice(0, 4), v, onChange, path)}
-      <div>
+      {renderFields(F.filter((f) => ["enabled", "end", "rolling_days", "heading"].includes(f.name)), v, onChange, path)}
+      {!hide.has("units") && <div>
         <div className="text-xs font-medium text-gray-700 mb-1">Birimler</div>
         <div className="flex gap-3 text-xs">
           {U.map(([u, l]) => (
@@ -374,8 +380,8 @@ export function CountdownInput({ value, onChange, renderFields, path }) {
             </label>
           ))}
         </div>
-      </div>
-      {renderFields(COUNTDOWN_FIELDS.slice(5), v, onChange, path)}
+      </div>}
+      {renderFields(F.filter((f) => !["enabled", "end", "rolling_days", "heading", "units"].includes(f.name)), v, onChange, path)}
     </div>
   );
 }
@@ -394,6 +400,12 @@ const SECTION_HEADER_FIELDS = [
   { name: "link", type: "group", label: "Bağlantı", show_if: { right: ["link"] }, fields: [{ name: "label", type: "text", label: "Yazı" }, { name: "link", type: "link", label: "Hedef" }] },
 ];
 
-export function SectionHeaderInput({ value, onChange, renderFields, path }) {
-  return <div className="space-y-2">{renderFields(SECTION_HEADER_FIELDS, isObj(value) ? value : {}, onChange, path)}</div>;
+// Şemada `right_options: ["none","link",…]` → "Sağ taraf" yalnız bloğun desteklediği seçenekleri sunar;
+// `hide: ["tag","align",…]` → kullanılmayan alt alanlar gizlenir.
+export function SectionHeaderInput({ field = {}, value, onChange, renderFields, path }) {
+  const hide = new Set(field.hide || []);
+  const allowed = Array.isArray(field.right_options) && field.right_options.length ? new Set(field.right_options) : null;
+  const fields = SECTION_HEADER_FIELDS.filter((f) => !hide.has(f.name)).map((f) => (f.name === "right" && allowed
+    ? { ...f, options: f.options.filter((o) => allowed.has(o.value)) } : f));
+  return <div className="space-y-2">{renderFields(fields, isObj(value) ? value : {}, onChange, path)}</div>;
 }

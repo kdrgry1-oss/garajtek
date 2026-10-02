@@ -81,7 +81,11 @@
       "type": "section_header",
       "label": "Başlık",
       "tab": "İçerik",
-      "help": "Ortalı/sola yaslı görünümde başlık şablondaki gibi gizlidir (ekran okuyucu). Hap başlıklı görünümde başlık solda, sekmeler sağda görünür; Sağ taraf = “Tümünü gör” bağlantısı ise sekmelerin yanında bağlantı çıkar."
+      "help": "Ortalı/sola yaslı görünümde başlık şablondaki gibi gizlidir (ekran okuyucu). Hap başlıklı görünümde başlık solda, sekmeler sağda görünür; Sağ taraf = “Tümünü gör” bağlantısı ise sekmelerin yanında bağlantı çıkar.",
+      "right_options": [
+        "none",
+        "link"
+      ]
     },
     {
       "name": "tabs",

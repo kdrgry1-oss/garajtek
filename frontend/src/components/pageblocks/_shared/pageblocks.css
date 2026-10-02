@@ -82,3 +82,13 @@ html.pd-no-anim .electro .pd-layer { animation: none !important; }
 /* ---- yukarı çık düğmesi ---- */
 .electro .pd-gotop { position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--electro-primary, #fed700); color: var(--pd-on-primary, #333e48); box-shadow: 0 4px 12px rgba(0,0,0,.18); z-index: 1040; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; }
 .electro .pd-gotop--left { right: auto; left: 24px; }
+
+/* ---- üst bar blokları (Header'da, .electro dışında) cihaz görünürlüğü ---- */
+@media (min-width: 1200px) { .pd-bar-hide-desktop { display: none !important; } }
+@media (min-width: 768px) and (max-width: 1199.98px) { .pd-bar-hide-tablet { display: none !important; } }
+@media (max-width: 767.98px) { .pd-bar-hide-mobile { display: none !important; } }
+
+/* "+ Blok ekle" tutamacı: ekran görüntüsü karşılaştırmasında (?pd-noanim=1) ve dokunmatik/dar önizlemede
+   blokların üstüne binmesin (dokunmatikte :hover yapışkan kalır). Ekleme panel listesinden de yapılabilir. */
+html.pd-no-anim .pd-insert { display: none !important; }
+@media (hover: none) { .pd-preview .pd-insert { display: none !important; } }

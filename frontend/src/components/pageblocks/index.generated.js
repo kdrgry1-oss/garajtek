@@ -149,6 +149,8 @@ import SiteHeaderSchema from "./_global/site_header/schema.json";
 import SiteHeaderDefaults from "./_global/site_header/defaults.json";
 import SiteNewsletterSchema from "./_global/site_newsletter/schema.json";
 import SiteNewsletterDefaults from "./_global/site_newsletter/defaults.json";
+import SitePageLayoutSchema from "./_global/site_page_layout/schema.json";
+import SitePageLayoutDefaults from "./_global/site_page_layout/defaults.json";
 import SiteSecondaryMenuSchema from "./_global/site_secondary_menu/schema.json";
 import SiteSecondaryMenuDefaults from "./_global/site_secondary_menu/defaults.json";
 import SiteThemeSchema from "./_global/site_theme/schema.json";
@@ -212,6 +214,7 @@ export const GLOBALS = {
   site_footer_widgets: { schema: SiteFooterWidgetsSchema, defaults: SiteFooterWidgetsDefaults },
   site_header: { schema: SiteHeaderSchema, defaults: SiteHeaderDefaults },
   site_newsletter: { schema: SiteNewsletterSchema, defaults: SiteNewsletterDefaults },
+  site_page_layout: { schema: SitePageLayoutSchema, defaults: SitePageLayoutDefaults },
   site_secondary_menu: { schema: SiteSecondaryMenuSchema, defaults: SiteSecondaryMenuDefaults },
   site_theme: { schema: SiteThemeSchema, defaults: SiteThemeDefaults },
   site_topbar: { schema: SiteTopbarSchema, defaults: SiteTopbarDefaults },

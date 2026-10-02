@@ -129,3 +129,12 @@ def test_with_defaults_fills_new_fields_into_old_items():
     assert out["slides"][0]["title"] == "Eski slayt"
     assert out["slides"][0]["button"]["style"] == "primary" and out["slides"][0]["layout"] == "promo"
     assert out["carousel"]["transition"] == "fade"
+
+
+def test_deep_merge_per_view_table_is_atomic():
+    """Karusel kırılım tablosu (sayısal anahtarlar) bütün olarak değişir: silinen kırılım varsayılandan geri gelmez."""
+    base = {"carousel": {"per_view": {"0": 1, "480": 2, "768": 3}, "dots": True}}
+    out = pb.deep_merge(base, {"carousel": {"per_view": {"0": 2, "992": 4}}})
+    assert out["carousel"]["per_view"] == {"0": 2, "992": 4}
+    assert out["carousel"]["dots"] is True
+    assert pb.deep_merge({"h": {"desktop": 1, "mobile": 2}}, {"h": {"desktop": 5}}) == {"h": {"desktop": 5, "mobile": 2}}

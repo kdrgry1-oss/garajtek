@@ -89,6 +89,9 @@ def _clean_items(items, depth=1):
         }
         if it.get("special") == "account":
             node["special"] = "account"
+        img = _s(it.get("image"), 500)
+        if img and not re.match(r"^\s*javascript:", img, re.I):
+            node["image"] = img   # dikey menü açılır panel arka plan görseli (şablon megamenu-2.png)
         if depth < _MAX_DEPTH:
             kids = _clean_items(it.get("children"), depth + 1)
             if kids:

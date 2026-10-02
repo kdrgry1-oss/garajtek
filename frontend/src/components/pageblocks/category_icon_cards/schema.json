@@ -74,7 +74,12 @@
       "type": "section_header",
       "label": "Başlık satırı",
       "tab": "İçerik",
-      "help": "Başlık boşsa başlık satırı gizlenir."
+      "help": "Başlık boşsa başlık satırı gizlenir.",
+      "right_options": [
+        "none",
+        "pills",
+        "link"
+      ]
     },
     {
       "name": "tiles",

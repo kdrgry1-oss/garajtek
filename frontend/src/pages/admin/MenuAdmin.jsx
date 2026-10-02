@@ -5,6 +5,7 @@ import {
   Plus, Trash2, ChevronUp, ChevronDown, Save, RotateCcw, CornerDownRight,
 } from "lucide-react";
 import { DEFAULT_MENU_TABS } from "../../lib/headerMenu";
+import { uploadImageFile } from "../../lib/uploadImage";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -355,7 +356,7 @@ function LinkPicker({ value, onChange, cats, pages }) {
 }
 
 /** 3 seviyeye kadar menü ağacı düzenleyici (ekle / düzenle / sırala / alt öğe). */
-function MenuTreeEditor({ items, onChange, cats, pages, depth = 1, maxDepth = 3, allowIcon = false, allowStyle = true }) {
+function MenuTreeEditor({ items, onChange, cats, pages, depth = 1, maxDepth = 3, allowIcon = false, allowStyle = true, allowImage = false }) {
   const list = items || [];
   const upd = (i, patch) => onChange(list.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   return (
@@ -383,6 +384,19 @@ function MenuTreeEditor({ items, onChange, cats, pages, depth = 1, maxDepth = 3,
             )}
             <button type="button" className="p-1 hover:bg-red-50 text-red-600 rounded" title="Sil" onClick={() => onChange(list.filter((_, j) => j !== i))}><Trash2 size={14} /></button>
           </div>
+          {allowImage && depth === 1 && (
+            <div className="flex flex-wrap items-center gap-1 mt-1 text-xs" data-testid={`menu-item-image-${i}`}>
+              <span className="text-gray-500">Açılır panel arka plan görseli (önerilen 540×460):</span>
+              <input value={it.image || ""} onChange={(e) => upd(i, { image: e.target.value })} placeholder="Görsel adresi" className="flex-1 min-w-[180px] border rounded px-2 py-1 text-xs" />
+              <label className="cursor-pointer border rounded px-2 py-1 hover:bg-gray-50">Yükle
+                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  try { upd(i, { image: await uploadImageFile(f) }); toast.success("Görsel yüklendi"); } catch { toast.error("Görsel yüklenemedi"); }
+                }} />
+              </label>
+              {it.image && <button type="button" className="text-red-600 px-1" onClick={() => upd(i, { image: "" })}>Kaldır</button>}
+            </div>
+          )}
           {(it.children || []).length > 0 && (
             <MenuTreeEditor items={it.children} onChange={(v) => upd(i, { children: v })} cats={cats} pages={pages} depth={depth + 1} maxDepth={maxDepth} allowStyle={allowStyle} />
           )}
@@ -463,7 +477,7 @@ function GroupEditor({ group, data, onSave, onReset, refs }) {
         <div><div className="text-sm font-semibold mb-1">Üste sabitlenen hızlı bağlantılar</div>
           <MenuTreeEditor items={d.quick} onChange={(v) => setD({ ...d, quick: v })} {...refs} maxDepth={1} /></div>
         {d.mode === "manual" && <div><div className="text-sm font-semibold mb-1">Menü öğeleri (alt öğeler sağda açılan panelde sütun olur)</div>
-          <MenuTreeEditor items={d.items} onChange={(v) => setD({ ...d, items: v })} {...refs} /></div>}
+          <MenuTreeEditor items={d.items} onChange={(v) => setD({ ...d, items: v })} {...refs} allowIcon allowImage /></div>}
         {d.mode !== "manual" && <p className="text-xs text-gray-500">Kategoriler <a className="underline" href="/admin/kategoriler">Kategoriler</a> ekranındaki sıra ve “menüde göster” ayarına göre listelenir.</p>}
       </div>
     );

@@ -13,8 +13,13 @@ let timer = null;
 
 export function clearProductSourceCache() { cache.clear(); }
 
-function recentIds() {
-  try { const a = JSON.parse(localStorage.getItem("recently_viewed") || "[]"); return Array.isArray(a) ? a.map(String) : []; } catch { return []; }
+// Ürün sayfası (ProductDetail) "store_recently_viewed" anahtarına {id,…} anlık görüntüleri yazar;
+// eski "recently_viewed" (düz id listesi) de okunur.
+export function recentIds() {
+  const read = (k) => { try { const a = JSON.parse(localStorage.getItem(k) || "[]"); return Array.isArray(a) ? a : []; } catch { return []; } };
+  const ids = [...read("store_recently_viewed"), ...read("recently_viewed")]
+    .map((x) => (x && typeof x === "object" ? x.id : x)).filter((x) => x !== undefined && x !== null && x !== "").map(String);
+  return Array.from(new Set(ids));
 }
 
 function normalize(src) {

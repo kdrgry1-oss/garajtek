@@ -17,6 +17,25 @@ export function perViewVars(pv = {}) {
   return out;
 }
 
+/** Kırılım tablosuna göre verilen genişlikte görünen adet (min-width, Owl tarzı). */
+export function perViewAt(pv = {}, w = 0) {
+  const keys = Object.keys(pv || {}).map(Number).filter((n) => !Number.isNaN(n)).sort((a, b) => a - b);
+  let v = 1;
+  keys.forEach((k) => { if (k <= w) v = Number(pv[String(k)]) || v; });
+  return v;
+}
+
+const STD_BPS = new Set(BPS.map((b) => b[1]));
+function useWinWidth() {
+  const [w, setW] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1440));
+  useEffect(() => {
+    const on = () => setW(window.innerWidth);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return w;
+}
+
 function chunk(arr, n) { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
 
 function useAutoplay(api, { autoplay, interval, pause, rewind, loop, rootRef, count, onTick }) {
@@ -87,7 +106,17 @@ export default function BlockCarousel({
   const raw = Children.toArray(children).filter(Boolean);
   const rows = Math.max(1, Number(c.rows) || 1);
   const items = rows > 1 ? chunk(raw, rows).map((g, i) => <div key={`r${i}`} className="pd-carousel__rows">{g}</div>) : raw;
-  const pvVars = useMemo(() => perViewVars(perView || c.per_view || { 0: 1 }), [perView, c.per_view]);
+  const pvTable = perView || c.per_view || { 0: 1 };
+  const winW = useWinWidth();
+  const nowPer = perViewAt(pvTable, winW);
+  // Standart dışı kırılım (ör. şablondaki 1400 px) varsa CSS kırılımları yetmez → o anki genişliğe göre tek değer.
+  const custom = Object.keys(pvTable).some((k) => !STD_BPS.has(Number(k)));
+  const pvVars = useMemo(() => {
+    if (!custom) return perViewVars(pvTable);
+    const out = {};
+    BPS.forEach(([n]) => { out[`--el-n-${n}`] = nowPer; });
+    return out;
+  }, [custom, nowPer, JSON.stringify(pvTable)]); // eslint-disable-line react-hooks/exhaustive-deps
   const fade = c.transition === "fade";
   const duration = Math.max(10, Math.min(60, Math.round((Number(c.speed) || 300) / 12)));
   const [emblaRef, api] = useEmblaCarousel(fade ? { active: false } : {
@@ -131,6 +160,12 @@ export default function BlockCarousel({
     return <FadeCarousel items={items} c={c} header={header} className={className} dotsClassName={dotsClassName} ariaLabel={ariaLabel} testId={testId} onSelect={onSelect} sideArrows={sideArrows} />;
   }
   const ctl = { prev, next, canPrev: canPrev || !!c.rewind, canNext: canNext || !!c.rewind || !!c.loop };
+  // Noktalar şablondaki gibi SAYFA başına (görünen adet kadar kart = 1 nokta), kaydırma konumu başına değil.
+  const per = Math.max(1, nowPer);
+  const lastSnap = Math.max(0, snaps.length - 1);
+  const dotPages = c.loop ? snaps.length : Math.min(snaps.length, Math.ceil(items.length / per));
+  const dotSel = c.loop ? sel : (sel >= lastSnap && dotPages > 0 ? dotPages - 1 : Math.min(dotPages - 1, Math.floor(sel / per)));
+  const goPage = (i) => { if (!api) return; api.scrollTo(c.loop ? i : Math.min(i * per, lastSnap)); };
   const style = { ...pvVars, "--el-gutter": `${Number(c.gutter) || 0}px` };
   return (
     <>
@@ -147,7 +182,7 @@ export default function BlockCarousel({
           </div>
         </div>
         {sideArrows(ctl)}
-        <Dots count={snaps.length} sel={sel} onGo={(i) => api && api.scrollTo(i)} mode={c.dots} className={dotsClassName} />
+        <Dots count={dotPages} sel={dotSel} onGo={goPage} mode={c.dots} className={dotsClassName} />
       </div>
     </>
   );

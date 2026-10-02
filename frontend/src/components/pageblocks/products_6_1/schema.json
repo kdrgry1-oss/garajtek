@@ -100,7 +100,12 @@
       "type": "section_header",
       "label": "Başlık satırı",
       "tab": "İçerik",
-      "help": "Haplar bağlantı olabilir ya da “Sekme gibi” işaretlenip kendi ürün kaynağını gösterebilir; kaynağı boş sekme bloğun ürün kaynağını kullanır."
+      "help": "Haplar bağlantı olabilir ya da “Sekme gibi” işaretlenip kendi ürün kaynağını gösterebilir; kaynağı boş sekme bloğun ürün kaynağını kullanır.",
+      "right_options": [
+        "none",
+        "pills",
+        "link"
+      ]
     },
     {
       "name": "source",

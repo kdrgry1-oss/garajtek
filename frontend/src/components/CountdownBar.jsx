@@ -32,6 +32,8 @@
 import { useState, useEffect } from "react";
 import { usePreviewState } from "../lib/pagePreview";
 import { countdownEnd } from "./pageblocks/_shared/Countdown";
+import SmartLink, { linkHref } from "./pageblocks/_shared/SmartLink";
+import { barAllowed, barVisClass } from "./pageblocks/_shared/topBars";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -78,7 +80,10 @@ const _readBarCache = () => {
 /** v2 şema (text, countdown{end, heading, labels, on_expire, expired_text}, background, text_color) →
  * bu bileşenin iç alanları. Eski alanlar (left_text, end_at, …) doğrudan okunur (geri uyum). */
 function normalizeSettings(st) {
-  if (!st || !st.countdown || typeof st.countdown !== "object") return st || {};
+  if (!st || !st.countdown || typeof st.countdown !== "object") {
+    // eski (v1) biçim: left_text / timer_label / start_at / end_at / fallback_text
+    return { ...(st || {}), on_expire: st && st.fallback_text ? "show_text" : "hide_block", legacy: true };
+  }
   const cd = st.countdown;
   const end = cd.enabled === false ? null : countdownEnd(cd);
   return {
@@ -89,9 +94,13 @@ function normalizeSettings(st) {
     bg_color: st.background,
     text_color: st.text_color,
     fallback_text: cd.on_expire === "show_text" ? cd.expired_text || "" : "",
+    on_expire: cd.on_expire || "hide_block",
     labels: cd.labels || {},
     units: Array.isArray(cd.units) && cd.units.length ? cd.units : ["days", "hours", "minutes", "seconds"],
+    hide_zero_days: !!cd.hide_zero_days,
+    pad: cd.pad !== false,
     timer_off: cd.enabled === false,
+    link: st.link,
   };
 }
 
@@ -139,9 +148,13 @@ export default function CountdownBar({ block: forced }) {
   const endAt   = _parseLocal(s.end_at);
   const bg      = s.bg_color || "#000000"; // DENETİM FIX: panelde seçilen renk uygulanıyordu değildi
   const fg      = s.text_color || "#ffffff";
-  const inWindow =
-    (!startAt || now >= startAt.getTime()) &&
-    (!endAt   || now <= endAt.getTime());
+  const started = !startAt || now >= startAt.getTime();
+  const expired = !!endAt && now > endAt.getTime();
+  // Süre bitince (Sayfa Tasarımı › Geri sayım › "Süre bitince"): hide_block → bar gizli; show_text → bitiş
+  // metni; hide_timer → metin kalır, sayaç gizlenir; zero → metin + 00 sayaç.
+  const keepAfterExpiry = expired && (s.on_expire === "hide_timer" || s.on_expire === "zero");
+  const inWindow = started && (!expired || keepAfterExpiry);
+  const fallbackField = s.legacy ? undefined : "countdown.expired_text";
 
   let rawText;
   if (!block)          rawText = "";                             // blok yok → metin yok (yedek metin kaldırıldı)
@@ -173,58 +186,67 @@ export default function CountdownBar({ block: forced }) {
   }
 
   // Hiç blok yok → hiçbir şey gösterme (yedek/statik metin kaldırıldı).
-  if (!block) return null;
+  if (!block || !barAllowed(block)) return null;
+  const visCls = barVisClass(block);
 
   if (!inWindow) {
     // Bar pasif (planlanmış ya da süresi dolmuş) → fallback metin (kayan marquee)
     if (!messages.length) return null; // tamamen gizle
     return (
-      <div className="py-2 md:py-2.5" style={{ backgroundColor: bg, color: fg }}
+      <div className={`py-2 md:py-2.5 ${visCls}`} style={{ backgroundColor: bg, color: fg }}
            data-testid="topbar-fallback">
-        <Marquee items={messages} fg={fg}
-          className="text-[13px] md:text-[17px] uppercase fct-topbar-heavy" />
+        <SmartLink link={s.link} fallback="div" style={{ color: fg }} className="block">
+          <Marquee items={messages} fg={fg} field={fallbackField}
+            className="text-[13px] md:text-[17px] uppercase fct-topbar-heavy" />
+        </SmartLink>
       </div>
     );
   }
 
-  // Aktif: sayaç + (dönüşümlü) sol metin
+  // Aktif: sayaç + (dönüşümlü) sol metin. Tüm metinler panelden gelir (sabit yedek metin yok).
   const target = endAt ? endAt.getTime() : now;
   const { days, hours, mins, secs } = _diffParts(target, now);
-  const timerLbl  = (s.timer_label || "KALAN SÜRE:").trim();
+  const timerLbl  = (s.timer_label || "").trim();
+  const showTimer = !s.timer_off && !(expired && s.on_expire === "hide_timer");
+  let units = s.units || ["days", "hours", "minutes", "seconds"];
+  if (s.hide_zero_days && days === 0) units = units.filter((u) => u !== "days");
+  const vals = { days, hours: units.includes("days") ? hours : hours + days * 24, minutes: mins, seconds: secs };
+  const href = linkHref(s.link);
 
   return (
     <div
-      className="text-center py-2 md:py-2.5"
+      className={`text-center py-2 md:py-2.5 ${visCls}`}
       style={{ backgroundColor: bg, color: fg }}
       data-testid="topbar-countdown"
     >
       {fadeKeyframes}
-      <div className="max-w-screen-2xl mx-auto px-3 md:px-6 flex items-center justify-center gap-3 md:gap-5 flex-wrap">
+      <SmartLink link={href ? s.link : undefined} fallback="div" style={{ color: fg }}
+        className="max-w-screen-2xl mx-auto px-3 md:px-6 flex items-center justify-center gap-3 md:gap-5 flex-wrap" data-testid="topbar-countdown-inner">
         {currentMsg && (
-          <Rotator idx={msgIdx} text={currentMsg} multi={multi}
+          <Rotator idx={msgIdx} text={currentMsg} multi={multi} field={s.legacy ? undefined : "text"}
              className="text-xs md:text-sm font-semibold tracking-wide flex-shrink-0" />
         )}
-        <div className="flex items-center gap-2 md:gap-3">
-          {timerLbl && (
-            <span className="text-[11px] md:text-[13px] tracking-[0.22em] uppercase font-semibold hidden md:inline">
+        {(showTimer || timerLbl) && <div className="flex items-center gap-2 md:gap-3">
+          {timerLbl && showTimer && (
+            <span className="text-[11px] md:text-[13px] tracking-[0.22em] uppercase font-semibold hidden md:inline" data-pd-field={s.legacy ? undefined : "countdown.heading"}>
               {timerLbl}
             </span>
           )}
-          {!s.timer_off && (s.units || ["days", "hours", "minutes", "seconds"]).map((u) => (
-            <CountUnit key={u} value={{ days, hours, minutes: mins, seconds: secs }[u]}
-              label={(s.labels || {})[u] || { days: "GÜN", hours: "SAAT", minutes: "DK", seconds: "SN" }[u]} fg={fg} bg={bg} />
+          {showTimer && units.map((u) => (
+            <CountUnit key={u} value={vals[u]} pad={s.pad !== false} field={s.legacy ? undefined : `countdown.labels.${u}`}
+              label={(s.labels || {})[u] || ""} fg={fg} bg={bg} />
           ))}
-        </div>
-      </div>
+        </div>}
+      </SmartLink>
     </div>
   );
 }
 
 // Üst bar yazı geçişi — suudcollection tarzı: dikey kayan (clipped slide-up) rotasyon.
-function Rotator({ idx, text, multi, className }) {
-  if (!multi) return <p className={className}>{text}</p>;
+function Rotator({ idx, text, multi, className, field }) {
+  if (!multi) return <p className={className} data-pd-field={field}>{text}</p>;
   return (
-    <p className={`${className} overflow-hidden`} style={{ lineHeight: 1.6 }}>
+    <p className={`${className} overflow-hidden`} style={{ lineHeight: 1.6 }} data-pd-field={field}>
       <span
         key={idx}
         style={{ display: "inline-block", animation: "fctTopbarSlide .6s cubic-bezier(.22,1,.36,1)", willChange: "transform, opacity" }}
@@ -239,7 +261,7 @@ function Rotator({ idx, text, multi, className }) {
 // başa dönerken zıplama olmaz (içerik iki kez basılır, track -%50 kaydırılır). Hover'da
 // durur; prefers-reduced-motion açıksa animasyon kapalıdır. Hız metin uzunluğuna göre
 // ayarlanır → mesaj sayısından bağımsız sabit akış hızı.
-function Marquee({ items, className, fg = "#ffffff" }) {
+function Marquee({ items, className, fg = "#ffffff", field }) {
   const list = (items || []).filter(Boolean);
   if (!list.length) return null;
   const totalLen = list.join("   ").length || 20;
@@ -248,7 +270,7 @@ function Marquee({ items, className, fg = "#ffffff" }) {
     <div className="flex items-center shrink-0" aria-hidden={ariaHidden ? "true" : undefined}>
       {list.map((t, i) => (
         <span key={i} className="flex items-center shrink-0">
-          <span className={className}>{t}</span>
+          <span className={className} data-pd-field={ariaHidden ? undefined : field}>{t}</span>
           <span className="mx-5 md:mx-9 opacity-60 select-none" style={{ color: fg }}>◆</span>
         </span>
       ))}
@@ -271,7 +293,7 @@ function Marquee({ items, className, fg = "#ffffff" }) {
   );
 }
 
-function CountUnit({ value, label, fg, bg }) {
+function CountUnit({ value, label, fg, bg, pad = true, field }) {
   // Beyaz tabela + metin renkleri tersine — bar siyah arkaplanlıysa kutular beyaz arka, metin siyah
   return (
     <div className="flex items-center gap-1">
@@ -279,9 +301,9 @@ function CountUnit({ value, label, fg, bg }) {
         className="inline-flex items-center justify-center min-w-[26px] md:min-w-[34px] h-6 md:h-7 px-1 md:px-1.5 text-[11px] md:text-sm font-semibold tabular-nums"
         style={{ backgroundColor: fg, color: bg }}
       >
-        {_pad(value)}
+        {pad ? _pad(value) : value}
       </span>
-      <span className="text-[9px] md:text-[11px] tracking-[0.18em] uppercase font-medium">{label}</span>
+      {label && <span className="text-[9px] md:text-[11px] tracking-[0.18em] uppercase font-medium" data-pd-field={field}>{label}</span>}
     </div>
   );
 }

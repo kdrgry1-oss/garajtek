@@ -31,7 +31,19 @@ function Widget({ field, value, onChange, ctx, path, defaults, renderFields }) {
     case "select": return <SelectInput {...props} />;
     case "color": return <ColorInput {...props} />;
     case "date_time": return <DateTimeInput {...props} />;
-    case "icon": return <IconInput {...props} />;
+    case "icon": return (
+      <div className="space-y-1.5">
+        <IconInput {...props} />
+        {field.allow_upload && (
+          <div data-testid="icon-upload">
+            <div className="text-[11px] text-gray-500 mb-0.5">veya görsel/SVG yükleyin (ikonun yerine geçer)</div>
+            <ImageField field={{ label: `${field.label} görseli`, recommended: field.recommended || [64, 64], accept: "image/*" }}
+              value={isObj(value) ? value.image || null : null}
+              onChange={(img) => { const v = isObj(value) ? value : { icon: typeof value === "string" ? value : "" }; const n = { ...v, image: img }; if (!img || !img.url) delete n.image; onChange(n); }} />
+          </div>
+        )}
+      </div>
+    );
     case "spacing": return <SpacingInput {...props} />;
     case "image": return <ImageField {...props} />;
     case "link": return <LinkField {...props} />;
@@ -44,7 +56,12 @@ function Widget({ field, value, onChange, ctx, path, defaults, renderFields }) {
         {renderFields(field.fields || [], isObj(value) ? value : {}, onChange, path, isObj(defaults) ? defaults : {})}
       </div>
     );
-    case "repeater": return <RepeaterInput {...props} path={path} renderFields={(f, v, oc, p) => renderFields(f, v, oc, p, itemDefault(field))} />;
+    // Öğe alanının "↺" düğmesi şablondaki AYNI sıradaki öğeye döner (defaults.json); şablonda o sırada öğe yoksa yeni öğe varsayılanına.
+    case "repeater": return <RepeaterInput {...props} path={path} renderFields={(f, v, oc, p) => {
+      const i = Number(String(p).split(".").pop());
+      const tpl = Array.isArray(defaults) && isObj(defaults[i]) ? defaults[i] : itemDefault(field);
+      return renderFields(f, v, oc, p, tpl);
+    }} />;
     case "carousel": return <CarouselInput {...props} path={path} renderFields={(f, v, oc, p) => <div className="grid grid-cols-6 gap-2">{renderFields(f, v, oc, p, isObj(defaults) ? defaults : {})}</div>} />;
     case "countdown": return <CountdownInput {...props} path={path} renderFields={(f, v, oc, p) => <div className="grid grid-cols-6 gap-2">{renderFields(f, v, oc, p, isObj(defaults) ? defaults : {})}</div>} />;
     case "section_header": return <SectionHeaderInput {...props} path={path} renderFields={(f, v, oc, p) => <div className="grid grid-cols-6 gap-2">{renderFields(f, v, oc, p, isObj(defaults) ? defaults : {})}</div>} />;
@@ -106,7 +123,15 @@ export function useRenderFields(ctx, errors) {
 export default function SchemaForm({ fields, tabs: tabOrder = [], value, onChange, defaults, errors = [], ctx = {}, focusPath, testId = "schema-form" }) {
   const root = value || {};
   const errs = useMemo(() => errors.map((e) => ({ ...e, p: normErrPath(e.path) })), [errors]);
-  const fullCtx = { ...ctx, root, parentOf: (p) => { const parts = String(p).split("."); parts.pop(); return parts.length > 1 ? getPath(root, parts.slice(0, -1).join(".")) : root; } };
+  const fullCtx = { ...ctx, root, parentOf: (p) => {
+    // `$parent.x`: alanın bulunduğu nesneyi (kapsam) içeren bir üst NESNE. Repeater öğesindeki bir gruptaysa
+    // öğenin kendisi; doğrudan öğedeyse (dizi atlanır) öğeyi taşıyan nesne.
+    const parts = String(p || "").split(".").filter(Boolean);
+    parts.pop();
+    let v = parts.length ? getPath(root, parts.join(".")) : root;
+    while (Array.isArray(v)) { parts.pop(); v = parts.length ? getPath(root, parts.join(".")) : root; }
+    return v;
+  } };
   const renderFields = useRenderFields(fullCtx, errs);
   const tabs = useMemo(() => {
     const order = [...tabOrder];

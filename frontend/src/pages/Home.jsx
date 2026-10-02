@@ -7,9 +7,9 @@ import axios from "axios";
 import Header from "../components/Header";
 import RotatingText from "../components/RotatingText";
 import Footer from "../components/Footer";
-import PageRenderer, { hasProductColumns } from "../components/pageblocks/_shared/PageRenderer";
+import PageRenderer, { hasProductColumns, prepareBlocks } from "../components/pageblocks/_shared/PageRenderer";
 import { PageCtx } from "../components/pageblocks/_shared/PageCtx";
-import { defaultHome, withDefaults } from "../components/pageblocks/registry";
+import { defaultHome, TOP_BAR_TYPES, withDefaults } from "../components/pageblocks/registry";
 import { useSiteDesign } from "../lib/siteDesign";
 import { SITE_NAME } from "../lib/brand";
 import "../components/pageblocks/_shared/pageblocks.css";
@@ -49,13 +49,19 @@ export function HomeShell({ blocks, loading, ctx, isMember = false }) {
   const sd = useSiteDesign();
   const bars = topBarsOf(blocks || []);
   const hideWidgets = useMemo(() => hasProductColumns(blocks || []), [blocks]);
+  // İlk görünür akış bloğu bir hero mu? (dikey menü yalnız o zaman slider'ın üstünde açık başlar)
+  const heroFirst = useMemo(() => {
+    if (loading) return true;
+    const first = prepareBlocks(blocks || [], { isMember }).find((p) => !TOP_BAR_TYPES.has(p.block.type));
+    return !first || ["hero_slider", "hero_tabs"].includes(first.block.type);
+  }, [blocks, loading, isMember]);
   return (
     <div className="sf-page" data-testid="home-page">
-      <Header announcement={bars.rotating ? <RotatingText block={bars.rotating} /> : null} announcementFirst={bars.announcementFirst} />
+      <Header announcement={bars.rotating ? <RotatingText block={bars.rotating} /> : null} announcementFirst={bars.announcementFirst} announcementPosition={bars.position} heroFirst={heroFirst} />
       <main id="content" role="main" className="electro el-page">
         <h1 className="sr-only">{SITE_NAME} — Oto Servis ve Garaj Ekipmanları</h1>
         <PageCtx.Provider value={ctx}>
-          {loading ? <HomeSkeleton /> : <PageRenderer blocks={blocks} isMember={isMember} revealDefault={sd.site_theme?.reveal_default !== false} />}
+          {loading ? <HomeSkeleton /> : <PageRenderer blocks={blocks} isMember={isMember} layout={sd.site_page_layout?.home_layout === "left_sidebar" ? "left_sidebar" : "full"} revealDefault={sd.site_theme?.reveal_default !== false} />}
         </PageCtx.Provider>
       </main>
       <Footer hideWidgets={hideWidgets} />

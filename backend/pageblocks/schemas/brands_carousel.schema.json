@@ -221,7 +221,7 @@
       "type": "bool",
       "label": "Tüm sayfalarda footer üstünde göster",
       "tab": "Gelişmiş",
-      "help": "Şablonda marka şeridi her sayfanın altında yer alır. Diğer sayfalarda gösterim vitrin altyapısına bağlanınca bu ayar etkinleşir; şimdilik yalnız bu sayfada görünür."
+      "help": "Şablonda marka şeridi her sayfanın altında yer alır. Açıkken ürün, kategori, sepet vb. tüm sayfalarda footer'ın hemen üstünde bu bloğun aynısı gösterilir (ana sayfada blok zaten bulunduğu yerde durur)."
     },
     {
       "name": "carousel",

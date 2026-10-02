@@ -9,6 +9,8 @@ export const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v))
 
 /** `over` kazanır; nesneler özyinelemeli, diziler/skalerler değiştirilir. */
 export function deepMerge(base, over) {
+  // tamamen sayısal anahtarlı nesne (karusel per_view kırılım tablosu) bütün olarak değiştirilir (backend ile aynı)
+  if (isObj(over) && Object.keys(over).length && Object.keys(over).every((k) => /^\d+$/.test(k))) return clone(over);
   if (isObj(base) && isObj(over)) {
     const out = { ...clone(base) };
     Object.keys(over).forEach((k) => { out[k] = k in out ? deepMerge(out[k], over[k]) : clone(over[k]); });

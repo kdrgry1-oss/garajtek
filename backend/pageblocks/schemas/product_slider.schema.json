@@ -87,7 +87,13 @@
       "type": "section_header",
       "label": "Başlık satırı",
       "tab": "İçerik",
-      "help": "Şablonda başlığın sağında ‹ › okları vardır (Sağ taraf: Oklar). Karusel sekmesinde Oklar = Başlıkta olmalı."
+      "help": "Şablonda başlığın sağında ‹ › okları vardır (Sağ taraf: Oklar). Karusel sekmesinde Oklar = Başlıkta olmalı.",
+      "right_options": [
+        "none",
+        "arrows",
+        "pills",
+        "link"
+      ]
     },
     {
       "name": "source",

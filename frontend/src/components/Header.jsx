@@ -41,11 +41,11 @@ const MAX_VERTICAL = 14; // dikey menüde gösterilecek en fazla kök kategori (
 /* ------------------------------------------------------------------ */
 /** Elle tanımlı menü öğesini (label/link/children) kategori düğümü biçimine çevirir. */
 function itemToNode(it) {
-  return { id: it.id, name: it.label, slug: null, link: it.link || "/", style: it.style, icon: it.icon, children: (it.children || []).map(itemToNode) };
+  return { id: it.id, name: it.label, slug: null, link: it.link || "/", style: it.style, icon: it.icon, image: it.image || "", children: (it.children || []).map(itemToNode) };
 }
 const nodeHref = (n) => n.link || `/${n.slug}`;
 
-function VerticalMenu({ roots, open, variant, onNavigate, config }) {
+function VerticalMenu({ roots, open, variant, onNavigate, config, moreLabel, texts = {} }) {
   const [hover, setHover] = useState(null);
   const timer = useRef(null);
   const enter = (id) => { clearTimeout(timer.current); setHover(id); };
@@ -115,8 +115,8 @@ function VerticalMenu({ roots, open, variant, onNavigate, config }) {
                                   {col.all && (
                                     <li>
                                       <Link className="nav-link u-header__sub-menu-nav-link u-nav-divider border-top pt-2 flex-column align-items-start" to={col.to} onClick={onNavigate}>
-                                        <div>Tüm {cat.name}</div>
-                                        <div className="u-nav-subtext font-size-11 text-gray-30">Tüm ürünleri keşfedin</div>
+                                        <div>{texts.all_prefix ?? "Tüm"} {cat.name}</div>
+                                        {(texts.all_subtext ?? "Tüm ürünleri keşfedin") && <div className="u-nav-subtext font-size-11 text-gray-30" data-pd-field="site_departments_menu.all_subtext">{texts.all_subtext ?? "Tüm ürünleri keşfedin"}</div>}
                                       </Link>
                                     </li>
                                   )}
@@ -132,7 +132,7 @@ function VerticalMenu({ roots, open, variant, onNavigate, config }) {
               })}
               {source.length > maxRoots && (
                 <li className="nav-item u-header__nav-item" data-event="hover">
-                  <Link to="/tum-urunler" className="nav-link u-header__nav-link font-weight-bold" onClick={onNavigate}>Tüm Kategoriler</Link>
+                  <Link to="/tum-urunler" className="nav-link u-header__nav-link font-weight-bold" onClick={onNavigate} data-pd-field="site_departments_menu.title">{cfg.more_label || moreLabel || "Tüm Kategoriler"}</Link>
                 </li>
               )}
             </ul>
@@ -652,7 +652,7 @@ function MobileSidebar({ open, onClose, roots, tabs, menus, highlight }) {
 /* ------------------------------------------------------------------ */
 /* Header                                                              */
 /* ------------------------------------------------------------------ */
-export default function Header({ announcement, announcementFirst = false, variant: forcedVariant }) {
+export default function Header({ announcement, announcementFirst = false, announcementPosition, heroFirst = true, variant: forcedVariant }) {
   const location = useLocation();
   const { user } = useAuth();
   const info = useStoreInfo();
@@ -685,6 +685,8 @@ export default function Header({ announcement, announcementFirst = false, varian
   }, [selfBars]);
   const topAnnouncement = selfBars ? (bars?.rotating ? <RotatingText block={bars.rotating} /> : null) : announcement;
   const topFirst = selfBars ? !!bars?.announcementFirst : announcementFirst;
+  // Dönen duyuru konumu (Sayfa Tasarımı › Dönen Duyuru › Konum): üst barın üstünde (vars.) / altında
+  const annBelow = (selfBars ? bars?.rotating?.settings?.position : announcementPosition) === "below_topbar";
 
   // Admin menü sekmeleri (Tasarım › Menü Yönetimi) + SALE menüsü
   const [menuTabs, setMenuTabs] = useState(() => getCachedMenu() || DEFAULT_MENU_TABS);
@@ -741,7 +743,9 @@ export default function Header({ announcement, announcementFirst = false, varian
   const sup = hd.support || {};
   const deptTitle = home ? (dm.title || "Tüm Kategoriler") : (dm.title_shop || "Kategoriler");
   const deptIcon = dm.title_icon?.icon || "fa fa-list-ul";
-  const deptOpenByDefault = home ? dm.open_on_home !== false : !!dm.open_elsewhere;
+  // Ana sayfada açık dikey menü şablondaki gibi slider'ın ÜSTÜNE biner; sayfa slider ile başlamıyorsa
+  // ilk içerik bloğunu örtmesin diye kapalı başlar (tıklayınca açılır).
+  const deptOpenByDefault = home ? dm.open_on_home !== false && heroFirst : !!dm.open_elsewhere;
   const navMax = home ? Number(sm.max_visible_home) || NAV_MAX_HOME : Number(sm.max_visible_shop) || NAV_MAX_SHOP;
   const closeMobile = () => setMobileOpen(false);
 
@@ -766,7 +770,7 @@ export default function Header({ announcement, announcementFirst = false, varian
 
   const bar = (
     <>
-      {topFirst ? <>{topAnnouncement}<CountdownBar /></> : <><CountdownBar />{topAnnouncement}</>}
+      {annBelow ? <CountdownBar /> : topFirst ? <>{topAnnouncement}<CountdownBar /></> : <><CountdownBar />{topAnnouncement}</>}
     </>
   );
 
@@ -793,7 +797,7 @@ export default function Header({ announcement, announcementFirst = false, varian
                   <div className="topbar-right ml-auto">
                     <ul className="list-inline mb-0">
                       {topItems.map((it) => (
-                        <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border" key={it.id || it.label}>
+                        <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border" key={it.id || it.label} data-pd-field="site_topbar.right_items">
                           {it.special === "account" ? (user ? (
                             <Link to="/hesabim" className="u-header-topbar__nav-link" data-testid="topbar-account">{it.icon && <i className={`${it.icon} mr-1`} />} {it.label || "Hesabım"}{user.first_name ? ` (${user.first_name})` : ""}</Link>
                           ) : (
@@ -807,7 +811,7 @@ export default function Header({ announcement, announcementFirst = false, varian
                       ))}
                       {tb.currency_text && (
                         <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
-                          <span className="u-header-topbar__nav-link"><i className="ec ec-dollar mr-1" /> {tb.currency_text}</span>
+                          <span className="u-header-topbar__nav-link" data-pd-field="site_topbar.currency_text"><i className="ec ec-dollar mr-1" /> {tb.currency_text}</span>
                         </li>
                       )}
                     </ul>
@@ -815,6 +819,7 @@ export default function Header({ announcement, announcementFirst = false, varian
                 </div>
               </div>
             </div>}
+            {annBelow && topAnnouncement}
 
             {/* Logo + arama/menü + ikonlar */}
             <div className={`py-2 ${home ? "py-xl-5" : "py-xl-4"}${hd.mobile_band_primary === false ? "" : " bg-primary-down-lg"}${hv === "v3_full_color" && home ? " bg-primary" : ""}`}>
@@ -887,7 +892,7 @@ export default function Header({ announcement, announcementFirst = false, varian
                               <span className="pl-1 text-gray-90" data-pd-field="site_departments_menu.title">{deptTitle}</span>
                             </button>
                           </div>
-                          <VerticalMenu roots={roots} open={deptOpenByDefault ? !deptOpen : deptOpen} variant="home" config={menus.departments} />
+                          <VerticalMenu roots={roots} open={deptOpenByDefault ? !deptOpen : deptOpen} variant="home" config={menus.departments} moreLabel={dm.title} texts={dm} />
                         </div>
                       </div>
                     </div>
@@ -898,7 +903,7 @@ export default function Header({ announcement, announcementFirst = false, varian
                 </div>
               </div>
             ) : (
-              <ShopBar roots={roots} deptOpen={deptOpen || hl === "departments" || (!!dm.open_elsewhere && !deptOpen)} setDeptOpen={setDeptOpen} config={menus.departments}
+              <ShopBar dm={dm} roots={roots} deptOpen={deptOpen || hl === "departments" || (!!dm.open_elsewhere && !deptOpen)} setDeptOpen={setDeptOpen} config={menus.departments}
                 highlight={hl === "departments"} title={deptTitle} enabled={dm.enabled !== false} searchCfg={searchCfg} iconsCfg={iconsCfg} />
             )}
           </div>
@@ -927,7 +932,7 @@ export default function Header({ announcement, announcementFirst = false, varian
 }
 
 /** İç sayfalar: sarı şerit — "Kategoriler" (açılır dikey menü) + arama + ikonlar. */
-function ShopBar({ roots, deptOpen, setDeptOpen, config, highlight, title = "Kategoriler", enabled = true, searchCfg = {}, iconsCfg = {} }) {
+function ShopBar({ roots, deptOpen, setDeptOpen, config, highlight, title = "Kategoriler", enabled = true, searchCfg = {}, iconsCfg = {}, dm = {} }) {
   const ref = useRef(null);
   useEffect(() => {
     if (!deptOpen) return undefined;
@@ -950,7 +955,7 @@ function ShopBar({ roots, deptOpen, setDeptOpen, config, highlight, title = "Kat
                       <span className="text-gray-90 ml-3"><span className="ec ec-arrow-down-search" /></span>
                     </button>
                   </div>
-                  <VerticalMenu roots={roots} open={deptOpen} variant="shop" onNavigate={() => setDeptOpen(false)} config={config} />
+                  <VerticalMenu roots={roots} open={deptOpen} variant="shop" onNavigate={() => setDeptOpen(false)} config={config} moreLabel={dm.title} texts={dm} />
                 </div>
               </div>
             </div>

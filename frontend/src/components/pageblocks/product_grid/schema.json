@@ -109,7 +109,12 @@
       "type": "section_header",
       "label": "Başlık satırı",
       "tab": "İçerik",
-      "help": "Sağda “Tümünü gör” bağlantısı ya da hap sekmeler (sekme haplar kendi ürün kaynağını gösterir)."
+      "help": "Sağda “Tümünü gör” bağlantısı ya da hap sekmeler (sekme haplar kendi ürün kaynağını gösterir).",
+      "right_options": [
+        "none",
+        "pills",
+        "link"
+      ]
     },
     {
       "name": "source",

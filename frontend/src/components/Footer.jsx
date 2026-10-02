@@ -19,6 +19,7 @@ import SmartLink, { linkHref } from "./pageblocks/_shared/SmartLink";
 import RichText from "./pageblocks/_shared/RichText";
 import SmartImage from "./pageblocks/_shared/SmartImage";
 import GoToTop from "./pageblocks/_shared/GoToTop";
+import SiteWideBrands from "./pageblocks/_shared/SiteWideBrands";
 import { plainText } from "./pageblocks/_shared/schema";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -172,6 +173,7 @@ export default function Footer({ hideWidgets = false }) {
 
   return (
     <footer className="electro el-footer" data-testid={fl.mode === "html" ? "footer-html" : "footer-structured"}>
+      <SiteWideBrands />
       {!hideWidgets && fw.enabled !== false && <FooterWidgets cfg={fw} />}
       {nl.enabled !== false && <NewsletterBand nl={nl} />}
       {fl.mode === "html" && fl.custom_html ? (

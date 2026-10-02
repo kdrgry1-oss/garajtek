@@ -151,8 +151,10 @@ async def _query(db, src: dict, member: bool, limit: int) -> list:
     for k, d in reversed(sort):
         cur = cur.sort(k, d)
     rows = await cur.to_list(fetch)
-    if kind == "top_rated" and not any(r.get("rating") for r in rows):
-        rows.sort(key=lambda r: -(r.get("sales_count") or 0))
+    if kind == "top_rated":
+        # ürün belgesinde puan yoksa onaylı yorumların ortalaması; hiç puan yoksa çok satanlara düşer
+        await _attach_ratings(db, rows)
+        rows.sort(key=lambda r: (-(float(r.get("rating") or 0)), -(r.get("review_count") or 0), -(r.get("sales_count") or 0)))
     s = src.get("sort")
     if s == "price_asc":
         rows.sort(key=_price)
@@ -173,6 +175,28 @@ def _clean(rows: list) -> list:
         def _strip_internal_fields(p):
             return p
     return [_strip_internal_fields(dict(r)) for r in rows]
+
+
+async def _attach_ratings(db, rows: list) -> None:
+    """Onaylı müşteri yorumlarından ortalama puan + yorum sayısı (kartlardaki yıldızlar; şablonda Top Rated sütunu)."""
+    ids = [r.get("id") for r in rows if r.get("id")]
+    if not ids:
+        return
+    try:
+        revs = await db.reviews.find({"product_id": {"$in": ids}, "status": "approved"}, {"_id": 0, "product_id": 1, "rating": 1}).to_list(5000)
+    except Exception:  # noqa: BLE001
+        return
+    agg: dict = {}
+    for rv in revs:
+        try:
+            agg.setdefault(rv.get("product_id"), []).append(float(rv.get("rating") or 0))
+        except (TypeError, ValueError):
+            continue
+    for r in rows:
+        vals = [v for v in agg.get(r.get("id"), []) if v > 0]
+        if vals:
+            r["rating"] = round(sum(vals) / len(vals), 2)
+            r["review_count"] = len(vals)
 
 
 async def resolve_source(db, src: dict, *, member: bool = False, use_cache: bool = True) -> list:
@@ -201,6 +225,7 @@ async def resolve_source(db, src: dict, *, member: bool = False, use_cache: bool
             _apply_campaign_badge(r, camps)
     except Exception:  # noqa: BLE001
         pass
+    await _attach_ratings(db, rows)
     out = _clean(rows)
     _CACHE[k] = (time.time(), out)
     if len(_CACHE) > 500:

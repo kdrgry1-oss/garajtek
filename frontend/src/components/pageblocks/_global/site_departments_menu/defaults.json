@@ -10,5 +10,7 @@
   "open_elsewhere": false,
   "toggle_event": "click",
   "width": 270,
-  "overlay_hero": true
+  "overlay_hero": true,
+  "all_prefix": "Tüm",
+  "all_subtext": "Tüm ürünleri keşfedin"
 }

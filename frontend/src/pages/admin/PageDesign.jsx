@@ -37,7 +37,7 @@ const headers = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}
 const ask = (m) => (appConfirm ? appConfirm(m) : Promise.resolve(window.confirm(m)));
 
 const GLOBAL_GROUPS = [
-  ["site_theme", "Tema"], ["site_contact", "İletişim Bilgileri"], ["site_topbar", "Üst Bar"], ["site_header", "Header"],
+  ["site_theme", "Tema"], ["site_page_layout", "Sayfa Düzeni"], ["site_contact", "İletişim Bilgileri"], ["site_topbar", "Üst Bar"], ["site_header", "Header"],
   ["site_departments_menu", "Dikey Menü"], ["site_secondary_menu", "Ana / İkincil Menü"], ["site_newsletter", "E-Bülten"],
   ["site_footer_widgets", "Footer Ürün Sütunları"], ["site_footer_contact", "Footer İletişim"], ["site_footer_links", "Footer Bağlantıları"],
   ["site_footer_bottom", "Footer Alt Şerit"],

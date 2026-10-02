@@ -1,0 +1,26 @@
+{
+  "key": "site_page_layout",
+  "version": 2,
+  "title": "Sayfa Düzeni",
+  "description": "Ana sayfanın tam genişlik mi yoksa sol kenar çubuklu mu (şablon home-v2 düzeni) çizileceği.",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik"
+  ],
+  "fields": [
+    {
+      "name": "home_layout",
+      "type": "select",
+      "label": "Ana sayfa düzeni",
+      "tab": "İçerik",
+      "options": [
+        { "value": "full", "label": "Tam genişlik (şablon v1 ana sayfa)" },
+        { "value": "left_sidebar", "label": "Sol kenar çubuklu (şablon v2 ana sayfa)" }
+      ],
+      "help": "Sol kenar çubuklu düzende 'Kenar Çubuğu' kategorisindeki bloklar (Kenar Reklam Görseli, Kenar Ürün Listesi, Kenar Avantajlar…) 1200 px ve üzerinde soldaki sütuna yerleşir; tam genişlikli bloklar (ör. Ana Slider) üstte kalır. Dar ekranlarda kenar çubuğu gizlenir."
+    }
+  ]
+}

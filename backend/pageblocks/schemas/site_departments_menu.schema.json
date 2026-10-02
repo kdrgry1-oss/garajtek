@@ -41,6 +41,22 @@
       "set": "electro"
     },
     {
+      "name": "all_prefix",
+      "type": "text",
+      "label": "Açılır panel 'tümü' bağlantısı ön eki",
+      "tab": "İçerik",
+      "width": "half",
+      "help": "Açılır panelin altındaki bağlantı: '<ön ek> <kategori adı>' (şablon: All Computers & Accessories)."
+    },
+    {
+      "name": "all_subtext",
+      "type": "text",
+      "label": "'Tümü' bağlantısı alt yazısı",
+      "tab": "İçerik",
+      "width": "half",
+      "help": "Şablon: Discover more products."
+    },
+    {
       "name": "header_style",
       "type": "select",
       "label": "Başlık stili",

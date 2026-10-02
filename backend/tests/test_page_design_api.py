@@ -181,3 +181,23 @@ def test_resolve_products(client):
     assert len(ids[7]) == 5 and set(ids[7][:2]) <= {"p0", "p2", "p1"}
     assert ids[8] == ["p7", "p6"]
     assert "cost_price" not in res[0][0]
+
+
+def test_resolve_products_ratings_from_reviews(client):
+    """Onaylı yorumların ortalaması kartlara `rating`/`review_count` olarak eklenir; top_rated buna göre sıralanır."""
+    import asyncio
+
+    async def seed():
+        for i in range(3):
+            await client.db.products.insert_one({"id": f"r{i}", "name": f"R {i}", "slug": f"r-{i}", "price": 10,
+                                                 "is_active": True, "stock": 5, "created_at": f"2026-02-0{i + 1}T00:00:00"})
+        for pid, rt, st in [("r1", 5, "approved"), ("r1", 4, "approved"), ("r2", 3, "approved"), ("r0", 5, "pending")]:
+            await client.db.reviews.insert_one({"id": f"{pid}{rt}", "product_id": pid, "rating": rt, "status": st})
+    asyncio.run(seed())
+    r = client.post("/api/page-blocks/resolve-products", json={"sources": [
+        {"kind": "top_rated", "limit": 3}, {"kind": "manual", "product_ids": ["r0", "r1"]}]})
+    res = r.json()["results"]
+    assert [p["id"] for p in res[0]][:2] == ["r1", "r2"]
+    m = {p["id"]: p for p in res[1]}
+    assert m["r1"]["rating"] == 4.5 and m["r1"]["review_count"] == 2
+    assert "rating" not in m["r0"] or not m["r0"]["rating"]  # bekleyen yorum sayılmaz

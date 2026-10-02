@@ -91,7 +91,9 @@ export function fetchTopBars(apiBase) {
         const countdown = blocks.find((b) => b.type === "countdown_bar") || null;
         const announcementFirst = !!(rotating && countdown)
           && (Number(rotating.sort_order ?? 0) < Number(countdown.sort_order ?? 0));
-        const out = { rotating, announcementFirst };
+        // "Tüm sayfalarda footer üstünde göster" açık marka şeridi (brands_carousel.show_on_all_pages)
+        const brands = blocks.find((b) => b.type === "brands_carousel" && b.settings && b.settings.show_on_all_pages) || null;
+        const out = { rotating, announcementFirst, brands };
         _barsResolved = out;
         try { localStorage.setItem(_BARS_LS, JSON.stringify(out)); } catch { /* yoksay */ }
         return out;

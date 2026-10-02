@@ -44,7 +44,12 @@
       "name": "header",
       "type": "section_header",
       "label": "Başlık satırı",
-      "tab": "İçerik"
+      "tab": "İçerik",
+      "right_options": [
+        "none",
+        "pills",
+        "link"
+      ]
     },
     {
       "name": "source",

@@ -126,7 +126,11 @@ def all_fields(schema: dict) -> list:
 
 # ------------------------------------------------------------------ yardımcılar
 def deep_merge(base, over):
-    """`over` kazanır; sözlükler özyinelemeli birleşir, listeler/skalerler değiştirilir."""
+    """`over` kazanır; sözlükler özyinelemeli birleşir, listeler/skalerler değiştirilir.
+    Anahtarları tamamen sayısal olan sözlükler (karusel `per_view` kırılım tablosu) bütün olarak değiştirilir —
+    yöneticinin sildiği kırılım varsayılandan geri gelmez."""
+    if isinstance(over, dict) and over and all(str(k).isdigit() for k in over):
+        return copy.deepcopy(over)
     if isinstance(base, dict) and isinstance(over, dict):
         out = {k: copy.deepcopy(v) for k, v in base.items()}
         for k, v in over.items():

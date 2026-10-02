@@ -16,6 +16,13 @@ import { fmtPrice, productHref, priceOf, isSoldOut, needsVariantChoice } from ".
 import { toggleCompare, useCompare } from "./electro/compare";
 import useCategoryTree from "./electro/useCategoryTree";
 import { CodBadge } from "./electro/CodInfo";
+import { useSiteDesign } from "../lib/siteDesign";
+
+/** Kart yazıları: Sayfa Tasarımı › Genel Alanlar › Tema › Ürün kartı (sepete ekle / favori / karşılaştır). */
+export function useCardTexts() {
+  const c = useSiteDesign()?.site_theme?.card || {};
+  return { add: c.add_to_cart_text || "Sepete Ekle", fav: c.wishlist_text || "Favori", cmp: c.compare_text || "Karşılaştır" };
+}
 
 function stripHtml(s) {
   return String(s || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -103,16 +110,17 @@ function Badges({ product, pv, soldOut }) {
   );
 }
 
-function FooterLinks({ product, a, wishlistLabel = "Favorilere Ekle" }) {
+function FooterLinks({ product, a, wishlistLabel }) {
+  const tx = useCardTexts();
   return (
     <div className="product-item__footer">
       <div className="border-top pt-2 flex-center-between flex-wrap">
         <a href="#karsilastir" onClick={a.cmp} className={`text-gray-6 font-size-13${a.inCompare ? " text-blue" : ""}`} data-testid={`compare-${product.id}`}>
-          <i className="ec ec-compare mr-1 font-size-15" /> Karşılaştır
+          <i className="ec ec-compare mr-1 font-size-15" /> {tx.cmp}
         </a>
         <a href="#favori" onClick={a.fav} className={`text-gray-6 font-size-13${a.isFav ? " text-red" : ""}`}
           data-testid={`favorite-${product.id}`} aria-label={a.isFav ? "Favorilerden çıkar" : "Favorilere ekle"} aria-pressed={a.isFav}>
-          <i className={`${a.isFav ? "fas fa-heart" : "ec ec-favorites"} mr-1 font-size-15`} /> {a.isFav ? "Favorilerde" : wishlistLabel}
+          <i className={`${a.isFav ? "fas fa-heart" : "ec ec-favorites"} mr-1 font-size-15`} /> {a.isFav ? "Favorilerde" : (wishlistLabel || tx.fav)}
         </a>
       </div>
     </div>
@@ -120,10 +128,11 @@ function FooterLinks({ product, a, wishlistLabel = "Favorilere Ekle" }) {
 }
 
 function AddButton({ product, a }) {
+  const tx = useCardTexts();
   return (
     <div className="prodcut-add-cart">
       <a href={a.href} onClick={a.add} className={`btn-add-cart btn-primary transition-3d-hover${a.soldOut ? " disabled" : ""}`}
-        data-testid={`quick-add-${product.id}`} aria-label={a.soldOut ? "Tükendi" : "Sepete ekle"} title={a.soldOut ? "Tükendi" : "Sepete Ekle"}>
+        data-testid={`quick-add-${product.id}`} aria-label={a.soldOut ? "Tükendi" : "Sepete ekle"} title={a.soldOut ? "Tükendi" : tx.add}>
         <i className="ec ec-add-to-cart" />
       </a>
     </div>
@@ -132,6 +141,7 @@ function AddButton({ product, a }) {
 
 export default function ProductCard({ product, listId = "", listName = "", index, variant = "grid", as: Tag = "div", className = "", innerClassName, wishlistLabel }) {
   const a = useProductActions(product, { listId, listName, index });
+  const tx = useCardTexts();
   const cat = useCategoryLabel(product);
   const pv = priceOf(product);
   const promo = product.promo_badge ? (
@@ -181,7 +191,7 @@ export default function ProductCard({ product, listId = "", listName = "", index
                 <CardPrice product={product} />
                 <div className="d-none d-xl-block"><AddButton product={product} a={a} /></div>
               </div>
-              <FooterLinks product={product} a={a} wishlistLabel={wishlistLabel || "Favori"} />
+              <FooterLinks product={product} a={a} wishlistLabel={wishlistLabel} />
             </div>
           </div>
         </div>
@@ -215,14 +225,14 @@ export default function ProductCard({ product, listId = "", listName = "", index
                 <div className="d-none d-md-block"><CardPrice product={product} /></div>
                 <div className="prodcut-add-cart mt-3">
                   <a href={a.href} onClick={a.add} className="btn btn-sm btn-block btn-primary-dark btn-wide transition-3d-hover" data-testid={`quick-add-${product.id}`}>
-                    {a.soldOut ? "Tükendi" : "Sepete Ekle"}
+                    {a.soldOut ? "Tükendi" : tx.add}
                   </a>
                 </div>
               </div>
               <div className="flex-horizontal-center justify-content-between justify-content-wd-center flex-wrap border-top pt-3">
-                <a href="#karsilastir" onClick={a.cmp} className="text-gray-6 font-size-13 mx-wd-3"><i className="ec ec-compare mr-1 font-size-15" /> Karşılaştır</a>
+                <a href="#karsilastir" onClick={a.cmp} className="text-gray-6 font-size-13 mx-wd-3"><i className="ec ec-compare mr-1 font-size-15" /> {tx.cmp}</a>
                 <a href="#favori" onClick={a.fav} className={`text-gray-6 font-size-13 mx-wd-3${a.isFav ? " text-red" : ""}`} data-testid={`favorite-${product.id}`} aria-pressed={a.isFav}>
-                  <i className={`${a.isFav ? "fas fa-heart" : "ec ec-favorites"} mr-1 font-size-15`} /> Favori
+                  <i className={`${a.isFav ? "fas fa-heart" : "ec ec-favorites"} mr-1 font-size-15`} /> {a.isFav ? "Favorilerde" : tx.fav}
                 </a>
               </div>
             </div>

@@ -50,7 +50,13 @@
       "type": "section_header",
       "label": "Başlık satırı",
       "tab": "İçerik",
-      "help": "Şablon: “Çok Satanlar” başlığı, sağda haplar. İlk hap (İlk 20) ana ürün kaynağını gösterir; kendi kaynağı olan hap sekme gibi davranır."
+      "help": "Şablon: “Çok Satanlar” başlığı, sağda haplar. İlk hap (İlk 20) ana ürün kaynağını gösterir; kendi kaynağı olan hap sekme gibi davranır.",
+      "right_options": [
+        "none",
+        "arrows",
+        "pills",
+        "link"
+      ]
     },
     {
       "name": "pills_auto_categories",

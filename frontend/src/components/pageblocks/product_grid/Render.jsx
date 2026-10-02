@@ -2,7 +2,7 @@
 // home-v9 son bakılanlar = yalnız görsel kart). Başlık + "Tümünü gör" bağlantısı (veya hap sekmeler), cihaz başına
 // sütun sayısı, kart tipi, isteğe bağlı sayfalama ya da "Daha Fazla Göster" düğmesi.
 import { useMemo, useState } from "react";
-import useProductSource from "../_shared/useProductSource";
+import useProductSource, { recentIds } from "../_shared/useProductSource";
 import ProductCard from "../_shared/ProductCard";
 import { colCounts, colsStyle, dividerClasses } from "../deals_tabs/gridUtil";
 import GridHeader, { initialPill, pillSource } from "./GridHeader";
@@ -12,9 +12,7 @@ import { isPreviewActive } from "../../../lib/pagePreview";
  *  en yeni ürünler örnek olarak gösterilir (vitrinde etkisi yok). */
 function previewSample(src) {
   if (!src || src.kind !== "recently_viewed" || !isPreviewActive()) return src;
-  let ids = [];
-  try { ids = JSON.parse(localStorage.getItem("recently_viewed") || "[]"); } catch { ids = []; }
-  return Array.isArray(ids) && ids.length ? src : { ...src, kind: "newest" };
+  return recentIds().length ? src : { ...src, kind: "newest" };
 }
 
 export default function Render({ settings }) {

@@ -117,7 +117,13 @@
       "name": "header",
       "type": "section_header",
       "label": "Başlık satırı",
-      "tab": "İçerik"
+      "tab": "İçerik",
+      "right_options": [
+        "none",
+        "arrows",
+        "pills",
+        "link"
+      ]
     },
     {
       "name": "source",

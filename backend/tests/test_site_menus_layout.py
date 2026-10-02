@@ -31,3 +31,12 @@ def test_pristine_detection():
     assert not _pristine({"type": "hero_slider", "title": "Ana Slider", "images": ["x"], "settings": {}})
     assert not _pristine({"type": "text_block", "title": "Benim", "images": [], "settings": {}})
     assert not _pristine({"type": "full_banner", "title": "Tek Banner", "updated_at": "x", "settings": {}})
+
+
+def test_menu_item_megamenu_image_kept_and_sanitized():
+    """Dikey menü (elle) öğesinin açılır panel arka plan görseli saklanır; javascript: reddedilir."""
+    from routes import site_menus as sm
+    out = sm._clean_items([{"label": "Liftler", "link": "/liftler", "image": "/api/upload/files/x.png"},
+                           {"label": "Kötü", "link": "/", "image": "javascript:alert(1)"}])
+    assert out[0]["image"] == "/api/upload/files/x.png"
+    assert "image" not in out[1]

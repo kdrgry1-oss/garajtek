@@ -4,12 +4,13 @@
 // ayarları (favori/karşılaştır/kategori/eski fiyat/indirim rozeti) tema CSS'iyle uygulanır (ThemeVars).
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import BaseCard, { CardPrice, useProductActions } from "../../ProductCard";
+import BaseCard, { CardPrice, useCardTexts, useProductActions } from "../../ProductCard";
 import { optimizeImg, galleryImages, firstImage } from "../../../lib/img";
 import { fmtPrice, priceOf } from "../../electro/format";
 
 export function FeaturedBigCard({ product, thumbnails = true, listName = "featured_big", aspect = "564 / 420", className = "col product-item remove-divider", as: Tag = "li" }) {
   const a = useProductActions(product, { listName });
+  const tx = useCardTexts();
   const imgs = galleryImages(product);
   const [cur, setCur] = useState(0);
   const cat = product.category_name;
@@ -49,8 +50,8 @@ export function FeaturedBigCard({ product, thumbnails = true, listName = "featur
           </div>
           <div className="product-item__footer">
             <div className="border-top pt-2 flex-center-between flex-wrap">
-              <a href="#karsilastir" onClick={a.cmp} className="text-gray-6 font-size-13" data-testid={`compare-${product.id}`}><i className="ec ec-compare mr-1 font-size-15" /> Karşılaştır</a>
-              <a href="#favori" onClick={a.fav} className={`text-gray-6 font-size-13${a.isFav ? " text-red" : ""}`} data-testid={`favorite-${product.id}`}><i className="ec ec-favorites mr-1 font-size-15" /> Favorilere Ekle</a>
+              <a href="#karsilastir" onClick={a.cmp} className="text-gray-6 font-size-13" data-testid={`compare-${product.id}`}><i className="ec ec-compare mr-1 font-size-15" /> {tx.cmp}</a>
+              <a href="#favori" onClick={a.fav} className={`text-gray-6 font-size-13${a.isFav ? " text-red" : ""}`} data-testid={`favorite-${product.id}`}><i className="ec ec-favorites mr-1 font-size-15" /> {tx.fav}</a>
             </div>
           </div>
         </div>
@@ -90,7 +91,7 @@ export default function ProductCard({ product, card = "grid", as = "div", classN
   switch (card) {
     case "grid_small":
       return <BaseCard product={product} as={as} className={className} listName={listName} index={index}
-        innerClassName={innerClassName || "product-item__inner px-wd-4 p-2 p-md-3"} wishlistLabel="Favori" />;
+        innerClassName={innerClassName || "product-item__inner px-wd-4 p-2 p-md-3"} />;
     case "horizontal":
       return <BaseCard product={product} variant="card" as={as} className={className} listName={listName} index={index} innerClassName={innerClassName} />;
     case "list_small":
