@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Mağaza</string>
-    <string name="title_activity_main">Mağaza</string>
-    <string name="package_name">com.example.store</string>
-    <string name="custom_url_scheme">store</string>
-</resources>

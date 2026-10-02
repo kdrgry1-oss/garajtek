@@ -4,7 +4,6 @@ import { Toaster } from "sonner";
 import { CartProvider } from "./context/CartContext";
 import { AuthProvider } from "./context/AuthContext";
 import { FavoritesProvider } from "./context/FavoritesContext";
-import { bootstrapNative, isNative, appTarget } from "./lib/native";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 // Storefront — sadece ana sayfa (LCP) eager; gerisi route'a girilince yüklenir.
@@ -29,7 +28,6 @@ const OrderSuccess = lazy(() => import("./pages/OrderSuccess"));
 const PaymentNotification = lazy(() => import("./pages/PaymentNotification"));
 const ReturnRequest = lazy(() => import("./pages/ReturnRequest"));
 const GuestReturn = lazy(() => import("./pages/GuestReturn"));
-const MiuMiuTheme = lazy(() => import("./pages/storefront/MiuMiuTheme"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Compare = lazy(() => import("./pages/Compare"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -43,8 +41,6 @@ const AnnouncementBar = lazy(() => import("./components/AnnouncementBar"));
 const SitePopup = lazy(() => import("./components/SitePopup"));
 // DENETİM FIX (#5/#6): 301/302 yönlendirme + per-path meta override tüketimi
 const SeoManager = lazy(() => import("./components/SeoManager"));
-// Özel Tema (CSS/JS) — yalnız storefront'ta enjekte eder (admin'de asla)
-const CustomThemeInjector = lazy(() => import("./components/CustomThemeInjector"));
 const WhatsAppButton = lazy(() => import("./components/WhatsAppButton"));
 import { trackVisit } from "./lib/attribution";
 
@@ -130,8 +126,6 @@ function App() {
       window.__STORE_TRACKED__ = true;
       trackVisit();
     }
-    // Capacitor native bootstrap (web mode'da no-op)
-    bootstrapNative();
   }, []);
 
   return (
@@ -146,27 +140,20 @@ function App() {
             <CookieConsent />
             <StorefrontScope>
             <ElectroStyles />
-            {/* Storefront Duyuru barı + Popup + SEO (native uygulamada gösterme).
-                Görünüm bozulmasının gerçek nedeni lock-file (yarn.lock) değişikliğiydi;
-                düzeltildi. Bu bileşenler güvenli (aktif popup/duyuru/yönlendirme yoksa
-                hiçbir şey render etmez), geri açıldı. */}
-            {!isNative && (
-              <Suspense fallback={null}>
-                <SeoManager />
-                <CustomThemeInjector />
-                <HideOnCheckout>
-                  <AnnouncementBar />
-                  <SitePopup />
-                  <WhatsAppButton />
-                </HideOnCheckout>
-              </Suspense>
-            )}
+            {/* Storefront Duyuru barı + Popup + SEO. Bu bileşenler güvenli (aktif
+                popup/duyuru/yönlendirme yoksa hiçbir şey render etmez). */}
+            <Suspense fallback={null}>
+              <SeoManager />
+              <HideOnCheckout>
+                <AnnouncementBar />
+                <SitePopup />
+                <WhatsAppButton />
+              </HideOnCheckout>
+            </Suspense>
             <MaintenanceGate>
               <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "#888" }}>Yükleniyor…</div>}>
                 <Routes>
-                {/* Kök route: müşteri app + web → Home (storefront); yalnız admin app'te → /admin.
-                    Hedef, build zamanı REACT_APP_APP_TARGET ile belirlenir (native.js appTarget). */}
-                <Route path="/" element={isNative && appTarget === "admin" ? <Navigate to="/admin" replace /> : <Home />} />
+                <Route path="/" element={<Home />} />
                 <Route path="/kategori/:slug" element={<Category />} />
                 <Route path="/full-look" element={<FullLook />} />
                 <Route path="/full-look/:lookRef" element={<FullLook />} />
@@ -193,8 +180,6 @@ function App() {
                 <Route path="/karsilastir" element={<Compare />} />
 
                 {/* Tema önizleme */}
-                <Route path="/tema/:slug/*" element={<MiuMiuTheme />} />
-                <Route path="/tema" element={<MiuMiuTheme />} />
 
                 {/* Admin — lazy yüklenen ayrı chunk. /admin/login dahil tüm admin
                     rotaları AdminApp içindeki kendi <Routes>'unda tanımlı. */}
