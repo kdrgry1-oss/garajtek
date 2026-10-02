@@ -150,10 +150,10 @@ export default function FAQ() {
                 <div className="card mb-3 border-top-0 border-left-0 border-right-0 border border-color-1 rounded-0" key={key}>
                   <div className="card-header card-collapse bg-transparent-on-hover border-0">
                     <h5 className="mb-0">
-                      <button type="button" className={`px-0 btn btn-link btn-block d-flex justify-content-between card-btn py-3 font-size-20 border-0 text-left${open ? "" : " collapsed"}`}
+                      <button type="button" className={`px-0 btn btn-link btn-block d-flex justify-content-between card-btn py-3 font-size-20 border-0 text-left text-wrap${open ? "" : " collapsed"}`}
                         aria-expanded={open} onClick={() => setOpenKey(open ? `${panel.id}:none` : key)}>
                         <span>{item.q}</span>
-                        <span className="card-btn-arrow"><i className={`fas ${open ? "fa-chevron-up" : "fa-chevron-down"} text-gray-90 font-size-18`} /></span>
+                        <span className="card-btn-arrow flex-shrink-0"><i className={`fas ${open ? "fa-chevron-up" : "fa-chevron-down"} text-gray-90 font-size-18`} /></span>
                       </button>
                     </h5>
                   </div>

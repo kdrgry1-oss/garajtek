@@ -319,3 +319,8 @@
 .electro .el-steps__label { display: block; margin-top: .4rem; font-size: .75rem; color: #878787; }
 .electro .el-steps__item.active .el-steps__label { color: #333e48; font-weight: 700; }
 .electro .max-width-890 { max-width: 890px; }
+
+/* Geliştirici künyesi (footer alt şerit) */
+.electro .el-devcredit { opacity: .8; }
+.electro .el-devcredit:hover { opacity: 1; color: #333e48; }
+.electro .el-devcredit img { height: 16px; width: auto; }

@@ -180,6 +180,18 @@ export function PaymentBand({ url, className = "" }) {
   );
 }
 
+/** Geliştirici künyesi (sözleşme md. 20) — kodda sabit, panelden değiştirilemez.
+ * Logo: public/roofcommerce-logo.svg (yoksa .png). */
+function DevCredit() {
+  return (
+    <a href="https://roofcommerce.com.tr/" target="_blank" rel="noopener" className="el-devcredit d-inline-flex align-items-center mt-1 font-size-12 text-gray-5" data-testid="dev-credit">
+      <span className="mr-1">Designed by</span>
+      <img src="/roofcommerce-logo.svg" alt="roofcommerce" height="16" width="118" loading="lazy"
+        onError={(e) => { if (!e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = "1"; e.currentTarget.src = "/roofcommerce-logo.png"; } }} />
+    </a>
+  );
+}
+
 export default function Footer({ hideWidgets = false }) {
   const [tpl, setTpl] = useState(null);
   const info = useStoreInfo();
@@ -298,7 +310,8 @@ export default function Footer({ hideWidgets = false }) {
         <div className="container">
           <div className="flex-center-between d-block d-md-flex">
             <div className="mb-3 mb-md-0">
-              {copyright || <>© {new Date().getFullYear()} <Link to="/" className="font-weight-bold text-gray-90">{info.name}</Link> - Tüm hakları saklıdır</>}
+              <div>{copyright || <>© {new Date().getFullYear()} <Link to="/" className="font-weight-bold text-gray-90">{info.name}</Link> - Tüm hakları saklıdır</>}</div>
+              <DevCredit />
             </div>
             <PaymentBand url={tpl?.payment_band_url} />
           </div>
