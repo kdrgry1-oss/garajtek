@@ -1574,6 +1574,29 @@ async def create_order(
             raise HTTPException(status_code=403, detail=(
                 "Sepetinizde üyelerimize özel bir ürün var. Siparişi tamamlamak için lütfen giriş yapın "
                 "veya üye olun."))
+    # ÜRÜN SETİ: set ürünü kendisi sipariş kalemi olamaz (sepete bileşenleri eklenir). Set
+    # kalemlerinin set_id/set_slot'u doğrulanır; set adı SUNUCUDAN yazılır (istemci etiketi değil).
+    _set_ids = {str(it.get("set_id")) for it in _items if isinstance(it, dict) and it.get("set_id")}
+    _set_names = {}
+    if _set_ids:
+        async for _sd in db.products.find({"id": {"$in": list(_set_ids)}, "product_type": "set"},
+                                          {"_id": 0, "id": 1, "name": 1, "slug": 1}):
+            _set_names[_sd["id"]] = _sd
+    for it in _items:
+        if not isinstance(it, dict):
+            continue
+        if (_pmap.get(it.get("product_id")) or {}).get("product_type") == "set":
+            raise HTTPException(status_code=400, detail="Set ürünü sepete bileşenleriyle eklenir. Lütfen sepeti yenileyin.")
+        _sid = str(it.get("set_id") or "")
+        if _sid and _sid in _set_names:
+            it["set_id"] = _sid
+            it["set_name"] = _set_names[_sid].get("name", "")
+            it["set_slug"] = _set_names[_sid].get("slug", "")
+            it["set_slot"] = str(it.get("set_slot") or it.get("product_id") or "")
+        else:
+            for _k in ("set_id", "set_name", "set_slug", "set_slot"):
+                it.pop(_k, None)
+
     _subtotal = 0.0
     try:
         from business_rules import get_rule as _get_rule_q
@@ -1652,6 +1675,22 @@ async def create_order(
     _subtotal = round(_subtotal, 2)
     order["subtotal"] = _subtotal
 
+    # KAPIDA ÖDEME KISITLARI (cod_rules.py): kapalı ürün/kategori ve alt/üst tutar sınırı.
+    # Kasa bu ürünlerde kapıda ödemeyi hiç göstermez; doğrudan API çağrısı da reddedilir.
+    if _pm0 in ("cash_on_delivery", "kapida", "kapida_odeme", "cod"):
+        from cod_rules import cod_config as _cod_cfg, product_cod_blocked as _cod_blk
+        _ccfg = await _cod_cfg(db)
+        _blk = [p.get("name") or p.get("id") for p in _pmap.values()
+                if _cod_blk(p, _ccfg["excluded_category_ids"])]
+        if _blk:
+            raise HTTPException(status_code=400, detail=(
+                "Sepetinizdeki şu ürün(ler) kapıda ödemeye uygun değil: " + ", ".join(_blk[:5])
+                + ". Lütfen başka bir ödeme yöntemi seçin."))
+        if _ccfg["min_total"] and _subtotal < _ccfg["min_total"]:
+            raise HTTPException(status_code=400, detail=f"Kapıda ödeme {_ccfg['min_total']:.0f} ₺ ve üzeri siparişlerde geçerlidir.")
+        if _ccfg["max_total"] and _subtotal > _ccfg["max_total"]:
+            raise HTTPException(status_code=400, detail=f"Kapıda ödeme en fazla {_ccfg['max_total']:.0f} ₺ tutarındaki siparişlerde geçerlidir.")
+
     # İndirim: promo motoru (SUNUCU fiyatlarıyla); ödeme yöntemi de dikkate alınır.
     _server_discount = 0.0
     _free_shipping = False
@@ -1662,6 +1701,7 @@ async def create_order(
             "category_id": it.get("category_id"),
             "qty": int(it.get("quantity", it.get("qty", 1)) or 1),
             "price": float(it.get("price", 0) or 0),
+            **({"set_id": it["set_id"], "set_slot": it.get("set_slot")} if it.get("set_id") else {}),
         } for it in _items]
         # KRİTİK: Müşterinin kasada "×" ile KALDIRDIĞI kampanyalar (excluded_ids) motora
         # AKTARILMALI. Aktarılmadığında sunucu, ekranda GÖSTERİLMEYEN kampanyaları da üst üste
@@ -7198,6 +7238,15 @@ async def _order_item_discounts(order: dict) -> list:
         if amt <= 0.005:
             continue
         cid = pr.get("coupon_id")
+        if str(cid or "").startswith("set:"):
+            # Set indirimi yalnız o setin kalemlerine (brüt payıyla) dağıtılır.
+            _sid = str(cid)[4:]
+            _idx = [i for i, it in enumerate(items) if str((it or {}).get("set_id") or "") == _sid]
+            _b = sum(gross[i] for i in _idx)
+            if _b > 0.005:
+                for i in _idx:
+                    disc[i] += amt * (gross[i] / _b)
+                continue
         cpn = await db.coupons.find_one({"id": cid}, {"_id": 0}) if cid else None
         allowed_cats = set(str(x) for x in ((cpn or {}).get("categories") or []) if x)
         allowed_pids = set(str(x) for x in ((cpn or {}).get("products") or []) if x)

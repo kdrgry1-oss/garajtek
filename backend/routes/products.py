@@ -2482,7 +2482,7 @@ async def get_similar_products(product_id: str, request: Request, limit: int = 4
              "variants": 1, "is_new": 1, "is_featured": 1, "category_name": 1,
              "discount_percentage": 1, "brand": 1,
              # Kampanya kapsamı (rozet: % ve "3 AL 2 ÖDE") için gerekli
-             "category_ids": 1, "category_id": 1}
+             "category_ids": 1, "category_id": 1, "cod_disabled": 1}
 
     results = []
     base_q = {"is_active": True, "is_deleted": {"$ne": True}, "id": {"$ne": p["id"]}}
@@ -2842,6 +2842,7 @@ async def create_product(
         "is_showcase": product_data.get("is_showcase", False),
         "is_opportunity": product_data.get("is_opportunity", False),
         "is_free_shipping": product_data.get("is_free_shipping", False),
+        "cod_disabled": bool(product_data.get("cod_disabled", False)),  # kapıda ödemeye kapalı (cod_rules.py)
         "vat_rate": product_data.get("vat_rate", default_vat),
         "use_default_markup": product_data.get("use_default_markup", True),
         "markup_rate": float(product_data.get("markup_rate", 0)),
@@ -3566,7 +3567,7 @@ async def get_cart_suggestions(payload: dict, request: Request):
                  "is_deleted": {"$ne": True}, "id": {"$nin": list(seen)},
                  "stock": {"$gt": 0}},
                 {"_id": 0, "id": 1, "name": 1, "slug": 1, "price": 1, "sale_price": 1,
-                 "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1}
+                 "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1, "cod_disabled": 1}
             ).limit(limit):
                 suggestions.append({**p, "_source": "similar"})
                 seen.add(p["id"])
@@ -3587,7 +3588,7 @@ async def get_cart_suggestions(payload: dict, request: Request):
         async for p in db.products.find(
             sale_query,
             {"_id": 0, "id": 1, "name": 1, "slug": 1, "price": 1, "sale_price": 1,
-             "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1}
+             "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1, "cod_disabled": 1}
         ).limit(needed):
             suggestions.append({**p, "_source": "sale"})
             seen.add(p["id"])
@@ -3598,7 +3599,7 @@ async def get_cart_suggestions(payload: dict, request: Request):
         async for p in db.products.find(
             {"is_active": {"$ne": False}, "id": {"$nin": list(seen)}},
             {"_id": 0, "id": 1, "name": 1, "slug": 1, "price": 1, "sale_price": 1,
-             "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1}
+             "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1, "cod_disabled": 1}
         ).sort("created_at", -1).limit(needed):
             suggestions.append({**p, "_source": "new"})
 
@@ -3632,7 +3633,7 @@ async def get_checkout_deals(payload: dict, request: Request):
     async for p in db.products.find(
         sale_query,
         {"_id": 0, "id": 1, "name": 1, "slug": 1, "price": 1, "sale_price": 1,
-         "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1}
+         "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1, "cod_disabled": 1}
     ).limit(limit * 2):
         sp = p.get("sale_price") or 0
         if sp > 0 and sp < (p.get("price") or 0):

@@ -1358,6 +1358,19 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
     # ('En Yeniler' gibi ikincil kategoriye ozel kampanyalar bunsuz hic eslesmiyordu).
     items = await _enrich_items_category_ids(items)
 
+    # 0) ÜRÜN SETİ İNDİRİMİ (product_sets.py — kural orada belgeli): set kalemleri (set_id) tam
+    # ise set yüzdesi yalnız o kalemlere uygulanır; kampanyalar set-indirimli kalan tutar
+    # üzerinden hesaplanır. Önizleme (sepet/kasa) ve sipariş kaydı aynı yoldan geçer.
+    try:
+        from product_sets import compute_set_discounts as _set_disc
+        _set_entries = await _set_disc(db, items)
+        # Müşteri kasada "×" ile kaldırdıysa sunucu da uygulamaz (önizleme = sipariş tutarı)
+        _set_entries = [e for e in _set_entries if f"set:{e['set_id']}" not in {str(x) for x in (excluded_ids or [])}]
+    except Exception as _se:
+        logger.warning(f"[set-indirimi] hesaplanamadi: {_se}")
+        _set_entries = []
+    _set_total = round(sum(e["amount"] for e in _set_entries), 2)
+
     # 1) Adaylar: aktif auto_apply kampanyalar + girilen kod
     candidates = {}
     # OTO-UYGULAMA VARSAYILAN AÇIK: admin panelindeki "Otomatik uygula (kod gerekmez)"
@@ -1499,6 +1512,10 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
             _units.append([i, float(it.get("price", 0) or 0)])
     _base_total = sum(u[1] for u in _units)
     _scale0 = (cart_total / _base_total) if (_base_total > 0 and abs(_base_total - cart_total) > 0.009) else 1.0
+    if _set_entries:
+        from product_sets import apply_to_units as _set_units
+        _set_units(_units, _set_entries)
+        running = round(cart_total - _set_total, 2)
     for cand in selected:
         _live = [k for k, u in enumerate(_units) if u[1] > 0.005]   # ≤ yarım kuruş = tükenmiş
         scaled_items = [{**items[_units[k][0]], "price": _units[k][1] * _scale0, "qty": 1} for k in _live]
@@ -1554,6 +1571,16 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
             a["applied_discount"] = round(a["applied_discount"] * factor, 2)
         total = round(sum(a["applied_discount"] for a in applied), 2)
         capped = True
+
+    # Set indirimleri (kampanya tavanına tabi değil; ayrı satır olarak görünür)
+    for _e in _set_entries:
+        applied.insert(0, {
+            "c": {"id": f"set:{_e['set_id']}", "code": "", "title": _e["title"], "type": "set"},
+            "applied_discount": _e["amount"], "free_shipping": False,
+            "priority": 1000, "combinable": True, "stack_group": "set", "combinable_with": [],
+            "set_id": _e["set_id"],
+        })
+        total = round(total + _e["amount"], 2)
 
     # ── OTOMATİK ÜYE / ÖĞRENCİ İNDİRİMLERİ ───────────────────────────────────────
     # İkisi de AYNI tabandan hesaplanır: (sepet − kampanya/kupon indirimi). Birbirlerini
@@ -1636,8 +1663,10 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
             "discount": a["applied_discount"], "free_shipping": a["free_shipping"],
             "priority": a["priority"], "combinable": a["combinable"], "stack_group": a["stack_group"],
             "combinable_with": a.get("combinable_with") or [],
+            **({"set_id": a["set_id"]} if a.get("set_id") else {}),
         } for a in applied],
         "total_discount": total,
+        "set_discount": _set_total,
         # Öğrenci / üye indirimi ayrıca bildirilir (kasa ekranı ayrı satır gösterebilsin).
         "edu_discount": edu_amount,
         "edu_discount_pct": edu_pct if edu_amount > 0 else 0,
