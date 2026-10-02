@@ -34,6 +34,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
+import HomeBlockFields, { HOME_BLOCK_TYPES, ImageSlot, SizeHint } from "../../components/admin/HomeBlockFields";
+import DemoContentCard from "../../components/admin/DemoContentCard";
+import { SIZES } from "../../lib/homeLayout";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 // Origin'i dogru turet (API.replace('/api','') ilk //api'yi silip bozuk URL uretirdi).
@@ -41,11 +44,17 @@ const BACKEND_ORIGIN = String(process.env.REACT_APP_BACKEND_URL || "").replace(/
 
 const BLOCK_TYPES = [
   { value: "countdown_bar", label: "Geri Sayım Barı (Üst Bar)", icon: "⏱️", description: "Sitenin EN ÜST'ünde, planlanabilir tarih/saatli countdown" },
-  { value: "hero_slider", label: "Hero Slider", icon: "🎠", description: "Ana sayfa slider - Dönen görseller" },
+  { value: "hero_slider", label: "Ana Slider", icon: "🎠", description: "Tam genişlik dönen slaytlar (1920×466) — solda Tüm Kategoriler menüsü" },
+  { value: "ads_block", label: "Reklam Bannerları (3'lü)", icon: "🪧", description: "Görsel + yazılı 3 kart (410×281, 410×281, 714×486)" },
+  { value: "deals_tabs", label: "Günün Fırsatı + Ürün Sekmeleri", icon: "⏳", description: "Geri sayımlı fırsat kartı + 3 sekmeli ürün ızgarası" },
+  { value: "product_grid_212", label: "Kategori Ürün Izgarası (2-1-2)", icon: "🔲", description: "Gri zeminli, kategori sekmeli, ortada büyük ürün" },
+  { value: "best_sellers", label: "Çok Satanlar Karuseli", icon: "🏆", description: "Sekmeli, 6'lı kart grupları" },
   { value: "rotating_text", label: "Dönen Yazı", icon: "📢", description: "Üst banner'da dönen metin" },
-  { value: "full_banner", label: "Tam Genişlik Banner", icon: "🖼️", description: "Tek görsel tam genişlik" },
+  { value: "full_banner", label: "Tam Genişlik Banner", icon: "🖼️", description: "Tek görsel (önerilen 1170×207)" },
+  { value: "product_slider", label: "Ürün Karuseli", icon: "🛍️", description: "Yatay ürün listesi (ör. Son Eklenenler)" },
+  { value: "brands_carousel", label: "Markalar", icon: "🏷️", description: "Marka logoları (200×60); boşsa ürün markaları" },
+  { value: "product_columns", label: "Alt Ürün Sütunları", icon: "📋", description: "3 küçük ürün listesi (Öne çıkan / İndirimli / Çok satan)" },
   { value: "half_banners", label: "Yarı Yarıya Banner", icon: "◧", description: "İki görsel yan yana" },
-  { value: "product_slider", label: "Ürün Slider", icon: "🛍️", description: "Yatay ürün listesi" },
   { value: "instashop", label: "InstaShop", icon: "📸", description: "Instagram tarzı görseller" },
   { value: "text_block", label: "Yazı Bloğu", icon: "📝", description: "Başlık ve açıklama" },
   { value: "video_banner", label: "Video Banner", icon: "🎬", description: "Video arka planlı banner" },
@@ -173,6 +182,7 @@ function SortableBlockItem({ block, selected, onSelect, onEdit, onDelete, onTogg
   };
 
   const typeInfo = getBlockTypeInfo(block.type);
+  const thumb = block.images?.[0] || (block.settings?.items || []).find((x) => x && x.image)?.image || "";
 
   return (
     <div 
@@ -197,15 +207,15 @@ function SortableBlockItem({ block, selected, onSelect, onEdit, onDelete, onTogg
 
         {/* Preview */}
         <div className="hidden flex-shrink-0 sm:block sm:w-24">
-          {block.images?.[0] ? (
-            /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(block.images[0]) ? (
+          {thumb ? (
+            /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(thumb) ? (
               <div className="relative w-full h-20">
-                <video src={block.images[0]} className="w-full h-16 object-cover rounded" muted playsInline preload="metadata" />
+                <video src={thumb} className="w-full h-16 object-cover rounded" muted playsInline preload="metadata" />
                 <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1 rounded">🎬</span>
               </div>
             ) : (
               <img
-                src={block.images[0]}
+                src={thumb}
                 alt=""
                 className="w-full h-16 object-cover rounded"
               />
@@ -257,6 +267,16 @@ function SortableBlockItem({ block, selected, onSelect, onEdit, onDelete, onTogg
               ? block.settings?.video_url ? "Video eklendi ✓" : "Video eklenmemiş"
               : block.type === "rotating_text"
               ? `${block.settings?.texts?.length || 0} metin`
+              : block.type === "ads_block"
+              ? `${(block.settings?.items || []).filter((x) => x && x.image).length}/3 görsel · ${(block.settings?.items || []).map((x) => x?.strong).filter(Boolean).join(", ")}`
+              : block.type === "deals_tabs"
+              ? `Fırsat: ${block.settings?.special?.mode === "manual" ? "seçili ürün" : "otomatik"} · ${(block.settings?.tabs || []).map((t) => t?.label).filter(Boolean).join(" / ")}`
+              : block.type === "product_grid_212" || block.type === "best_sellers"
+              ? `${block.settings?.first_label || "İlk sekme"} + ${(block.settings?.category_ids || []).length || "otomatik"} kategori`
+              : block.type === "product_columns"
+              ? (block.settings?.columns || []).map((c) => c?.title).filter(Boolean).join(" · ")
+              : block.type === "brands_carousel"
+              ? (block.images?.length ? `${block.images.length} logo` : "Ürün markalarından otomatik")
               : `${block.images?.length || 0} görsel`
             }
           </p>
@@ -729,10 +749,11 @@ function HomePageDesign() {
 
   const addProductToBlock = (product) => {
     const currentIds = formData.settings?.product_ids || [];
-    if (currentIds.includes(product._id)) {
+    const pid = product.id || product._id;
+    if (currentIds.includes(pid)) {
       return toast.error("Bu ürün zaten ekli");
     }
-    const newIds = [...currentIds, product._id];
+    const newIds = [...currentIds, pid];
     setFormData({ 
       ...formData, 
       settings: { ...formData.settings, product_ids: newIds } 
@@ -833,13 +854,36 @@ function HomePageDesign() {
     setSelectedProductDetails([]);
   };
 
+  // Kaydedilmemiş taslağı sitede önizle: taslak localStorage'a yazılır, ana sayfa ?onizleme=taslak ile okur.
+  const previewDraft = () => {
+    try { localStorage.setItem("page_design_draft", JSON.stringify(blocks)); } catch (_) { /* kota */ }
+    window.open("/?onizleme=taslak", "_blank", "noopener");
+  };
+
+  // Şablonun v1.0 ana sayfa düzenini blok olarak ekle (mevcutları koru ya da değiştir)
+  const installTemplateLayout = async () => {
+    if (hasChanges) { toast.error("Önce taslaktaki değişiklikleri kaydedin."); return; }
+    const ask = (m) => (window.appConfirm ? window.appConfirm(m) : Promise.resolve(window.confirm(m)));
+    const replace = blocks.some((b) => !["rotating_text", "countdown_bar"].includes(b.type))
+      ? await ask("Mevcut ana sayfa blokları (üst barlar hariç) kaldırılıp şablon düzeni kurulsun mu? 'İptal' derseniz bloklar mevcutların sonuna eklenir.")
+      : false;
+    try {
+      const token = localStorage.getItem("token");
+      const r = await axios.post(`${API}/page-blocks/install-default-home?replace=${replace ? "true" : "false"}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success(`${r.data?.created || 0} blok eklendi`);
+      await fetchBlocks();
+    } catch (err) {
+      toast.error("Şablon düzeni yüklenemedi");
+    }
+  };
+
   const getBlockTypeInfo = (type) => {
     return BLOCK_TYPES.find(t => t.value === type) || { label: type, icon: "📦" };
   };
 
   // text_block'a görsel eklenebilir (görsel + yazı kompozisyonu); rotating_text ve
   // countdown salt metin barları olduğundan görsel alanı almaz.
-  const needsImages = ["hero_slider", "full_banner", "half_banners", "instashop", "video_banner", "text_block"].includes(formData.type);
+  const needsImages = ["hero_slider", "full_banner", "half_banners", "instashop", "video_banner", "text_block", "brands_carousel"].includes(formData.type);
 
 
   return (
@@ -854,7 +898,15 @@ function HomePageDesign() {
           </div>
           <p className="mt-0.5 text-xs text-gray-500">Blokları taslakta düzenleyin, tamamını tek seferde kaydedin.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={previewDraft} data-testid="preview-draft-btn"
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" title="Kaydetmeden, taslağı sitede yeni sekmede göster">
+            <Eye size={16} /> Taslağı Sitede Önizle
+          </button>
+          <button type="button" onClick={installTemplateLayout} data-testid="install-layout-btn"
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" title="Şablonun ana sayfa düzenini (tüm bölümler) blok olarak ekler">
+            <Plus size={16} /> Şablon Düzenini Yükle
+          </button>
           <button type="button" onClick={undo} disabled={historyIndex <= 0} aria-label="Geri al" title="Geri al"
             className="rounded-lg border bg-white p-2 text-gray-700 disabled:opacity-30"><Undo2 size={17} /></button>
           <button type="button" onClick={redo} disabled={historyIndex >= history.length - 1} aria-label="Yinele" title="Yinele"
@@ -890,6 +942,7 @@ function HomePageDesign() {
             ))}
           </div>
           {!filteredBlockTypes.length && <p className="py-6 text-center text-xs text-gray-500">Eşleşen blok yok.</p>}
+          <div className="mt-4"><DemoContentCard onChanged={fetchBlocks} /></div>
         </aside>
 
         <main className="min-w-0 rounded-xl border border-gray-200 bg-white p-4" aria-label="Sayfa akışı">
@@ -961,7 +1014,7 @@ function HomePageDesign() {
               <div className="max-h-[420px] min-h-[260px] overflow-y-auto bg-white">
                 {blocks.filter((block) => block.is_active !== false && (previewMode === "mobile" ? block.show_mobile !== false : block.show_desktop !== false)).map((block) => {
                   const info = getBlockTypeInfo(block.type);
-                  const image = block.images?.[0];
+                  const image = block.images?.[0] || (block.settings?.items || []).find((x) => x && x.image)?.image;
                   return (
                     <div key={block.id} className={`relative border-b border-gray-100 ${block.id === selectedId ? "ring-2 ring-inset ring-blue-500" : ""}`} onClick={() => setSelectedId(block.id)}>
                       {image ? <img src={image} alt="" className={`w-full object-cover ${block.type === "hero_slider" ? "h-28" : "h-20"}`} /> : (
@@ -1122,7 +1175,7 @@ function HomePageDesign() {
                       onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, hero_style: e.target.value } })}
                       className="w-full border px-3 py-2 rounded text-sm"
                     >
-                      <option value="klasik">Klasik — yatay geçiş (fade + oklar)</option>
+                      <option value="klasik">Şablon (tam genişlik, yazılı slaytlar)</option>
                       <option value="dikey">Dikey Editorial (Zara) — tam ekran, dikey kaydırma</option>
                     </select>
                     <p className="text-[11px] text-gray-500 mt-1">
@@ -1131,6 +1184,9 @@ function HomePageDesign() {
                   </div>
                 )}
                 <label className="block text-sm font-medium mb-2">Görseller</label>
+                {formData.type === "hero_slider" && <div className="mb-2"><SizeHint size={SIZES.hero} extra={<>mobil görsel: <b>800 × 860 px</b> (isteğe bağlı)</>} /></div>}
+                {formData.type === "full_banner" && <div className="mb-2"><SizeHint size={SIZES.fullBanner} /></div>}
+                {formData.type === "brands_carousel" && <div className="mb-2"><SizeHint size={SIZES.brand} extra="şeffaf PNG; bağlantı: marka/kategori sayfası" /></div>}
                 <p className="text-[11px] text-gray-500 mb-2">Slaytları <b>sürükleyerek</b> sıralayabilirsin. Görsel veya <b>video</b> (mp4/webm) yükleyebilir, kutuya <b>sürükleyip bırakarak</b> da ekleyebilirsin.</p>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   {formData.images.map((img, index) => (
@@ -1197,6 +1253,43 @@ function HomePageDesign() {
                           </div>
                         );
                       })()}
+                      {formData.type === "hero_slider" && formData.settings?.hero_style !== "dikey" && (() => {
+                        const caps = Array.isArray(formData.settings?.captions) ? formData.settings.captions : [];
+                        const cap = caps[index] || {};
+                        const mob = Array.isArray(formData.settings?.mobile_images) ? formData.settings.mobile_images : [];
+                        const setCap = (patch) => {
+                          const next = [...caps];
+                          while (next.length <= index) next.push({});
+                          next[index] = { ...next[index], ...patch };
+                          setFormData({ ...formData, settings: { ...formData.settings, captions: next } });
+                        };
+                        const setMob = (url) => {
+                          const next = [...mob];
+                          while (next.length <= index) next.push("");
+                          next[index] = url;
+                          setFormData({ ...formData, settings: { ...formData.settings, mobile_images: next } });
+                        };
+                        return (
+                          <div className="mt-1.5 space-y-1" data-testid={`hero-caption-${index}`}>
+                            <input type="text" value={cap.title || ""} onChange={(e) => setCap({ title: e.target.value })}
+                              placeholder="Başlık (ör. İki Sütunlu Liftlerde Fırsat)" className="w-full text-[11px] border px-2 py-1 rounded" />
+                            <input type="text" value={cap.subtitle || ""} onChange={(e) => setCap({ subtitle: e.target.value })}
+                              placeholder="Alt başlık (ör. 4 TON — %15 İNDİRİM)" className="w-full text-[11px] border px-2 py-1 rounded" />
+                            <div className="flex gap-1">
+                              <input type="text" value={cap.price_label || ""} onChange={(e) => setCap({ price_label: e.target.value })}
+                                placeholder="Fiyat etiketi" className="w-1/2 text-[11px] border px-2 py-1 rounded" />
+                              <input type="number" value={cap.price ?? ""} onChange={(e) => setCap({ price: e.target.value === "" ? "" : Number(e.target.value) })}
+                                placeholder="Fiyat ₺" className="w-1/2 text-[11px] border px-2 py-1 rounded" />
+                            </div>
+                            <input type="text" value={cap.cta || ""} onChange={(e) => setCap({ cta: e.target.value })}
+                              placeholder="Buton yazısı (ör. Hemen İncele)" className="w-full text-[11px] border px-2 py-1 rounded" />
+                            <details className="text-[11px]">
+                              <summary className="cursor-pointer text-gray-600">Mobil görsel (800×860)</summary>
+                              <div className="mt-1"><ImageSlot value={mob[index] || ""} onChange={setMob} size={SIZES.heroMobile} /></div>
+                            </details>
+                          </div>
+                        );
+                      })()}
                       {formData.type === "hero_slider" && formData.settings?.hero_style === "dikey" && (() => {
                         const caps = Array.isArray(formData.settings?.captions) ? formData.settings.captions : [];
                         const cap = caps[index] || {};
@@ -1252,6 +1345,8 @@ function HomePageDesign() {
                 </div>
               </div>
             )}
+
+            {HOME_BLOCK_TYPES.includes(formData.type) && <HomeBlockFields formData={formData} setFormData={setFormData} />}
 
             {formData.type === "text_block" && (
               <div>
@@ -1527,6 +1622,8 @@ function HomePageDesign() {
                 >
                   <option value="manual">Elle Seçim (aşağıdan ürün ekle)</option>
                   <option value="newest">En Yeni Ürünler (otomatik)</option>
+                  <option value="featured">Öne Çıkan Ürünler (otomatik)</option>
+                  <option value="popular">Çok Satanlar (otomatik)</option>
                   <option value="favorites">En Çok Favorilenenler (otomatik)</option>
                   <option value="discounted">İndirimdeki Ürünler (sale + kampanya, otomatik)</option>
                   <option value="category">Seçili Kategorilerden (otomatik)</option>

@@ -30,11 +30,11 @@ _DEFAULT = {
         {
             "title": "Alışveriş",
             "links": [
-                {"to": "/kategori/en-yeniler", "label": "En Yeniler"},
-                {"to": "/kategori/elbise", "label": "Elbise"},
-                {"to": "/kategori/pantolon", "label": "Pantolon"},
-                {"to": "/kategori/ceket", "label": "Ceket"},
-                {"to": "/kategori/aksesuar", "label": "Aksesuar"},
+                {"to": "/en-yeniler", "label": "Yeni Ürünler"},
+                {"to": "/sale", "label": "İndirimli Ürünler"},
+                {"to": "/tum-urunler?sort=popular&order=desc", "label": "Çok Satanlar"},
+                {"to": "/tum-urunler", "label": "Tüm Ürünler"},
+                {"to": "/karsilastir", "label": "Ürün Karşılaştır"},
             ],
         },
         {
@@ -68,9 +68,9 @@ _DEFAULT = {
         },
     ],
     "newsletter": {
-        "title": "Bültenimize katıl",
-        "description": "Yeni koleksiyonlar, özel kampanyalar ve sana özel fırsatlardan ilk sen haberdar ol.",
-        "placeholder": "E-posta adresin",
+        "title": "E-Bültene Kaydolun",
+        "description": "Yeni ürünler, kampanyalar ve atölye fırsatlarından ilk siz haberdar olun.",
+        "placeholder": "E-posta adresiniz",
     },
     "social": {
         "instagram": "{store_instagram}",

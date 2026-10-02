@@ -193,6 +193,9 @@ SMALL = [
     ("small-4", "Takım arabaları %15 indirimde", "/takim-arabalari-ve-tezgahlar"),
 ]
 WIDE = ("wide-1", "Atölyenizi kazançla donatın", "/indirimli-urunler")
+# Ana sayfa "Reklam Bannerları" bloğu (şablon ads-block: 410x281, 410x281, 714x486)
+ADS = [("ad-1", "/lokma-takimlari"), ("ad-2", "/kompresorler"), ("ad-3", "/takim-arabalari-ve-tezgahlar")]
+BRANDS = ["Grayzer", "Liftmax", "Airpro", "Torkmatik", "Balanstek", "Voltix", "Weldon", "Diagnox", "Teknolift", "Atölye Pro"]
 
 
 def _read(rel: str) -> bytes:
@@ -215,12 +218,57 @@ async def remove_demo(db) -> dict:
     from routes.upload import delete_stored_file
 
     q = {"seed_source": DEMO_TAG}
-    files = await db.files.find(q, {"_id": 0, "id": 1, "r2_key": 1, "storage_path": 1}).to_list(5000)
+    files = await db.files.find(q, {"_id": 0, "id": 1, "r2_key": 1, "r2_url": 1, "storage_path": 1}).to_list(5000)
+    urls = set()
+    for rec in files:
+        if rec.get("r2_url"):
+            urls.add(rec["r2_url"])
+        if rec.get("storage_path"):
+            urls.add(f"/api/upload/files/{rec['storage_path']}")
+    blocks_cleaned = await _strip_from_blocks(db, urls)
     for rec in files:
         await delete_stored_file(rec)
     pr = await db.products.delete_many({**q, "demo": True})
     br = await db.banners.delete_many({**q, "demo": True})
-    return {"removed_products": pr.deleted_count, "removed_banners": br.deleted_count, "removed_files": len(files)}
+    return {"removed_products": pr.deleted_count, "removed_banners": br.deleted_count, "removed_files": len(files),
+            "blocks_cleaned": blocks_cleaned}
+
+
+def _is_demo(url, urls):
+    u = str(url or "")
+    return bool(u) and (u in urls or any(u.endswith(x) for x in urls if x.startswith("/api/")))
+
+
+async def _strip_from_blocks(db, urls) -> int:
+    """Ana sayfa bloklarından YALNIZ demo görsellerini çıkarır (yöneticinin eklediklerine dokunmaz)."""
+    if not urls:
+        return 0
+    n = 0
+    for b in await db.page_blocks.find({}, {"_id": 0}).to_list(500):
+        imgs = b.get("images") or []
+        st = dict(b.get("settings") or {})
+        changed = False
+        if any(_is_demo(u, urls) for u in imgs):
+            keep = [i for i, u in enumerate(imgs) if not _is_demo(u, urls)]
+            links = b.get("links") or []
+            b["images"] = [imgs[i] for i in keep]
+            b["links"] = [links[i] if i < len(links) else "/" for i in keep]
+            for key in ("captions", "mobile_images", "img_dims", "slide_schedule"):
+                if isinstance(st.get(key), list):
+                    st[key] = [st[key][i] if i < len(st[key]) else None for i in keep]
+            changed = True
+        items = st.get("items")
+        if isinstance(items, list):
+            for it in items:
+                if isinstance(it, dict) and _is_demo(it.get("image"), urls):
+                    it["image"] = ""
+                    changed = True
+        if changed:
+            st.pop("demo_filled", None)
+            await db.page_blocks.update_one({"id": b["id"]}, {"$set": {"images": b["images"], "links": b["links"],
+                                                                       "settings": st}})
+            n += 1
+    return n
 
 
 async def load_demo(db, create_product) -> dict:
@@ -298,5 +346,66 @@ async def load_demo(db, create_product) -> dict:
     for b in await db.banners.find({"seed_source": DEMO_TAG}, {"_id": 0, "id": 1, "image": 1, "link": 1}).to_list(50):
         await db.banners.update_one({"id": b["id"]}, {"$set": {"image_url": b["image"], "link_url": b["link"]}})
 
+    filled = await _fill_blocks(db, upload)
     return {"created_products": len(created), "skipped": skipped, "banners": banners,
-            "replaced": removed}
+            "blocks_filled": filled, "replaced": removed}
+
+
+async def _fill_blocks(db, upload) -> int:
+    """Sayfa Tasarımı'ndaki ana sayfa bloklarının BOŞ görsel alanlarını demo görselleriyle doldurur
+    (dolu alanlara dokunmaz). Blok yoksa önce varsayılan düzen kurulur (home_layout)."""
+    try:
+        from home_layout import ensure_default_home
+        await ensure_default_home(db)
+    except Exception:  # noqa: BLE001
+        pass
+    blocks = await db.page_blocks.find({"page": "home"}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    n = 0
+    hero = next((b for b in blocks if b.get("type") == "hero_slider" and not (b.get("images") or [])), None)
+    if hero:
+        st = dict(hero.get("settings") or {})
+        imgs, links, mob, caps = [], [], [], []
+        for key, title, subtitle, link in HEROES:
+            imgs.append(await upload(f"banners/{key}.webp"))
+            mob.append(await upload(f"banners/{key}-m.webp"))
+            links.append(link)
+            caps.append({"title": title, "subtitle": subtitle, "cta": "Hemen İncele"})
+        st.update({"captions": caps, "mobile_images": mob, "img_dims": [[1920, 422]] * len(imgs), "demo_filled": True})
+        await db.page_blocks.update_one({"id": hero["id"]}, {"$set": {"images": imgs, "links": links, "settings": st}})
+        n += 1
+    ads = next((b for b in blocks if b.get("type") == "ads_block"), None)
+    if ads:
+        st = dict(ads.get("settings") or {})
+        items = [dict(x) for x in (st.get("items") or [])]
+        while len(items) < len(ADS):
+            items.append({})
+        ch = False
+        for i, (key, link) in enumerate(ADS):
+            if not items[i].get("image"):
+                items[i]["image"] = await upload(f"banners/{key}.webp")
+                items[i].setdefault("link", link)
+                ch = True
+        if ch:
+            st["items"] = items
+            await db.page_blocks.update_one({"id": ads["id"]}, {"$set": {"settings": st}})
+            n += 1
+    full = next((b for b in blocks if b.get("type") == "full_banner" and not (b.get("images") or [])), None)
+    if full:
+        await db.page_blocks.update_one({"id": full["id"]}, {"$set": {
+            "images": [await upload(f"banners/{WIDE[0]}.webp")], "links": [WIDE[2]],
+            "settings": {**(full.get("settings") or {}), "img_dims": [[1170, 207]], "demo_filled": True}}})
+        n += 1
+    brands = next((b for b in blocks if b.get("type") == "brands_carousel" and not (b.get("images") or [])), None)
+    if brands:
+        imgs = []
+        for i, name in enumerate(BRANDS):
+            with open(os.path.join(IMG_DIR, "brands", f"brand-{i + 1}.png"), "rb") as f:
+                from routes.upload import store_image_bytes
+                res = await store_image_bytes(f.read(), "image/png", "png", f"demo-brand-{i + 1}.png",
+                                              extra={"demo": True, "seed_source": DEMO_TAG})
+            imgs.append(res["url"])
+        await db.page_blocks.update_one({"id": brands["id"]}, {"$set": {
+            "images": imgs, "links": [f"/arama?q={name}" for name in BRANDS],
+            "settings": {**(brands.get("settings") or {}), "demo_filled": True}}})
+        n += 1
+    return n

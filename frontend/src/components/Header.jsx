@@ -28,6 +28,7 @@ import CategoryIcon from "./electro/CategoryIcon";
 import Logo from "./electro/Logo";
 import { fmtPrice, priceOf } from "./electro/format";
 import { useCompare } from "./electro/compare";
+import { fetchSiteMenus, getCachedSiteMenus } from "../lib/siteMenus";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const MAX_VERTICAL = 14; // dikey menüde gösterilecek en fazla kök kategori (fazlası "Tüm Kategoriler" bağlantısında)
@@ -35,30 +36,43 @@ const MAX_VERTICAL = 14; // dikey menüde gösterilecek en fazla kök kategori (
 /* ------------------------------------------------------------------ */
 /* Dikey "Tüm Kategoriler" menüsü (hs-mega-menu, 3 seviye)              */
 /* ------------------------------------------------------------------ */
-function VerticalMenu({ roots, open, variant, onNavigate }) {
+/** Elle tanımlı menü öğesini (label/link/children) kategori düğümü biçimine çevirir. */
+function itemToNode(it) {
+  return { id: it.id, name: it.label, slug: null, link: it.link || "/", style: it.style, icon: it.icon, children: (it.children || []).map(itemToNode) };
+}
+const nodeHref = (n) => n.link || `/${n.slug}`;
+
+function VerticalMenu({ roots, open, variant, onNavigate, config }) {
   const [hover, setHover] = useState(null);
   const timer = useRef(null);
   const enter = (id) => { clearTimeout(timer.current); setHover(id); };
   const leave = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setHover(null), 120); };
-  const list = roots.slice(0, MAX_VERTICAL);
+  const cfg = config || {};
+  const manual = cfg.mode === "manual" && (cfg.items || []).length > 0;
+  const maxRoots = Number(cfg.max_roots) || MAX_VERTICAL;
+  const source = manual ? cfg.items.map(itemToNode) : roots;
+  const list = source.slice(0, maxRoots);
+  const quick = Array.isArray(cfg.quick) ? cfg.quick : [
+    { id: "q1", label: "Günün Fırsatları", link: "/sale", style: "bold" },
+    { id: "q2", label: "Yeni Ürünler", link: "/en-yeniler", style: "bold" },
+  ];
   return (
     <div className={`collapse vertical-menu${variant === "shop" ? " v1" : ""}${open ? " show" : ""}`} data-testid="vertical-menu">
       <div className="card-body p-0">
         <nav className="js-mega-menu navbar navbar-expand-xl u-header__navbar u-header__navbar--no-space hs-menu-initialized hs-menu-vertical">
           <div className="collapse navbar-collapse u-header__navbar-collapse show">
             <ul className="navbar-nav u-header__navbar-nav">
-              <li className="nav-item u-header__nav-item" data-event="hover">
-                <Link to="/sale" className="nav-link u-header__nav-link font-weight-bold" onClick={onNavigate}>Günün Fırsatları</Link>
-              </li>
-              <li className="nav-item u-header__nav-item" data-event="hover">
-                <Link to="/en-yeniler" className="nav-link u-header__nav-link font-weight-bold" onClick={onNavigate}>Yeni Ürünler</Link>
-              </li>
+              {quick.map((q) => (
+                <li className="nav-item u-header__nav-item" data-event="hover" key={q.id || q.label}>
+                  <Link to={q.link || "/"} className={`nav-link u-header__nav-link${q.style === "sale" ? " text-sale font-weight-bold" : q.style === "normal" ? "" : " font-weight-bold"}`} onClick={onNavigate}>{q.label}</Link>
+                </li>
+              ))}
               {list.map((cat) => {
                 const kids = cat.children || [];
                 if (!kids.length) {
                   return (
                     <li key={cat.id} className="nav-item u-header__nav-item" data-event="hover">
-                      <Link to={`/${cat.slug}`} className="nav-link u-header__nav-link" onClick={onNavigate}>
+                      <Link to={nodeHref(cat)} className="nav-link u-header__nav-link" onClick={onNavigate}>
                         <span title={cat.name}><CategoryIcon cat={cat} className="el-cat-icon mr-2" /><span className="el-vm-label">{cat.name}</span></span>
                       </Link>
                     </li>
@@ -68,15 +82,15 @@ function VerticalMenu({ roots, open, variant, onNavigate }) {
                 const withKids = kids.filter((k) => (k.children || []).length);
                 const leafs = kids.filter((k) => !(k.children || []).length);
                 const cols = [];
-                if (leafs.length) cols.push({ title: cat.name, to: `/${cat.slug}`, items: leafs, all: true });
-                withKids.forEach((k) => cols.push({ title: k.name, to: `/${k.slug}`, items: k.children }));
+                if (leafs.length) cols.push({ title: cat.name, to: nodeHref(cat), items: leafs, all: true });
+                withKids.forEach((k) => cols.push({ title: k.name, to: nodeHref(k), items: k.children }));
                 const half = Math.ceil(cols.length / 2);
                 const colGroups = cols.length > 1 ? [cols.slice(0, half), cols.slice(half)] : [cols];
                 const opened = hover === cat.id;
                 return (
                   <li key={cat.id} className={`nav-item hs-has-mega-menu u-header__nav-item${opened ? " hs-mega-menu-opened" : ""}`}
                     data-event="hover" onMouseEnter={() => enter(cat.id)} onMouseLeave={leave}>
-                    <Link to={`/${cat.slug}`} className="nav-link u-header__nav-link u-header__nav-link-toggle" onClick={onNavigate} aria-haspopup="true" aria-expanded={opened}>
+                    <Link to={nodeHref(cat)} className="nav-link u-header__nav-link u-header__nav-link-toggle" onClick={onNavigate} aria-haspopup="true" aria-expanded={opened}>
                       <span title={cat.name}><CategoryIcon cat={cat} className="el-cat-icon mr-2" /><span className="el-vm-label">{cat.name}</span></span>
                     </Link>
                     <div className="hs-mega-menu vmm-tfw u-header__sub-menu el-anim-up" data-testid={`vmenu-panel-${cat.slug}`}>
@@ -93,7 +107,7 @@ function VerticalMenu({ roots, open, variant, onNavigate }) {
                                 <Link to={col.to} className="u-header__sub-menu-title d-block" onClick={onNavigate}>{col.title}</Link>
                                 <ul className="u-header__sub-menu-nav-group mb-3">
                                   {col.items.map((it) => (
-                                    <li key={it.id}><Link className="nav-link u-header__sub-menu-nav-link" to={`/${it.slug}`} onClick={onNavigate}>{it.name}</Link></li>
+                                    <li key={it.id}><Link className="nav-link u-header__sub-menu-nav-link" to={nodeHref(it)} onClick={onNavigate}>{it.name}</Link></li>
                                   ))}
                                   {col.all && (
                                     <li>
@@ -113,7 +127,7 @@ function VerticalMenu({ roots, open, variant, onNavigate }) {
                   </li>
                 );
               })}
-              {roots.length > MAX_VERTICAL && (
+              {source.length > maxRoots && (
                 <li className="nav-item u-header__nav-item" data-event="hover">
                   <Link to="/tum-urunler" className="nav-link u-header__nav-link font-weight-bold" onClick={onNavigate}>Tüm Kategoriler</Link>
                 </li>
@@ -143,7 +157,7 @@ function megaColumnsOf(tab) {
 export const NAV_MAX_HOME = 7;
 export const NAV_MAX_SHOP = 6;
 
-function HorizontalNav({ tabs, saleMenu, freeShippingText, showLast, maxVisible = NAV_MAX_HOME }) {
+function HorizontalNav({ tabs, saleMenu, freeShippingText, freeShippingLink = "/sayfa/kargo-ve-teslimat", showLast, maxVisible = NAV_MAX_HOME }) {
   const [open, setOpen] = useState(null);
   const timer = useRef(null);
   const enter = (id) => { clearTimeout(timer.current); setOpen(id); };
@@ -283,7 +297,7 @@ function HorizontalNav({ tabs, saleMenu, freeShippingText, showLast, maxVisible 
           )}
           {showPromo && (
             <li className="nav-item u-header__nav-last-item">
-              <Link className="text-gray-90" to="/sayfa/kargo-ve-teslimat">{promoText}</Link>
+              <Link className="text-gray-90" to={freeShippingLink || "/"}>{promoText}</Link>
             </li>
           )}
         </ul>
@@ -488,9 +502,52 @@ function HeaderIcons({ variant, onMobileSearch, mobileSearchOpen }) {
 /* ------------------------------------------------------------------ */
 /* Mobil off-canvas menü (u-sidebar--left)                              */
 /* ------------------------------------------------------------------ */
-function MobileSidebar({ open, onClose, roots, tabs }) {
+/** Elle tanımlı menü ağacı (hamburger / mobil menü "elle" modunda) — 3 seviyeye kadar. */
+function ManualSidebarList({ items, onClose }) {
+  const [expanded, setExpanded] = useState(null);
+  return items.map((it) => {
+    const kids = it.children || [];
+    const cls = `u-header-collapse__nav-link${it.style === "bold" ? " font-weight-bold" : ""}${it.style === "sale" ? " text-sale font-weight-bold" : ""}`;
+    const icon = it.icon ? <i className={`${it.icon} el-cat-icon mr-2`} aria-hidden="true" /> : null;
+    if (!kids.length) return <li key={it.id}><Link className={cls} to={it.link || "/"} onClick={onClose}>{icon}{it.label}</Link></li>;
+    const isOpen = expanded === it.id;
+    return (
+      <li key={it.id} className="u-has-submenu u-header-collapse__submenu">
+        <button type="button" className={`${cls} u-header-collapse__nav-pointer btn btn-link p-0 text-left w-100${isOpen ? "" : " collapsed"}`}
+          aria-expanded={isOpen} onClick={() => setExpanded(isOpen ? null : it.id)}>{icon}{it.label}</button>
+        <div className={`collapse${isOpen ? " show" : ""}`}>
+          <ul className="u-header-collapse__nav-list">
+            <li><Link className="u-header-collapse__submenu-nav-link font-weight-bold" to={it.link || "/"} onClick={onClose}>Tümü: {it.label}</Link></li>
+            {kids.map((k) => (
+              <li key={k.id}>
+                {(k.children || []).length ? (
+                  <>
+                    <Link className="u-header-sidebar__sub-menu-title d-block" to={k.link || "/"} onClick={onClose}>{k.label}</Link>
+                    {k.children.map((g) => <Link key={g.id} className="u-header-collapse__submenu-nav-link d-block" to={g.link || "/"} onClick={onClose}>{g.label}</Link>)}
+                  </>
+                ) : <Link className="u-header-collapse__submenu-nav-link" to={k.link || "/"} onClick={onClose}>{k.label}</Link>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </li>
+    );
+  });
+}
+
+function MobileSidebar({ open, onClose, roots, tabs, menus, highlight }) {
   const [expanded, setExpanded] = useState(null);
   const { user } = useAuth();
+  const isSmall = typeof window !== "undefined" && window.innerWidth < 1200;
+  const hb = menus?.hamburger || {};
+  const mob = menus?.mobile || {};
+  const useMobile = isSmall && mob.mode === "manual" && (mob.items || []).length > 0;
+  const manualItems = useMobile ? mob.items : (hb.mode === "manual" && (hb.items || []).length ? hb.items : null);
+  const quick = Array.isArray(hb.quick) ? hb.quick : [
+    { id: "q1", label: "Günün Fırsatları", link: "/sale", style: "bold" },
+    { id: "q2", label: "Yeni Ürünler", link: "/en-yeniler", style: "bold" },
+  ];
+  const quickLinks = new Set(quick.map((q) => (q.link || "").split("?")[0]));
   useEffect(() => {
     if (!open) return undefined;
     const prev = document.body.style.overflow;
@@ -503,7 +560,7 @@ function MobileSidebar({ open, onClose, roots, tabs }) {
   return (
     <>
       <div className="el-backdrop" onClick={onClose} aria-hidden="true" />
-      <aside id="sidebarHeader1" className="u-sidebar u-sidebar--left el-anim-left" role="dialog" aria-modal="true" aria-label="Menü" data-testid="mobile-menu">
+      <aside id="sidebarHeader1" className={`u-sidebar u-sidebar--left el-anim-left${highlight ? " el-menu-hl" : ""}`} role="dialog" aria-modal="true" aria-label="Menü" data-testid="mobile-menu" data-menu-group={useMobile ? "mobile" : "hamburger"}>
         <div className="u-sidebar__scroller">
           <div className="u-sidebar__container">
             <div className="u-header-sidebar__footer-offset">
@@ -516,9 +573,15 @@ function MobileSidebar({ open, onClose, roots, tabs }) {
                 <div id="headerSidebarContent" className="u-sidebar__content u-header-sidebar__content">
                   <Logo className="navbar-brand u-header__navbar-brand u-header__navbar-brand-center mb-3" onClick={onClose} />
                   <ul id="headerSidebarList" className="u-header-collapse__nav">
-                    <li><Link className="u-header-collapse__nav-link font-weight-bold" to="/sale" onClick={onClose}>Günün Fırsatları</Link></li>
-                    <li><Link className="u-header-collapse__nav-link font-weight-bold" to="/en-yeniler" onClick={onClose}>Yeni Ürünler</Link></li>
-                    {tabs.filter((t) => !/^\/(sale|en-yeniler)$/.test(t.link || "")).map((t) => (
+                    {manualItems ? <ManualSidebarList items={manualItems} onClose={onClose} /> : <>
+                    {quick.map((q) => (
+                      <li key={q.id || q.label}><Link className={`u-header-collapse__nav-link${q.style === "normal" ? "" : " font-weight-bold"}${q.style === "sale" ? " text-sale" : ""}`} to={q.link || "/"} onClick={onClose}>{q.label}</Link></li>
+                    ))}
+                    {tabs.filter((t) => {
+                      const l = (t.link || "").split("?")[0];
+                      // kategori ağacında zaten olan sekmeleri tekrar listeleme
+                      return !quickLinks.has(l) && !roots.some((r) => `/${r.slug}` === l || r.name.toLocaleLowerCase("tr") === String(t.label || "").toLocaleLowerCase("tr"));
+                    }).map((t) => (
                       <li key={`tab-${t.id}`}><Link className={`u-header-collapse__nav-link font-weight-bold${t.style === "sale" ? " text-sale" : ""}`} to={t.link || "/"} onClick={onClose}>{t.label}</Link></li>
                     ))}
                     {roots.map((cat) => {
@@ -555,7 +618,9 @@ function MobileSidebar({ open, onClose, roots, tabs }) {
                         </li>
                       );
                     })}
+                    </>}
                   </ul>
+                  {hb.show_account_links !== false && (
                   <ul className="list-unstyled border-top pt-3 mt-3 mb-0 font-size-14">
                     <li className="mb-2"><Link to={user ? "/hesabim" : "/giris"} className="text-gray-90" onClick={onClose}><i className="ec ec-user mr-2" />{user ? "Hesabım" : "Giriş Yap / Üye Ol"}</Link></li>
                     <li className="mb-2"><Link to="/favoriler" className="text-gray-90" onClick={onClose}><i className="ec ec-favorites mr-2" />Favorilerim</Link></li>
@@ -563,6 +628,7 @@ function MobileSidebar({ open, onClose, roots, tabs }) {
                     <li className="mb-2"><Link to="/iade-islemleri" className="text-gray-90" onClick={onClose}><i className="ec ec-returning mr-2" />İade Talebi</Link></li>
                     <li className="mb-2"><Link to="/sayfa/iletisim" className="text-gray-90" onClick={onClose}><i className="ec ec-map-pointer mr-2" />İletişim</Link></li>
                   </ul>
+                  )}
                 </div>
               </div>
             </div>
@@ -613,12 +679,23 @@ export default function Header({ announcement, announcementFirst = false, varian
     return () => { alive = false; };
   }, []);
 
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // Menü grupları (Menü Yönetimi): üst bar, sol menü, hamburger, orta menü sağ yazısı, mobil
+  const [menus, setMenus] = useState(getCachedSiteMenus);
+  useEffect(() => {
+    let alive = true;
+    fetchSiteMenus(API).then((m) => { if (alive && m) setMenus(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  // Panel "Sitede göster": ?menu-highlight=<grup> → ilgili alan vurgulanır (hamburger/mobil açılır)
+  const hl = (() => { try { return new URLSearchParams(location.search).get("menu-highlight") || ""; } catch { return ""; } })();
+  const hlCls = (g) => (hl === g ? " el-menu-hl" : "");
+
+  const [mobileOpen, setMobileOpen] = useState(() => hl === "hamburger" || hl === "mobile");
   const [mobileSearch, setMobileSearch] = useState(false);
   const [deptOpen, setDeptOpen] = useState(false);
   const [stuck, setStuck] = useState(false);
   const headerRef = useRef(null);
-  useEffect(() => { setMobileOpen(false); setMobileSearch(false); setDeptOpen(false); }, [location.pathname, location.search]);
+  useEffect(() => { setMobileOpen(hl === "hamburger" || hl === "mobile"); setMobileSearch(false); setDeptOpen(false); }, [location.pathname, location.search, hl]);
 
   // Masaüstü yapışkan şerit: header görünümden çıkınca üstte sabit sarı şerit belirir.
   useEffect(() => {
@@ -631,8 +708,10 @@ export default function Header({ announcement, announcementFirst = false, varian
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const welcome = `${info.name && info.name !== "Mağaza" ? info.name : SITE_NAME}'e Hoş Geldiniz — Oto Servis & Garaj Ekipmanları`;
-  const freeShip = "Ücretsiz Kargo Fırsatları";
+  const welcome = menus.topbar?.welcome || `${info.name && info.name !== "Mağaza" ? info.name : SITE_NAME}'e Hoş Geldiniz — Oto Servis & Garaj Ekipmanları`;
+  const freeShip = menus.center?.right_text ?? "Ücretsiz Kargo Fırsatları";
+  const freeShipLink = menus.center?.right_link || "/sayfa/kargo-ve-teslimat";
+  const topItems = Array.isArray(menus.topbar?.items) ? menus.topbar.items : [];
   const closeMobile = () => setMobileOpen(false);
 
   // Ödeme sayfasında sade header (yalnız logo) — dikkat dağıtmaz.
@@ -667,7 +746,7 @@ export default function Header({ announcement, announcementFirst = false, varian
         <header id="header" className="u-header u-header-left-aligned-nav" ref={headerRef} data-testid="site-header">
           <div className="u-header__section">
             {/* Topbar */}
-            <div className="u-header-topbar py-2 d-none d-xl-block">
+            <div className={`u-header-topbar py-2 d-none d-xl-block${hlCls("topbar")}`} data-menu-group="topbar">
               <div className="container">
                 <div className="d-flex align-items-center">
                   <div className="topbar-left">
@@ -675,21 +754,21 @@ export default function Header({ announcement, announcementFirst = false, varian
                   </div>
                   <div className="topbar-right ml-auto">
                     <ul className="list-inline mb-0">
-                      <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
-                        <Link to="/sayfa/iletisim" className="u-header-topbar__nav-link"><i className="ec ec-map-pointer mr-1" /> Mağazamız</Link>
-                      </li>
-                      <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
-                        <Link to="/siparis-takip" className="u-header-topbar__nav-link"><i className="ec ec-transport mr-1" /> Sipariş Takibi</Link>
-                      </li>
+                      {topItems.map((it) => (
+                        <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border" key={it.id || it.label}>
+                          {it.special === "account" ? (user ? (
+                            <Link to="/hesabim" className="u-header-topbar__nav-link" data-testid="topbar-account">{it.icon && <i className={`${it.icon} mr-1`} />} {it.label || "Hesabım"}{user.first_name ? ` (${user.first_name})` : ""}</Link>
+                          ) : (
+                            <Link to="/giris" className="u-header-topbar__nav-link" data-testid="topbar-login">{it.icon && <i className={`${it.icon} mr-1`} />} Üye Ol <span className="text-gray-50">veya</span> Giriş Yap</Link>
+                          )) : /^https?:/i.test(it.link || "") ? (
+                            <a href={it.link} className="u-header-topbar__nav-link" target="_blank" rel="noopener noreferrer">{it.icon && <i className={`${it.icon} mr-1`} />} {it.label}</a>
+                          ) : (
+                            <Link to={it.link || "/"} className="u-header-topbar__nav-link">{it.icon && <i className={`${it.icon} mr-1`} />} {it.label}</Link>
+                          )}
+                        </li>
+                      ))}
                       <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
                         <span className="u-header-topbar__nav-link"><i className="ec ec-dollar mr-1" /> Türk Lirası (₺)</span>
-                      </li>
-                      <li className="list-inline-item mr-0 u-header-topbar__nav-item u-header-topbar__nav-item-border">
-                        {user ? (
-                          <Link to="/hesabim" className="u-header-topbar__nav-link" data-testid="topbar-account"><i className="ec ec-user mr-1" /> Hesabım{user.first_name ? ` (${user.first_name})` : ""}</Link>
-                        ) : (
-                          <Link to="/giris" className="u-header-topbar__nav-link" data-testid="topbar-login"><i className="ec ec-user mr-1" /> Üye Ol <span className="text-gray-50">veya</span> Giriş Yap</Link>
-                        )}
                       </li>
                     </ul>
                   </div>
@@ -715,7 +794,7 @@ export default function Header({ announcement, announcementFirst = false, varian
                     </div>
                   ) : (
                     <>
-                      <div className="col d-none d-xl-block el-hnav-col">
+                      <div className={`col d-none d-xl-block el-hnav-col${hlCls("center")}`} data-menu-group="center">
                         <HorizontalNav tabs={tabs} saleMenu={saleMenu} maxVisible={NAV_MAX_SHOP} />
                       </div>
                       <div className="d-none d-xl-block col-md-auto">
@@ -747,7 +826,7 @@ export default function Header({ announcement, announcementFirst = false, varian
             {home ? (
               <div className="d-none d-xl-block container">
                 <div className="row">
-                  <div className="col-md-auto d-none d-xl-block">
+                  <div className={`col-md-auto d-none d-xl-block${hlCls("departments")}`} data-menu-group="departments">
                     <div className="max-width-270 min-width-270">
                       <div id="basicsAccordion">
                         <div className="card border-0">
@@ -758,18 +837,18 @@ export default function Header({ announcement, announcementFirst = false, varian
                               <span className="pl-1 text-gray-90">Tüm Kategoriler</span>
                             </button>
                           </div>
-                          <VerticalMenu roots={roots} open={!deptOpen} variant="home" />
+                          <VerticalMenu roots={roots} open={!deptOpen} variant="home" config={menus.departments} />
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="col el-hnav-col">
-                    <HorizontalNav tabs={tabs} saleMenu={saleMenu} freeShippingText={freeShip} showLast />
+                  <div className={`col el-hnav-col${hlCls("center")}`} data-menu-group="center">
+                    <HorizontalNav tabs={tabs} saleMenu={saleMenu} freeShippingText={freeShip} freeShippingLink={freeShipLink} showLast />
                   </div>
                 </div>
               </div>
             ) : (
-              <ShopBar roots={roots} deptOpen={deptOpen} setDeptOpen={setDeptOpen} />
+              <ShopBar roots={roots} deptOpen={deptOpen || hl === "departments"} setDeptOpen={setDeptOpen} config={menus.departments} highlight={hl === "departments"} />
             )}
           </div>
         </header>
@@ -789,7 +868,7 @@ export default function Header({ announcement, announcementFirst = false, varian
           </div>
         )}
 
-        <MobileSidebar open={mobileOpen} onClose={closeMobile} roots={roots} tabs={tabs} />
+        <MobileSidebar open={mobileOpen} onClose={closeMobile} roots={roots} tabs={tabs} menus={menus} highlight={hl === "hamburger" || hl === "mobile"} />
         <CartDrawer />
       </div>
     </>
@@ -797,7 +876,7 @@ export default function Header({ announcement, announcementFirst = false, varian
 }
 
 /** İç sayfalar: sarı şerit — "Kategoriler" (açılır dikey menü) + arama + ikonlar. */
-function ShopBar({ roots, deptOpen, setDeptOpen }) {
+function ShopBar({ roots, deptOpen, setDeptOpen, config, highlight }) {
   const ref = useRef(null);
   useEffect(() => {
     if (!deptOpen) return undefined;
@@ -809,7 +888,7 @@ function ShopBar({ roots, deptOpen, setDeptOpen }) {
     <div className="d-none d-xl-block bg-primary">
       <div className="container">
         <div className="row align-items-stretch min-height-50">
-          <div className="col-md-auto d-none d-xl-flex align-items-end">
+          <div className={`col-md-auto d-none d-xl-flex align-items-end${highlight ? " el-menu-hl" : ""}`} data-menu-group="departments">
             <div className="max-width-270 min-width-270" ref={ref}>
               <div id="basicsAccordion">
                 <div className="card border-0 rounded-0">
@@ -820,7 +899,7 @@ function ShopBar({ roots, deptOpen, setDeptOpen }) {
                       <span className="text-gray-90 ml-3"><span className="ec ec-arrow-down-search" /></span>
                     </button>
                   </div>
-                  <VerticalMenu roots={roots} open={deptOpen} variant="shop" onNavigate={() => setDeptOpen(false)} />
+                  <VerticalMenu roots={roots} open={deptOpen} variant="shop" onNavigate={() => setDeptOpen(false)} config={config} />
                 </div>
               </div>
             </div>

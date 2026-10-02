@@ -24,8 +24,10 @@ def test_demo_images_exist_and_small():
             p = os.path.join(dc.IMG_DIR, "banners", f"{key}{suffix}.webp")
             assert os.path.isfile(p), p
             total += os.path.getsize(p)
-    for key, *_ in dc.SMALL + [dc.WIDE]:
+    for key, *_ in dc.SMALL + [dc.WIDE] + dc.ADS:
         assert os.path.isfile(os.path.join(dc.IMG_DIR, "banners", f"{key}.webp"))
+    for i in range(len(dc.BRANDS)):
+        assert os.path.isfile(os.path.join(dc.IMG_DIR, "brands", f"brand-{i + 1}.png"))
     assert total < 8 * 1024 * 1024
 
 

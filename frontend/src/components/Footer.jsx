@@ -50,12 +50,12 @@ function NewsletterBand({ nl }) {
         <div className="row align-items-center">
           <div className="col-lg-7 mb-md-3 mb-lg-0">
             <div className="row align-items-center">
-              <div className="col-auto flex-horizontal-center">
+              <div className="col-12 col-md-auto flex-horizontal-center">
                 <i className="ec ec-newsletter font-size-40" />
                 <h2 className="font-size-20 mb-0 ml-3">{title}</h2>
               </div>
-              <div className="col my-4 my-md-0">
-                <h5 className="font-size-15 ml-4 mb-0">{description}</h5>
+              <div className="col-12 col-md my-3 my-md-0">
+                <h5 className="font-size-15 ml-md-4 mb-0">{description}</h5>
               </div>
             </div>
           </div>
@@ -182,7 +182,7 @@ function PaymentBadges() {
   );
 }
 
-export default function Footer() {
+export default function Footer({ hideWidgets = false }) {
   const [tpl, setTpl] = useState(null);
   const info = useStoreInfo();
   const tree = useCategoryTree();
@@ -214,7 +214,7 @@ export default function Footer() {
 
   return (
     <footer className="electro el-footer" data-testid={tpl?.mode === "html" ? "footer-html" : "footer-structured"}>
-      <FooterWidgets />
+      {!hideWidgets && <FooterWidgets />}
       <NewsletterBand nl={tpl?.newsletter} />
       {tpl?.mode === "html" && tpl?.custom_html ? (
         <div className="pt-8 pb-4 bg-gray-13">

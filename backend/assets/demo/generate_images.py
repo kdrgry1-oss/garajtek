@@ -590,12 +590,12 @@ def hero_mobile(slide):
     W, H = 800, 860
     im = Image.new("RGB", (W, H), (245, 245, 245))
     d = ImageDraw.Draw(im)
-    d.ellipse((260, 360, 900, 1000), fill=(254, 236, 128))
+    d.ellipse((330, 460, 930, 1060), fill=(254, 236, 128))
     kind, col, *_ = slide["arts"][0]
     art = render_art(kind, col)
-    k = min(560 / art.height, 620 / art.width)
+    k = min(400 / art.height, 520 / art.width)
     art = art.resize((int(art.width * k), int(art.height * k)), Image.LANCZOS)
-    x, y = W - art.width - 40, H - art.height - 50
+    x, y = W - art.width - 50, H - art.height - 40
     im.paste(art, (x, y), art)
     return im
 
@@ -632,25 +632,56 @@ def small_banner(b):
 
 
 def wide_banner():
-    """Tam genişlik kampanya bandı — 1400x206 (Electro home-v1 tam banner oranı)."""
-    W, H = 1400, 206
+    """Tam genişlik kampanya bandı — 1170x207 (şablon v1.0 home-v1-banner ölçüsü)."""
+    W, H = 1170, 207
     im = Image.new("RGB", (W, H), (245, 245, 245))
     d = ImageDraw.Draw(im)
     for i, (kind, col) in enumerate((("tool_cart", RED), ("socket_set", RED), ("ratchet", None))):
         art = render_art(kind, col)
-        k = 170 / art.height
+        k = 165 / art.height if kind != "socket_set" else 120 / art.height
         art = art.resize((int(art.width * k), int(art.height * k)), Image.LANCZOS)
-        im.paste(art, (40 + i * 150, H - art.height - 18), art)
-    fl, fb = _font("light", 34), _font("bold", 34)
-    x, y = 520, 58
-    for s, f in (("ATÖLYENİZİ ", fl), ("KAZANÇLA", fb), (" DONATIN", fl)):
-        d.text((x, y), s, font=f, fill=(51, 62, 72))
-        x += d.textlength(s, font=f)
-    d.text((520, 112), "El aletleri ve takım arabalarında %20'ye varan indirim", font=_font("regular", 21), fill=(51, 62, 72))
-    d.rounded_rectangle((1130, 52, 1350, 152), radius=12, fill=(254, 215, 0))
-    d.text((1245, 82), "FIRSATLAR", font=_font("light", 22), fill=(51, 62, 72), anchor="mm")
-    d.text((1245, 118), "%20'ye varan", font=_font("bold", 28), fill=(51, 62, 72), anchor="mm")
+        im.paste(art, (30 + i * 125, H - art.height - 20), art)
+    fl, fb = _font("light", 30), _font("bold", 30)
+    x, y = 450, 62
+    for s_, f in (("ATÖLYENİZİ ", fl), ("KAZANÇLA", fb), (" DONATIN", fl)):
+        d.text((x, y), s_, font=f, fill=(51, 62, 72))
+        x += d.textlength(s_, font=f)
+    d.text((450, 108), "El aletleri ve takım arabalarında %20'ye varan indirim", font=_font("regular", 18), fill=(51, 62, 72))
+    d.rounded_rectangle((930, 55, 1140, 152), radius=12, fill=(254, 215, 0))
+    d.text((1035, 84), "FIRSATLAR", font=_font("light", 20), fill=(51, 62, 72), anchor="mm")
+    d.text((1035, 119), "%20'ye varan", font=_font("bold", 26), fill=(51, 62, 72), anchor="mm")
     return im
+
+
+def ad_image(kind, color, size):
+    """Reklam bloğu görseli (şablon v1.0 ads-block: 410x281 / 714x486) — açık zemin, metinsiz."""
+    W, H = size
+    im = Image.new("RGB", (W, H), (245, 245, 245))
+    art = render_art(kind, color)
+    k = min(W * 0.8 / art.width, H * 0.8 / art.height)
+    art = art.resize((int(art.width * k), int(art.height * k)), Image.LANCZOS)
+    im.paste(art, ((W - art.width) // 2, (H - art.height) // 2), art)
+    return im
+
+
+def brand_logo(name, style):
+    """200x60 marka logosu (demo markalar — gri tonlu kelime işareti)."""
+    W, H = 400, 120  # 2x çiz, sonra küçült
+    im = Image.new("RGBA", (W, H), (255, 255, 255, 0))
+    d = ImageDraw.Draw(im)
+    f = _font("xbold" if style % 2 == 0 else "bold", 54)
+    tw = d.textlength(name, font=f)
+    x = (W - tw) / 2
+    if style % 3 == 0:
+        d.rounded_rectangle((x - 22, 22, x + tw + 22, 98), radius=14, outline=(90, 98, 106), width=6)
+    d.text((W / 2, H / 2), name, font=f, fill=(90, 98, 106), anchor="mm")
+    if style % 3 == 1:
+        d.ellipse((x + tw + 6, 70, x + tw + 22, 86), fill=(254, 215, 0))
+    return im.resize((200, 60), Image.LANCZOS)
+
+
+ADS = [("ad-1", "socket_set", RED, (410, 281)), ("ad-2", "compressor", BLUE, (410, 281)), ("ad-3", "tool_cart", RED, (714, 486))]
+BRANDS = ["Grayzer", "Liftmax", "Airpro", "Torkmatik", "Balanstek", "Voltix", "Weldon", "Diagnox", "Teknolift", "Atölye Pro"]
 
 
 # Ürün görsel planı: (anahtar, tür, renk, tuval boyutu) — farklı en-boy oranları gerçek
@@ -723,6 +754,11 @@ def main():
         for b in SMALL:
             save(small_banner(b), f"banners/{b['key']}.webp")
         save(wide_banner(), "banners/wide-1.webp")
+        for key, kind, col, size in ADS:
+            save(ad_image(kind, col, size), f"banners/{key}.webp")
+        os.makedirs(os.path.join(OUT, "brands"), exist_ok=True)
+        for i, name in enumerate(BRANDS):
+            brand_logo(name, i).save(os.path.join(OUT, "brands", f"brand-{i + 1}.png"), optimize=True)
     total = 0
     for root, _d, files in os.walk(OUT):
         total += sum(os.path.getsize(os.path.join(root, f)) for f in files)

@@ -160,6 +160,25 @@ def _requester_is_admin(request) -> bool:
     except Exception:
         return False
 
+_home_layout_checked = False
+
+
+async def _ensure_home_layout_once():
+    """Ana sayfa varsayılan (şablon v1.0) düzeni — süreç başına bir kez kontrol edilir; boş ya da
+    el değmemiş eski iskelet varsa kurar, düzenlenmiş tasarıma dokunmaz (bkz. home_layout.py)."""
+    global _home_layout_checked
+    if _home_layout_checked:
+        return
+    _home_layout_checked = True
+    try:
+        from home_layout import ensure_default_home
+        res = await ensure_default_home(db)
+        if res:
+            logger.info(f"[page-blocks] varsayılan ana sayfa düzeni kuruldu: {res}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[page-blocks] varsayılan ana sayfa düzeni kurulamadı: {e}")
+
+
 @router.get("")
 async def get_page_blocks(
     request: Request,
@@ -172,6 +191,8 @@ async def get_page_blocks(
     ZAMANLI YAYIN: slayt/blok bazlı zaman aralığı kuralları SUNUCUDA uygulanır —
     zamanı gelmemiş ya da süresi dolmuş slayt vitrine hiç gitmez. Panel (admin
     token + ?all=1) hepsini görür, yoksa düzenleme ekranında slaytlar kaybolurdu."""
+    if page == "home":
+        await _ensure_home_layout_once()
     query = {"page": page}
     if is_active is not None:
         query["is_active"] = is_active
@@ -409,6 +430,25 @@ async def reorder_page_blocks(
         )
         updated += r.modified_count
     return {"success": True, "updated": updated, "total": len(ids)}
+
+
+@router.post("/install-default-home")
+async def install_default_home_layout(
+    request: Request,
+    replace: bool = Query(False, description="True: üst barlar dışındaki mevcut ana sayfa bloklarını siler"),
+    current_user: dict = Depends(require_admin),
+):
+    """Şablonun v1.0 ana sayfa düzenini (slider, reklam bannerları, fırsat+sekmeler, 2-1-2 ızgara,
+    çok satanlar, tam banner, son eklenenler, markalar, ürün sütunları) blok olarak ekler."""
+    from home_layout import install_default_home
+    before = await db.page_blocks.find({"page": "home"}, {"_id": 0}).to_list(200)
+    res = await install_default_home(db, replace=replace)
+    await record_admin_audit(
+        db, action="page_block.install_default_home", entity_type="page_block", entity_id="home",
+        before={"blocks": len(before)}, after=res, current_user=current_user, request=request,
+        source="content.blocks",
+    )
+    return {"success": True, **res}
 
 
 @router.post("/seed-default-home")
