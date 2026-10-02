@@ -1,5 +1,5 @@
 # garajtek → SNET VDS dağıtımı.
-# main'e her push'ta: frontend GitHub'da derlenir (2 GB'lık sunucu yorulmaz), backend + deploy/
+# main ve claude/admiring-gates-5v49dc dalına her push'ta: frontend GitHub'da derlenir (2 GB'lık sunucu yorulmaz), backend + deploy/
 # betikleri + derlenmiş frontend rsync ile /opt/garajtek'e gönderilir, sunucuda update.sh çalışır.
 # İlk çalıştırmada sunucu kurulu değilse deploy/install.sh otomatik çalışır.
 #
@@ -20,7 +20,7 @@ name: Deploy (VDS)
 
 on:
   push:
-    branches: [main]
+    branches: [main, "claude/admiring-gates-5v49dc"]
   workflow_dispatch: {}
 
 concurrency:
