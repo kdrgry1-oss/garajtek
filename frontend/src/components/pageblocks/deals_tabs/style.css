@@ -1,0 +1,75 @@
+/* Grup B — şablon v1.0 `_section-onsale-product.scss` + `_products-carousel-tabs.scss` karşılığı.
+   Tamamı .electro kapsamında; sınıf öneki pdb- (page design, grup B). */
+
+/* ---- özel teklif kartı ---- */
+.electro .pdb-onsale { border: 2px solid var(--electro-primary, #fed700); border-radius: 1.214em; padding: 1.429em 1.571em; background: #fff; position: relative; }
+.electro .pdb-onsale__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1em; min-height: 3.6em; }
+.electro .pdb-onsale__title { font-size: 1.786em; line-height: 1.6em; padding-bottom: .4em; margin: 0; font-weight: 400; color: #333e48; position: relative; display: inline-block; }
+.electro .pdb-onsale__title::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 100%; border-bottom: 2px solid var(--electro-primary, #fed700); }
+.electro .pdb-onsale__title.pdb-no-line::after { content: none; }
+.electro .pdb-onsale__product > a { display: block; color: inherit; }
+.electro .pdb-onsale__thumb { margin-bottom: 1.714em; text-align: center; }
+.electro .pdb-onsale__name { clear: both; text-align: center; margin-bottom: 1.214em; font-size: 1em; line-height: 1.286em; font-weight: 700; color: #0062bd; }
+.electro .pdb-onsale__product > a:hover .pdb-onsale__name { color: #333e48; }
+
+.electro .pdb-img { display: block; width: 100%; position: relative; overflow: hidden; }
+.electro .pdb-img > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+
+.electro .pdb-price { display: block; width: 100%; text-align: center; font-size: 2.143em; line-height: 1.286em; margin-bottom: 1em; color: #343f49; white-space: nowrap; }
+.electro .pdb-price ins { color: #ee0000; text-decoration: none; }
+.electro .pdb-price del { color: #848484; font-size: .6em; line-height: 1.5em; margin-left: .3em; }
+
+/* kazanç kutusu 110×65 #343f49 */
+.electro .pdb-savings { flex-shrink: 0; position: relative; width: 110px; height: 65px; border-radius: 8px; background-color: #343f49; color: #fff; font-size: 18px; line-height: 18px; font-weight: 700; }
+.electro .pdb-savings__text { position: absolute; top: 50%; transform: translateY(-50%); display: block; width: 100%; text-align: center; }
+.electro .pdb-savings__amount { display: block; }
+
+/* stok çubuğu */
+.electro .pdb-progress__stock { display: flex; justify-content: space-between; font-size: 1.071em; line-height: 1.2em; margin-bottom: .867em; }
+.electro .pdb-progress__track { border-radius: .571em; background-color: #eee; height: 1.429em; margin-bottom: 1.875em; overflow: hidden; }
+.electro .pdb-progress__bar { display: block; height: 100%; border-radius: .571em; background-color: var(--electro-primary, #fed700); }
+
+/* geri sayım */
+.electro .pdb-cd { margin-bottom: .857em; text-align: center; color: #383838; }
+.electro .pdb-cd__heading { margin-bottom: 1.071em; }
+.electro .pdb-cd__expired { font-size: 1.071em; }
+.electro .pdb-cd__unit { display: inline-block; margin: 0 6px; }
+.electro .pdb-cd__value { font-size: 2.143em; line-height: 1.367em; width: 56px; height: 41px; border-radius: 4px; background-color: #e6e6e6; display: inline-block; text-align: center; position: relative; margin-bottom: .429em; }
+.electro .pdb-cd__value::after { content: ":"; display: inline-block; position: absolute; right: -9px; font-size: .8em; line-height: 1.708em; }
+.electro .pdb-cd__unit:last-child .pdb-cd__value::after { content: none; }
+.electro .pdb-cd__unit b { display: block; font-size: .857em; text-transform: uppercase; line-height: 1em; }
+
+/* ---- v1 sekmeleri (nav-inline) ---- */
+.electro .pdb-tabs-v1 { display: flex; justify-content: center; list-style: none; padding: 0; margin: 0; border-bottom: 1px solid #ddd; white-space: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.electro .pdb-tabs-v1.pdb-tabs--left { justify-content: flex-start; }
+.electro .pdb-tabs-v1 > li + li { margin-left: 4em; }
+.electro .pdb-tabs-v1 a { display: block; color: #333e48; font-size: 1.429em; line-height: .9em; padding: .25em 0 1em; position: relative; text-decoration: none; }
+.electro .pdb-tabs-v1 a.active { font-weight: 700; }
+.electro .pdb-tabs-v1 a.active::after { content: ""; position: absolute; left: 0; bottom: 0; width: 100%; border-bottom: 2px solid var(--electro-primary, #fed700); }
+.electro .pdb-tabs-v1 a.active::before { content: ""; position: absolute; bottom: -4px; left: 50%; width: 10px; height: 4px; border-radius: 0 0 10px 10px; transform: translateX(-50%); background: var(--electro-primary, #fed700); }
+.electro .pdb-tabs-v1-wrap { padding-bottom: 5px; }
+@media (max-width: 767.98px) {
+  .electro .pdb-tabs-v1 { justify-content: flex-start; }
+  .electro .pdb-tabs-v1 > li + li { margin-left: 2em; }
+  .electro .pdb-tabs-v1 a { font-size: 1.214em; }
+}
+
+/* sekme içi geçişler */
+.electro .pdb-anim-fade { animation: pdbFade .4s ease both; }
+.electro .pdb-anim-up { animation: pdbUp .5s ease both; }
+@keyframes pdbFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pdbUp { from { opacity: 0; transform: translate3d(0, 40px, 0); } to { opacity: 1; transform: none; } }
+html.pd-no-anim .electro .pdb-anim-fade, html.pd-no-anim .electro .pdb-anim-up { animation: none; }
+
+/* iskelet */
+.electro .pdb-skel { background: linear-gradient(90deg, #f1f1f1 25%, #e8e8e8 50%, #f1f1f1 75%); background-size: 200% 100%; animation: pdbSkel 1.2s linear infinite; border-radius: 4px; }
+@keyframes pdbSkel { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+html.pd-no-anim .electro .pdb-skel { animation: none; }
+
+/* ---- cihaz başına sütunlu ürün ızgarası (product_grid, banner_with_products_grid, deals_tabs) ---- */
+.electro .pdb-cols { display: flex; flex-wrap: wrap; list-style: none; padding: 0; margin: 0; }
+.electro .pdb-cols > * { flex: 0 0 calc(100% / var(--pdb-cm, 2)); max-width: calc(100% / var(--pdb-cm, 2)); min-width: 0; }
+@media (min-width: 768px) { .electro .pdb-cols > * { flex-basis: calc(100% / var(--pdb-ct, 3)); max-width: calc(100% / var(--pdb-ct, 3)); } }
+@media (min-width: 1200px) { .electro .pdb-cols > * { flex-basis: calc(100% / var(--pdb-cd, 4)); max-width: calc(100% / var(--pdb-cd, 4)); } }
+.electro .pdb-tabs-v1 > li { flex-shrink: 0; }
+.electro .pdb-tabs-v1 a { white-space: nowrap; }

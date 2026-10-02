@@ -1,12 +1,13 @@
 {
   "title": "Kategori fırsatları",
   "nav_mode": "tabs",
+  "nav_align": "left",
   "nav_items": [
     {
       "label": "En İyi Fırsatlar",
       "link": {
         "kind": "url",
-        "url": "",
+        "url": "/sale",
         "new_tab": false
       },
       "source": {
@@ -43,12 +44,12 @@
         "bottom": 58
       },
       "tablet": {
-        "top": 40,
-        "bottom": 40
+        "top": 58,
+        "bottom": 58
       },
       "mobile": {
-        "top": 30,
-        "bottom": 30
+        "top": 58,
+        "bottom": 58
       }
     },
     "margin_bottom": {

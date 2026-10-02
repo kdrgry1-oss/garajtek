@@ -2,12 +2,14 @@
   "key": "product_grid",
   "version": 2,
   "title": "Ürün Izgarası",
-  "description": "",
+  "description": "Başlık + “Tümünü gör” bağlantılı çok sütunlu ürün ızgarası; sayfalama veya “Daha Fazla Göster” (v2.0 home-v7 Recommendation For You, home-v10 Hot Products, home-v9 son bakılanlar)",
   "category": "urun",
   "group": "B",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v7.html"
+    "T2/html/home/home-v7.html#Recommendation-For-You",
+    "T2/html/home/home-v10.html#Hot-Products-Today",
+    "T2/html/home/home-v9.html#Recently-Viewed"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,15 +17,208 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "recommendations",
+      "label": "Size özel öneriler (6 sütun)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "recently_viewed",
+      "label": "Son bakılan ürünler (yalnız görsel)",
+      "defaults_patch": {
+        "header": {
+          "title": "Son Baktığınız Ürünler",
+          "right": "none"
+        },
+        "source": {
+          "kind": "recently_viewed",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 8,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        },
+        "card": "image_only",
+        "columns": {
+          "desktop": 8,
+          "tablet": 4,
+          "mobile": 3
+        },
+        "empty_text": ""
+      }
+    },
+    {
+      "value": "hot",
+      "label": "Bugünün popüler ürünleri (yatay kart)",
+      "defaults_patch": {
+        "header": {
+          "title": "Bugünün Popüler Ürünleri"
+        },
+        "source": {
+          "kind": "best_sellers",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 8,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        },
+        "card": "horizontal",
+        "columns": {
+          "desktop": 4,
+          "tablet": 2,
+          "mobile": 1
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
     "Görünüm",
-    "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık satırı",
+      "tab": "İçerik",
+      "help": "Sağda “Tümünü gör” bağlantısı ya da hap sekmeler (sekme haplar kendi ürün kaynağını gösterir)."
+    },
+    {
+      "name": "source",
+      "type": "product_source",
+      "label": "Ürün kaynağı",
+      "tab": "Ürünler",
+      "allowed_kinds": [
+        "manual",
+        "category",
+        "discounted",
+        "newest",
+        "best_sellers",
+        "featured",
+        "top_rated",
+        "tag",
+        "brand",
+        "recently_viewed"
+      ],
+      "default_limit": 12
+    },
+    {
+      "name": "columns",
+      "type": "number",
+      "label": "Sütun sayısı",
+      "tab": "Görünüm",
+      "responsive": true,
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "unit": "adet"
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "grid",
+          "label": "Izgara kartı"
+        },
+        {
+          "value": "image_only",
+          "label": "Yalnız görsel"
+        },
+        {
+          "value": "horizontal",
+          "label": "Yatay kart"
+        }
+      ]
+    },
+    {
+      "name": "pagination",
+      "type": "bool",
+      "label": "Sayfalama",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "page_size",
+      "type": "number",
+      "label": "Sayfa başına ürün",
+      "tab": "Görünüm",
+      "width": "half",
+      "min": 1,
+      "max": 48,
+      "unit": "adet",
+      "show_if": {
+        "pagination": [
+          true
+        ]
+      }
+    },
+    {
+      "name": "show_more_button",
+      "type": "group",
+      "label": "“Daha Fazla Göster” düğmesi",
+      "tab": "Görünüm",
+      "show_if": {
+        "pagination": [
+          false
+        ]
+      },
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "label": "Açık",
+          "width": "half"
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "label": "Düğme yazısı",
+          "width": "half"
+        },
+        {
+          "name": "initial",
+          "type": "number",
+          "label": "İlk gösterilen",
+          "min": 1,
+          "max": 48,
+          "unit": "adet",
+          "width": "half"
+        },
+        {
+          "name": "step",
+          "type": "number",
+          "label": "Her tıklamada eklenen",
+          "min": 1,
+          "max": 48,
+          "unit": "adet",
+          "width": "half"
+        }
+      ]
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Ürün yoksa gösterilecek yazı",
+      "tab": "Gelişmiş",
+      "help": "Boşsa ürün yokken bölüm gizlenir."
+    }
+  ],
   "common": [
     "section",
     "visibility",

@@ -1,0 +1,29 @@
+/* Grup B — şablon v1.0 `_products-6-1.scss` (+ v2.0 home-v3 Products-8-1). .electro kapsamlı. */
+.electro .pdb-61__header { margin-bottom: 2.143em; }
+.electro .pdb-61__cols { display: flex; flex-wrap: wrap; }
+.electro .pdb-61__grid { width: 100%; list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; }
+.electro .pdb-61__grid > li { width: 50%; padding-right: 5px; margin-bottom: 5px; }
+.electro .pdb-61__grid > li > .product-item, .electro .pdb-61__grid > li.product-item { height: 100%; }
+.electro .pdb-61__grid .product-item__inner { background: #fff; height: 100%; }
+.electro .pdb-61__grid .product-item::after { content: none !important; }
+.electro .pdb-61__main { width: 100%; list-style: none; padding: 0; margin: 0 0 5px; display: flex; }
+@media (min-width: 768px) { .electro .pdb-61__grid > li { width: 33.3333%; } }
+@media (min-width: 992px) {
+  .electro .pdb-61__grid { width: 58.3333%; }
+  .electro .pdb-61__main { width: 41.6667%; }
+  .electro .pdb-61--8 .pdb-61__grid > li { width: 33.3333%; }
+}
+@media (min-width: 1480px) {
+  .electro .pdb-61--8 .pdb-61__grid { width: 66.6667%; }
+  .electro .pdb-61--8 .pdb-61__grid > li { width: 25%; }
+  .electro .pdb-61--8 .pdb-61__main { width: 33.3333%; }
+}
+@media (min-width: 992px) and (max-width: 1479.98px) { .electro .pdb-61--8 .pdb-61__grid > li:nth-child(n+7) { display: none; } }
+.electro .pdb-61 .pdb-main__price { font-size: 1.786em; }
+.electro .pdb-61 .pdb-main__price-row { margin-bottom: 1.643em; }
+.electro .pdb-61 .pdb-main__thumb { margin-bottom: 1.571em; }
+@media (min-width: 992px) {
+  .electro .pdb-61__cols { margin: 0 -15px; }
+  .electro .pdb-61__grid { padding-left: 15px; }
+  .electro .pdb-61__main { padding-right: 15px; }
+}

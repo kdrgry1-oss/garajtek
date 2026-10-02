@@ -2,12 +2,16 @@
   "key": "deals_tabs",
   "version": 2,
   "title": "Özel Teklif + Ürün Sekmeleri",
-  "description": "Solda geri sayımlı özel teklif, sağda sekmeli ürün ızgarası (şablon: deals-and-tabs)",
+  "description": "Solda geri sayımlı özel teklif, sağda sekmeli ürün ızgarası (şablon v1.0 deals-and-tabs; v2.0 index ve home-v6)",
   "category": "firsat",
   "group": "B",
   "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/deals-and-tabs.php"
+    "T1/inc/blocks/homepage/deals-and-tabs.php",
+    "T1/assets/sass/blocks/_section-onsale-product.scss",
+    "T1/assets/sass/blocks/_products-carousel-tabs.scss",
+    "T2/html/home/index.html#Deals-and-tabs",
+    "T2/html/home/home-v6.html#Catch-Daily-Deals"
   ],
   "layout": "container",
   "singleton": false,
@@ -18,28 +22,183 @@
   "variants": [
     {
       "value": "v1",
-      "label": "v1 (varsayılan)",
+      "label": "v1 – Ana sayfa (koyu kazanç kutusu, 3 sütun)",
       "defaults_patch": {}
     },
     {
       "value": "v2",
-      "label": "v2 – geniş kart (v2.0)",
-      "defaults_patch": {}
+      "label": "v2 – 370 px kart, yuvarlak kazanç rozeti, 8 ürün",
+      "defaults_patch": {
+        "columns": "4",
+        "tabs": [
+          {
+            "label": "Öne Çıkanlar",
+            "source": {
+              "kind": "featured",
+              "product_ids": [],
+              "category_ids": [],
+              "include_children": true,
+              "tag": "",
+              "brand_ids": [],
+              "limit": 8,
+              "sort": "default",
+              "exclude_out_of_stock": false,
+              "exclude_ids": [],
+              "fill_with": "none"
+            }
+          },
+          {
+            "label": "İndirimdekiler",
+            "source": {
+              "kind": "discounted",
+              "product_ids": [],
+              "category_ids": [],
+              "include_children": true,
+              "tag": "",
+              "brand_ids": [],
+              "limit": 8,
+              "sort": "default",
+              "exclude_out_of_stock": false,
+              "exclude_ids": [],
+              "fill_with": "none"
+            }
+          },
+          {
+            "label": "Çok Satanlar",
+            "source": {
+              "kind": "best_sellers",
+              "product_ids": [],
+              "category_ids": [],
+              "include_children": true,
+              "tag": "",
+              "brand_ids": [],
+              "limit": 8,
+              "sort": "default",
+              "exclude_out_of_stock": false,
+              "exclude_ids": [],
+              "fill_with": "none"
+            }
+          }
+        ]
+      }
     },
     {
       "value": "discount_tabs",
-      "label": "İndirim sekmeleri (v2.0 v6)",
-      "defaults_patch": {}
+      "label": "İndirim sekmeleri – başlıkta hap sekmeler (v2.0 home-v6)",
+      "defaults_patch": {
+        "columns": "4",
+        "tabs": [
+          {
+            "label": "%50 ve üzeri",
+            "source": {
+              "kind": "discounted",
+              "product_ids": [],
+              "category_ids": [],
+              "include_children": true,
+              "tag": "",
+              "brand_ids": [],
+              "limit": 8,
+              "sort": "default",
+              "exclude_out_of_stock": false,
+              "exclude_ids": [],
+              "fill_with": "none"
+            }
+          },
+          {
+            "label": "Lift ve Kaldırma",
+            "source": {
+              "kind": "discounted",
+              "product_ids": [],
+              "category_ids": [],
+              "include_children": true,
+              "tag": "",
+              "brand_ids": [],
+              "limit": 8,
+              "sort": "default",
+              "exclude_out_of_stock": false,
+              "exclude_ids": [],
+              "fill_with": "none"
+            }
+          },
+          {
+            "label": "Kompresörler",
+            "source": {
+              "kind": "discounted",
+              "product_ids": [],
+              "category_ids": [],
+              "include_children": true,
+              "tag": "",
+              "brand_ids": [],
+              "limit": 8,
+              "sort": "default",
+              "exclude_out_of_stock": false,
+              "exclude_ids": [],
+              "fill_with": "none"
+            }
+          },
+          {
+            "label": "El Aletleri",
+            "source": {
+              "kind": "discounted",
+              "product_ids": [],
+              "category_ids": [],
+              "include_children": true,
+              "tag": "",
+              "brand_ids": [],
+              "limit": 8,
+              "sort": "default",
+              "exclude_out_of_stock": false,
+              "exclude_ids": [],
+              "fill_with": "none"
+            }
+          }
+        ]
+      }
     }
   ],
   "tabs": [
     "İçerik",
     "Ürünler",
     "Görünüm",
-    "Karusel",
     "Gelişmiş"
   ],
   "fields": [
+    {
+      "name": "header_title",
+      "type": "text",
+      "label": "Bölüm başlığı",
+      "tab": "İçerik",
+      "show_if": {
+        "_variant": [
+          "discount_tabs"
+        ]
+      }
+    },
+    {
+      "name": "header_link",
+      "type": "group",
+      "label": "Başlık sağındaki bağlantı",
+      "tab": "İçerik",
+      "show_if": {
+        "_variant": [
+          "discount_tabs"
+        ]
+      },
+      "fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Yazı",
+          "width": "half"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "width": "half"
+        }
+      ]
+    },
     {
       "name": "deal",
       "type": "group",
@@ -146,6 +305,14 @@
                   "manual"
                 ]
               }
+            },
+            {
+              "name": "color",
+              "type": "color",
+              "label": "Kutu rengi",
+              "palette": "theme",
+              "allow_transparent": false,
+              "help": "Boşsa görünüme göre: v1 koyu lacivert (#343f49), diğerleri tema ana rengi."
             }
           ]
         },
@@ -217,7 +384,8 @@
         {
           "name": "countdown",
           "type": "countdown",
-          "label": "Geri sayım"
+          "label": "Geri sayım",
+          "help": "Bitiş tarihi boşsa her gün 23:59'a + belirtilen gün sayısına kadar sayar."
         },
         {
           "name": "border_color",
@@ -312,7 +480,8 @@
           "value": "4",
           "label": "4"
         }
-      ]
+      ],
+      "help": "Masaüstü sütun sayısı; tablette en çok 3, mobilde 2."
     },
     {
       "name": "card",
@@ -367,7 +536,13 @@
           "value": "left",
           "label": "Sol"
         }
-      ]
+      ],
+      "show_if": {
+        "_variant": [
+          "v1",
+          "v2"
+        ]
+      }
     },
     {
       "name": "empty_text",

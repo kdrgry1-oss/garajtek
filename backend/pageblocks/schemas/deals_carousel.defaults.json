@@ -1,1 +1,170 @@
-{}
+{
+  "header": {
+    "title": "Haftanın Fırsatları",
+    "tag": "h2",
+    "align": "left",
+    "right": "none",
+    "pills": [],
+    "link": {
+      "label": "Günün fırsatlarına git",
+      "link": {
+        "kind": "url",
+        "url": "/sale",
+        "new_tab": false
+      }
+    },
+    "underline": false
+  },
+  "prev_label": "Önceki Fırsat",
+  "next_label": "Sonraki Fırsat",
+  "deals": [
+    {
+      "product": "",
+      "title_override": "",
+      "main_image": null,
+      "thumbnails": [],
+      "savings": {
+        "show": true,
+        "label": "Kazancınız",
+        "mode": "auto",
+        "amount": "",
+        "color": ""
+      },
+      "stock": {
+        "show": true,
+        "sold_label": "Satılan:",
+        "available_label": "Kalan:",
+        "mode": "auto",
+        "sold": 2,
+        "available": 26
+      },
+      "countdown": {
+        "enabled": true,
+        "end": "",
+        "rolling_days": 7,
+        "units": [
+          "days",
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "hide_zero_days": true,
+        "labels": {
+          "days": "Gün",
+          "hours": "Saat",
+          "minutes": "Dk",
+          "seconds": "Sn"
+        },
+        "heading": "Acele edin! Kampanya bitimine:",
+        "on_expire": "zero",
+        "expired_text": "Kampanya sona erdi",
+        "pad": true
+      }
+    },
+    {
+      "product": "",
+      "title_override": "",
+      "main_image": null,
+      "thumbnails": [],
+      "savings": {
+        "show": true,
+        "label": "Kazancınız",
+        "mode": "auto",
+        "amount": "",
+        "color": ""
+      },
+      "stock": {
+        "show": true,
+        "sold_label": "Satılan:",
+        "available_label": "Kalan:",
+        "mode": "auto",
+        "sold": 2,
+        "available": 26
+      },
+      "countdown": {
+        "enabled": true,
+        "end": "",
+        "rolling_days": 7,
+        "units": [
+          "days",
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "hide_zero_days": true,
+        "labels": {
+          "days": "Gün",
+          "hours": "Saat",
+          "minutes": "Dk",
+          "seconds": "Sn"
+        },
+        "heading": "Acele edin! Kampanya bitimine:",
+        "on_expire": "zero",
+        "expired_text": "Kampanya sona erdi",
+        "pad": true
+      }
+    }
+  ],
+  "source": {
+    "kind": "discounted",
+    "product_ids": [],
+    "category_ids": [],
+    "include_children": true,
+    "tag": "",
+    "brand_ids": [],
+    "limit": 2,
+    "sort": "discount_desc",
+    "exclude_out_of_stock": true,
+    "exclude_ids": [],
+    "fill_with": "none"
+  },
+  "card": "grid_small",
+  "header_countdown": {
+    "enabled": true,
+    "end": "",
+    "rolling_days": 0,
+    "units": [
+      "hours",
+      "minutes",
+      "seconds"
+    ],
+    "hide_zero_days": true,
+    "labels": {
+      "days": "Gün",
+      "hours": "Saat",
+      "minutes": "Dk",
+      "seconds": "Sn"
+    },
+    "heading": "Bitimine:",
+    "on_expire": "zero",
+    "expired_text": "Kampanya sona erdi",
+    "pad": true
+  },
+  "border_color": "",
+  "carousel": {
+    "per_view": {
+      "0": 1
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": true,
+    "arrows": "none",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 50,
+      "tablet": 40,
+      "mobile": 30
+    }
+  }
+}

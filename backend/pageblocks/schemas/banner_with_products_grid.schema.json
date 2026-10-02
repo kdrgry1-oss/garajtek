@@ -2,12 +2,14 @@
   "key": "banner_with_products_grid",
   "version": 2,
   "title": "Banner + Ürün Izgarası",
-  "description": "",
+  "description": "Başlıkta hap sekmeler, yanda 360×616 banner / büyük ürün / kategori listesi / menü, yanında ürün ızgarası (v2.0 home-v2/v4/v7/v10)",
   "category": "urun",
   "group": "B",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v2.html"
+    "T2/html/home/home-v4.html#Smartphones-Tablets",
+    "T2/html/home/home-v7.html#Headphones",
+    "T2/html/home/home-v10.html#Categories-menu-and-Product"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,15 +17,304 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "banner_list",
+      "label": "Kategori listesi + banner + ızgara (v2.0 home-v4)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "banner",
+      "label": "Banner + ızgara",
+      "defaults_patch": {
+        "show_list": false,
+        "columns": {
+          "desktop": 4,
+          "tablet": 3,
+          "mobile": 2
+        }
+      }
+    },
+    {
+      "value": "menu",
+      "label": "Kutulu menü + ızgara (v2.0 home-v10)",
+      "defaults_patch": {
+        "side": "menu",
+        "show_list": false,
+        "columns": {
+          "desktop": 4,
+          "tablet": 3,
+          "mobile": 2
+        }
+      }
+    },
+    {
+      "value": "featured",
+      "label": "Büyük ürün + ızgara",
+      "defaults_patch": {
+        "side": "featured_product",
+        "show_list": false,
+        "columns": {
+          "desktop": 3,
+          "tablet": 2,
+          "mobile": 2
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
     "Görünüm",
-    "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "help": "Birden çok sekme varsa başlığın sağında sekme hapları görünür (aşağıdaki “Sekmeler”den)."
+    },
+    {
+      "name": "tabs",
+      "type": "repeater",
+      "label": "Sekmeler",
+      "tab": "Ürünler",
+      "min": 1,
+      "max": 6,
+      "item_noun": "Sekme",
+      "item_label": "{{label}}",
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Sekme adı",
+          "width": "half"
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "label": "Başlangıçta seçili",
+          "width": "half"
+        },
+        {
+          "name": "source",
+          "type": "product_source",
+          "label": "Ürün kaynağı",
+          "allowed_kinds": [
+            "manual",
+            "category",
+            "discounted",
+            "newest",
+            "best_sellers",
+            "featured",
+            "top_rated",
+            "tag",
+            "brand",
+            "recently_viewed"
+          ],
+          "default_limit": 8
+        }
+      ],
+      "item_default": {
+        "label": "Yeni sekme",
+        "active": false,
+        "source": {
+          "kind": "featured",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 8,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        }
+      }
+    },
+    {
+      "name": "side",
+      "type": "select",
+      "label": "Yan alan",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "banner",
+          "label": "Banner görseli"
+        },
+        {
+          "value": "featured_product",
+          "label": "Büyük ürün"
+        },
+        {
+          "value": "category_list",
+          "label": "Yalnız kategori listesi"
+        },
+        {
+          "value": "menu",
+          "label": "Kutulu menü"
+        },
+        {
+          "value": "none",
+          "label": "Yok"
+        }
+      ]
+    },
+    {
+      "name": "show_list",
+      "type": "bool",
+      "label": "Banner'ın yanında kategori listesi",
+      "tab": "Görünüm",
+      "show_if": {
+        "side": [
+          "banner"
+        ]
+      }
+    },
+    {
+      "name": "side_position",
+      "type": "select",
+      "label": "Yan alan konumu",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "left",
+          "label": "Sol"
+        },
+        {
+          "value": "right",
+          "label": "Sağ"
+        }
+      ]
+    },
+    {
+      "name": "banner",
+      "type": "group",
+      "label": "Banner",
+      "tab": "İçerik",
+      "show_if": {
+        "side": [
+          "banner"
+        ]
+      },
+      "fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            360,
+            616
+          ],
+          "allow_mobile": true
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        }
+      ]
+    },
+    {
+      "name": "featured_product",
+      "type": "product_picker",
+      "label": "Büyük ürün",
+      "tab": "Ürünler",
+      "multiple": false,
+      "show_if": {
+        "side": [
+          "featured_product"
+        ]
+      },
+      "help": "Boş bırakılırsa etkin sekmenin ilk ürünü büyük gösterilir."
+    },
+    {
+      "name": "menu_title",
+      "type": "text",
+      "label": "Menü başlığı",
+      "tab": "İçerik",
+      "show_if": {
+        "side": [
+          "menu"
+        ]
+      }
+    },
+    {
+      "name": "category_links",
+      "type": "repeater",
+      "label": "Kategori bağlantıları",
+      "tab": "İçerik",
+      "max": 10,
+      "item_noun": "Bağlantı",
+      "item_label": "{{label}}",
+      "show_if": {
+        "side": [
+          "banner",
+          "category_list",
+          "menu"
+        ]
+      },
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Yazı",
+          "width": "half"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "width": "half"
+        }
+      ],
+      "item_default": {
+        "label": "Yeni bağlantı",
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        }
+      }
+    },
+    {
+      "name": "columns",
+      "type": "number",
+      "label": "Sütun sayısı",
+      "tab": "Görünüm",
+      "responsive": true,
+      "min": 1,
+      "max": 6,
+      "unit": "adet"
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "grid",
+          "label": "Izgara kartı"
+        },
+        {
+          "value": "grid_small",
+          "label": "Küçük ızgara kartı"
+        }
+      ]
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Boş sekme yazısı",
+      "tab": "Gelişmiş"
+    }
+  ],
   "common": [
     "section",
     "visibility",

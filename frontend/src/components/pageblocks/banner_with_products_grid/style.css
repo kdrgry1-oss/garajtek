@@ -1,0 +1,5 @@
+/* Grup B — banner + ürün ızgarası (v2.0 home-v4: kategori listesi + 360×616 banner + ızgara). */
+.electro .pdb-bpg__banner { width: 360px; max-width: 100%; }
+.electro .pdb-bpg__banner img { width: 100%; height: auto; display: block; }
+@media (max-width: 767.98px) { .electro .pdb-bpg__banner { width: 100%; } }
+.electro .pdb-bpg .list-group-item a.hover-on-bold:hover { font-weight: 700; }

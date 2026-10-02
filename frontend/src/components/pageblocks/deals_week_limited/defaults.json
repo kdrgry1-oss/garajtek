@@ -1,1 +1,91 @@
-{}
+{
+  "left": {
+    "title": "Haftanın <strong>Sınırlı</strong> Fırsatları",
+    "show_symbol": true,
+    "big_symbol": "%",
+    "offer": {
+      "show": false,
+      "prefix": "KAZANCINIZ",
+      "value": "70",
+      "suffix": "%",
+      "sub": "İNDİRİM!"
+    },
+    "button": {
+      "show": false,
+      "text": "Alışverişe Başla",
+      "link": {
+        "kind": "url",
+        "url": "/sale",
+        "new_tab": false
+      }
+    },
+    "countdown": {
+      "enabled": true,
+      "end": "",
+      "rolling_days": 0,
+      "units": [
+        "hours",
+        "minutes",
+        "seconds"
+      ],
+      "hide_zero_days": true,
+      "labels": {
+        "days": "Gün",
+        "hours": "Saat",
+        "minutes": "Dk",
+        "seconds": "Sn"
+      },
+      "heading": "Acele edin! Kampanya bitimine:",
+      "on_expire": "zero",
+      "expired_text": "Kampanya sona erdi",
+      "pad": true
+    }
+  },
+  "source": {
+    "kind": "discounted",
+    "product_ids": [],
+    "category_ids": [],
+    "include_children": true,
+    "tag": "",
+    "brand_ids": [],
+    "limit": 9,
+    "sort": "default",
+    "exclude_out_of_stock": true,
+    "exclude_ids": [],
+    "fill_with": "none"
+  },
+  "card": "grid_small",
+  "background": "#f5f5f5",
+  "show_when_empty": false,
+  "carousel": {
+    "per_view": {
+      "0": 2,
+      "768": 2,
+      "992": 2,
+      "1200": 3,
+      "1400": 4,
+      "1480": 5
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": true,
+    "arrows": "side",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 50,
+      "tablet": 40,
+      "mobile": 30
+    }
+  }
+}

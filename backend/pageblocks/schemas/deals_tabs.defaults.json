@@ -1,4 +1,13 @@
 {
+  "header_title": "Günün Fırsatlarını Yakalayın!",
+  "header_link": {
+    "label": "Tüm fırsatlar",
+    "link": {
+      "kind": "url",
+      "url": "/sale",
+      "new_tab": false
+    }
+  },
   "deal": {
     "enabled": true,
     "mode": "auto",
@@ -10,7 +19,8 @@
       "show": true,
       "label": "Kazancınız",
       "mode": "auto",
-      "amount": ""
+      "amount": "",
+      "color": ""
     },
     "stock": {
       "show": true,

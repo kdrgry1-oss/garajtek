@@ -2,20 +2,46 @@
   "key": "deals_week_limited",
   "version": 2,
   "title": "Sınırlı Haftalık Fırsatlar",
-  "description": "",
+  "description": "Gri bant: solda başlık, büyük % simgesi / indirim teklifi, geri sayım ve düğme; sağda ürün karuseli (v2.0 home-v4 / home-v11 Week Deals limited)",
   "category": "firsat",
   "group": "B",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v4.html"
+    "T2/html/home/home-v4.html#Week-Deals-limited",
+    "T2/html/home/home-v11.html#Week-Deals-limited"
   ],
-  "layout": "container",
+  "layout": "full_bleed",
   "singleton": false,
   "allowed_pages": [
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v4",
+      "label": "v4 – başlık, % simgesi ve geri sayım",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v11",
+      "label": "v11 – büyük başlık, %70 indirim teklifi ve düğme",
+      "defaults_patch": {
+        "left": {
+          "title": "OUTLET FIRSATLARI <strong>STOK SONU</strong>",
+          "show_symbol": false,
+          "offer": {
+            "show": true
+          },
+          "button": {
+            "show": true
+          },
+          "countdown": {
+            "enabled": false
+          }
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -23,7 +49,167 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "left",
+      "type": "group",
+      "label": "Sol bölüm",
+      "tab": "İçerik",
+      "fields": [
+        {
+          "name": "title",
+          "type": "rich_text",
+          "label": "Başlık",
+          "marks": [
+            "strong",
+            "br",
+            "span_highlight"
+          ]
+        },
+        {
+          "name": "show_symbol",
+          "type": "bool",
+          "label": "Büyük simgeyi göster",
+          "width": "half"
+        },
+        {
+          "name": "big_symbol",
+          "type": "text",
+          "label": "Büyük simge",
+          "width": "half",
+          "max_length": 4,
+          "show_if": {
+            "show_symbol": [
+              true
+            ]
+          }
+        },
+        {
+          "name": "offer",
+          "type": "group",
+          "label": "İndirim teklifi",
+          "collapsible": true,
+          "fields": [
+            {
+              "name": "show",
+              "type": "bool",
+              "label": "Göster"
+            },
+            {
+              "name": "prefix",
+              "type": "text",
+              "label": "Ön yazı",
+              "width": "half"
+            },
+            {
+              "name": "value",
+              "type": "text",
+              "label": "Değer",
+              "width": "half"
+            },
+            {
+              "name": "suffix",
+              "type": "text",
+              "label": "Üst simge",
+              "width": "half"
+            },
+            {
+              "name": "sub",
+              "type": "text",
+              "label": "Alt yazı",
+              "width": "half"
+            }
+          ]
+        },
+        {
+          "name": "button",
+          "type": "group",
+          "label": "Düğme",
+          "collapsible": true,
+          "fields": [
+            {
+              "name": "show",
+              "type": "bool",
+              "label": "Göster"
+            },
+            {
+              "name": "text",
+              "type": "text",
+              "label": "Yazı",
+              "width": "half"
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı",
+              "width": "half"
+            }
+          ]
+        },
+        {
+          "name": "countdown",
+          "type": "countdown",
+          "label": "Geri sayım"
+        }
+      ]
+    },
+    {
+      "name": "source",
+      "type": "product_source",
+      "label": "Ürün kaynağı",
+      "tab": "Ürünler",
+      "allowed_kinds": [
+        "manual",
+        "category",
+        "discounted",
+        "newest",
+        "best_sellers",
+        "featured",
+        "top_rated",
+        "tag",
+        "brand",
+        "recently_viewed"
+      ],
+      "default_limit": 9
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "grid_small",
+          "label": "Küçük ızgara kartı"
+        },
+        {
+          "value": "grid",
+          "label": "Izgara kartı"
+        }
+      ]
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "label": "Bant rengi",
+      "tab": "Görünüm",
+      "width": "half",
+      "allow_transparent": true
+    },
+    {
+      "name": "show_when_empty",
+      "type": "bool",
+      "label": "Ürün yokken de sol bölümü göster",
+      "tab": "Gelişmiş"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel"
+    }
+  ],
   "common": [
     "section",
     "visibility",

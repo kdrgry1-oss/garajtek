@@ -1,1 +1,181 @@
-{}
+{
+  "header": {
+    "title": "Lift ve Kaldırma Ekipmanları",
+    "tag": "h3",
+    "align": "left",
+    "right": "pills",
+    "pills": [],
+    "link": {
+      "label": "Tümünü gör",
+      "link": {
+        "kind": "url",
+        "url": "/liftler",
+        "new_tab": false
+      }
+    },
+    "underline": true
+  },
+  "tabs": [
+    {
+      "label": "Çok Satanlar",
+      "active": true,
+      "source": {
+        "kind": "best_sellers",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 8,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "label": "İki Sütunlu",
+      "active": false,
+      "source": {
+        "kind": "newest",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 8,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "label": "Makaslı",
+      "active": false,
+      "source": {
+        "kind": "discounted",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 8,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "label": "Krikolar",
+      "active": false,
+      "source": {
+        "kind": "featured",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 8,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    }
+  ],
+  "side": "banner",
+  "show_list": true,
+  "side_position": "left",
+  "banner": {
+    "image": null,
+    "link": {
+      "kind": "url",
+      "url": "/liftler",
+      "new_tab": false
+    }
+  },
+  "featured_product": "",
+  "menu_title": "Ürün Grupları",
+  "category_links": [
+    {
+      "label": "İki Sütunlu Liftler",
+      "link": {
+        "kind": "url",
+        "url": "/iki-sutunlu-liftler",
+        "new_tab": false
+      }
+    },
+    {
+      "label": "Makaslı Liftler",
+      "link": {
+        "kind": "url",
+        "url": "/makasli-liftler",
+        "new_tab": false
+      }
+    },
+    {
+      "label": "Yer Krikoları",
+      "link": {
+        "kind": "url",
+        "url": "/yer-krikolari",
+        "new_tab": false
+      }
+    },
+    {
+      "label": "Şanzıman Krikoları",
+      "link": {
+        "kind": "url",
+        "url": "/sanziman-krikolari",
+        "new_tab": false
+      }
+    },
+    {
+      "label": "Pistonlu Kompresörler",
+      "link": {
+        "kind": "url",
+        "url": "/pistonlu-kompresorler",
+        "new_tab": false
+      }
+    },
+    {
+      "label": "Sessiz ve Yağsız Kompresörler",
+      "link": {
+        "kind": "url",
+        "url": "/sessiz-ve-yagsiz-kompresorler",
+        "new_tab": false
+      }
+    },
+    {
+      "label": "Lastik Balans Makineleri",
+      "link": {
+        "kind": "url",
+        "url": "/lastik-balans-makineleri",
+        "new_tab": false
+      }
+    },
+    {
+      "label": "Takım Arabaları",
+      "link": {
+        "kind": "url",
+        "url": "/takim-arabalari",
+        "new_tab": false
+      }
+    }
+  ],
+  "columns": {
+    "desktop": 3,
+    "tablet": 3,
+    "mobile": 2
+  },
+  "card": "grid",
+  "empty_text": "Bu sekmede henüz ürün yok.",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 50,
+      "tablet": 40,
+      "mobile": 30
+    }
+  }
+}

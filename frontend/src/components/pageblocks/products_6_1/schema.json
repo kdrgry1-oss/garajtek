@@ -2,12 +2,14 @@
   "key": "products_6_1",
   "version": 2,
   "title": "6+1 Çok Satanlar Izgarası",
-  "description": "",
+  "description": "Tam genişlik gri bantta başlık + haplar, solda 6 (veya 8) ürün, sağda büyük ürün (şablon v1.0 products-6-1; v2.0 home-v3 Products-8-1)",
   "category": "urun",
   "group": "B",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/homepage-3/products-6-1.php"
+    "T1/inc/blocks/homepage-3/products-6-1.php",
+    "T1/assets/sass/blocks/_products-6-1.scss",
+    "T2/html/home/home-v3.html#Products-8-1"
   ],
   "layout": "full_bleed",
   "singleton": false,
@@ -15,15 +17,194 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "6_1",
+      "label": "6 + 1 (v1.0 home-v3)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "8_1",
+      "label": "8 + 1 (v2.0 home-v3)",
+      "defaults_patch": {
+        "count": "8",
+        "source": {
+          "kind": "best_sellers",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 9,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        },
+        "header": {
+          "pills": [
+            {
+              "label": "İlk 9",
+              "link": {
+                "kind": "none",
+                "url": "",
+                "new_tab": false
+              },
+              "active": true,
+              "as_tab": true
+            },
+            {
+              "label": "Liftler",
+              "link": {
+                "kind": "url",
+                "url": "/liftler",
+                "new_tab": false
+              },
+              "active": false,
+              "as_tab": false
+            },
+            {
+              "label": "Kompresörler",
+              "link": {
+                "kind": "url",
+                "url": "/kompresorler",
+                "new_tab": false
+              },
+              "active": false,
+              "as_tab": false
+            },
+            {
+              "label": "Lastik Ekipmanları",
+              "link": {
+                "kind": "url",
+                "url": "/lastik-ekipmanlari",
+                "new_tab": false
+              },
+              "active": false,
+              "as_tab": false
+            }
+          ]
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
     "Görünüm",
-    "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık satırı",
+      "tab": "İçerik",
+      "help": "Haplar bağlantı olabilir ya da “Sekme gibi” işaretlenip kendi ürün kaynağını gösterebilir; kaynağı boş sekme bloğun ürün kaynağını kullanır."
+    },
+    {
+      "name": "source",
+      "type": "product_source",
+      "label": "Ürün kaynağı",
+      "tab": "Ürünler",
+      "allowed_kinds": [
+        "manual",
+        "category",
+        "discounted",
+        "newest",
+        "best_sellers",
+        "featured",
+        "top_rated",
+        "tag",
+        "brand",
+        "recently_viewed"
+      ],
+      "default_limit": 7,
+      "help": "İlk ürün sağdaki büyük üründür (elle seçilmediyse); kalanlar soldaki ızgaraya dizilir."
+    },
+    {
+      "name": "count",
+      "type": "select",
+      "label": "Soldaki ürün sayısı",
+      "tab": "Ürünler",
+      "width": "half",
+      "options": [
+        {
+          "value": "6",
+          "label": "6 (3 × 2)"
+        },
+        {
+          "value": "8",
+          "label": "8 (4 × 2)"
+        }
+      ]
+    },
+    {
+      "name": "main_product_mode",
+      "type": "select",
+      "label": "Büyük ürün",
+      "tab": "Ürünler",
+      "width": "half",
+      "options": [
+        {
+          "value": "first_of_source",
+          "label": "Kaynağın ilk ürünü"
+        },
+        {
+          "value": "manual",
+          "label": "Elle seç"
+        }
+      ]
+    },
+    {
+      "name": "main_product",
+      "type": "product_picker",
+      "label": "Büyük ürün seçimi",
+      "tab": "Ürünler",
+      "multiple": false,
+      "show_if": {
+        "main_product_mode": [
+          "manual"
+        ]
+      }
+    },
+    {
+      "name": "main_image_height",
+      "type": "number",
+      "label": "Büyük ürün görsel yüksekliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 150,
+      "max": 700,
+      "step": 1,
+      "width": "half"
+    },
+    {
+      "name": "thumbnails",
+      "type": "number",
+      "label": "Küçük resim sayısı",
+      "tab": "Görünüm",
+      "unit": "adet",
+      "min": 0,
+      "max": 4,
+      "step": 1,
+      "width": "half",
+      "help": "Ürün galerisinden; 0 = gizli."
+    },
+    {
+      "name": "lightbox",
+      "type": "bool",
+      "label": "Büyük görsele tıklayınca büyüt",
+      "tab": "Görünüm"
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Ürün yoksa gösterilecek yazı",
+      "tab": "Gelişmiş",
+      "help": "Boş bırakılırsa ürün yokken bölüm boş kalır."
+    }
+  ],
   "common": [
     "section",
     "visibility",

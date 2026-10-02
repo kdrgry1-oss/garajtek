@@ -2,12 +2,15 @@
   "key": "deals_carousel",
   "version": 2,
   "title": "Haftanın Fırsatları Karuseli",
-  "description": "",
+  "description": "Slayt başına tek fırsat (görsel galerisi, kazanç, stok, geri sayım) veya başlıkta geri sayımlı fırsat kartları karuseli (şablon v1.0 deals-of-the-week-carousel; v2.0 home-v7/v8/v11 Deals of The Day)",
   "category": "firsat",
   "group": "B",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/deals-of-the-week-carousel.php"
+    "T1/inc/blocks/homepage/deals-of-the-week-carousel.php",
+    "T1/assets/sass/blocks/_section-onsale-product.scss",
+    "T2/html/home/home-v7.html#Deals-of-The-Day",
+    "T2/html/home/home-v11.html#Deals-of-The-Day"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,7 +18,49 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "gallery",
+      "label": "Galeri – slayt başına tek fırsat (v1.0)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "cards",
+      "label": "Kartlar – başlıkta geri sayım (v2.0)",
+      "defaults_patch": {
+        "header": {
+          "title": "Günün Fırsatları",
+          "underline": true,
+          "right": "link"
+        },
+        "source": {
+          "kind": "discounted",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 9,
+          "sort": "default",
+          "exclude_out_of_stock": true,
+          "exclude_ids": [],
+          "fill_with": "none"
+        },
+        "carousel": {
+          "per_view": {
+            "0": 2,
+            "768": 3,
+            "992": 4,
+            "1200": 4,
+            "1400": 5
+          },
+          "dots": true,
+          "arrows": "none",
+          "last_active_divider": true
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -23,7 +68,339 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "help": "Kartlar görünümünde “Sağ taraf: Tümünü gör bağlantısı” başlığın sağında bağlantı gösterir."
+    },
+    {
+      "name": "prev_label",
+      "type": "text",
+      "label": "Önceki bağlantı yazısı",
+      "tab": "İçerik",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "gallery"
+        ]
+      }
+    },
+    {
+      "name": "next_label",
+      "type": "text",
+      "label": "Sonraki bağlantı yazısı",
+      "tab": "İçerik",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "gallery"
+        ]
+      }
+    },
+    {
+      "name": "deals",
+      "type": "repeater",
+      "label": "Fırsatlar",
+      "tab": "Ürünler",
+      "max": 8,
+      "item_noun": "Fırsat",
+      "item_label": "Fırsat",
+      "show_if": {
+        "_variant": [
+          "gallery"
+        ]
+      },
+      "help": "Ürün seçilmeyen fırsatlar ürün kaynağının sıradaki ürünüyle dolar.",
+      "item_fields": [
+        {
+          "name": "product",
+          "type": "product_picker",
+          "label": "Ürün (boş = otomatik)",
+          "multiple": false
+        },
+        {
+          "name": "title_override",
+          "type": "rich_text",
+          "label": "Ürün adı yerine yazı",
+          "marks": [
+            "strong",
+            "br"
+          ]
+        },
+        {
+          "name": "main_image",
+          "type": "image",
+          "label": "Büyük görsel (boş = ürün görseli)",
+          "recommended": [
+            600,
+            600
+          ]
+        },
+        {
+          "name": "thumbnails",
+          "type": "repeater",
+          "label": "Küçük resimler (boş = ürün galerisi)",
+          "max": 4,
+          "item_noun": "Küçük resim",
+          "item_fields": [
+            {
+              "name": "image",
+              "type": "image",
+              "label": "Görsel",
+              "recommended": [
+                180,
+                180
+              ]
+            }
+          ],
+          "item_default": {
+            "image": null
+          }
+        },
+        {
+          "name": "savings",
+          "type": "group",
+          "label": "Kazanç kutusu",
+          "collapsible": true,
+          "fields": [
+            {
+              "name": "show",
+              "type": "bool",
+              "label": "Göster",
+              "width": "third"
+            },
+            {
+              "name": "label",
+              "type": "text",
+              "label": "Etiket",
+              "width": "third"
+            },
+            {
+              "name": "mode",
+              "type": "select",
+              "label": "Tutar",
+              "width": "third",
+              "options": [
+                {
+                  "value": "auto",
+                  "label": "Otomatik (liste − satış)"
+                },
+                {
+                  "value": "manual",
+                  "label": "Elle"
+                }
+              ]
+            },
+            {
+              "name": "amount",
+              "type": "text",
+              "label": "Tutar",
+              "show_if": {
+                "mode": [
+                  "manual"
+                ]
+              }
+            },
+            {
+              "name": "color",
+              "type": "color",
+              "label": "Kutu rengi",
+              "palette": "theme",
+              "help": "Boşsa koyu lacivert (#343f49)."
+            }
+          ]
+        },
+        {
+          "name": "stock",
+          "type": "group",
+          "label": "Stok çubuğu",
+          "collapsible": true,
+          "fields": [
+            {
+              "name": "show",
+              "type": "bool",
+              "label": "Göster",
+              "width": "third"
+            },
+            {
+              "name": "sold_label",
+              "type": "text",
+              "label": "Satılan etiketi",
+              "width": "third"
+            },
+            {
+              "name": "available_label",
+              "type": "text",
+              "label": "Kalan etiketi",
+              "width": "third"
+            },
+            {
+              "name": "mode",
+              "type": "select",
+              "label": "Değerler",
+              "options": [
+                {
+                  "value": "auto",
+                  "label": "Stok verisinden"
+                },
+                {
+                  "value": "manual",
+                  "label": "Elle"
+                }
+              ]
+            },
+            {
+              "name": "sold",
+              "type": "number",
+              "label": "Satılan",
+              "min": 0,
+              "width": "half",
+              "show_if": {
+                "mode": [
+                  "manual"
+                ]
+              }
+            },
+            {
+              "name": "available",
+              "type": "number",
+              "label": "Kalan",
+              "min": 0,
+              "width": "half",
+              "show_if": {
+                "mode": [
+                  "manual"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "countdown",
+          "type": "countdown",
+          "label": "Geri sayım"
+        }
+      ],
+      "item_default": {
+        "product": "",
+        "title_override": "",
+        "main_image": null,
+        "thumbnails": [],
+        "savings": {
+          "show": true,
+          "label": "Kazancınız",
+          "mode": "auto",
+          "amount": "",
+          "color": ""
+        },
+        "stock": {
+          "show": true,
+          "sold_label": "Satılan:",
+          "available_label": "Kalan:",
+          "mode": "auto",
+          "sold": 2,
+          "available": 26
+        },
+        "countdown": {
+          "enabled": true,
+          "end": "",
+          "rolling_days": 7,
+          "units": [
+            "days",
+            "hours",
+            "minutes",
+            "seconds"
+          ],
+          "hide_zero_days": true,
+          "labels": {
+            "days": "Gün",
+            "hours": "Saat",
+            "minutes": "Dk",
+            "seconds": "Sn"
+          },
+          "heading": "Acele edin! Kampanya bitimine:",
+          "on_expire": "zero",
+          "expired_text": "Kampanya sona erdi",
+          "pad": true
+        }
+      }
+    },
+    {
+      "name": "source",
+      "type": "product_source",
+      "label": "Ürün kaynağı",
+      "tab": "Ürünler",
+      "allowed_kinds": [
+        "manual",
+        "category",
+        "discounted",
+        "newest",
+        "best_sellers",
+        "featured",
+        "top_rated",
+        "tag",
+        "brand",
+        "recently_viewed"
+      ],
+      "default_limit": 9,
+      "help": "Kartlar görünümünde karuseldeki ürünler; galeri görünümünde ürün seçilmemiş fırsatları doldurur."
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "cards"
+        ]
+      },
+      "options": [
+        {
+          "value": "grid_small",
+          "label": "Küçük ızgara kartı"
+        },
+        {
+          "value": "grid",
+          "label": "Izgara kartı"
+        }
+      ]
+    },
+    {
+      "name": "header_countdown",
+      "type": "countdown",
+      "label": "Başlıktaki geri sayım",
+      "tab": "İçerik",
+      "show_if": {
+        "_variant": [
+          "cards"
+        ]
+      }
+    },
+    {
+      "name": "border_color",
+      "type": "color",
+      "label": "Çerçeve rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "show_if": {
+        "_variant": [
+          "gallery"
+        ]
+      },
+      "help": "Boşsa tema ana rengi."
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel"
+    }
+  ],
   "common": [
     "section",
     "visibility",
