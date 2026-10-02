@@ -13,7 +13,7 @@
  *   - value        : Mevcut seçili değer.
  *   - onChange     : (v) => void
  *   - isRequired   : Bu KANAL için zorunlu mu? → "ZORUNLU (<KANAL>)" rozeti.
- *   - channelLabel : Rozet etiketi ("TRENDYOL" | "HEPSIBURADA" | "TEMU"). Sabit değil!
+ *   - channelLabel : Rozet etiketi ("harici kanal" | "harici kanal" | "harici kanal"). Sabit değil!
  *   - allowCustom  : true ise izinli değer listesi olsa bile manuel değer eklenebilir.
  *
  * TASARIM: minimalist — tek vurgu (kırmızı yalnız zorunlu-boş), gri tonlar,
@@ -28,7 +28,7 @@ const SearchableAttribute = ({
   value,
   onChange,
   isRequired,
-  channelLabel = "TRENDYOL",
+  channelLabel = "ÖZELLİK",
   allowCustom = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);

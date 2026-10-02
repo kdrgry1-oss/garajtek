@@ -7,7 +7,7 @@ Endpoints (admin-only):
   GET    /api/admin/reports2/slow-movers?days=60&min_stock=1  — N gündür satılmayan ürünler
   GET    /api/admin/reports2/fast-movers?days=30&top=50       — En hızlı satanlar (velocity)
   GET    /api/admin/reports2/return-rate?threshold=20         — İade oranı X% üzerinde olan ürünler
-  GET    /api/admin/reports2/profit-by-channel?days=30        — Site/Trendyol/HB tahmini brüt marj
+  GET    /api/admin/reports2/profit-by-channel?days=30        — Site/harici kanal tahmini brüt marj
   GET    /api/admin/reports2/dead-stock?days=90               — N gündür hiç satılmamış (ölü) stok
 
   Product costs (manuel maliyet):
@@ -580,7 +580,7 @@ async def fast_movers(
              "sale_price": 1, "brand": 1, "category_name": 1, "categories": 1, "category_ids": 1, "category_id": 1, "variants.urun_id": 1, "variants.stock": 1}
     async for p in db.products.find({"id": {"$in": ids}}, _proj):
         stock_map[str(p["id"])] = p
-    # Eski (Ticimax/pazaryeri) siparişlerde product_id yerel UUID değil varyant urun_id'si
+    # Eski (eski altyapı/pazaryeri) siparişlerde product_id yerel UUID değil varyant urun_id'si
     # olabilir — çözülemeyenler varyant numarasından eşlenir ki ad/SKU boş kalmasın.
     missing = [pid for pid in ids if pid not in stock_map]
     if missing:
@@ -736,8 +736,8 @@ async def return_rate(
 ):
     """Belirli periyotta kesin kalem-bazlı iade oranı eşiğini aşan ürünleri listeler.
 
-    Kaynak, v1 ürün-iade raporuyla aynıdır: onaylı site iadeleri ve Accepted Trendyol
-    claim kalemleri. Ana oran Trendyol ile aynı şekilde İade / Brüt Satış'tır;
+    Kaynak, v1 ürün-iade raporuyla aynıdır: onaylı site iadeleri ve Accepted harici kanal
+    claim kalemleri. Ana oran harici kanal ile aynı şekilde İade / Brüt Satış'tır;
     iptaller iade adedine eklenmez ancak brüt satış paydasında kalır.
 
     Süzgeçler: `min_units` ADET (tablodaki "İptal Hariç Satış Ürün Adedi" = sold) üzerinden,
@@ -756,7 +756,7 @@ async def return_rate(
         sold = int(r.get("sold") or 0)
         gross_sold = int(r.get("gross_sold") or sold)
         ret = int(r.get("returned") or 0)
-        rate = r.get("trendyol_return_rate_pct")
+        rate = r.get("gross_return_rate_pct")
         order_count = int(r.get("order_count") or 0)
         if (sold >= min_units and order_count >= min_orders
                 and rate is not None and float(rate) >= threshold):
@@ -768,28 +768,24 @@ async def return_rate(
                 "returned": ret,
                 "order_count": order_count,
                 "return_rate_pct": r.get("return_rate_pct"),
-                "trendyol_return_rate_pct": round(float(rate), 2),
+                "gross_return_rate_pct": round(float(rate), 2),
                 "severity": "critical" if rate >= 40 else ("high" if rate >= 30 else "warning"),
             })
-    items.sort(key=lambda x: -x["trendyol_return_rate_pct"])
+    items.sort(key=lambda x: -x["gross_return_rate_pct"])
     return {"threshold": threshold, "days": days, "min_units": min_units,
             "min_orders": min_orders, "total": len(items), "items": items}
 
 
 # ---------------------------------------------------------------------------
-# 4) KANAL BAZLI BRÜT MARJ — Site / Trendyol / HB ...
+# 4) KANAL BAZLI BRÜT MARJ — Site / Manuel / Diğer kanal
 # ---------------------------------------------------------------------------
 # Kanal adı normalizasyonu: mağaza siparişleri platform='web' taşır → komisyon
 # haritasındaki 'site'; admin manuel siparişler → 'manual'.
 _CH_ALIAS = {"": "site", "web": "site",
              "admin_manual": "manual", "admin": "manual", "manuel": "manual"}
-# Pazaryeri komisyon varsayılanları (yüzde). Kârlılık ayarı (profitability-config →
+# Kanal komisyon varsayılanları (yüzde). Kârlılık ayarı (profitability-config →
 # commission_pct) varsa o önceliklidir — iki ekran aynı oranı kullanır.
-_DEFAULT_COMMISSION_PCT = {
-    "trendyol": 18.0, "hepsiburada": 17.0, "n11": 12.0, "amazon": 15.0,
-    "temu": 5.0, "ciceksepeti": 12.0, "pttavm": 8.0,
-    "site": 3.0, "manual": 0.0,
-}
+_DEFAULT_COMMISSION_PCT = {"site": 3.0, "other": 0.0, "manual": 0.0}
 
 
 def _norm_channel(ch) -> str:
@@ -798,20 +794,12 @@ def _norm_channel(ch) -> str:
 
 
 def _order_channel(o: dict) -> str:
-    """reports._channel_expr'in Python karşılığı (+ _CH_ALIAS): bilinen pazaryeri
-    platform/marketplace alanından; web/boş → site; diğerleri olduğu gibi."""
-    from .reports import _MARKETPLACES
+    """reports._channel_expr'in Python karşılığı: site / manuel / diğer kanal."""
+    from sales_channels import channel_of
     platform = str((o or {}).get("platform") or "").strip().lower()
-    marketplace = str((o or {}).get("marketplace") or "").strip().lower()
-    if platform in _MARKETPLACES:
-        ch = platform
-    elif marketplace in _MARKETPLACES:
-        ch = marketplace
-    elif platform in ("", "web"):
-        ch = "site"
-    else:
-        ch = platform
-    return _norm_channel(ch)
+    if _CH_ALIAS.get(platform) == "manual":
+        return "manual"
+    return channel_of(o)
 
 
 def _channel_margin_rows(product_rows: list, cost_map: dict, fallback_ratio: float,
@@ -886,8 +874,8 @@ async def profit_by_channel(
     O4: kargo düşülür.
 
     DENETİM (kanal kârı "Net Ciro"): ciro eskiden yalnız sipariş STATÜSÜNE göre süzülüp
-    orders.total toplanıyordu → statüsü henüz iadeye dönmemiş kabul edilmiş Trendyol
-    claim'leri, onaylı site iadeleri ve kısmi iptaller ciroda kalıyordu (Trendyol ~%17
+    orders.total toplanıyordu → statüsü henüz iadeye dönmemiş kabul edilmiş harici kanal
+    claim'leri, onaylı site iadeleri ve kısmi iptaller ciroda kalıyordu (harici kanal ~%17
     şişkin). Artık ciro/adet, satış raporunun kanonik ürün motorundan (reports.top_products,
     reports.profitability ile aynı) gelir: iptal, kısmi iptal ve onaylı/kabul edilmiş
     iadeler düşülmüş NET satıştır. Sipariş sayısı da satış raporunun kanonik kovalarından

@@ -150,7 +150,7 @@ export const TRAINING_UPDATES = [
           "Operasyonel iade yüzdesi (iptal hariç) = Onaylanmış İade Adedi / (Net Satış Adedi + Onaylanmış İade Adedi) × 100.",
           "Açık İade, henüz sonuçlanmamış kalem adedi/tutarıdır; Öngörülen Net Ciro = Net Ciro − Açık İade Tutarı.",
           "Haftalık satış hızı seçili dönemin net satış adedinden; stok kapsama haftası = Güncel Stok / Haftalık Satış Hızı formülünden gelir. Hız yoksa kapsama tahmin edilmez.",
-          "Pazaryeri sipariş tarihinde marketplace_order_date esastır; bu alan yoksa created_at kullanılır. Aynı order_number kopyaları kanonik rapor satırında tekilleştirilir.",
+          "Sipariş tarihi created_at alanıdır (eski içe aktarılmış kayıtlarda varsa harici sipariş tarihi esas alınır). Aynı order_number kopyaları kanonik rapor satırında tekilleştirilir.",
         ],
         tips: [
           "Kısmi iptal/iade tüm sipariş yerine yalnız ilgili kalem adedi ve tutarıyla ayrıştırılır; siparişte kalan ürün net satışta kalır.",

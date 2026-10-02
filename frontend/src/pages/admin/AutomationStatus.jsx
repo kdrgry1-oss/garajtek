@@ -85,7 +85,7 @@ export default function AutomationStatus() {
             <Activity size={20} /> Otomasyon Durumu
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Arka planda çalışan tüm cron işlerinin, marketplace senkronlarının ve son entegrasyon loglarının canlı özeti.
+            Arka planda çalışan tüm cron işlerinin ve son entegrasyon loglarının canlı özeti.
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -13,7 +13,7 @@ Endpoint'ler:
   POST /api/integrations/iyzico/test-connection  → admin: API bağlantı testi
   POST /api/integrations/iyzico/refund           → admin: kısmi iade (kargo kesintili)
 
-Not: Diğer modüllerin (Trendyol, HB, Temu vb.) bu modülün `log_integration_event`
+Not: Diğer modüllerin (harici kanal vb.) bu modülün `log_integration_event`
 yardımcısına ihtiyacı vardır. İlk aşamada fonksiyon `integrations.py` içinde
 kaldığı için oradan import edilir.
 =============================================================================

@@ -173,12 +173,6 @@ async def create_category(
         "image": category_data.get("image", ""),
         "image_url": category_data.get("image_url", ""),
         "parent_id": category_data.get("parent_id"),
-        "trendyol_category_id": category_data.get("trendyol_category_id"),
-        "hepsiburada_category_id": category_data.get("hepsiburada_category_id"),
-        "hepsiburada_category_name": category_data.get("hepsiburada_category_name", ""),
-        "temu_category_id": category_data.get("temu_category_id"),
-        "temu_category_name": category_data.get("temu_category_name", ""),
-        "amazon_category_id": category_data.get("amazon_category_id"),
         "attribute_mapping": category_data.get("attribute_mapping", {}),
         "sort_order": category_data.get("sort_order", 0),
         "is_active": category_data.get("is_active", True),
@@ -337,13 +331,13 @@ async def merge_categories(payload: dict, current_user: dict = Depends(require_a
         report["feeds_error"] = str(e)[:120]
     try:
         _mp = 0
-        for _coll in ("category_mappings", "hepsiburada_category_attributes", "trendyol_attributes"):
+        for _coll in ("category_mappings",):
             _r = await db[_coll].update_many({"category_id": {"$in": src_vars}},
                                              {"$set": {"category_id": tgt_real}})
             _mp += _r.modified_count
-        report["marketplace_maps_moved"] = _mp
+        report["category_maps_moved"] = _mp
     except Exception as e:
-        report["marketplace_maps_error"] = str(e)[:120]
+        report["category_maps_error"] = str(e)[:120]
 
     # 7) source kategorisini sil — ÖNCE öksüz ürün kalmadığını doğrula
     _left = await db.products.count_documents(

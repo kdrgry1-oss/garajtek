@@ -1,5 +1,5 @@
 """
-TOTP tabanlı MFA (çok faktörlü kimlik doğrulama) — Amazon DPP uyumu.
+TOTP tabanlı MFA (çok faktörlü kimlik doğrulama) — harici kanal DPP uyumu.
 
 Google Authenticator / Authy uyumlu. Opsiyoneldir: mfa_enabled=False kullanıcılar
 normal login yapar (mevcut akış bozulmaz). mfa_secret AES vault ile şifreli saklanır.

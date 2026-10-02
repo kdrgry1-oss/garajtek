@@ -545,7 +545,7 @@ export function ExtraReports() {
   const [source, setSource] = useState("all");
   useEffect(() => {
     (async () => {
-      // Saatlik + il bazında rapor KAYNAĞA göre ayrılır (site/trendyol/hepsiburada/temu).
+      // Saatlik + il bazında rapor KAYNAĞA göre ayrılır (site/harici kanal).
       const results = await Promise.allSettled([
         axios.get(`${API}/admin/reports-extra/hourly`, { headers: h(), params: { source } }),
         axios.get(`${API}/admin/reports-extra/by-city`, { headers: h(), params: { source } }),
@@ -565,10 +565,8 @@ export function ExtraReports() {
         <h1 className="text-2xl font-bold">Gelişmiş Raporlar</h1>
         <select value={source} onChange={(e) => setSource(e.target.value)} className="px-3 py-1.5 border rounded text-sm" title="Saatlik ve il bazında satışı kaynağa göre ayır">
           <option value="all">Tüm Kaynaklar</option>
-          <option value="site">Site (Kendi)</option>
-          <option value="trendyol">Trendyol</option>
-          <option value="hepsiburada">Hepsiburada</option>
-          <option value="temu">Temu</option>
+          <option value="site">Web Sitesi</option>
+          <option value="other">Diğer kanal (eski kayıtlar)</option>
         </select>
       </div>
 

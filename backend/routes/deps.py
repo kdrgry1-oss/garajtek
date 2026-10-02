@@ -706,8 +706,8 @@ def next_urun_id(used_set) -> str:
 
 
 # =============================================================================
-# Şifre Politikası (Amazon DPP uyumu — personel/admin hesapları)
-# Amazon, Amazon verisine erişen personel için min 12 karakter + karmaşıklık ister.
+# Şifre Politikası (harici kanal DPP uyumu — personel/admin hesapları)
+# harici kanal verisine erişen personel için min 12 karakter + karmaşıklık ister.
 # Müşteri (storefront) hesaplarına UYGULANMAZ; mevcut login akışını bozmaz.
 # =============================================================================
 import re as _re_pw
@@ -716,7 +716,7 @@ import re as _re_pw
 def validate_strong_password(password: str, identifiers=None) -> None:
     """Personel/admin şifresi için güç doğrulaması. Zayıfsa HTTPException(400) atar.
     identifiers: ad/soyad/username/e-posta gibi değerler → şifre bunların bir parçasını
-    İÇEREMEZ (Amazon DPP). Geriye-uyumlu: verilmezse yalnız karmaşıklık kontrol edilir."""
+    İÇEREMEZ (harici kanal DPP). Geriye-uyumlu: verilmezse yalnız karmaşıklık kontrol edilir."""
     pw = password or ""
     errors = []
     if len(pw) < 12:

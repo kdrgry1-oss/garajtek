@@ -1,5 +1,5 @@
 """
-Ticimax ürün açıklamalarındaki yapılandırılmış (etiketli) özellikleri ÇIKARMA.
+eski altyapı ürün açıklamalarındaki yapılandırılmış (etiketli) özellikleri ÇIKARMA.
 
 Açıklama HTML'i tipik olarak şu kalıbı içerir:
 

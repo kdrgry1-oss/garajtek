@@ -369,7 +369,7 @@ export default function ProductDetail() {
         }
 
         // Varsayılan/ilk uygun bedeni önce belirle — ViewContent'in Meta content_id'si
-        // seçili bedenin Ticimax varyant id'si olsun (katalog eşleşmesi için).
+        // seçili bedenin eski altyapı varyant id'si olsun (katalog eşleşmesi için).
         // ?beden=XL ile gelindiyse (WhatsApp/AI linki) o bedeni ön-seç (stokluysa).
         let _wantSize = "";
         try { _wantSize = (new URLSearchParams(window.location.search).get("beden") || "").trim(); } catch { _wantSize = ""; }
@@ -477,7 +477,7 @@ export default function ProductDetail() {
     // Beden değişince açık bildirim formunu kapat (stoklu bedene geçilirse gizlenir)
     if (variant.stock > 0) setNotifyOpen(false);
     // Beden değişince ViewContent'i seçili bedenin Meta katalog id'siyle yeniden gönder
-    // (Meta content_id = o bedenin Ticimax varyant id'si — her beden için doğru eşleşme).
+    // (Meta content_id = o bedenin eski altyapı varyant id'si — her beden için doğru eşleşme).
     if (product) {
       trackViewContent({
         product_id: product.id,
@@ -583,12 +583,12 @@ export default function ProductDetail() {
     product.estimated_delivery && ["Tahmini Teslim", `${product.estimated_delivery} iş günü`],
     ...attrs.map((a) => [a.name, String(a.value)]),
   ].filter(Boolean);
-  const shortList = attrs.slice(0, 5);
-  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
   if (otherRows.length) specGroups.push({ key: "diger", group: "Diğer Bilgiler", rows: otherRows.map(([label, value]) => ({ label, value })) });
   const specRows = specGroups.flatMap((g) => g.rows);
   const enc = encodeURIComponent;
   const copyLink = async () => {
+  const shortList = attrs.slice(0, 5);
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
     try { await navigator.clipboard.writeText(shareUrl); toast.success("Bağlantı kopyalandı"); } catch { toast.error("Kopyalanamadı"); }
   };
   const nativeShare = async () => {
@@ -953,7 +953,7 @@ export default function ProductDetail() {
                         {r.comment && <p className="text-gray-90">{r.comment}</p>}
                         <div className="mb-2">
                           <strong>{r.user_name || "Müşteri"}</strong>
-                          {(r.source === "trendyol" || r.verified) && <span className="badge badge-success ml-2">Doğrulanmış Alışveriş</span>}
+                          {r.verified && <span className="badge badge-success ml-2">Doğrulanmış Alışveriş</span>}
                           <span className="font-size-13 text-gray-23 ml-2">- {r.created_at ? new Date(r.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }) : ""}</span>
                         </div>
                         {r.admin_reply && <div className="ml-3 pl-3 border-left"><div className="font-size-12 font-weight-bold">{SITE_NAME}</div><div className="font-size-13">{r.admin_reply}</div></div>}

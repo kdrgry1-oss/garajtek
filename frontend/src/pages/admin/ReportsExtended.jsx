@@ -403,8 +403,8 @@ function GradTile({ label, value, sub, grad, icon: Icon, testid }) {
 }
 
 const _CS_SOURCES = [
-  { key: "", label: "Tüm Kanallar" }, { key: "site", label: "Site" },
-  { key: "trendyol", label: "Trendyol" }, { key: "hepsiburada", label: "Hepsiburada" },
+  { key: "", label: "Tüm Kanallar" }, { key: "site", label: "Web Sitesi" },
+  { key: "other", label: "Diğer kanal" },
 ];
 
 const _CS_COLS = [

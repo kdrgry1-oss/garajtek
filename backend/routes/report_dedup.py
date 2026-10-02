@@ -1,73 +1,21 @@
-"""Rapor dedup — ticimax_history ÇİFT kayıtlarını rapor toplamlarından HARİÇ tutar.
+"""Rapor yardımcıları — tek-belge (kanonik) sipariş seçimi, tarih eşleşmesi, iade ve
+adet metrikleri.
 
-Arka plan: Ticimax geçmiş aktarımı (`imported_from="ticimax_history"`) bazı Trendyol
-siparişlerini, CANLI Trendyol sync'inde de var olan siparişlerle ÇİFT oluşturdu.
-Bu ticimax kopyasının `ticimax_siparis_no` alanı `TY-<ticimaxId>_<GERÇEK_TY_NO>`
-biçimindedir; son `_` segmenti (GERÇEK_TY_NO) bir CANLI (native) siparişin
-`order_number` değeriyle eşleşir. Kopyanın KENDİ `order_number`'ı ise ticimax id'sidir
-(native ile çakışmaz). Böyle bir kopya raporda aynı satışı İKİNCİ kez saydırır.
-
-Bu modül SALT-OKUNUR sorgu-zamanı filtresi üretir — HİÇBİR belgeyi silmez/değiştirmez.
-Twin'i OLMAYAN gerçek geçmiş kayıtlara (6791 tekil) DOKUNMAZ; yalnız twin'i olan
-kopyalar rapor $match'lerinden düşülür. Sonuç kısa süre cache'lenir (geçmiş veri statik;
-backfill tamamlandı). Cache, router'lara eklenen `load_dup_dep` bağımlılığıyla her
-istekte tazelenir; `dup_nor()` senkron erişimci tazelenmiş cache'i okur.
+Eskiden burada başka bir altyapıdan aktarılmış ÇİFT sipariş kopyalarını rapordan
+düşen bir süzgeç vardı; bu mağazada öyle bir aktarım olmadığından süzgeç kaldırıldı.
+`load_dup_order_numbers` / `dup_nor` / `merge_match` geriye dönük uyum için korunur
+ve etkisizdir (no-op).
 """
 import time
 from typing import List
 
-from .deps import db
-
-_TTL = 1800.0  # 30 dk — geçmiş veri statik; sık taramaya gerek yok
-_cache = {"at": -1e9, "nums": None}  # type: ignore
+_cache = {"at": -1e9, "nums": []}  # type: ignore
 
 
 async def load_dup_order_numbers() -> List[str]:
-    """Twin'i olan ticimax_history kopyalarının KENDİ order_number'larını döndürür.
-
-    $lookup ile: her ticimax_history belgesi için gömülü GERÇEK_TY_NO
-    (ticimax_siparis_no'nun son '_' segmenti) native (ticimax_history OLMAYAN) bir
-    order_number ile eşleşiyorsa, o kopya ÇİFT'tir. order_number index'i kullanılır.
-    Hata/boşlukta önceki cache (veya boş) döner — rapor asla patlamaz.
-    """
-    now = time.monotonic()
-    c = _cache
-    if c["nums"] is not None and (now - c["at"]) < _TTL:
-        return c["nums"]
-    nums: List[str] = []
-    try:
-        pipeline = [
-            {"$match": {"imported_from": "ticimax_history"}},
-            {"$project": {
-                "order_number": 1,
-                "_emb": {"$arrayElemAt": [
-                    {"$split": [{"$ifNull": ["$ticimax_siparis_no", ""]}, "_"]}, -1]},
-            }},
-            {"$lookup": {
-                "from": "orders",
-                "let": {"e": "$_emb"},
-                "pipeline": [
-                    {"$match": {"$expr": {"$and": [
-                        {"$eq": ["$order_number", "$$e"]},
-                        {"$ne": ["$imported_from", "ticimax_history"]},
-                    ]}}},
-                    {"$limit": 1},
-                    {"$project": {"_id": 1}},
-                ],
-                "as": "_twin",
-            }},
-            {"$match": {"_twin.0": {"$exists": True}}},
-            {"$project": {"_id": 0, "order_number": 1}},
-        ]
-        async for r in db.orders.aggregate(pipeline):
-            on = r.get("order_number")
-            if on is not None:
-                nums.append(str(on))
-    except Exception:
-        return c["nums"] or []
-    c["nums"] = nums
-    c["at"] = now
-    return nums
+    """Geriye dönük uyum: elenecek kopya yok → boş liste."""
+    _cache["at"] = time.monotonic()
+    return []
 
 
 def dup_filter_state() -> int:
@@ -78,17 +26,8 @@ def dup_filter_state() -> int:
 
 
 def dup_nor() -> dict:
-    """Senkron erişimci: rapor $match'ine eklenecek hariç-tutma parçası (veya {}).
-
-    `{"$nor": [{imported_from: ticimax_history, order_number: {$in: [...]}}]}` —
-    yalnız twin'i olan ticimax kopyalarını düşürür; native twin ve tekil geçmiş kalır.
-    Cache `load_dup_dep` bağımlılığıyla tazelenmiş olmalı; boşsa {} döner (no-op).
-    """
-    nums = _cache["nums"]
-    if not nums:
-        return {}
-    return {"$nor": [{"imported_from": "ticimax_history",
-                      "order_number": {"$in": nums}}]}
+    """Geriye dönük uyum: hariç tutulacak kopya yok → {}."""
+    return {}
 
 
 def merge_match(base: dict) -> dict:
@@ -104,7 +43,7 @@ def merge_match(base: dict) -> dict:
 def canonical_order_stages() -> list:
     """Mongo aggregation stages that enforce one document per real order.
 
-    Marketplace imports can leave two documents with the same ``order_number``.
+    Historical imports can leave two documents with the same ``order_number``.
     Reports must consistently select the newest terminal/partial-cancel document,
     while orders without an order number remain distinct by their internal id.
     Call this immediately after the report's initial ``$match`` and before any
@@ -143,8 +82,8 @@ def canonical_order_stages() -> list:
 def effective_order_date_match(start: str, end: str | None = None) -> dict:
     """Date predicate shared by every order-backed report.
 
-    Marketplace order time is authoritative. ``created_at`` is only the
-    fallback for site orders and legacy records where marketplace time is empty.
+    ``marketplace_order_date`` (external order time on legacy records) wins when present;
+    ``created_at`` is the normal source for site orders.
     """
 
     bounds = {"$gte": start}
@@ -191,7 +130,7 @@ def partial_cancel_net_values(total: float, units: int, cancel_amount: float,
                               cancel_units: int, total_scope: str = "") -> tuple[float, int]:
     """Return the active remainder without subtracting an active-only total twice.
 
-    New Trendyol reconciliation records explicitly mark totals/items that already
+    New harici kanal reconciliation records explicitly mark totals/items that already
     contain only active package lines. Legacy records have no marker and retain the
     historical full-order subtraction behaviour.
     """
@@ -207,7 +146,7 @@ def partial_cancel_net_values(total: float, units: int, cancel_amount: float,
 def product_quantity_metrics(net: int, cancelled: int, returned: int) -> dict:
     """Kanonik ürün adetleri ve iki açıkça adlandırılmış iade oranı.
 
-    Trendyol İş Analizi: iade / (net + iptal + iade).
+    Brüt oran: iade / (net + iptal + iade).
     Operasyonel oran: iade / (net + iade), yani iptaller paydaya girmez.
     """
     net = max(0, int(net or 0))
@@ -217,7 +156,7 @@ def product_quantity_metrics(net: int, cancelled: int, returned: int) -> dict:
     sold_excluding_cancels = net + returned
     return {
         "gross_qty": gross,
-        "trendyol_return_rate_pct": round(100 * returned / gross, 2) if gross else 0.0,
+        "gross_return_rate_pct": round(100 * returned / gross, 2) if gross else 0.0,
         "return_rate_excluding_cancels_pct": (
             round(100 * returned / sold_excluding_cancels, 2)
             if sold_excluding_cancels else 0.0
@@ -252,10 +191,10 @@ def reconciled_platform_breakdown(product: dict) -> list[dict]:
 
 
 def product_platform_metrics(net_rows: list[dict], event_rows: list[dict]) -> list[dict]:
-    """Build scope-safe product metrics for each marketplace/channel.
+    """Build scope-safe product metrics for each sales channel.
 
     ``net_rows`` contains kept sales, while ``event_rows`` contains cancelled and
-    returned units/amounts. Keeping both in one row prevents a Trendyol rate from
+    returned units/amounts. Keeping both in one row prevents a channel rate from
     accidentally using the all-channel denominator.
     """
     platforms: dict[str, dict] = {}
@@ -289,43 +228,12 @@ def product_platform_metrics(net_rows: list[dict], event_rows: list[dict]) -> li
 
 
 def payment_report_group_key(order: dict) -> str:
-    """Return the payment-report bucket without losing marketplace identity.
-
-    Marketplace orders are reported under their marketplace, regardless of a
-    legacy/default ``payment_method`` value.  Site orders retain their actual
-    payment method.  Some legacy imports put the marketplace only in the
-    ``marketplace`` field, so both fields must be inspected.
-    """
-    marketplaces = {"trendyol", "hepsiburada", "temu", "n11", "amazon"}
-    platform = str((order or {}).get("platform") or "").strip().lower()
-    marketplace = str((order or {}).get("marketplace") or "").strip().lower()
-    if platform in marketplaces:
-        return platform
-    if marketplace in marketplaces:
-        return marketplace
+    """Ödeme raporu kovası: site siparişlerinde gerçek ödeme yöntemi; site dışı
+    (geçmişten kalan) kanal kayıtları tek "other" kovasında toplanır."""
+    from sales_channels import channel_of, OTHER
+    if channel_of(order) == OTHER:
+        return OTHER
     return str((order or {}).get("payment_method") or "—").strip().lower() or "—"
-
-
-# Marketplace return state is shared by the operational Returns screen and the
-# financial reports.  Keeping this vocabulary here prevents the two surfaces
-# from silently assigning the same Trendyol claim item to different buckets.
-OPEN_MARKETPLACE_CLAIM_STATUSES = frozenset({"Created", "WaitingInAction", "InAnalysis"})
-
-
-def marketplace_claim_status_bucket(status: str, has_cargo: bool = False) -> str | None:
-    """Map a marketplace claim-item status to the canonical operational bucket."""
-    status = str(status or "").strip()
-    if status == "Accepted":
-        return "onaylanan"
-    if status in ("Rejected", "Unresolved"):
-        return "reddedilen"
-    if status in ("WaitingInAction", "InAnalysis"):
-        return "aksiyon_bekleyen"
-    if status == "Created":
-        return "kargoya_verilen" if has_cargo else "talep_olusturulan"
-    if status == "Cancelled":
-        return "iptal"
-    return None
 
 
 def dedupe_return_records(records: list[dict]) -> list[dict]:
@@ -370,97 +278,6 @@ def dedupe_return_items(items: list[dict]) -> list[dict]:
         seen.add(key)
         out.append(item)
     return out
-
-
-def claim_items_with_status(claim: dict, statuses: set[str]) -> list[dict]:
-    """Return marketplace claim units whose child status is in ``statuses``.
-
-    Trendyol claims may contain a mixture of Accepted, Created and Rejected
-    ``claimItems``.  The claim-level status deliberately represents the most
-    actionable child status, so it is not a safe source for historical return
-    quantities.  Reports must inspect every raw claim item instead.
-
-    Each Trendyol ``claimItem`` is one returned unit.  Barcode is optional here:
-    order-level financial reconciliation still has to count a unit whose legacy
-    line is missing a barcode (product-level reports may ignore that barcode).
-    Legacy/manual rows do not
-    always have raw data; for those, normalized items are used only when the
-    stored claim itself is accepted.  Returned rows include a stable key so a
-    repeated claim item cannot inflate totals.
-    """
-    raw_items = ((claim or {}).get("raw_data") or {}).get("items") or []
-    matched: list[dict] = []
-    seen: set[str] = set()
-    claim_id = str((claim or {}).get("claim_id") or "").strip()
-    normalized_by_id = {
-        str((item or {}).get("claim_item_id") or "").strip(): (item or {})
-        for item in ((claim or {}).get("items") or [])
-        if str((item or {}).get("claim_item_id") or "").strip()
-    }
-
-    if raw_items:
-        saw_marketplace_child = False
-        for line_index, raw_line in enumerate(raw_items):
-            raw_line = raw_line or {}
-            raw_children = raw_line.get("claimItems") or []
-            if raw_children:
-                saw_marketplace_child = True
-            order_line = raw_line.get("orderLine") or {}
-            barcode = str(order_line.get("barcode") or "").strip()
-            for item_index, claim_item in enumerate(raw_children):
-                claim_item = claim_item or {}
-                status = str(((claim_item.get("claimItemStatus") or {}).get("name") or "")).strip()
-                if status not in statuses:
-                    continue
-                item_id = str(claim_item.get("id") or "").strip()
-                key = f"{claim_id}:{item_id}" if item_id else f"{claim_id}:raw:{line_index}:{item_index}"
-                if key in seen:
-                    continue
-                seen.add(key)
-                normalized = normalized_by_id.get(item_id) or {}
-                try:
-                    amount = float(normalized.get("price") or normalized.get("unit_price")
-                                   or order_line.get("price") or 0)
-                except Exception:
-                    amount = 0.0
-                matched.append({"key": key, "barcode": barcode, "quantity": 1,
-                                "amount": max(0.0, amount), "status": status})
-        # Trendyol has nested claimItems. HB commonly has a flat raw ``items``
-        # array; in that case fall through to the normalized-items parser.
-        if saw_marketplace_child:
-            return matched
-
-    stored_status = str((claim or {}).get("claim_status") or "").strip()
-    if stored_status not in statuses:
-        return matched
-    for item_index, item in enumerate((claim or {}).get("items") or []):
-        item = item or {}
-        barcode = str(item.get("barcode") or "").strip()
-        if not barcode:
-            continue
-        item_id = str(item.get("claim_item_id") or "").strip()
-        key = f"{claim_id}:{item_id}" if item_id else f"{claim_id}:legacy:{item_index}"
-        if key in seen:
-            continue
-        seen.add(key)
-        try:
-            unit_amount = float(item.get("price") or item.get("unit_price") or 0)
-        except Exception:
-            unit_amount = 0.0
-        quantity = max(1, int(item.get("quantity") or 1))
-        matched.append({
-            "key": key,
-            "barcode": barcode,
-            "quantity": quantity,
-            "amount": max(0.0, unit_amount) * quantity,
-            "status": stored_status,
-        })
-    return matched
-
-
-def accepted_claim_items(claim: dict) -> list[dict]:
-    """Return accepted marketplace claim units, item by item."""
-    return claim_items_with_status(claim, {"Accepted"})
 
 
 async def load_dup_dep():

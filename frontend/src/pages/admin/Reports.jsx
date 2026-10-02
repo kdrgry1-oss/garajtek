@@ -11,6 +11,7 @@ import {
   reportRangeDays, reportRangeError, trTodayYmd,
 } from "../../lib/reportFilters";
 import { createLatestRequestManager, isCanceledRequest } from "../../lib/latestRequest";
+import { channelLabel } from "../../lib/salesChannels";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
@@ -311,12 +312,8 @@ export function SalesReport() {
           </button>
           <select value={source} onChange={(e) => setSource(e.target.value)} className="px-3 py-1.5 border rounded text-sm" data-testid="sales-source-select">
             <option value="all">Tüm Kaynaklar</option>
-            <option value="site">Site (Kendi)</option>
-            <option value="trendyol">Trendyol</option>
-            <option value="hepsiburada">Hepsiburada</option>
-            <option value="temu">Temu</option>
-            <option value="n11">n11</option>
-            <option value="amazon">Amazon</option>
+            <option value="site">Web Sitesi</option>
+            <option value="other">Diğer kanal (eski kayıtlar)</option>
           </select>
           <DateBar from={from} setFrom={setFrom} to={to} setTo={setTo} onRefresh={() => load()}
             preset={preset} setPreset={setPreset} applied={applied} />
@@ -350,7 +347,7 @@ export function SalesReport() {
           <div key={k.lbl} className={`bg-gradient-to-br ${k.c} text-white rounded-xl p-5`}>
             <div className="text-[11px] uppercase opacity-80 leading-tight">{k.lbl}</div>
             <div className="text-2xl font-bold mt-1">{tl(k.d?.revenue)}</div>
-            {/* ADET = kalem adetleri toplamı — pazaryeri raporlarıyla (Trendyol "Brüt Satış
+            {/* ADET = kalem adetleri toplamı ("Brüt Satış
                 Adedi") AYNI birim. Sipariş sayısıyla karıştırılmasın: 1 sipariş 2-3 adet
                 taşıyabilir, mutabakatta fark buradan çıkar. */}
             <div className="text-[11px] opacity-75 mt-1">
@@ -389,7 +386,7 @@ export function SalesReport() {
         <span className="text-[11px] text-gray-400 ml-2" title="Net ciro / (net sipariş + kısmi iade/iptalli siparişler — kalan ürünleri net cirodadır)">{fmtInt(aovOrders)} sipariş ortalaması</span>
       </div>
 
-      {/* 🏬 Pazaryerine Göre Satış · İptal · İade — TEK tablo (eski iki ayrı blok birleştirildi) */}
+      {/* 🏬 Kanala Göre Satış · İptal · İade — TEK tablo (eski iki ayrı blok birleştirildi) */}
       {cancelRet.length > 0 && (
         <div className="bg-white border rounded-xl p-4" data-testid="channel-combined">
           <h2 className="text-sm font-bold uppercase tracking-wider mb-2">Kanala Göre Satış · İptal · İade</h2>
@@ -400,7 +397,7 @@ export function SalesReport() {
                   <th className="text-left p-2">Kanal</th>
                   <th className="text-right p-2" title="NET sipariş sayısı — iptal + iade + ödenmemiş HARİÇ (sipariş birimi)">Sipariş Adeti <span className="text-[9px] text-emerald-600 font-normal">(Net)</span></th>
                   <th className="text-right p-2" title="NET ürün adedi — iptal + iade + ödenmemiş hariç">Ürün Adeti <span className="text-[9px] text-emerald-600 font-normal">(Net)</span></th>
-                  <th className="text-right p-2" title="Net + İptal + İade — Trendyol 'Brüt Satış' adediyle karşılaştırın">Brüt Adet</th>
+                  <th className="text-right p-2" title="Net + İptal + İade adedi (brüt)">Brüt Adet</th>
                   <th className="text-right p-2">Net Ciro</th>
                   <th className="text-right p-2">İptal (Ürün Adedi)</th>
                   <th className="text-right p-2">İptal Tutarı</th>
@@ -425,7 +422,7 @@ export function SalesReport() {
                       <td className="p-2 font-medium">{c.source}</td>
                       <td className="p-2 text-right tabular-nums">{c.orders || 0}</td>
                       <td className="p-2 text-right tabular-nums font-semibold">{c.units || 0}</td>
-                      <td className="p-2 text-right tabular-nums text-gray-500" title="Net + İptal + İade adedi — Trendyol 'Brüt Satış' ile karşılaştırın">{c.total_units || 0}</td>
+                      <td className="p-2 text-right tabular-nums text-gray-500" title="Net + İptal + İade adedi (brüt)">{c.total_units || 0}</td>
                       <td className="p-2 text-right tabular-nums font-semibold">{tl(c.revenue)}</td>
                       <td className="p-2 text-right tabular-nums">{c.cancel_units || 0}</td>
                       <td className="p-2 text-right tabular-nums text-rose-600">{tl(c.cancel_total)}</td>
@@ -561,7 +558,7 @@ export function SalesReport() {
         </ResponsiveContainer>
       </div>
 
-      {/* Ödeme Yöntemi Dağılımı — grafik + sipariş sayıları TEK blokta (Trendyol/HB ayrık).
+      {/* Ödeme Yöntemi Dağılımı — grafik + sipariş sayıları TEK blokta (harici kanal ayrık).
           Net kartıyla AYNI kohort tabanı: toplam = Net kartı (ciro ve sipariş). */}
       <div className="bg-white rounded-xl border p-5" data-testid="payment-distribution">
         <h3 className="font-semibold mb-3 flex items-center gap-2"><CreditCard size={16} /> Ödeme Yöntemi &amp; Sipariş Dağılımı</h3>
@@ -690,14 +687,14 @@ export function ProductsReport() {
   // rozeti, hız süzgeci ve ivme TÜM KANAL hızını kullanır (velocity_all); platform
   // seçili değilken velocity_all gelmez, velocity zaten tüm kanaldır.
   const velOf = (p) => (p && (p.velocity_all || p.velocity)) || {};
-  const platLabel = (p) => ({ site: "Site", trendyol: "Trendyol", hepsiburada: "Hepsiburada", temu: "Temu", n11: "n11", amazon: "Amazon" }[p] || (p ? p[0].toUpperCase() + p.slice(1) : "—"));
+  const platLabel = (p) => (p ? channelLabel(p) : "—");
   // Sezon ürün kartındaki 'Sezon' özniteliğinden gelir (backend normalize eder); yoksa boş.
   const SEASONS = ["İlkbahar/Sonbahar", "Tüm Sezonlar", "Yaz", "Kış"];
   // Kapsama ilk tıkta KÜÇÜKTEN büyüğe: RPT durumu acil olanlar (az haftası kalanlar) üstte.
   const toggleSort = (k) => { if (sortKey === k) setSortDir(d => d === "desc" ? "asc" : "desc"); else { setSortKey(k); setSortDir(k === "name" || k === "best_size" || k === "_cover" ? "asc" : "desc"); } };
   // Filtre seçenekleri (veriden)
   const platOptions = Array.from(new Set([
-    "site", "trendyol", "hepsiburada", "temu", "n11", "amazon",
+    "site",
     ...top.flatMap(p => (p.platform_breakdown || []).map(x => x.platform)),
     ...top.flatMap(p => (p.cancel_return_by_platform || []).map(x => x.platform)),
   ])).sort();
@@ -1092,7 +1089,7 @@ export function ProductsReport() {
       <div className="bg-white border rounded-xl p-4" data-testid="cr-products-block">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
           {/* Taban açıkça: ürün iadesi gider pusulasından değil KABUL EDİLMİŞ iade
-              talebinden (Trendyol Accepted + onaylı site iadesi) sayılır; Satış
+              talebinden (onaylı site iadesi) sayılır; Satış
               sayfasındaki 'Sadece İadeler' kartı (pusula) ile birebir tutmayabilir. */}
           <h2 className="text-sm font-bold uppercase tracking-wider">İade &amp; İptal Raporu ({applied?.from || from} → {applied?.to || to})</h2>
           <div className="flex gap-2">

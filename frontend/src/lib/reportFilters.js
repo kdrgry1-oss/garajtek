@@ -105,12 +105,17 @@ export function reportRangeError(from, to) {
   return "";
 }
 
+const _SITE_ROW = ["site", "web", "site (kendi)", "web sitesi"];
+const _OTHER_ROW = ["other", "diğer kanal"];
+
 export function filterReportChannels(items, source) {
   if (!source || source === "all") return items || [];
-  const wanted = source === "site" ? "site" : source.toLocaleLowerCase("tr");
+  const wanted = source.toLocaleLowerCase("tr");
   return (items || []).filter((row) => {
     const value = String(row?.source || row?.channel || "").trim().toLocaleLowerCase("tr");
-    return wanted === "site" ? ["site", "web", "site (kendi)"].includes(value) : value === wanted;
+    if (wanted === "site") return _SITE_ROW.includes(value);
+    if (wanted === "other") return _OTHER_ROW.includes(value);
+    return value === wanted;
   });
 }
 

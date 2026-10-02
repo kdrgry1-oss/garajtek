@@ -423,7 +423,7 @@ export default function RooftrReturns({ embedded = false, gpStart = "085490", on
 
 
 
-  // Satır-içi gider pusulası (Trendyol ile ORTAK seri): siparişi köprüle → gider pusulası
+  // Satır-içi gider pusulası (harici kanal ile ORTAK seri): siparişi köprüle → gider pusulası
   // (tracking_no = ortak başlangıç no gpStart) → parent yazdırma modalını aç + sayacı +1 ilerlet.
   // Onaylanmış iadenin DÜZENLENMİŞ seçimini (kalemler + kargo) muhasebe/admin olarak
   // onayla ve kilitle. Statü/stok/bildirim değişmez; yenileyince yeni seçim korunur.
@@ -614,7 +614,7 @@ export default function RooftrReturns({ embedded = false, gpStart = "085490", on
             tarih aralıklı, muhasebe formatı) İadeler ekranının üst araç çubuğundadır. */}
       </div>
 
-      {/* İade durum sekmeleri — Trendyol sekmeleriyle birebir görsel dil (oval/pill) */}
+      {/* İade durum sekmeleri — harici kanal sekmeleriyle birebir görsel dil (oval/pill) */}
       <div className="flex flex-wrap gap-2 mb-4 border-b border-gray-200 pb-2">
         {RETURN_TABS.map((t) => {
           const n = (t.statuses || [t.key]).reduce((a, s) => a + (statusCounts[s] || 0), 0);

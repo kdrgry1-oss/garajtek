@@ -294,11 +294,10 @@ async def _serve(path: str, w: int = 0, q: int = 90):
 
 
 # =============================================================================
-# JPEG proxy — pazaryeri (Amazon) görsel aktarımı için. Amazon WebP KABUL ETMEZ
-# (yalnız JPEG/PNG/TIFF/GIF); ürün görsellerimiz R2'de WebP saklanıyor → Amazon
-# webp'leri sessizce düşürüyordu ("resimler aktarılmıyor"). Bu uç origin görseli
+# JPEG proxy — WebP kabul etmeyen dış servislere (feed/katalog) görsel aktarımı için
+# (yalnız JPEG/PNG/TIFF/GIF kabul eden servisler); ürün görsellerimiz R2'de WebP saklanıyor. Bu uç origin görseli
 # çekip tam çözünürlükte (≤2000px) JPEG'e çevirir. Cloudflare cdn-cgi transform
-# kotasına (ERROR 9422) bağlı DEĞİL → güvenilir. Amazon URL'i bir kez çekip cache'ler.
+# kotasına (ERROR 9422) bağlı DEĞİL → güvenilir. harici kanal URL'i bir kez çekip cache'ler.
 # =============================================================================
 def _cdn_host() -> str:
     from urllib.parse import urlparse as _up
@@ -313,10 +312,10 @@ def _media_host() -> str:
     return (_up(_m).hostname or "").lower() if _m else ""
 
 
-# Yalnız kendi CDN'imiz (env CDN_URL / R2_PUBLIC_URL), yerel medya host'u + eski Ticimax statik alanı.
-_JPEG_ALLOWED_HOSTS = {h for h in (_cdn_host(), _media_host(), "static.ticimax.cloud") if h}
+# Yalnız kendi CDN'imiz (env CDN_URL / R2_PUBLIC_URL), yerel medya host'u + eski eski altyapı statik alanı.
+_JPEG_ALLOWED_HOSTS = {h for h in (_cdn_host(), _media_host()) if h}
 
-# Pazaryeri (HB/Amazon) yüzlerce görseli AYNI ANDA ilk kez çektiğinde her biri ayrı PIL
+# Pazaryeri (harici kanal) yüzlerce görseli AYNI ANDA ilk kez çektiğinde her biri ayrı PIL
 # dönüşümü yapıyordu → işlemci doyup panel + vitrin saniyelerce bekliyordu. Aynı anda en
 # fazla 2 dönüşüm; sonuçlar küçük bir bellek önbelleğinde (≈64 MB) tutulur.
 _JPEG_SEM = asyncio.Semaphore(2)
@@ -340,8 +339,8 @@ def _jpeg_cache_put(key: str, data: bytes):
 
 @router.get("/jpeg/{token}.jpg")
 async def image_to_jpeg_ext(token: str, w: int = 2000):
-    """Amazon media_location için .jpg UZANTILI proxy: /api/upload/jpeg/<urlsafe-b64(src)>.jpg.
-    Amazon (ERROR 20015) dosya türünü URL/uzantı + içerikten doğrular; uzantısız
+    """harici kanal media_location için .jpg UZANTILI proxy: /api/upload/jpeg/<urlsafe-b64(src)>.jpg.
+    harici kanal (ERROR 20015) dosya türünü URL/uzantı + içerikten doğrular; uzantısız
     ?src= biçimi reddediliyordu. Aynı SSRF/boyut korumalarıyla to-jpeg'e delege eder."""
     import base64
     try:
@@ -355,7 +354,7 @@ async def image_to_jpeg_ext(token: str, w: int = 2000):
 @router.get("/to-jpeg")
 async def image_to_jpeg(src: str, w: int = 2000):
     """src (yalnız izinli CDN host) görselini tam çözünürlükte JPEG'e çevirip döndürür.
-    SSRF koruması: host beyaz-listesi. Amazon media_location için kullanılır."""
+    SSRF koruması: host beyaz-listesi. harici kanal media_location için kullanılır."""
     from urllib.parse import urlparse
     try:
         u = urlparse(src)

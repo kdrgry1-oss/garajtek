@@ -10,7 +10,7 @@ Attribution & Funnel Tracking.
 
 Channels auto-detected from utm_source/medium & referrer host:
   instagram, facebook, tiktok, twitter, youtube, google_ads, google_organic,
-  bing, email, direct, referral, trendyol, hepsiburada, n11, temu, other.
+  bing, email, direct, referral, harici kanal, other.
 """
 from fastapi import APIRouter, Request, Depends, Query, HTTPException
 from datetime import datetime, timezone, timedelta
@@ -41,14 +41,6 @@ SOCIAL_DOMAINS = {
     "linkedin.com": "linkedin",
     "whatsapp.com": "whatsapp",
     "wa.me": "whatsapp",
-}
-MARKETPLACE_DOMAINS = {
-    "trendyol.com": "trendyol",
-    "hepsiburada.com": "hepsiburada",
-    "n11.com": "n11",
-    "temu.com": "temu",
-    "amazon.com.tr": "amazon",
-    "amazon.com": "amazon",
 }
 
 
@@ -109,9 +101,6 @@ def detect_channel(utm_source: str, utm_medium: str, referrer: str,
         for d, label in SOCIAL_DOMAINS.items():
             if label in s or d in s:
                 return f"{label}_organic" if m in {"social", "organic", ""} else label
-        for d, label in MARKETPLACE_DOMAINS.items():
-            if label in s or d in s:
-                return label
         if "google" in s:
             return "google_organic"
 
@@ -129,9 +118,6 @@ def detect_channel(utm_source: str, utm_medium: str, referrer: str,
             for d, label in SOCIAL_DOMAINS.items():
                 if host == d or host.endswith("." + d):
                     return f"{label}_organic"
-            for d, label in MARKETPLACE_DOMAINS.items():
-                if host == d or host.endswith("." + d):
-                    return label
             return "referral"
         except Exception:
             pass

@@ -1,7 +1,7 @@
 /**
- * ProductFilters — Ticimax tarzı gelişmiş ürün filtreleme paneli (3 kolon).
+ * ProductFilters — eski altyapı tarzı gelişmiş ürün filtreleme paneli (3 kolon).
  *
- * Kullanıcının yüklediği Ticimax ekran görüntüleriyle birebir; ~45 alan.
+ * Kullanıcının yüklediği eski altyapı ekran görüntüleriyle birebir; ~45 alan.
  * Sunum bileşenidir: state `Products.jsx`'te tutulur, buradan `update(key, value)`
  * ile değiştirilir. Veri henüz yoksa bile alanlar görünür (backend yapısı hazır;
  * senkron aktifleşince otomatik sorgulanır).

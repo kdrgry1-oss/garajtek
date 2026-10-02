@@ -13,7 +13,7 @@ const KIND = {
   reklam:     { label: "Reklamdan Geldi",      cls: "bg-violet-100 text-violet-700 ring-violet-200", Icon: Megaphone },
   influencer: { label: "Influencer",           cls: "bg-pink-100 text-pink-700 ring-pink-200",       Icon: Star },
   organik:    { label: "Organik",              cls: "bg-emerald-100 text-emerald-700 ring-emerald-200", Icon: Compass },
-  pazaryeri:  { label: "Pazaryeri",            cls: "bg-amber-100 text-amber-700 ring-amber-200",    Icon: Store },
+  pazaryeri:  { label: "Diğer kanal",            cls: "bg-amber-100 text-amber-700 ring-amber-200",    Icon: Store },
   direct:     { label: "Doğrudan / Bilinmiyor", cls: "bg-gray-100 text-gray-600 ring-gray-200",      Icon: Globe },
 };
 

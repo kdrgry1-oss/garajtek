@@ -13,7 +13,7 @@ describe("product stock history labels", () => {
       actor: { login_method: "google" },
       context: { session_hash: "123456789abc", ip: "127.0.0.1" },
     })).toBe("google · 123456789abc · 127.0.0.1");
-    expect(stockSyncDetails({ platform: "trendyol", batch_id: "b-1", message: "accepted" }))
-      .toBe("trendyol · b-1 · accepted");
+    expect(stockSyncDetails({ platform: "sync", batch_id: "b-1", message: "accepted" }))
+      .toBe("sync · b-1 · accepted");
   });
 });

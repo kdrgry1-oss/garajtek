@@ -467,7 +467,7 @@ export default function ProductAttributes() {
                     </button>
                   </div>
                   <p className="text-[11px] text-gray-400 mt-2">
-                    "Bizim için zorunlu": pazaryeri zorunlu tutmasa da bu özellik boşsa doğrulama/eksik
+                    "Bizim için zorunlu": bu özellik boşsa doğrulama/eksik
                     raporunda uyarı verilir.
                   </p>
 

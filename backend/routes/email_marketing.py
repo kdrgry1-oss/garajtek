@@ -32,6 +32,7 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from datetime import datetime, timezone
+from sales_channels import site_match as _sc_site_match
 
 from .deps import db, generate_id, logger, require_permission
 
@@ -1008,7 +1009,7 @@ async def _campaign_report(campaign_id: str, days: int = 14) -> dict:
     by_email_orders: dict = {}
     if emails and start:
         q = {"created_at": {"$gte": start}, "status": {"$nin": _CONV_EXCLUDED},
-             "platform": {"$nin": ["trendyol", "hepsiburada", "amazon"]},
+             "$and": _sc_site_match()["$and"],
              "$or": [{"shipping_address.email": {"$in": emails}}, {"email": {"$in": emails}}, {"customer_email": {"$in": emails}}]}
         if end_dt:
             q["created_at"]["$lte"] = end_dt

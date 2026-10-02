@@ -22,7 +22,6 @@ spec.loader.exec_module(report_dedup)
 canonical_order_stages = report_dedup.canonical_order_stages
 effective_order_date_match = report_dedup.effective_order_date_match
 split_confirmed_return = report_dedup.split_confirmed_return
-accepted_claim_items = report_dedup.accepted_claim_items
 product_quantity_metrics = report_dedup.product_quantity_metrics
 kept_gross_revenue = report_dedup.kept_gross_revenue
 reconciled_platform_breakdown = report_dedup.reconciled_platform_breakdown
@@ -71,24 +70,11 @@ def test_confirmed_return_cannot_exceed_sold_quantity():
     assert split_confirmed_return(2, 300.0, 9) == (0, 0.0, 2, 300.0)
 
 
-def test_hepsiburada_flat_raw_items_fall_back_to_normalized_items():
-    claim = {
-        "claim_id": "HB-1", "claim_status": "Accepted",
-        "raw_data": {"items": [{"sku": "HBCV1", "quantity": 2}]},
-        "items": [{"claim_item_id": "line-1", "barcode": "869", "quantity": 2,
-                   "price": 125.0}],
-    }
-    assert accepted_claim_items(claim) == [{
-        "key": "HB-1:line-1", "barcode": "869", "quantity": 2,
-        "amount": 250.0, "status": "Accepted",
-    }]
-
-
-def test_product_quantity_metrics_separates_trendyol_and_operational_rates():
+def test_product_quantity_metrics_separates_gross_and_operational_rates():
     metrics = product_quantity_metrics(net=2, cancelled=2, returned=4)
     assert metrics == {
         "gross_qty": 8,
-        "trendyol_return_rate_pct": 50.0,
+        "gross_return_rate_pct": 50.0,
         "return_rate_excluding_cancels_pct": 66.67,
     }
 
@@ -96,7 +82,7 @@ def test_product_quantity_metrics_separates_trendyol_and_operational_rates():
 def test_product_quantity_metrics_are_non_negative_and_zero_safe():
     assert product_quantity_metrics(-1, 0, 0) == {
         "gross_qty": 0,
-        "trendyol_return_rate_pct": 0.0,
+        "gross_return_rate_pct": 0.0,
         "return_rate_excluding_cancels_pct": 0.0,
     }
 
@@ -133,103 +119,44 @@ def test_profitability_platform_parts_equal_canonical_product_totals():
         "qty": 3, "revenue": 100.01,
         "platform_breakdown": [
             {"platform": "site", "qty": 1, "revenue": 33.33},
-            {"platform": "trendyol", "qty": 2, "revenue": 66.67},
+            {"platform": "other", "qty": 2, "revenue": 66.67},
         ],
     })
     assert sum(row["qty"] for row in rows) == 3
     assert round(sum(row["revenue"] for row in rows), 2) == 100.01
 
 
-def test_product_platform_metrics_keep_all_and_trendyol_scopes_separate():
+def test_product_platform_metrics_keep_all_and_channel_scopes_separate():
     rows = product_platform_metrics(
         [
-            {"platform": "trendyol", "qty": 2, "revenue": 200},
+            {"platform": "other", "qty": 2, "revenue": 200},
             {"platform": "site", "qty": 7, "revenue": 700},
         ],
         [
-            {"platform": "trendyol", "cancel": 2, "return": 4,
+            {"platform": "other", "cancel": 2, "return": 4,
              "cancel_total": 150, "return_total": 400},
             {"platform": "site", "cancel": 1, "return": 0,
              "cancel_total": 100, "return_total": 0},
         ],
     )
     by_platform = {row["platform"]: row for row in rows}
-    trendyol = by_platform["trendyol"]
-    assert trendyol["gross_qty"] == 8
-    assert trendyol["trendyol_return_rate_pct"] == 50.0
-    assert trendyol["net_revenue"] == 200.0
-    assert trendyol["gross_revenue"] == 750.0
-    assert trendyol["net_qty"] + trendyol["cancel_qty"] + trendyol["return_qty"] == trendyol["gross_qty"]
+    other = by_platform["other"]
+    assert other["gross_qty"] == 8
+    assert other["gross_return_rate_pct"] == 50.0
+    assert other["net_revenue"] == 200.0
+    assert other["gross_revenue"] == 750.0
+    assert other["net_qty"] + other["cancel_qty"] + other["return_qty"] == other["gross_qty"]
     assert sum(row["gross_qty"] for row in rows) == 16
     assert sum(row["net_qty"] for row in rows) == 9
     assert sum(row["cancel_qty"] for row in rows) == 3
     assert sum(row["return_qty"] for row in rows) == 4
 
 
-def test_payment_report_group_keeps_marketplace_over_default_payment_method():
+def test_payment_report_group_puts_other_channel_records_in_one_bucket():
     assert payment_report_group_key({
-        "platform": "web", "marketplace": "Trendyol",
+        "platform": "web", "marketplace": "legacy-channel",
         "payment_method": "marketplace",
-    }) == "trendyol"
+    }) == "other"
     assert payment_report_group_key({
         "platform": "web", "payment_method": "bank_transfer",
     }) == "bank_transfer"
-
-
-def test_mixed_trendyol_claim_counts_only_accepted_child_items():
-    claim = {
-        "claim_id": "claim-1",
-        "claim_status": "Created",
-        "items": [{"barcode": "legacy-would-be-wrong", "quantity": 3}],
-        "raw_data": {"items": [{
-            "orderLine": {"barcode": "8680001"},
-            "claimItems": [
-                {"id": "a", "claimItemStatus": {"name": "Accepted"}},
-                {"id": "b", "claimItemStatus": {"name": "Created"}},
-                {"id": "c", "claimItemStatus": {"name": "Rejected"}},
-            ],
-        }]},
-    }
-    assert accepted_claim_items(claim) == [
-        {"key": "claim-1:a", "barcode": "8680001", "quantity": 1,
-         "amount": 0.0, "status": "Accepted"}
-    ]
-
-
-def test_accepted_claim_item_ids_are_deduplicated():
-    claim = {
-        "claim_id": "claim-2",
-        "raw_data": {"items": [{
-            "orderLine": {"barcode": "8680002"},
-            "claimItems": [
-                {"id": "same", "claimItemStatus": {"name": "Accepted"}},
-                {"id": "same", "claimItemStatus": {"name": "Accepted"}},
-            ],
-        }]},
-    }
-    assert len(accepted_claim_items(claim)) == 1
-
-
-def test_legacy_accepted_claim_uses_normalized_quantity_without_raw_data():
-    claim = {
-        "claim_id": "legacy-1",
-        "claim_status": "Accepted",
-        "items": [{"claim_item_id": "x", "barcode": "8680003", "quantity": 2}],
-    }
-    assert accepted_claim_items(claim) == [
-        {"key": "legacy-1:x", "barcode": "8680003", "quantity": 2,
-         "amount": 0.0, "status": "Accepted"}
-    ]
-
-
-def test_accepted_child_uses_its_own_normalized_net_price():
-    claim = {
-        "claim_id": "priced",
-        "items": [{"claim_item_id": "accepted", "barcode": "868", "price": 799.5}],
-        "raw_data": {"items": [{
-            "orderLine": {"barcode": "868", "price": 999},
-            "claimItems": [{"id": "accepted", "claimItemStatus": {"name": "Accepted"}}],
-        }]},
-    }
-    assert accepted_claim_items(claim)[0]["amount"] == 799.5
-

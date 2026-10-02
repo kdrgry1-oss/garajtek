@@ -1,8 +1,8 @@
-"""Validation helpers for inbound Amazon SNS HTTP(S) messages.
+"""Validation helpers for inbound harici kanal SNS HTTP(S) messages.
 
 SNS message fields are attacker-controlled until the RSA signature has been
 verified.  In particular, never fetch ``SigningCertURL`` or ``SubscribeURL``
-before validating that the URL is an HTTPS Amazon SNS endpoint.
+before validating that the URL is an HTTPS harici kanal SNS endpoint.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ def validate_subscribe_url(url: str, payload: dict) -> bool:
 
 
 def canonical_sns_message(payload: dict) -> bytes:
-    """Build the exact byte sequence signed by Amazon SNS."""
+    """Build the exact byte sequence signed by harici kanal SNS."""
 
     message_type = str(payload.get("Type") or "")
     if message_type == "Notification":

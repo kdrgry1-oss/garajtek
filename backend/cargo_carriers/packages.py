@@ -3,7 +3,7 @@ cargo_carriers/packages.py — Siparişin koli ölçüsünü (adet / desi / kg) 
 
 Öncelik:
   1) order.cargo_package = {pieces, desi, kg}  (yönetici siparişe özel girdiyse)
-  2) Ürün alanları (models.Product / Ticimax şeması):
+  2) Ürün alanları (models.Product / eski altyapı şeması):
        desi = width × depth × height / 3000  (cm)  — yoksa cargo_weight (KARGOAGIRLIGI)
        kg   = product_weight (URUNAGIRLIGI) → weight → cargo_weight
      satır miktarı ile çarpılıp toplanır.

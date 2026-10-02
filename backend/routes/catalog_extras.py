@@ -545,16 +545,10 @@ async def resolve_payment_discounts():
 extra_reports_router = APIRouter(prefix="/admin/reports-extra", tags=["admin-reports-extra"])
 
 
-# Gelişmiş Raporlar kaynak (site/trendyol/hepsiburada/temu) filtresi — pazaryeri platform VEYA
-# marketplace alanında durabilir; 'site' = pazaryeri OLMAYAN. Boş/all = filtre yok.
-_MARKETPLACES_EX = ["trendyol", "hepsiburada", "temu", "n11", "amazon"]
+# Gelişmiş Raporlar kaynak filtresi (bkz. sales_channels.source_filter). Boş/all = filtre yok.
 def _src_match_ex(source):
-    s = (source or "all").strip().lower()
-    if s in ("", "all", "tum", "tümü", "hepsi"):
-        return {}
-    if s in ("site", "web", "kendi"):
-        return {"platform": {"$nin": _MARKETPLACES_EX}, "marketplace": {"$nin": _MARKETPLACES_EX}}
-    return {"$or": [{"platform": s}, {"marketplace": s}]}
+    from sales_channels import source_filter
+    return source_filter(source) or {}
 
 
 @extra_reports_router.get("/hourly")

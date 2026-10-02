@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { Package, RefreshCw, XCircle, Truck } from "lucide-react";
+import { isOtherChannelOrder } from "../../lib/salesChannels";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const auth = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
@@ -51,7 +52,7 @@ export default function OrderCargoActions({ order, onChanged }) {
   const [carrier, setCarrier] = useState("");
   const [busy, setBusy] = useState("");
   const s = cargoSummary(order);
-  const isMarketplace = ["trendyol", "hepsiburada"].includes(String(order?.platform || "").toLowerCase());
+  const isMarketplace = isOtherChannelOrder(order);
 
   useEffect(() => {
     let off = false;

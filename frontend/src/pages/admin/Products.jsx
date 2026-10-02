@@ -97,7 +97,7 @@ const fixImg = (u) => {
  * - "Kaynak"  : HTML kaynak kodunu textarea içinde düzenle.
  * - "Önizleme": HTML'i canlı olarak render et (read-only).
  * - "Bölünmüş": iki yan yana panel (kaynak + canlı).
- * Trendyol'a aktarımda HTML temizleme backend tarafında yapılır.
+ * harici kanal aktarımda HTML temizleme backend tarafında yapılır.
  */
 function DescriptionEditor({ value, onChange }) {
   const [mode, setMode] = useState("split"); // "source" | "preview" | "split"
@@ -171,8 +171,7 @@ function DescriptionEditor({ value, onChange }) {
       </div>
       <div className="px-3 py-1.5 bg-amber-50 border-t border-amber-200 text-[10px] text-amber-800">
         <strong>İpucu:</strong> Önizleme alanı da düzenlenebilir — imleci tıklayıp doğrudan yazabilirsiniz
-        (değişiklik kaynağa da işlenir). <strong>Not:</strong> Trendyol'a aktarımda HTML etiketleri
-        otomatik temizlenip düz metin (paragraflar ve satır sonları korunarak) gönderilir.
+        (değişiklik kaynağa da işlenir).
       </div>
     </div>
   );
@@ -205,7 +204,7 @@ export default function AdminProducts() {
   // ---------------------------------------------------------------------------
   // Toplu Seçim State'i: siparişler tablosundaki gibi soldaki tiklerle seçilen
   // ürünlerin id listesi. "Seçilenlerin barkod kartını yazdır" ve gelecekte
-  // "toplu durum değişikliği / toplu Trendyol push" için kullanılır.
+  // "toplu durum değişikliği / toplu harici kanal push" için kullanılır.
   // ---------------------------------------------------------------------------
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [barcodeSizeModal, setBarcodeSizeModal] = useState(null); // barkod yazdırma beden seçimi
@@ -237,7 +236,7 @@ export default function AdminProducts() {
       toast.error("Fiyat güncellenemedi");
     }
   };
-  // technicalDetails: XML/Ticimax description'dan parse edilen teknik özellikler.
+  // technicalDetails: XML/eski altyapı description'dan parse edilen teknik özellikler.
   // Shape: { kumas: {label, value}, kalip: {label, value}, ... } VEYA boş obj
   const [technicalDetails, setTechnicalDetails] = useState({});
   const [uploading, setUploading] = useState(false);
@@ -270,8 +269,6 @@ export default function AdminProducts() {
   const [techImportModalOpen, setTechImportModalOpen] = useState(false);
   const [techImportResults, setTechImportResults] = useState(null);
   const [techImporting, setTechImporting] = useState(false);
-  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
-  const toolsMenuRef = useRef(null);
   const [techApplying, setTechApplying] = useState(false);
 
   const [filters, setFilters] = useState(() => _loadProductsView().appliedFilters || {
@@ -358,7 +355,7 @@ export default function AdminProducts() {
     images: [], is_active: false, is_featured: false, is_new: false,
     stock: 0, stock_code: "", barcode: "", sku: "",
     urun_karti_id: "", urun_id: "",
-    // Ticimax fields
+    // eski altyapı fields
     variation_code: "", gtip_code: "", unit: "ADET", keywords: "",
     supplier: "", manufacturer: DEFAULT_PRODUCT_BRAND, max_installment: 9, purchase_price: 0, member_price_1: null,
     color: "", specs: {}, extra_specs: [], variant_labels: {},
@@ -371,20 +368,11 @@ export default function AdminProducts() {
     variants: [], newVariant: {},
     attributes: {},
     auto_barcode: false,
-    trendyol_attributes: {},
-    trendyol_category_id: "",
-    trendyol_multiplier: 0,
-    hepsiburada_category_id: "",
-    hepsiburada_category_name: "",
-    temu_category_id: "",
-    temu_category_name: "",
     use_default_markup: true,
     markup_rate: 0,
-    hepsiburada_attributes: {},
-    temu_attributes: {},
-    ticimax_fields: {}
+    catalog_fields: {}
   });
-  const [ticimaxSchema, setTicimaxSchema] = useState([]);
+  const [catalogSchema, setCatalogSchema] = useState([]);
 
   const [globalAttributes, setGlobalAttributes] = useState([]);
   const [globalSizes, setGlobalSizes] = useState([]);
@@ -466,9 +454,9 @@ export default function AdminProducts() {
   // Ürün detay alan şemasını bir kez çek (sekmelere gömülü ek alanlar için)
   useEffect(() => {
     const token = localStorage.getItem('token');
-    axios.get(`${API}/products/meta/ticimax-schema`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => setTicimaxSchema(res.data.groups || []))
-      .catch(() => setTicimaxSchema([]));
+    axios.get(`${API}/products/meta/catalog-schema`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setCatalogSchema(res.data.groups || []))
+      .catch(() => setCatalogSchema([]));
     // Gelişmiş filtre paneli dropdown verileri (marka/tedarikçi/para birimi/teknik detay)
     axios.get(`${API}/products/meta/filter-options`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setFilterOptions(res.data || {}))
@@ -543,7 +531,7 @@ export default function AdminProducts() {
       'attr_key', 'attr_value', 'sizes',
     ].forEach((k) => set(k, f[k]));
 
-    // ticimax_fields sayısal aralıkları
+    // catalog_fields sayısal aralıkları
     const rangeMap = {
       min_indirimli: 'tfmin_INDIRIMLIFIYAT', max_indirimli: 'tfmax_INDIRIMLIFIYAT',
       min_alis: 'tfmin_ALISFIYATI', max_alis: 'tfmax_ALISFIYATI',
@@ -551,7 +539,7 @@ export default function AdminProducts() {
     };
     Object.entries(rangeMap).forEach(([k, param]) => set(param, f[k]));
 
-    // ticimax_fields tekil alanları (tf_)
+    // catalog_fields tekil alanları (tf_)
     const tfMap = {
       kdv_dahil: 'tf_KDVDAHIL', kart_aktif: 'tf_KARTAKTIF', para_birimi: 'tf_PARABIRIMI',
       yemek_karti: 'tf_YEMEKKARTIODEMEYASAKLILISTESI',
@@ -806,88 +794,6 @@ export default function AdminProducts() {
    */
   // ── "Toplu İşlemler" menüsü (ürün aramanın altındaki dropdown) handlerleri ──
   // Buton onClick'leri buraya taşındı; menü öğeleri bu fonksiyonları çağırır.
-  const handleSilinenOzellikKurtar = async () => {
-    const token = localStorage.getItem('token');
-    const t = toast.loading("Önizleme hazırlanıyor...");
-    try {
-      const pre = await axios.post(
-        `${API}/integrations/site/teknik-detay/recover?apply=false`,
-        null, { headers: { Authorization: `Bearer ${token}` }, timeout: 120000 }
-      );
-      toast.dismiss(t);
-      const d = pre.data || {};
-      const ok = window.confirm(
-        "SİLİNEN TEKNİK DETAY KURTARMA — ÖNİZLEME\n\n" +
-        `• Eşleşen ürün: ${d.eslesen_urun}  (kart-ID: ${d.eslesen_kart_id_ile} · barkod: ${d.eslesen_barkod_ile})\n` +
-        `• Genel (Trendyol) dolacak özellik: ${d.doldurulacak_ozellik_toplam}\n` +
-        `• Hepsiburada'ya dolacak: ${d.hb_dolan_toplam}\n` +
-        `• Temu'ya dolacak: ${d.temu_dolan_toplam}\n` +
-        `• Hiç eşleşmeyen kart: ${d.eslesmeyen_urun_karti}  ·  Anormal (atlanan): ${d.anormal_atlanmis}\n\n` +
-        "Eşleştirme: önce urun_karti_id, tutmazsa BARKOD (varyant-benzersiz, güvenli).\n" +
-        "Genel + Hepsiburada + Temu alanlarına, yalnız BOŞ olanlara yazılır; mevcut değerler KORUNUR.\n" +
-        "attributes formatına dokunulmaz (Trendyol güvende). Fiyat / KDV / stok / barkoda DOKUNULMAZ.\n\n" +
-        "Uygulansın mı?"
-      );
-      if (!ok) { toast("İptal edildi"); return; }
-      const t2 = toast.loading("Kurtarma uygulanıyor...");
-      const res = await axios.post(
-        `${API}/integrations/site/teknik-detay/recover?apply=true`,
-        null, { headers: { Authorization: `Bearer ${token}` }, timeout: 180000 }
-      );
-      toast.dismiss(t2);
-      toast.success(`${res.data.guncellenen_urun} üründe — Genel ${res.data.doldurulacak_ozellik_toplam} · HB ${res.data.hb_dolan_toplam} · Temu ${res.data.temu_dolan_toplam} özellik dolduruldu`);
-      fetchProducts();
-    } catch (e) {
-      toast.dismiss(t);
-      toast.error(e.response?.data?.detail || "Kurtarma başarısız");
-    }
-  };
-
-  const handleEksikAciklamaKurtar = async () => {
-    const token = localStorage.getItem('token');
-    const t = toast.loading("Açıklama önizlemesi hazırlanıyor...");
-    try {
-      const pre = await axios.post(
-        `${API}/integrations/site/aciklama/recover?apply=false`,
-        null, { headers: { Authorization: `Bearer ${token}` }, timeout: 120000 }
-      );
-      toast.dismiss(t);
-      const d = pre.data || {};
-      const ok = window.confirm(
-        "EKSİK AÇIKLAMA KURTARMA — ÖNİZLEME\n\n" +
-        `• Açıklaması doldurulacak ürün: ${d.doldurulacak_urun}  (kart-ID: ${d.eslesen_kart_id_ile} · barkod: ${d.eslesen_barkod_ile})\n` +
-        `• Zaten dolu (atlanan): ${d.zaten_dolu}\n` +
-        `• Hiç eşleşmeyen kart: ${d.eslesmeyen_urun_karti}  ·  Anormal: ${d.anormal_atlanmis}\n\n` +
-        "Eşleştirme: önce urun_karti_id, tutmazsa BARKOD (güvenli).\n" +
-        "Yalnız BOŞ açıklama doldurulur, mevcut açıklama KORUNUR.\n" +
-        "Fiyat / KDV / stok / başlık / özelliklere DOKUNULMAZ.\n\n" +
-        "Uygulansın mı?"
-      );
-      if (!ok) { toast("İptal edildi"); return; }
-      const t2 = toast.loading("Açıklamalar yazılıyor...");
-      const res = await axios.post(
-        `${API}/integrations/site/aciklama/recover?apply=true`,
-        null, { headers: { Authorization: `Bearer ${token}` }, timeout: 180000 }
-      );
-      toast.dismiss(t2);
-      toast.success(`${res.data.guncellenen_urun} ürünün açıklaması dolduruldu`);
-      fetchProducts();
-    } catch (e) {
-      toast.dismiss(t);
-      toast.error(e.response?.data?.detail || "Açıklama kurtarma başarısız");
-    }
-  };
-
-  // Toplu İşlemler menüsü: dışarı tıklayınca kapat
-  useEffect(() => {
-    if (!toolsMenuOpen) return;
-    const onDocClick = (e) => {
-      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target)) setToolsMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [toolsMenuOpen]);
-
   const fetchProducts = async () => {
     const _seq = ++_prodReqSeq.current;   // bu isteğin sıra no'su
     setLoading(true);
@@ -1105,7 +1011,7 @@ export default function AdminProducts() {
       // Yeni urun(ler): TEK Urun Kart ID. Renkler ayri urune bolunse bile hepsi AYNI id'yi alir
       // (kart id kendi icinde artmaz). Bos ise sistemdeki en buyuk + 1 alinir.
       if (!editingProduct) {
-        let cid = String((formData.ticimax_fields && formData.ticimax_fields.URUNKARTIID) || formData.urun_karti_id || "").trim();
+        let cid = String((formData.catalog_fields && formData.catalog_fields.URUNKARTIID) || formData.urun_karti_id || "").trim();
         if (!cid) {
           try {
             const r = await axios.get(`${API}/products/meta/next-card-id`, { headers });
@@ -1114,7 +1020,7 @@ export default function AdminProducts() {
         }
         if (cid) {
           payload.urun_karti_id = cid;
-          payload.ticimax_fields = { ...(payload.ticimax_fields || {}), URUNKARTIID: cid };
+          payload.catalog_fields = { ...(payload.catalog_fields || {}), URUNKARTIID: cid };
         }
       }
 
@@ -1139,7 +1045,7 @@ export default function AdminProducts() {
   /**
    * handleDelete — Ürünü kalıcı olarak siler.
    *   Geriye dönük silmeyi önlemek için JS confirm ile onay alır. Silme başarılı
-   *   olduğunda liste tazelenir. Trendyol'da da hâlâ varsa oradan ayrıca
+   *   olduğunda liste tazelenir. harici kanal da hâlâ varsa oradan ayrıca
    *   kaldırılması gerekir (P2 backlog).
    */
   const handleDelete = async (id) => {
@@ -1310,7 +1216,7 @@ export default function AdminProducts() {
     }
     const ok = await window.appConfirm({
       title: `${selectedProducts.length} ürün silinsin mi?`,
-      description: "Bu işlem geri alınamaz. Ürünler kalıcı olarak silinecek ve varsa pazaryerlerindeki eşleşmeleri de etkilenebilir.",
+      description: "Bu işlem geri alınamaz. Ürünler kalıcı olarak silinecek.",
       confirmText: `Evet, ${selectedProducts.length} Ürünü Sil`,
       cancelText: "Vazgeç",
       variant: "danger",
@@ -1410,8 +1316,6 @@ export default function AdminProducts() {
     setFormData({
       id: product.id,
       category_id: product.category_id,
-      trendyol_category_id: product.trendyol_category_id,
-      hepsiburada_category_id: product.hepsiburada_category_id,
       name: product.name || "",
       slug: product.slug || "",
       description: product.description || "",
@@ -1483,9 +1387,6 @@ export default function AdminProducts() {
       meta_keywords: product.meta_keywords || "",
       use_default_markup: product.use_default_markup ?? true,
       markup_rate: product.markup_rate || 0,
-      trendyol_attributes: product.trendyol_attributes || {},
-      hepsiburada_attributes: product.hepsiburada_attributes || {},
-      temu_attributes: product.temu_attributes || {},
       // _stock0 = forma YÜKLENEN stok (temel). Sunucu bunu kullanarak "admin stoğa
       // dokunmadı" durumunu ayırt eder ve form açıkken gelen sipariş/iade hareketini
       // EZMEZ. Dokunulmuş alan (stock !== _stock0) ise aynen yazılır.
@@ -1510,7 +1411,7 @@ export default function AdminProducts() {
         }
         return base;
       })(),
-      ticimax_fields: { ...(product.ticimax_fields || {}), URUNKARTIID: ((product.ticimax_fields || {}).URUNKARTIID || product.urun_karti_id || "") },
+      catalog_fields: { ...(product.catalog_fields || {}), URUNKARTIID: ((product.catalog_fields || {}).URUNKARTIID || product.urun_karti_id || "") },
     });
     setModalOpen(true);
   };
@@ -1538,12 +1439,9 @@ export default function AdminProducts() {
       is_free_shipping: false, is_showcase: false,
       meta_title: "", meta_description: "", meta_keywords: "",
       use_default_markup: true, markup_rate: 0,
-      trendyol_attributes: {},
-      hepsiburada_attributes: {},
-      temu_attributes: {},
       variants: [], newVariant: {},
       attributes: {},
-      ticimax_fields: {},
+      catalog_fields: {},
     });
   };
 
@@ -1589,13 +1487,13 @@ export default function AdminProducts() {
   const updateDetailField = (key, val) =>
     setFormData((prev) => ({
       ...prev,
-      ticimax_fields: { ...(prev.ticimax_fields || {}), [key]: val },
+      catalog_fields: { ...(prev.catalog_fields || {}), [key]: val },
     }));
   const renderDetailFields = (groupLabels) => (
     <ProductDetailFields
-      schema={ticimaxSchema}
+      schema={catalogSchema}
       groupLabels={groupLabels}
-      values={formData.ticimax_fields || {}}
+      values={formData.catalog_fields || {}}
       onChange={updateDetailField}
     />
   );
@@ -1860,49 +1758,7 @@ export default function AdminProducts() {
         </button>
       </div>
 
-      {/* Toplu İşlemler — ürün aramanın altında dropdown (toolbar'dan taşındı) */}
-      <div className="relative mb-4" ref={toolsMenuRef}>
-        <button
-          onClick={() => setToolsMenuOpen((o) => !o)}
-          data-testid="bulk-tools-menu-btn"
-          className="flex items-center gap-2 px-4 py-2 border rounded bg-white hover:bg-gray-50 transition-colors font-medium text-sm shadow-sm"
-        >
-          <Layers size={18} className="text-gray-700" />
-          <span>Toplu İşlemler</span>
-          <ChevronDown size={16} className={`transition-transform ${toolsMenuOpen ? "rotate-180" : ""}`} />
-        </button>
-        {toolsMenuOpen && (
-          <div className="absolute left-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 z-30">
-            <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-              Ürün Toplu İşlemleri
-            </div>
-            {[
-              { label: "Silinen Özellik Kurtar", desc: "Snapshot'tan teknik detayları geri yükle", color: "bg-teal-600", on: handleSilinenOzellikKurtar, testid: "teknik-detay-recover-btn", icon: RefreshCw },
-              { label: "Eksik Açıklama Kurtar", desc: "Boş açıklamaları export'tan doldur", color: "bg-cyan-600", on: handleEksikAciklamaKurtar, testid: "aciklama-recover-btn", icon: RefreshCw },
-            ].map((it) => {
-              const Icon = it.icon;
-              return (
-                <button
-                  key={it.testid}
-                  data-testid={it.testid}
-                  onClick={() => { setToolsMenuOpen(false); it.on(); }}
-                  className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-gray-50 text-left transition-colors"
-                >
-                  <span className={`mt-0.5 w-7 h-7 shrink-0 rounded-md ${it.color} text-white flex items-center justify-center`}>
-                    <Icon size={14} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-gray-900">{it.label}</span>
-                    <span className="block text-xs text-gray-500 truncate">{it.desc}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Advanced Filters Panel — Ticimax tarzı 3 kolonlu gelişmiş filtre */}
+      {/* Gelişmiş filtre paneli — 3 kolonlu */}
       {showFilters && (
         <ProductFilters
           filters={filters}
@@ -2426,7 +2282,7 @@ export default function AdminProducts() {
                         />
                       </div>
 
-                      {/* Ticimax Senkronizasyon Kimlikleri */}
+                      {/* Entegrasyon kimlikleri */}
                       <div className="pt-3 border-t">
                         <div className="text-xs font-bold text-gray-500 uppercase mb-2">Entegrasyon Kodları</div>
                         <div className="grid grid-cols-2 gap-2">
@@ -2436,7 +2292,7 @@ export default function AdminProducts() {
                             <label className="block text-[10px] text-gray-400 mb-1">Ürün Kart ID</label>
                             <input
                               type="text"
-                              value={(formData.ticimax_fields || {}).URUNKARTIID || ""}
+                              value={(formData.catalog_fields || {}).URUNKARTIID || ""}
                               onChange={(e) => updateDetailField("URUNKARTIID", e.target.value)}
                               placeholder="—"
                               className="w-full border-gray-200 border px-3 py-2 rounded-lg font-mono text-xs bg-gray-50 focus:bg-white focus:border-black outline-none"
@@ -2446,7 +2302,7 @@ export default function AdminProducts() {
                             <label className="block text-[10px] text-gray-400 mb-1">GTİP Kodu</label>
                             <input
                               type="text"
-                              value={(formData.ticimax_fields || {}).GTIPKODU || ""}
+                              value={(formData.catalog_fields || {}).GTIPKODU || ""}
                               onChange={(e) => updateDetailField("GTIPKODU", e.target.value)}
                               placeholder="—"
                               className="w-full border-gray-200 border px-3 py-2 rounded-lg font-mono text-xs bg-gray-50 focus:bg-white focus:border-black outline-none"
@@ -2605,10 +2461,10 @@ export default function AdminProducts() {
                   const hiddenAttrNames = [
                     "beden", "renk", "web color", "yaka",
                     "alt siluet", "ust siluet", "silüet", "kesim", "ozellik", "stil",
-                    // DENETİM FIX: "urun icerik bilgisi" gizli listeden ÇIKARILDI — Trendyol'da
-                    // zorunlu "Materyal Bileşeni"ne bridge olur (integrations_trendyol.py:1474);
+                    // DENETİM FIX: "urun icerik bilgisi" gizli listeden ÇIKARILDI — harici kanal
+                    // zorunlu "Materyal Bileşeni"ne bridge olur ((kaldırılan entegrasyon));
                     // gizliyken yeni/boş üründe hiç girilemiyor → boş → push'ta atlanıyordu.
-                    // "materyal/kimyasal analiz testi" gizli KALIR (Trendyol dosya/sertifika ister).
+                    // "materyal/kimyasal analiz testi" gizli KALIR (harici kanal dosya/sertifika ister).
                     "kumas", "yikama talimati", "materyal analiz testi",
                     "kimyasal analiz testi", "ürün tipi", "ürün detayı",
                   ].map(_attrNorm);
@@ -2682,7 +2538,7 @@ export default function AdminProducts() {
                       || _catalogDefaults[name] || FIXED_DEFAULT_ATTRS[name]
                       || _companyValFor(name) || "";
                     // Sabit varsayılanları bu bölümün listesinde yoksa DOLU satır olarak ekle
-                    // (özellikle HB: kategori seçilmeden liste boş kalıyordu).
+                    // (özellikle harici kanal: kategori seçilmeden liste boş kalıyordu).
                     const _present = new Set((sourceList || []).map(a => (a.name || "").toLocaleLowerCase("tr")));
                     const fixedRows = Object.keys(FIXED_DEFAULT_ATTRS)
                       .filter(nm => !_present.has(nm.toLocaleLowerCase("tr"))
@@ -2691,8 +2547,8 @@ export default function AdminProducts() {
                     const sourceListAll = [...(sourceList || []), ...fixedRows];
 
                     // Mükerrer fix: Teknik Detay panelinde gösterilen etiketler (Materyal, Kalıp, Kumaş...)
-                    // pazaryeri özellik bölümlerinde TEKRAR listelenmez — tek kaynak. (HB kendi şema isimlerini
-                    // kullandığı için pratikte Trendyol/Temu bölümlerini etkiler.) Değer yine kaydedilir.
+                    // pazaryeri özellik bölümlerinde TEKRAR listelenmez — tek kaynak. (harici kanal kendi şema isimlerini
+                    // kullandığı için pratikte harici kanal bölümlerini etkiler.) Değer yine kaydedilir.
                     const _techNames = new Set(
                       Object.values(technicalDetails || {})
                         .map(t => (t?.label || "").toLocaleLowerCase('tr').trim())

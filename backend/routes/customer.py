@@ -180,7 +180,7 @@ async def cancel_my_order(order_id: str, payload: dict = Body(default={}), curre
 _CARGO_NAME_MAP = {
     "MNG": "MNG Kargo", "DHL": "DHL", "Yurtici": "Yurtiçi Kargo",
     "Aras": "Aras Kargo", "PTT": "PTT Kargo", "UPS": "UPS",
-    "HepsiJet": "HepsiJet", "Trendyol": "Trendyol Express", "Other": "Kargo",
+    "Other": "Kargo",
 }
 
 

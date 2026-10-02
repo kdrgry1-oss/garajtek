@@ -1,6 +1,6 @@
 """
 Lightweight in-process circuit breaker for outbound integrations
-(Trendyol/DHL/Iyzico/Doğan etc.). Prevents thundering herd toward a
+(harici kanal/DHL/Iyzico/Doğan etc.). Prevents thundering herd toward a
 broken upstream and surfaces "tripped" state to the dashboard.
 """
 from __future__ import annotations

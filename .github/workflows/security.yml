@@ -8,7 +8,7 @@ name: Security Scan
 # NOT: Bu tarama KODU denetler; CANLI saldırı tespiti DEĞİLDİR (onu Cloudflare WAF +
 # uygulamadaki rate-limit/ban katmanı yapar). Tarayıcının çalışamaması ve secret
 # bulgusu job'u kırmızı yapar; ayrıntılar Security sekmesi + Summary'de görünür.
-# (Amazon SP-API Restricted Role / DPP: otomatik SAST + secret + bağımlılık taraması.)
+# (Otomatik SAST + secret + bağımlılık taraması.)
 
 on:
   push:

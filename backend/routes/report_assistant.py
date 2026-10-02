@@ -3,7 +3,7 @@
 Yönetici doğal dille (yazarak ya da sesli) rapor sorusu sorar; dil modeli sistemin
 KENDİ rapor fonksiyonlarını araç olarak çağırarak cevap verir. Model rakam UYDURMAZ:
 her sayı, raporlar ekranının kullandığı aynı hesaplardan (dönem muhasebesi, kohort
-net, gider pusulası = iade, TR yerel gün sınırları, mükerrer/ticimax elemeleri) gelir.
+net, gider pusulası = iade, TR yerel gün sınırları, mükerrer/eski altyapı elemeleri) gelir.
 
 Sağlayıcı: önce Gemini, olmazsa (anahtar yok / kota / hata) OpenAI.
 
@@ -27,11 +27,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from .deps import db, limiter, logger, require_admin
+from sales_channels import channel_label as _ch_label
 
 router = APIRouter(prefix="/admin/reports/assistant", tags=["report-assistant"])
 
 _TR = timedelta(hours=3)
-_KANALLAR = ["all", "site", "trendyol", "hepsiburada", "amazon", "temu"]
+_KANALLAR = ["all", "site", "other"]
 _MAX_TUR = 6            # model ↔ araç gidiş-dönüş sınırı (sonsuz döngü olmasın)
 _MAX_SONUC = 14000      # tek araç çıktısının modele giden en fazla karakteri
 _MAX_SES = 10 * 1024 * 1024
@@ -177,7 +178,7 @@ async def _t_zaman_serisi(a, u):
 _URUN_ALANLARI = ("name", "stock_code", "category", "category_name", "qty", "revenue",
                   "gross_revenue", "discount_amount", "cancel_qty", "cancel_total", "return_qty",
                   "return_total", "current_stock", "best_size", "top_platform",
-                  "return_rate_excluding_cancels_pct", "trendyol_return_rate_pct")
+                  "return_rate_excluding_cancels_pct", "gross_return_rate_pct")
 
 
 async def _t_urun_raporu(a, u):
@@ -339,13 +340,13 @@ async def _t_siparis(a, u):
            async for g in db.gider_pusulasi.find(
                {"order_number": no},
                {"_id": 0, "number": 1, "display_number": 1, "created_at": 1, "totals.net": 1})]
-    talep = [{"statu": c.get("claim_status"), "acilis": _tr_saat(c.get("created_date")),
-              "onay": _tr_saat(c.get("return_approved_at"))}
-             async for c in db.trendyol_claims.find(
+    talep = [{"statu": r.get("status"), "acilis": _tr_saat(r.get("created_at")),
+              "onay": _tr_saat((r.get("approval") or {}).get("at"))}
+             async for r in db.customer_returns.find(
                  {"order_number": no},
-                 {"_id": 0, "claim_status": 1, "created_date": 1, "return_approved_at": 1})]
+                 {"_id": 0, "status": 1, "created_at": 1, "approval.at": 1})]
     return {
-        "siparis_no": no, "kanal": o.get("platform") or "site",
+        "siparis_no": no, "kanal": _ch_label(o.get("platform") or o.get("marketplace")),
         "statu": _STATU_TR.get(str(o.get("status")), o.get("status")),
         "siparis_tarihi_TR": _tr_saat(o.get("marketplace_order_date") or o.get("created_at")),
         "iptal_tarihi_TR": _tr_saat(o.get("cancelled_at")) if o.get("cancelled_at") else None,
@@ -540,11 +541,11 @@ _K = {"type": "string", "enum": _KANALLAR, "description": "Kanal; 'all' = tüm k
 ARACLAR: dict[str, tuple] = {
     "donem_ozeti": (_t_donem_ozeti,
         "Bir dönemin ciro özeti: brüt ciro, iptal, iade, DÖNEM (muhasebe) net'i, BU DÖNEMİN "
-        "SATIŞININ net'i (kohort — pazaryeri panelleriyle kıyaslanan), önceki aylara ait iade/"
+        "SATIŞININ net'i (kohort), önceki aylara ait iade/"
         "iptal, açık iade talepleri. Ciro/net/iade/iptal sorularının çoğu için ilk araç.",
         {"start_date": _T(), "end_date": _T(), "kanal": _K}),
     "kanal_tablosu": (_t_kanal_tablosu,
-        "Kanal kanal (Site, Trendyol, Hepsiburada, Amazon, Temu) brüt/iptal/iade/net ve açık iade.",
+        "Kanal kanal (Web Sitesi / Diğer kanal) brüt/iptal/iade/net ve açık iade.",
         {"start_date": _T(), "end_date": _T()}),
     "zaman_serisi": (_t_zaman_serisi,
         "Gün gün, hafta hafta ya da ay ay net ciro ve sipariş serisi. Trend ve kıyas soruları için.",
@@ -559,7 +560,7 @@ ARACLAR: dict[str, tuple] = {
          "limit": {"type": "integer"}}),
     "kategori_raporu": (_t_kategori, "Kategori kategori satış adedi ve ciro.",
         {"start_date": _T(), "end_date": _T(), "kanal": _K}),
-    "odeme_yontemleri": (_t_odeme, "Ödeme yöntemine göre (kart, havale, kapıda, pazaryeri) sipariş ve ciro.",
+    "odeme_yontemleri": (_t_odeme, "Ödeme yöntemine göre (kart, havale, kapıda) sipariş ve ciro.",
         {"start_date": _T(), "end_date": _T(), "kanal": _K}),
     "saat_gun_analizi": (_t_saat_gun,
         "Satışların saatlere (TR saati) ya da haftanın günlerine dağılımı ve zirve.",
@@ -672,13 +673,12 @@ SİSTEMİN SAYMA KURALLARI (cevaplarken bunlara göre açıkla)
 - İptal, iptalin kesinleştiği güne; İADE yalnız koçan numarası atanmış GİDER PUSULASI
   kesildiğinde ve pusulanın tarihine yazılır. Açık/onaylanmamış iade talebi satış sayılır.
 - İki net vardır: "net_BU_DONEMIN_SATISININ" (kohort: bu dönemde satılanın net'i —
-  Trendyol/HB panelleriyle kıyaslanacak olan, ticari performans) ve "net_DONEM_muhasebe"
+  ticari performans) ve "net_DONEM_muhasebe"
   (bu dönemde kesinleşen TÜM iptal/iadeler düşülür, önceki ayların siparişlerinden gelenler
   dahil). "Net satış ne?" sorusuna varsayılan olarak kohort net'i ver, muhasebe net'ini
   ayrıca belirt.
-- Trendyol panelindeki sipariş sayısı iptallerin bir kısmını saymaz; "Siparişleriniz"
-  Excel'i iptalleri hiç içermez. Bu yüzden panel sayısı bizden biraz düşük olabilir.
-- Kanal anahtarları: site, trendyol, hepsiburada, amazon, temu.
+- Mağazanın tek satış kanalı web sitesidir. Kanal anahtarları: site, other (geçmişten
+  kalan, site dışı kayıtlar — adı verilmez, "Diğer kanal" denir).
 
 EXCEL / DOSYA
 - Kullanıcı Excel, liste, dosya, indir, tablo olarak ver derse excel_olustur aracını çağır.
@@ -779,7 +779,7 @@ async def assistant_chat(request: Request, payload: dict,
     gecmis = _gecmisi_temizle(payload.get("messages"))
     if not gecmis:
         raise HTTPException(status_code=400, detail="Soru boş")
-    try:  # raporların ticimax-kopya elemesi için önbellek (rapor router'ı bunu kendisi yapar)
+    try:  # raporların eski altyapı-kopya elemesi için önbellek (rapor router'ı bunu kendisi yapar)
         from .report_dedup import load_dup_order_numbers
         await load_dup_order_numbers()
     except Exception:

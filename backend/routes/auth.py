@@ -27,7 +27,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 # kullanıcıda da bu sabit dummy hash'e karşı bcrypt.checkpw çalıştırıp süreyi eşitleriz.
 _DUMMY_PW_HASH = "$2b$12$C6UzMDM.H6dfI/f/IKcEeO3G1xIS3vJhWvNqfa5eLPBz3XjE5rLZC"
 
-# ── Amazon DPP §7: personel/admin şifre geçmişi + yaş politikası ─────────────
+# ── harici kanal DPP §7: personel/admin şifre geçmişi + yaş politikası ─────────────
 _PW_HISTORY_KEEP = 10          # son 10 şifre tekrar kullanılamaz
 _PW_MIN_AGE_HOURS = 24         # min yaş: 1 gün (yalnız kullanıcı-başlatan değişimde)
 _PW_MAX_AGE_DAYS = 365         # max ömür: 365 gün (login'de flag)
@@ -442,7 +442,7 @@ async def login(request: Request):
             "mfa_token": create_mfa_pending_token(user["id"]),
         }
 
-    # ZORUNLU MFA (Amazon DPP): admin MFA kurmamışsa —
+    # ZORUNLU MFA (harici kanal DPP): admin MFA kurmamışsa —
     #  • Hesabın KAYITLI TELEFONU varsa: kurulum ekranı GÖSTERME; OTOMATİK SMS gönder ve
     #    doğrudan OTP adımına geç (telefon girmeye gerek yok, her e-posta kendi numarasıyla).
     #  • Hiç telefon yoksa: mfa_setup_required=True (bir kere numara girilir).
@@ -490,7 +490,7 @@ async def login(request: Request):
     await write_audit_log("login", user_id=user["id"], email=email,
                           ip=ip, user_agent=ua, success=True)
 
-    # Amazon DPP §7: personel/admin şifresi 365 günden eskiyse flag (bloklamaz — panel değişim ister).
+    # harici kanal DPP §7: personel/admin şifresi 365 günden eskiyse flag (bloklamaz — panel değişim ister).
     # Bu bilgilendirme flag'i HİÇBİR koşulda login'i kıramaz → tamamen try/except'te.
     _pw_expired = False
     try:
@@ -768,7 +768,7 @@ async def change_password(
     new = safe_str((payload or {}).get("new_password", ""), 200)
     if not cur or not new:
         raise HTTPException(status_code=400, detail="Mevcut ve yeni şifre zorunlu")
-    # Personel/admin hesapları için güçlü şifre politikası (Amazon DPP); müşteri min 6
+    # Personel/admin hesapları için güçlü şifre politikası (harici kanal DPP); müşteri min 6
     if current_user.get("is_admin"):
         validate_strong_password(new, identifiers=[current_user.get("email"), current_user.get("name")])
     elif len(new) < 8:
@@ -781,7 +781,7 @@ async def change_password(
             success=False, meta={"reason": "wrong_current_password"},
         )
         raise HTTPException(status_code=400, detail="Mevcut şifre hatalı")
-    # Amazon DPP §7 (personel/admin): son-10 tekrar yasağı + min yaş (24s).
+    # harici kanal DPP §7 (personel/admin): son-10 tekrar yasağı + min yaş (24s).
     if user.get("is_admin"):
         _enforce_pw_history(user, new)
         _pca = _parse_iso_dt(user.get("password_changed_at"))
@@ -991,7 +991,7 @@ async def forgot_password_reset(req: OTPResetReq):
     if not user_id:
         raise HTTPException(status_code=400, detail="Kullanıcı bulunamadı")
 
-    # Amazon DPP §7: reset'te de son-10 tekrar yasağı (personel/admin). Min-yaş reset'te UYGULANMAZ (güvenlik).
+    # harici kanal DPP §7: reset'te de son-10 tekrar yasağı (personel/admin). Min-yaş reset'te UYGULANMAZ (güvenlik).
     _u = await db.users.find_one({"id": user_id}) or {}
     if _u.get("is_admin"):
         _enforce_pw_history(_u, req.new_password)

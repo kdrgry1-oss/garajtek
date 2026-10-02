@@ -34,7 +34,7 @@ export default function Dashboard() {
     order_status_breakdown: {}
   });
   const [dateRange, setDateRange] = useState("0"); // days — varsayılan: bugün (0)
-  const [platform, setPlatform] = useState("all"); // all | site | trendyol | hepsiburada | ...
+  const platform = "all"; // tek satış kanalı: web sitesi (eski kayıtlar dahil toplam)
 
   useEffect(() => {
     fetchStats();
@@ -72,7 +72,7 @@ export default function Dashboard() {
     card: "Kredi Kartı", credit_card: "Kredi Kartı", iyzico: "Kredi Kartı",
     bank_transfer: "Havale/EFT", havale: "Havale/EFT", eft: "Havale/EFT",
     cash_on_delivery: "Kapıda Ödeme", kapida: "Kapıda Ödeme", cod: "Kapıda Ödeme",
-    marketplace: "Pazaryeri", trendyol: "Trendyol", hepsiburada: "Hepsiburada", "diğer": "Diğer",
+    marketplace: "Diğer kanal", other: "Diğer kanal", "diğer": "Diğer",
   };
 
   const trendLabel = ({ "0": "düne göre", "7": "önceki haftaya göre", "30": "geçen aya göre",
@@ -155,19 +155,6 @@ export default function Dashboard() {
           <p className="text-sm text-gray-500 mt-1">Mağaza performansı ve istatistikleri</p>
         </div>
         <div className="flex items-center gap-3">
-          <select
-            value={platform}
-            onChange={(e) => setPlatform(e.target.value)}
-            className="border px-3 py-2 rounded-lg text-sm"
-            title="Platforma göre filtrele"
-          >
-            <option value="all">Tüm Platformlar</option>
-            <option value="site">Sadece Site</option>
-            <option value="trendyol">Trendyol</option>
-            <option value="hepsiburada">Hepsiburada</option>
-            <option value="ticimax">Ticimax</option>
-            <option value="temu">Temu</option>
-          </select>
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
@@ -256,7 +243,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Katalog + sepet ortalaması + cevap bekleyen (Ticimax "İstatistikler" seti) */}
+      {/* Katalog + sepet ortalaması + cevap bekleyen (istatistik seti) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard title="Sepet Ortalaması" value={fmtTL(stats.avg_cart)} icon={ShoppingBag} color="bg-indigo-500" />
         <StatCard title="Satıştaki Kategori" value={stats.total_categories || 0} icon={Layers} color="bg-teal-500" />

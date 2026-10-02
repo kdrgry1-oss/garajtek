@@ -333,7 +333,7 @@ class TestCustomerEndpoints:
 
 
 class TestIntegrationStatusEndpoints:
-    """Integration status endpoints tests (Iyzico, Trendyol, GIB)"""
+    """Integration status endpoints tests (Iyzico, GIB)"""
     
     def test_payment_status(self):
         """Test Iyzico payment status endpoint"""

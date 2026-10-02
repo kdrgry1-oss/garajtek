@@ -6,7 +6,7 @@
  * AMAÇ:
  *   Google arama görünümünü kontrol eden meta_title ve meta_description
  *   alanlarını düzenlemek. Frontend product detay sayfasında <Helmet> ile
- *   okunur; Trendyol'a gönderimde de bazı kanallar bu bilgileri kullanır.
+ *   okunur; harici kanal gönderimde de bazı kanallar bu bilgileri kullanır.
  *
  * PROPS:
  *   - formData    : Üst formun mevcut değeri.

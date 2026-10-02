@@ -1,17 +1,17 @@
 """
-Ticimax 113 sütunluk Ürün export şeması.
+113 sütunluk ürün katalog alanı şeması (Excel içe/dışa aktarım kolonları).
 
-Bu modül; ürün kartı arayüzünde tüm Ticimax alanlarının düzenlenebilir
+Bu modül; ürün kartı arayüzünde ek katalog alanlarının düzenlenebilir
 olarak gösterilmesi (gruplu) ve Excel import sırasında değerlerin
 normalize edilmesi için tek doğruluk kaynağıdır.
 
-Veriler ürün dökümanında `ticimax_fields` (Dict[str, Any]) altında,
-orijinal Ticimax kolon adlarıyla saklanır.
+Veriler ürün dökümanında `catalog_fields` (Dict[str, Any]) altında,
+kolon adlarıyla saklanır.
 """
 from __future__ import annotations
 from typing import Any, List, Dict
 
-# Orijinal Ticimax kolon sırası (113 alan)
+# Kolon sırası (113 alan)
 ORDERED_COLUMNS: List[str] = [
     "URUNKARTIID", "URUNID", "STOKKODU", "VARYASYONKODU", "BARKOD", "GTIPKODU",
     "URUNADI", "ONYAZI", "ACIKLAMA", "SATISBIRIMI", "ANAHTARKELIME",

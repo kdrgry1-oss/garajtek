@@ -20,7 +20,7 @@ const TARGETS = [
   },
   {
     value: "generic",
-    label: "Genel (diğer pazaryeri/araç)",
+    label: "Genel (diğer araçlar)",
     desc: "Standart ürün-seviyesi RSS (g:) feed. RSS/Google formatı kabul eden her araçta kullanılabilir.",
   },
 ];

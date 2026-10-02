@@ -1,5 +1,5 @@
 """
-Mağaza sabit öznitelik varsayılanları — TÜM pazaryerleri (Trendyol / Hepsiburada / Temu) için ORTAK.
+Mağaza sabit öznitelik varsayılanları — TÜM pazaryerleri (harici kanal) için ORTAK.
 
 Tasarım:
 - Pazaryerine BAĞIMSIZ. Değerler İSİMLE tutulur (value_id değil); her pazaryeri push

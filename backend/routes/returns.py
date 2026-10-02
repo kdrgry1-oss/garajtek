@@ -1,8 +1,8 @@
 """
 returns.py — Site iadeleri için toplu gider pusulası (İadeler sayfası).
 
-Eskiden `/integrations/trendyol/claims/gp-bulk-range` ucunda pazaryeri iadeleriyle
-(trendyol_claims) tek havuzda çalışıyordu. Pazaryeri entegrasyonları kaldırıldığı için
+Eskiden `/integrations/harici kanal/claims/gp-bulk-range` ucunda pazaryeri iadeleriyle
+(harici kanal) tek havuzda çalışıyordu. Pazaryeri entegrasyonları kaldırıldığı için
 yalnız SİTE iadeleri (customer_returns) için nötr bir modüle taşındı. Tekil pusula
 kesimi `routes.orders.site_return_gider_pusulasi` ile AYNI mantığı kullanır.
 

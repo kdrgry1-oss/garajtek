@@ -9,7 +9,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 // Storefront — sadece ana sayfa (LCP) eager; gerisi route'a girilince yüklenir.
 // Bu, ilk açılışta indirilen JS'i ciddi şekilde küçültür (mobil TBT/LCP/FCP iyileşir).
 import Home from "./pages/Home";
-const GizlilikPolitikasi = lazy(() => import("./pages/GizlilikPolitikasi"));
 const Category = lazy(() => import("./pages/Category"));
 const CampaignProducts = lazy(() => import("./pages/CampaignProducts"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
@@ -158,7 +157,8 @@ function App() {
                 <Route path="/odeme" element={<Checkout />} />
                 <Route path="/arama" element={<Search />} />
                 <Route path="/sayfa/:slug" element={<StaticPage />} />
-                <Route path="/gizlilik" element={<GizlilikPolitikasi />} />
+                <Route path="/gizlilik" element={<Navigate to="/sayfa/gizlilik" replace />} />
+                <Route path="/gizlilik-politikasi" element={<Navigate to="/sayfa/gizlilik" replace />} />
                 <Route path="/sikca-sorulan-sorular" element={<FAQ />} />
                 <Route path="/sss" element={<FAQ />} />
                 <Route path="/hesabim" element={<Account />} />

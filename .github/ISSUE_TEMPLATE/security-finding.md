@@ -5,7 +5,7 @@ title: "🔐 Security: <kısa özet>"
 labels: security
 ---
 
-<!-- Amazon DPP §10 Vulnerability Management — zorunlu alanlar -->
+<!-- Zafiyet yönetimi — zorunlu alanlar -->
 
 - **Discovery date:** <YYYY-MM-DD>
 - **Affected system:** <backend / frontend / infra / repo / entegrasyon>

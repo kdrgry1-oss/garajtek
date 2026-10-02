@@ -2,7 +2,7 @@
 help_center.py — Eğitim / Yardım Merkezi içeriği (çok-kiracılı / SaaS).
 
 AMAÇ:
-  Ticimax'in "destekalanı"na benzer yardım/yönerge alanı. İçerik KODA GÖMÜLÜ
+  eski altyapı "destekalanı"na benzer yardım/yönerge alanı. İçerik KODA GÖMÜLÜ
   DEĞİLDİR — admin panelinden düzenlenebilir. Böylece bu sistemi kullanan her
   firma kendi bilgilerini, kendi yönergelerini girebilir; başka bir firma
   sistemi kullandığında varsayılan metinler yerine kendi içeriğini yazar.

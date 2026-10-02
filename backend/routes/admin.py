@@ -16,7 +16,7 @@ async def get_dashboard_stats(
 ):
     """Admin dashboard istatistikleri.
 
-    days: aralık (gün). platform: 'all' | 'site' | 'trendyol' | 'hepsiburada' | 'ticimax' | ...
+    days: aralık (gün). platform: 'all' | 'site' | 'other'.
     TÜM hesaplar MongoDB aggregation ile yapılır (eski .to_list(1000) limiti KALDIRILDI) →
     28k+ siparişte grafik/ciro/gün eksiksiz gelir; önceki günler/aylar 0 görünmez.
     """
@@ -43,26 +43,19 @@ async def get_dashboard_stats(
         prev_end_iso = prev_end.isoformat()
         today_iso = today_midnight.isoformat()
 
-        # ── Platform filtresi (sadece site / sadece trendyol / sadece hb ...) ──
+        # ── Kanal filtresi: all | site | other (bkz. sales_channels.py) ──
+        from sales_channels import source_filter as _src_filter
         _pf = (platform or "all").strip().lower()
-        if _pf in ("", "all", "hepsi", "tumu", "tümü"):
-            plat_match = {}
-        elif _pf in ("site", "web", "storefront"):
-            plat_match = {"$or": [
-                {"platform": {"$in": ["web", "site", "storefront"]}},
-                {"platform": {"$in": [None, ""]}},
-                {"platform": {"$exists": False}},
-            ]}
-        else:
-            plat_match = {"platform": _pf}
+        plat_match = _src_filter(_pf) or {}
 
         _rev = {"$convert": {"input": "$total", "to": "double", "onError": 0, "onNull": 0}}
 
         def _with(*extra):
-            m = dict(plat_match)
+            m = {}
             for e in extra:
                 m.update(e)
-            return m
+            # Kanal koşulu $and ile eklenir → ekstra koşullardaki $or/$and'i EZMEZ.
+            return {"$and": [plat_match, m]} if plat_match else m
 
         # Ciro/sipariş sayımı: iptal/başarısız/iade edilmiş siparişler GELİR DEĞİL → dışla
         # (denetim: total_revenue eskiden iptal+ödenmemişi de topluyordu, ciro şişiyordu).
@@ -94,7 +87,7 @@ async def get_dashboard_stats(
         growth_revenue = ((total_revenue - prev_revenue) / max(prev_revenue, 1)) * 100 if prev_revenue else 0
 
         # Bekleyen/Kargodaki: TÜM-zaman yerine platform + seçili aralık (anlamlı/aksiyon bekleyen).
-        # Eski hâli 11.914 gibi pazaryeri-şişkin toplamlar gösteriyordu.
+        # Eski hâli tüm zamanların şişkin toplamlarını gösteriyordu.
         pending_orders = await db.orders.count_documents(_with({"status": "pending", "created_at": {"$gte": start_iso}}))
         shipped_orders = await db.orders.count_documents(_with({"status": "shipped", "created_at": {"$gte": start_iso}}))
 
@@ -158,7 +151,7 @@ async def get_dashboard_stats(
                         "created_at": 1, "platform": 1}
         ).sort("created_at", -1).limit(5).to_list(5)
 
-        # En çok satan ürünler — ürün adını name/title/product_name'den ÇÖZ (pazaryeri
+        # En çok satan ürünler — ürün adını name/title/product_name'den ÇÖZ (içe aktarılmış
         # kalemlerinde 'name' boş olabiliyor → adsız dev bir kalem #1 çıkıyordu). Boş adları ele.
         top_agg = await db.orders.aggregate([
             {"$match": _with({"created_at": {"$gte": start_iso}})},
@@ -216,18 +209,11 @@ async def get_dashboard_stats(
             total_brands = len([b for b in _brands if b and str(b).strip()])
         except Exception:
             total_brands = 0
-        # Sipariş gelen KAYNAKLAR (dinamik platform filtresi için) — pazaryeri değerleri
+        # Site dışı (geçmişten kalan) kanal kayıtları varsa tek "other" kovası olarak bildirilir.
         try:
-            _pl_agg = await db.orders.aggregate([
-                {"$group": {"_id": "$platform", "count": {"$sum": 1}}},
-                {"$sort": {"count": -1}},
-            ]).to_list(50)
-            available_platforms = []
-            for r in _pl_agg:
-                _key = r.get("_id")
-                if _key in (None, "", "web", "site", "storefront"):
-                    continue  # 'Sadece Site' seçeneği ayrı ekleniyor
-                available_platforms.append({"platform": str(_key), "count": r.get("count", 0)})
+            from sales_channels import other_match as _other_match
+            _oc = await db.orders.count_documents(_other_match())
+            available_platforms = [{"platform": "other", "count": _oc}] if _oc else []
         except Exception:
             available_platforms = []
 

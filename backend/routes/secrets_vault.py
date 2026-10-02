@@ -40,7 +40,7 @@ class SecretIn(BaseModel):
     key: str = Field(..., min_length=2, max_length=120)
     value: str = Field(..., min_length=1, max_length=8192)
     description: Optional[str] = None
-    scope: Optional[str] = "global"   # global | trendyol | iyzico | dhl | dogan | resend ...
+    scope: Optional[str] = "global"   # global | harici kanal | iyzico | dhl | dogan | resend ...
 
 
 @router.post("/secret")

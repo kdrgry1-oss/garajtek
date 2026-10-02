@@ -9,14 +9,15 @@ import time
 import logging
 from datetime import datetime, timezone, timedelta
 import uuid
+from sales_channels import site_match as _sc_site_match
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 
 # Periyodik stok/fiyat senkronları için HAFİF ürün projeksiyonu: fiyat/stok/SKU mantığının
-# kullanmadığı büyük alanlar hariç (görseller, açıklamalar, Ticimax ham alanları, SEO metinleri).
+# kullanmadığı büyük alanlar hariç (görseller, açıklamalar, eski altyapı ham alanları, SEO metinleri).
 _LIGHT_PRODUCT_PROJ = {"_id": 0, "images": 0, "description": 0, "short_description": 0,
-                       "long_description": 0, "ticimax_fields": 0, "seo_description": 0,
+                       "long_description": 0, "catalog_fields": 0, "seo_description": 0,
                        "meta_description": 0, "video_url": 0, "videos": 0}
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def havale_unpaid_query(cutoff_dt):
         "payment_status": {"$nin": ["paid", "expired", "refunded"]},
         "status": {"$in": HAVALE_UNPAID_STATUSES},
         "payment_method": HAVALE_METHOD_RX,
-        "platform": {"$nin": ["trendyol", "hepsiburada", "amazon", "n11", "etsy"]},
+        "$and": _sc_site_match()["$and"],   # yalnız site siparişleri
         "$or": [{"created_at": {"$lt": cutoff_iso, "$gte": HAVALE_SWEEP_SINCE}},
                 {"created_at": {"$lt": cutoff_dt, "$gte": since_dt}}],
     }
@@ -295,11 +296,10 @@ async def auto_cancel_unpaid_card_orders():
         query = {
             "payment_status": {"$in": ["pending", "failed"]},
             "status": {"$in": ["pending", "awaiting_payment"]},
-            # DENETİM (2026-09-29): pazaryeri siparişi (Amazon 'Pending', HB bilinmeyen statü →
-            # pending/pending) iyzico kaydı olmadığından bu süpürgeye takılıp iptal + stok iadesi
-            # alıyordu (oversell). Yalnız SİTE kart siparişleri süpürülür.
+            # DENETİM (2026-09-29): site dışı kanal kaydı (iyzico kaydı olmayan) bu süpürgeye
+            # takılıp iptal + stok iadesi almasın. Yalnız SİTE kart siparişleri süpürülür.
             "payment_method": {"$nin": _cod_bank + ["marketplace"]},
-            "platform": {"$nin": ["trendyol", "hepsiburada", "amazon", "temu", "n11"]},
+            "$and": _sc_site_match()["$and"],
             "$or": [
                 {"created_at": {"$lt": cutoff}},
                 {"$and": [{"created_at": {"$lt": cutoff_abandoned}}, _no_attempt]},
@@ -788,7 +788,7 @@ async def _ensure_restock_delta_backfill():
 async def _ensure_consignment_removed():
     """Tek seferlik: KONSİNYE STOK alanını veritabanından da tamamen kaldır.
 
-    Kullanıcı kararı ("konsinye stoğu tamamen sil sistemden"). Alan Ticimax Excel'inden
+    Kullanıcı kararı ("konsinye stoğu tamamen sil sistemden"). Alan eski altyapı Excel'inden
     gelmişti, HİÇBİR hesaplamada kullanılmıyordu (ölü alan) — koddan çıkarıldı, burada
     ürün belgelerinden de silinir. Bayrak (settings.consignment_removed_v1) bir kez uygular.
     Yalnız bu iki alanı $unset eder; başka hiçbir veriye dokunmaz.
@@ -800,16 +800,16 @@ async def _ensure_consignment_removed():
         r1 = await db.products.update_many(
             {"consignment_stock": {"$exists": True}}, {"$unset": {"consignment_stock": ""}})
         r2 = await db.products.update_many(
-            {"ticimax_fields.KONSINYESTOKADEDI": {"$exists": True}},
-            {"$unset": {"ticimax_fields.KONSINYESTOKADEDI": ""}})
+            {"catalog_fields.KONSINYESTOKADEDI": {"$exists": True}},
+            {"$unset": {"catalog_fields.KONSINYESTOKADEDI": ""}})
         await db.settings.update_one(
             {"id": "consignment_removed_v1"},
             {"$set": {"id": "consignment_removed_v1",
                       "applied_at": datetime.now(timezone.utc).isoformat(),
-                      "products": r1.modified_count, "ticimax_fields": r2.modified_count}},
+                      "products": r1.modified_count, "catalog_fields": r2.modified_count}},
             upsert=True)
         logger.info(f"[scheduler] Konsinye stok alanı silindi "
-                    f"(ürün: {r1.modified_count}, ticimax_fields: {r2.modified_count})")
+                    f"(ürün: {r1.modified_count}, catalog_fields: {r2.modified_count})")
     except Exception as e:
         logger.warning(f"[scheduler] _ensure_consignment_removed failed: {e}")
 
@@ -1747,7 +1747,7 @@ def start_scheduler():
         misfire_grace_time=3600,
     )
     # Tek seferlik: geçmiş iptallerin tarihini kanıttan çıkar ve DONDUR.
-    # SIRA ÖNEMLİ: iptal damgası basabilen TÜM işlerden (Trendyol iptal taraması +30 sn,
+    # SIRA ÖNEMLİ: iptal damgası basabilen TÜM işlerden (harici kanal iptal taraması +30 sn,
     # pazaryeri senkron tick'i +45 sn) ÖNCE çalışmalı; aksi halde onların "şimdi"
     # damgası kanıta dayalı tarihin yerini kapar (2026-09-23 olayı). Bayrak 'done'
     # olduğunda no-op; bu sıralama yeni kurulumlar içindir.

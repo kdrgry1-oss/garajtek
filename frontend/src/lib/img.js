@@ -1,12 +1,11 @@
 // Görsel optimizasyon yardımcısı — LCP/CLS ve ağ ağırlığını düşürmek için.
-// - Ticimax (Cloudflare) görsellerinde cdn-cgi/image resize param'ları kullanılır
+// - eski altyapı (Cloudflare) görsellerinde cdn-cgi/image resize param'ları kullanılır
 //   (width + quality + format=auto → otomatik WebP/AVIF).
 // - Kendi sunucumuzdaki /api/files veya /api/upload/files görsellerinde ?w=&q=
 //   query param'larıyla backend on-the-fly WebP resize devreye girer.
 
-const TCMX = "static.ticimax.cloud";
 // Cloudflare R2 özel domaini — Image Transformations (cdn-cgi/image) ile dinamik
-// AVIF/WebP + resize sunar (Ticimax ile aynı yöntem).
+// AVIF/WebP + resize sunar (eski altyapı ile aynı yöntem).
 // Host build-time env'den (REACT_APP_CDN_URL, ör. "https://cdn.ornek.com"); boşsa devre dışı.
 const R2_CDN = (() => {
   try {
@@ -41,20 +40,6 @@ export function optimizeImg(url, width = 800, quality = 75) {
       return url.replace(/-\d+\.webp/i, `-${target}.webp`);
     }
     return url;
-  }
-
-  // Ticimax Cloudflare CDN
-  if (url.includes(TCMX)) {
-    // Varsa mevcut cdn-cgi transform'unu soy → orijinal path'i al
-    let path = url;
-    const m = url.match(/static\.ticimax\.cloud\/cdn-cgi\/image\/[^/]+\/(.*)$/i);
-    if (m) {
-      path = `https://${TCMX}/${m[1]}`;
-    }
-    return path.replace(
-      `https://${TCMX}/`,
-      `https://${TCMX}/cdn-cgi/image/width=${width},quality=${quality},format=auto/`
-    );
   }
 
   // Kendi sunucumuz (MongoDB'den servis edilen yüklenmiş görseller)

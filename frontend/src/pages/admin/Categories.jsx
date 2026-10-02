@@ -136,8 +136,8 @@ export default function AdminCategories() {
       .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
       .map((c) => ({
         ...c,
-        id: c.id || c.ticimax_id || c._id,
-        children: buildTree(cats, c.id || c.ticimax_id, depth + 1),
+        id: c.id || c._id,
+        children: buildTree(cats, c.id, depth + 1),
       }));
   };
 

@@ -1,7 +1,7 @@
 """
 Integration routes - ana toplayıcı modül.
 
-Pazaryeri (Trendyol/Hepsiburada/Temu/Amazon) ve Ticimax aktarım uçları kaldırıldı.
+Pazaryeri (harici kanal) ve eski altyapı aktarım uçları kaldırıldı.
 Kalan genel uçlar integrations_common.py'dedir; bu modül yalnız onları toplar ve
 geriye dönük uyumluluk için ortak yardımcıları yeniden dışa aktarır.
 """
@@ -16,7 +16,7 @@ router.include_router(_common_router)
 from .integrations_common import (  # noqa: E402,F401
     log_integration_event,
     get_integration_logs,
-    ALLOWED_MARKETPLACES,
+    ALLOWED_PROVIDERS,
     get_marketplace_settings,
     save_marketplace_settings,
     get_marketplace_status,

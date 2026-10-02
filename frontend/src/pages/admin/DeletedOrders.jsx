@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Trash2, RotateCcw, Search, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { isOtherChannelOrder, OTHER_LABEL, SITE_LABEL } from "../../lib/salesChannels";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -32,13 +33,9 @@ function money(v) {
   return n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
 }
 
-// Kaynak: sipariş no önekinden (TY→Trendyol, HB→Hepsiburada, yoksa Site)
+// Kaynak: web sitesi ya da (geçmişten kalan) diğer kanal
 function channelLabel(o) {
-  const on = (o.order_number || "").toUpperCase();
-  const plat = (o.platform || "").toLowerCase();
-  if (on.startsWith("TY") || plat === "trendyol") return "Trendyol";
-  if (on.startsWith("HB") || plat === "hepsiburada") return "Hepsiburada";
-  return "Site";
+  return isOtherChannelOrder(o) ? OTHER_LABEL : SITE_LABEL;
 }
 
 export default function DeletedOrders() {

@@ -19,7 +19,7 @@ async def main():
     db = client[DB_NAME]
 
     data_dir = os.path.join(os.path.dirname(__file__), "..", "data_export")
-    collections = ["products", "categories", "orders", "banners", "settings", "trendyol_category_mappings"]
+    collections = ["products", "categories", "orders", "banners", "settings"]
 
     for col_name in collections:
         path = os.path.join(data_dir, f"{col_name}.json")

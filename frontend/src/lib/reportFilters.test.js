@@ -42,20 +42,20 @@ test("gecen ay onayari: ayin tamami, yil ve subat gecisleri dahil", () => {
 });
 
 test("channel table follows the selected report source", () => {
-  const rows = [{ source: "Site" }, { source: "Trendyol" }];
-  expect(filterReportChannels(rows, "site")).toEqual([{ source: "Site" }]);
-  expect(filterReportChannels(rows, "trendyol")).toEqual([{ source: "Trendyol" }]);
+  const rows = [{ source: "Web Sitesi" }, { source: "Diğer kanal" }];
+  expect(filterReportChannels(rows, "site")).toEqual([{ source: "Web Sitesi" }]);
+  expect(filterReportChannels(rows, "other")).toEqual([{ source: "Diğer kanal" }]);
   expect(filterReportChannels(rows, "all")).toEqual(rows);
 });
 
 test("product export carries every visible table filter", () => {
   const params = productExportParams({
-    from: "2026-06-05", to: "2026-09-07", platform: "trendyol", size: "M",
+    from: "2026-06-05", to: "2026-09-07", platform: "other", size: "M",
     season: "Yaz", velocity: "green", query: "bermuda", sortKey: "revenue", sortDir: "desc",
   });
   expect(Object.fromEntries(params)).toEqual({
-    start_date: "2026-06-05", end_date: "2026-09-07", source: "trendyol",
-    platform: "trendyol", size: "M", season: "Yaz", velocity: "green", q: "bermuda",
+    start_date: "2026-06-05", end_date: "2026-09-07", source: "other",
+    platform: "other", size: "M", season: "Yaz", velocity: "green", q: "bermuda",
     sort_by: "revenue", sort_dir: "desc",
   });
 });
@@ -64,16 +64,16 @@ test("product return rate uses the same visible scope for all and selected platf
   const product = {
     qty: 9, cancel_qty: 3, return_qty: 4, revenue: 900,
     platform_breakdown: [
-      { platform: "trendyol", qty: 2, revenue: 200 },
+      { platform: "other", qty: 2, revenue: 200 },
       { platform: "site", qty: 7, revenue: 700 },
     ],
     cancel_return_by_platform: [
-      { platform: "trendyol", cancel: 2, return: 4 },
+      { platform: "other", cancel: 2, return: 4 },
       { platform: "site", cancel: 1, return: 0 },
     ],
   };
   expect(productReportScope(product)).toMatchObject({ netQty: 9, cancelQty: 3, returnQty: 4, grossQty: 16, returnRatePct: 25 });
-  expect(productReportScope(product, "trendyol")).toMatchObject({ netQty: 2, cancelQty: 2, returnQty: 4, grossQty: 8, returnRatePct: 50 });
+  expect(productReportScope(product, "other")).toMatchObject({ netQty: 2, cancelQty: 2, returnQty: 4, grossQty: 8, returnRatePct: 50 });
   expect(productReportScope(product, "site")).toMatchObject({ netQty: 7, cancelQty: 1, returnQty: 0, grossQty: 8, returnRatePct: 0 });
 });
 
@@ -81,10 +81,10 @@ test("product platform_metrics is authoritative when backend supplies it", () =>
   const product = {
     qty: 99, cancel_qty: 99, return_qty: 99,
     platform_metrics: {
-      trendyol: { net_qty: 5, cancel_qty: 1, return_qty: 2, net_revenue: 500 },
+      other: { net_qty: 5, cancel_qty: 1, return_qty: 2, net_revenue: 500 },
       site: { net_qty: 3, cancel_qty: 0, return_qty: 0, net_revenue: 300 },
     },
   };
   expect(productReportScope(product)).toMatchObject({ netQty: 8, cancelQty: 1, returnQty: 2, grossQty: 11, revenue: 800 });
-  expect(productReportScope(product, "trendyol")).toMatchObject({ netQty: 5, cancelQty: 1, returnQty: 2, grossQty: 8, returnRatePct: 25 });
+  expect(productReportScope(product, "other")).toMatchObject({ netQty: 5, cancelQty: 1, returnQty: 2, grossQty: 8, returnRatePct: 25 });
 });

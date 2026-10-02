@@ -4,10 +4,10 @@
  * =============================================================================
  *
  * NE İŞE YARAR?
- *   Tüm kanallardan (web site, Trendyol, Hepsiburada, Temu) gelen siparişlerin
+ *   Tüm kanallardan (web site, harici kanal) gelen siparişlerin
  *   listelenmesi, filtrelenmesi, detaylarının görüntülenmesi, durumlarının
  *   güncellenmesi (onay, hazırlık, kargo, teslim, iptal), kargo çıkışı,
- *   fatura yüklenmesi, Trendyol'dan manuel içe aktarım ve toplu işlemlerin
+ *   fatura yüklenmesi, harici kanal manuel içe aktarım ve toplu işlemlerin
  *   yapıldığı ana admin ekranıdır.
  *
  * BAĞLANTILI BACKEND UÇLARI:
@@ -16,7 +16,7 @@
  *   - PUT  /api/orders/{id}/status         → Durum güncelleme
  *   - POST /api/orders/{id}/ship           → Kargoya verme
  *   - POST /api/orders/bulk                → Toplu durum değiştirme
- *   - POST /api/trendyol/import            → Trendyol manuel içe aktarım
+ *   - POST /api/harici kanal/import            → harici kanal manuel içe aktarım
  *   - GET  /api/orders/{id}/attribution    → Sipariş kaynağı/funnel
  *
  * BAĞLANTILI MODÜLLER:
@@ -53,6 +53,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import Pagination from "../../components/admin/Pagination";
+import { isOtherChannelOrder, channelBadge, OTHER_LABEL } from "../../lib/salesChannels";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -830,20 +831,11 @@ export default function AdminOrders({ unpaidView = false }) {
     }
   };
 
-  // Bir siparişin pazaryeri (Trendyol/HB/Temu/N11/Amazon) olup olmadığı.
-  const _isMarketplaceOrder = (o) => {
-    const s = String((o && (o.platform || o.marketplace)) || "").toLowerCase();
-    return ["trendyol", "hepsiburada", "temu", "n11", "amazon"].some((x) => s.includes(x));
-  };
-  // Trendyol API siparişinin marketplace_order_date'i artık GERÇEK UTC (sunucu 3 saat
-  // düzeltmesi) → TR saatine çevrilerek gösterilir. Eskiden "olduğu gibi" gösterilince
-  // Trendyol siparişleri 3 saat erken görünüyordu (00:12 sipariş "21:12").
-  const _tyGercekUtc = (o) =>
-    String((o && (o.platform || o.marketplace)) || "").toLowerCase().includes("trendyol") &&
-    !!(o && o.marketplace_order_date);
-  // asIs=true → değeri OLDUĞU GİBİ göster (kayma yok). Pazaryeri siparişlerinde orderDate
-  // TR duvar-saati olarak +00:00 etiketiyle saklanıyor (Trendyol orderDate quirk); +3 EKLENİRSE
-  // saat ileri kayar ("13:45 gibi gelecek saat"). Site siparişleri ise gerçek UTC → +3 (Istanbul).
+  // Site dışı (geçmişten kalan) kanal kaydı mı? (bkz. lib/salesChannels.js)
+  const _isMarketplaceOrder = (o) => isOtherChannelOrder(o);
+  // asIs=true → değeri OLDUĞU GİBİ göster (kayma yok). Diğer kanal kayıtlarında tarih
+  // TR duvar-saati olarak +00:00 etiketiyle saklanıyor; +3 EKLENİRSE saat ileri kayar.
+  // Site siparişleri ise gerçek UTC → +3 (Istanbul).
   const formatDate = (dateStr, asIs = false) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
@@ -1236,7 +1228,7 @@ export default function AdminOrders({ unpaidView = false }) {
                     </td>
                     <td>
                       <div className="flex flex-col gap-0.5">
-                        {/* Trendyol stores items in 'lines', web orders in 'items' */}
+                        {/* Eski içe aktarılmış kayıtlar kalemleri 'lines', site siparişleri 'items' alanında tutar */}
                         {(order.lines?.length > 0 ? order.lines : order.items)?.slice(0, 2).map((item, i) => {
                           const qty = item.quantity || 1;
                           const img = item.image || item.product_image || item.imageUrl;
@@ -1313,7 +1305,7 @@ export default function AdminOrders({ unpaidView = false }) {
                         if (pm === 'transfer' || pm === 'havale' || pm === 'bank_transfer' || pm === 'eft') label = 'Havale/EFT';
                         else if (pm === 'credit_card' || pm === 'card' || pm === 'iyzico' || pm === 'cc') label = 'Kredi Kartı';
                         else if (pm === 'cod' || pm === 'kapida') label = 'Kapıda';
-                        else if (order.platform === 'trendyol' || order.platform === 'hepsiburada' || order.platform === 'temu' || pm === 'marketplace') label = 'Marketplace';
+                        else if (isOtherChannelOrder(order) || pm === 'marketplace') label = OTHER_LABEL;
                         if (!label) return <span className="text-sm text-gray-400">—</span>;
                         const isHavale = (pm === 'transfer' || pm === 'havale' || pm === 'bank_transfer' || pm === 'eft');
                         return (
@@ -1326,15 +1318,7 @@ export default function AdminOrders({ unpaidView = false }) {
                     </td>
                     <td>
                       {(() => {
-                        const p = (order.platform || '').toLowerCase();
-                        const map = {
-                          trendyol: { label: 'Trendyol', bg: 'bg-[#F27A1A]' },
-                          hepsiburada: { label: 'Hepsiburada', bg: 'bg-[#FF6000]' },
-                          temu: { label: 'Temu', bg: 'bg-[#FB7701]' },
-                          amazon: { label: 'Amazon', bg: 'bg-[#232F3E]' },
-                          n11: { label: 'n11', bg: 'bg-[#EA0029]' },
-                        };
-                        const m = map[p] || { label: 'Web', bg: 'bg-gray-800' };
+                        const m = channelBadge(order);
                         return <span className={`inline-block px-2 py-0.5 ${m.bg} text-white text-[10px] uppercase font-bold tracking-wider rounded`}>{m.label}</span>;
                       })()}
                     </td>
@@ -1404,13 +1388,11 @@ export default function AdminOrders({ unpaidView = false }) {
                         return <span className="text-gray-300">—</span>;
                       })()}
                     </td>
-                    <td className="text-sm text-gray-500">{_tyGercekUtc(order)
-                      ? formatDate(order.marketplace_order_date)
-                      : formatDate(order.created_at, _isMarketplaceOrder(order))}</td>
+                    <td className="text-sm text-gray-500">{formatDate(order.created_at, _isMarketplaceOrder(order))}</td>
                     <td>
-                      {/* Ticimax benzeri işlem butonları - daha belirgin ve ayrık */}
+                      {/* İşlem butonları - belirgin ve ayrık */}
                       <div className="flex items-center gap-1 flex-wrap">
-                        {/* 1. Detay - Ticimax: mavi klasör */}
+                        {/* 1. Detay - mavi klasör */}
                         <button
                           onClick={() => openDetail(order)}
                           title="Sipariş Detayı"
@@ -1682,7 +1664,7 @@ export default function AdminOrders({ unpaidView = false }) {
                 );
               })()}
 
-              {/* Fatura — kesilmişse PDF'i otomatik göster (Trendyol'a yükleme zaten otomatik yapılır) */}
+              {/* Fatura — kesilmişse PDF'i otomatik göster */}
               {(selectedOrder.invoice_issued || selectedOrder.invoice_number || selectedOrder.invoice?.invoice_number || selectedOrder.invoice_pdf_url || selectedOrder.invoice_link) && (() => {
                 const invNo = selectedOrder.invoice?.invoice_number || selectedOrder.invoice_number;
                 const rawUrl = selectedOrder.invoice_pdf_url || selectedOrder.invoice_link || "";
@@ -1850,7 +1832,7 @@ export default function AdminOrders({ unpaidView = false }) {
                       </div>
                     </div>
                   ) : (() => {
-                    // Trendyol "Fatura Bilgileri" düzeni: Ad-Soyad/Ünvan, Adres, E-Fatura Mükellefi
+                    // harici kanal "Fatura Bilgileri" düzeni: Ad-Soyad/Ünvan, Adres, E-Fatura Mükellefi
                     // + (doluysa) VKN/Vergi Dairesi ve Fatura No — teslimatla YAN YANA tek kutu.
                     const sa = selectedOrder.shipping_address || {};
                     const bi = selectedOrder.billing_info || {};

@@ -15,7 +15,7 @@ const auth = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("
 const TRY = (n) => `${Number(n || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺`;
 
 const CHANNEL_LABELS = {
-  trendyol: "Trendyol", hepsiburada: "Hepsiburada", temu: "Temu", n11: "n11", amazon: "Amazon",
+  other: "Diğer kanal",
   instagram: "Instagram", google: "Google", meta: "Meta/Facebook",
   tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest",
   email: "E-posta", sms: "SMS", direct: "Doğrudan / Site",
@@ -88,11 +88,11 @@ export default function ReportsInsights() {
             brüt (iptal & iade dahil) uçlardan beslenir; yalnız Yeni/Tekrar Müşteri statü
             bazlı iptal & iade hariç sayar. Eskiden hepsi "hariç" etiketliydi. */}
         <h1 className="text-2xl font-semibold flex items-center gap-2"><TrendingUp size={22} /> Gelişmiş Raporlar <ReportScopeBadge kind={tab === "never" ? "stock" : tab === "cust" ? "exclude" : "gross"} /></h1>
-        <p className="text-sm text-gray-500 mt-1">İl/ilçe, satış kanalı (Instagram/Google/pazaryeri) ve uzun süredir satılmayan ürünler. <span className="text-gray-400">(İl/İlçe, Satış Kanalı, Saatlik, Ödeme Tipi ve Kupon sekmeleri brüttür: iptal &amp; iade dahil, ödenmemiş hariç. Yeni/Tekrar Müşteri sekmesi iptal &amp; iade statüsündeki siparişleri hariç tutar.)</span></p>
+        <p className="text-sm text-gray-500 mt-1">İl/ilçe, satış kanalı (Instagram/Google vb. trafik kaynağı) ve uzun süredir satılmayan ürünler. <span className="text-gray-400">(İl/İlçe, Satış Kanalı, Saatlik, Ödeme Tipi ve Kupon sekmeleri brüttür: iptal &amp; iade dahil, ödenmemiş hariç. Yeni/Tekrar Müşteri sekmesi iptal &amp; iade statüsündeki siparişleri hariç tutar.)</span></p>
       </div>
 
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900">
-        <span className="font-semibold">Bu raporda:</span> Seçtiğiniz tarih aralığında satışlarınızı farklı açılardan kesersiniz — <b>il/ilçe bazlı</b> (nereden ne kadar satıyorsunuz), <b>satış kanalı</b> (pazaryeri + Instagram/Google/Meta gibi trafik kaynakları), <b>saatlik yoğunluk</b>, <b>ödeme tipi</b>, <b>kupon performansı</b> ve <b>yeni/tekrar eden müşteri</b> kırılımı. <b>Uzun süredir satılmayan</b> sekmesiyle 30–365 gündür hiç satmayan ürünleri ve bunlara bağlanmış stok değerini görüp indirim/tasfiye kararı verebilirsiniz.
+        <span className="font-semibold">Bu raporda:</span> Seçtiğiniz tarih aralığında satışlarınızı farklı açılardan kesersiniz — <b>il/ilçe bazlı</b> (nereden ne kadar satıyorsunuz), <b>satış kanalı</b> (Instagram/Google/Meta gibi trafik kaynakları), <b>saatlik yoğunluk</b>, <b>ödeme tipi</b>, <b>kupon performansı</b> ve <b>yeni/tekrar eden müşteri</b> kırılımı. <b>Uzun süredir satılmayan</b> sekmesiyle 30–365 gündür hiç satmayan ürünleri ve bunlara bağlanmış stok değerini görüp indirim/tasfiye kararı verebilirsiniz.
       </div>
 
       {loadError && <div role="alert" className="rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{loadError}</div>}
@@ -147,12 +147,8 @@ export default function ReportsInsights() {
               <label className="block text-xs text-gray-500 mb-1">Kaynak</label>
               <select value={source} onChange={(e) => setSource(e.target.value)} className="border rounded px-2 py-1.5 text-sm">
                 <option value="all">Tümü</option>
-                <option value="site">Site</option>
-                <option value="trendyol">Trendyol</option>
-                <option value="hepsiburada">Hepsiburada</option>
-                <option value="temu">Temu</option>
-                <option value="n11">n11</option>
-                <option value="amazon">Amazon</option>
+                <option value="site">Web Sitesi</option>
+                <option value="other">Diğer kanal (eski kayıtlar)</option>
               </select>
             </div>
           </>
@@ -212,7 +208,7 @@ export default function ReportsInsights() {
       {tab === "source" && (
         <div className="bg-white border rounded-xl overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b">
-            <h3 className="font-semibold">Satış Kanalı (Pazaryeri + Trafik Kaynağı)</h3>
+            <h3 className="font-semibold">Satış Kanalı (Trafik Kaynağı)</h3>
             <span className="text-sm text-gray-500">Toplam: <b>{TRY(src?.totals?.revenue)}</b> · {src?.totals?.orders || 0} sipariş</span>
           </div>
           <table className="w-full text-sm">

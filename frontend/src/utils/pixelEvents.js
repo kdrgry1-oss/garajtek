@@ -60,7 +60,7 @@ export function trackViewContent({ product_id, name, category, price, brand, col
       id: product_id, name, category_name: category,
       brand: brand || SITE_NAME, color: color || "",
       sale_price: Number(price) || 0, price: Number(price) || 0,
-      // Meta content_ids için: seçili bedenin Ticimax varyant id'si (varsa)
+      // Meta content_ids için: seçili bedenin eski altyapı varyant id'si (varsa)
       catalog_id: (variant_id != null && variant_id !== "") ? variant_id : undefined,
     },
   });

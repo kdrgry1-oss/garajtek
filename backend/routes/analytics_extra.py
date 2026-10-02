@@ -74,7 +74,7 @@ async def rfm_analysis(
                         "return_requested", "return_approved", "return_in_transit",
                         "returned", "refunded"]},
                     "payment_status": {"$nin": ["expired", "failed", "refunded"]}}},
-        {"$match": merge_match({})},  # ticimax_history ÇİFT kayıtları hariç
+        {"$match": merge_match({})},  # eski altyapı ÇİFT kayıtları hariç
         {"$lookup": {"from": "customer_returns", "localField": "id", "foreignField": "order_id", "as": "_rets"}},
         {"$addFields": {"_net": {"$max": [0, {"$subtract": [
             {"$ifNull": ["$total", {"$ifNull": ["$total_amount", 0]}]},

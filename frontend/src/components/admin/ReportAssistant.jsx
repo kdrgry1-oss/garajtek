@@ -13,7 +13,7 @@ import { MessageCircle, X, Send, Mic, Square, Loader2, Trash2, FileSpreadsheet }
 const API = `${process.env.REACT_APP_BACKEND_URL}/api/admin/reports/assistant`;
 const STORE_KEY = "report_assistant_chat_v1";
 const ORNEKLER = [
-  "Bu ay Trendyol'un net satışı ne kadar?",
+  "Bu ay web sitesinin net satışı ne kadar?",
   "Bu ayı geçen ayla kanal kanal kıyasla",
   "Bu ay en çok iade edilen 10 ürün",
   "Dün hangi ürünlerden kaç adet sattık?",

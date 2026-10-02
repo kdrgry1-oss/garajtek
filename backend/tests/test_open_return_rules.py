@@ -83,15 +83,3 @@ def test_customer_return_records_and_items_dedupe_only_stable_ids():
         {"quantity": 1}, {"quantity": 1},
     ])
     assert len(items) == 3
-
-
-def test_marketplace_open_status_mapping_is_shared_and_counts_missing_barcode():
-    _, dedup = _load_reports_module()
-    assert dedup.marketplace_claim_status_bucket("Created", False) == "talep_olusturulan"
-    assert dedup.marketplace_claim_status_bucket("Created", True) == "kargoya_verilen"
-    assert dedup.marketplace_claim_status_bucket("InAnalysis", False) == "aksiyon_bekleyen"
-    claim = {"claim_id": "C1", "raw_data": {"items": [{
-        "orderLine": {},
-        "claimItems": [{"id": "I1", "claimItemStatus": {"name": "Created"}}],
-    }]}}
-    assert dedup.claim_items_with_status(claim, {"Created"})[0]["quantity"] == 1

@@ -614,7 +614,7 @@ def build_admin_order_email_html(order: Dict, ship: Dict, heading: str = "Yeni S
         "credit_card": "Kredi Kartı", "card": "Kredi Kartı", "creditcard": "Kredi Kartı",
         "bank_transfer": "Havale / EFT", "havale": "Havale / EFT", "eft": "Havale / EFT",
         "cash_on_delivery": "Kapıda Ödeme", "cod": "Kapıda Ödeme", "kapida": "Kapıda Ödeme",
-        "gift_card": "Hediye Çeki", "marketplace": "Pazaryeri",
+        "gift_card": "Hediye Çeki", "marketplace": "Diğer kanal",
     }
     _pm_raw = str(order.get("payment_method") or order.get("payment_type") or "").strip()
     _pm = _h.escape(_PM_TR.get(_pm_raw.lower(), _pm_raw) or "-")

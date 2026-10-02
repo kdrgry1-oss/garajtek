@@ -199,7 +199,7 @@ export default function Returns() {
 
   // Modaldan tek pusula yazdır: aynı 4'lü A4 mekanizmasını kullanır.
   // ÖNİZLEME (site iadesi) ise: numara YAZDIR anında atanır + kalıcılaşır (kullanıcı: 'numara
-  // yazdırınca atansın'). TY/manuel akışta numara zaten açılışta atandığından finalize yok.
+  // yazdırınca atansın'). harici kanal/manuel akışta numara zaten açılışta atandığından finalize yok.
   const printSingleGp = async () => {
     if (!gpData) return;
     let finalGp = gpData;

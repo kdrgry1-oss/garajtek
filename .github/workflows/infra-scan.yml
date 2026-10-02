@@ -1,6 +1,6 @@
 name: Infra Vulnerability Scan
 
-# Amaç (§9 — Amazon SP-API Restricted hazırlık): AYLIK altyapı/bağımlılık/konfig zafiyet taraması.
+# Amaç: AYLIK altyapı/bağımlılık/konfig zafiyet taraması.
 #   Trivy ile: (a) bağımlılık CVE'leri (fs), (b) IaC/Dockerfile/konfig yanlış-ayarları (config).
 #   Sonuç SARIF olarak Security sekmesine yazılır; Critical/High bulguda SLA takibi için otomatik
 #   güvenlik issue'su açılır (Critical: 7 gün, High: 30 gün — issue body'de belirtilir).

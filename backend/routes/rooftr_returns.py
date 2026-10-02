@@ -2,8 +2,8 @@
 =============================================================================
 rooftr_returns.py — Site / iade & kısmi iade SİPARİŞLERİ (İadeler sayfası)
 =============================================================================
-Ticimax sipariş import'u (integrations.py /ticimax/orders/import) iade ve kısmi
-iade durumundaki siparişleri `orders` koleksiyonuna `platform="ticimax"` +
+eski altyapı sipariş import'u (integrations.py /eski altyapı/orders/import) iade ve kısmi
+iade durumundaki siparişleri `orders` koleksiyonuna `platform="eski altyapı"` +
 status ∈ {returned, partial_refunded, refunded, return_*} olarak yazıyor.
 
 Bu modül o siparişleri İadeler sayfasında göstermek için listeler — ödeme tipi,
@@ -20,6 +20,7 @@ import os
 import re
 
 from .deps import db, logger, require_admin, generate_id, _search_tr_regex, tr_range_to_utc
+from sales_channels import other_match as _other_match
 from .orders import _order_vade_farki, _order_is_efatura, _compute_refund_breakdown
 
 router = APIRouter(prefix="/admin/rooftr", tags=["rooftr-returns"])
@@ -36,7 +37,6 @@ PAYMENT_LABELS = {
     "credit_card": "Kredi Kartı",
     "cash_on_delivery": "Kapıda Ödeme",
     "cod_card": "Kapıda Kredi Kartı",
-    "ticimax": "Diğer",
 }
 
 
@@ -85,21 +85,21 @@ async def list_rooftr_return_orders(
     end_date: Optional[str] = Query(None, description="İade ONAY tarihi bitişi (TR günü, YYYY-MM-DD)"),
     current_user: dict = Depends(require_admin),
 ):
-    """Ticimax kaynaklı iade / kısmi iade siparişlerini listeler.
+    """eski altyapı kaynaklı iade / kısmi iade siparişlerini listeler.
 
-    Veri kaynağı: orders koleksiyonu, platform/source = ticimax ve
+    Veri kaynağı: orders koleksiyonu, platform/source = eski altyapı ve
     status ∈ İade grubu. Her satır ödeme tipi (kod + okunabilir etiket) ve
     durumla döner; durumu değiştirmek için frontend PUT /api/orders/{id}/status
     çağırır.
     """
-    # "Web Sitesi" iadeleri = pazaryeri (Trendyol/Hepsiburada) DISI tum siparisler.
-    # Eski hali yalnizca platform/source=ticimax idi -> yeni site siparisleri (platform=web)
-    # iade/iptal edilince hicbir sekmede gorunmuyordu. Pazaryeri disi her kaynak (web + ticimax + bos) dahil.
-    # Web Sitesi iadeleri = YALNIZCA pazaryeri (Trendyol/HB) DIŞI siparişler.
+    # "Web Sitesi" iadeleri = pazaryeri (harici kanal) DISI tum siparisler.
+    # Eski hali yalnizca platform/source=eski altyapı idi -> yeni site siparisleri (platform=web)
+    # iade/iptal edilince hicbir sekmede gorunmuyordu. Pazaryeri disi her kaynak (web + eski altyapı + bos) dahil.
+    # Web Sitesi iadeleri = YALNIZCA pazaryeri (harici kanal) DIŞI siparişler.
     # Pazaryeri siparişleri (elle iade durumuna çekilse bile) BURAYA DÜŞMEZ; kendi
-    # pazaryeri sekmesinde (Trendyol/Hepsiburada) listelenir — 'ait olduğu panel' kuralı.
+    # pazaryeri sekmesinde (harici kanal) listelenir — 'ait olduğu panel' kuralı.
     base_filter = {
-        "platform": {"$nin": ["trendyol", "hepsiburada"]},
+        "$nor": [_other_match()],
     }
     base_filter.update(_iade_tarih_filtresi(start_date, end_date))
 
@@ -160,7 +160,7 @@ async def list_rooftr_return_orders(
     total = await db.orders.count_documents(base_filter)
 
     proj = {
-        "_id": 0, "id": 1, "order_number": 1, "order_code": 1, "ticimax_order_id": 1,
+        "_id": 0, "id": 1, "order_number": 1, "order_code": 1,
         "status": 1, "payment_method": 1, "payment_method_raw": 1, "payment_status": 1,
         "total": 1, "paid_amount": 1, "subtotal": 1, "shipping_cost": 1, "discount": 1,
         "payment_discount": 1,  # havale/EFT ödeme indirimi — iade net hesabı için ŞART (yoksa 0 gelip 4001 kalır)
@@ -207,7 +207,7 @@ async def list_rooftr_return_orders(
         # rakam tutarlı olsun diye sunuyoruz (işletme talebi: taksitli siparişte tüm tahsilat iade edilmeli).
         _vf, _charged, _inst = _order_vade_farki(o)
         # KDV-DAHİL TABAN DÜZELTMESİ (Ali Al 398MD4734D → tüm iadelere uygulanır): bazı içe-aktarılan
-        # (Ticimax) siparişlerde item.price KDV-HARİÇ ama subtotal/total KDV-DAHİL → panelde kalem
+        # (eski altyapı) siparişlerde item.price KDV-HARİÇ ama subtotal/total KDV-DAHİL → panelde kalem
         # KDV-hariç görünüp ara toplamla tutmuyordu. Siparişin KENDİ order-seviyesi KDV-dahil verisinden
         # faktör türet ve bir KDV oranına yakınsa (1.06–1.24) TÜM kalem fiyatlarını + ara toplamı
         # KDV-dahile ölçekle. İKİ aday: (a) subtotal−indirim, (b) total−kargo−vade farkı — hangisi
@@ -253,7 +253,6 @@ async def list_rooftr_return_orders(
         rows.append({
             "id": o.get("id"),
             "order_number": o.get("order_number"),
-            "ticimax_order_id": o.get("ticimax_order_id"),
             "customer_name": name,
             "phone": addr.get("phone") or "",
             "email": addr.get("email") or "",
@@ -452,7 +451,7 @@ async def list_rooftr_return_orders(
 
     # İstatistik: tüm iade grubunda durum + ödeme dağılımı (mevcut filtreden bağımsız,
     # pazaryeri DISI tum site siparisleri) — sekmedeki rozetler için
-    stat_filter = {"platform": {"$nin": ["trendyol", "hepsiburada"]},
+    stat_filter = {"$nor": [_other_match()],
                    "status": {"$in": RETURN_STATUSES}}
     status_counts = {}
     payment_counts = {}
@@ -468,7 +467,7 @@ async def list_rooftr_return_orders(
         ]):
             payment_counts[grp["_id"] or "bilinmiyor"] = grp["n"]
     except Exception as e:
-        logger.warning(f"[ticimax-returns] stats hatası: {e}")
+        logger.warning(f"[site-returns] stats hatası: {e}")
 
     # Ücretsiz-kargo siparişlerinde kısmi iade mahsubu için standart kargo ücreti
     # (vitrin/checkout ile AYNI kaynak: settings.cargo_fees[default] → settings.shipping_fee)
@@ -520,7 +519,7 @@ async def bulk_approve_site_returns(
     from datetime import datetime, timezone
     _cut = str(until).strip()[:10] + "T23:59:59"  # gün sonuna kadar dahil
     base_filter = {
-        "platform": {"$nin": ["trendyol", "hepsiburada"]},
+        "$nor": [_other_match()],
         "status": "return_requested",
     }
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -529,7 +528,7 @@ async def bulk_approve_site_returns(
     skipped_late = 0
     async for order in db.orders.find(base_filter, {"_id": 0}):
         _ca = str(order.get("created_at") or "")
-        # created_at boşsa yine de dahil et (eski Ticimax kayıtları tarihi eksik olabilir);
+        # created_at boşsa yine de dahil et (eski eski altyapı kayıtları tarihi eksik olabilir);
         # doluysa cutoff ile karşılaştır.
         if _ca and _ca[:19] > _cut:
             skipped_late += 1
@@ -607,7 +606,7 @@ async def set_return_status_silent(
     updated = []
     for onum in onums:
         o = await db.orders.find_one({"order_number": str(onum).strip(),
-                                      "platform": {"$nin": ["trendyol", "hepsiburada"]}},
+                                      "$nor": [_other_match()]},
                                      {"_id": 0, "id": 1, "status": 1})
         if not o:
             continue
@@ -628,7 +627,7 @@ async def flatten_order_financials(
     amount: Optional[float] = Query(None, description="Hedef düz tutar (TL). Verilmezse Σ kalem fiyatı."),
     current_user: dict = Depends(require_admin),
 ):
-    """TEK SİPARİŞİ 'DÜMDÜZ' TUTARA NORMALLE (işletme: Ticimax import'undan gelen
+    """TEK SİPARİŞİ 'DÜMDÜZ' TUTARA NORMALLE (işletme: eski altyapı import'undan gelen
     hayalet indirim/kargo düzeltmesi). İndirim (discount+payment_discount) ve kargoyu SIFIRLAR,
     subtotal=total=amount yapar, kalem fiyatlarını amount'a ölçekler, kalem indirimlerini sıfırlar.
     Böylece panel/iade/gider pusulası hepsi 'amount' (ör. 985,15) olarak düz görünür.
@@ -692,7 +691,7 @@ async def flatten_order_financials(
 # MÜKERRER İADE TEMİZLİĞİ — sistem geneli (işletme talebi: "site siparişlerinde
 # başka çift olan iade varsa sil sistem genelinde")
 # ----------------------------------------------------------------------------
-# Ticimax import'u bazı siparişleri hem BARE ticimax kaydı (telefon YOK, iade
+# eski altyapı import'u bazı siparişleri hem BARE eski altyapı kaydı (telefon YOK, iade
 # köprüsü/pusula YOK) hem de gerçek web kaydı (telefon + return_request +
 # customer_returns + gider_pusulası VAR) olarak iki kez oluşturdu → iade
 # panelinde AYNI sipariş no iki satır. Bu uç aynı order_number'lı iade
@@ -743,7 +742,7 @@ async def scan_duplicate_returns(
     HİÇBİRİ olmayan BARE-junk kayıt(lar) silinmeye aday gösterilir. confirm=true olunca
     silinir (orders_deleted'e arşivlenir; geri alınabilir)."""
     base_filter = {
-        "platform": {"$nin": ["trendyol", "hepsiburada"]},
+        "$nor": [_other_match()],
         "status": {"$in": RETURN_STATUSES},
     }
     proj = {"_id": 0, "id": 1, "order_number": 1, "platform": 1, "source": 1, "status": 1,
@@ -810,11 +809,11 @@ async def merge_ambiguous_duplicate_returns(
     current_user: dict = Depends(require_admin),
 ):
     """BELİRSİZ mükerrer gruplar: aynı order_number'da iki kayıt da iade köprüsü (customer_returns)
-    taşıyor. GERÇEK kayıt telefonlu web kaydıdır; twin (telefonsuz ticimax backfill) silinmeden
+    taşıyor. GERÇEK kayıt telefonlu web kaydıdır; twin (telefonsuz eski altyapı backfill) silinmeden
     ÖNCE köprü (customer_returns) + varsa gider_pusulası order_id/return_id'si KEEP kaydına
     TAŞINIR (order_id ile çözülen panel köprüsü kopmasın). Sonra twin arşivlenip silinir."""
     base_filter = {
-        "platform": {"$nin": ["trendyol", "hepsiburada"]},
+        "$nor": [_other_match()],
         "status": {"$in": RETURN_STATUSES},
     }
     proj = {"_id": 0, "id": 1, "order_number": 1, "platform": 1, "source": 1, "status": 1,
@@ -835,7 +834,7 @@ async def merge_ambiguous_duplicate_returns(
         sigs.sort(key=lambda s: (s["score"], s["updated_at"], s["created_at"]), reverse=True)
         keep = sigs[0]
         twins = [s for s in sigs[1:]
-                 if not s["has_phone"] and (s["platform"] == "ticimax" or "backfill" in (s["source"] or ""))]
+                 if not s["has_phone"] and "backfill" in (s["source"] or "")]
         # Yalnız GERÇEKTEN belirsiz olanlar: bare-junk taramasında SİLİNMEMİŞ (yani köprü/pusula taşıyan) twin.
         twins = [s for s in twins
                  if s["has_customer_returns"] or s["has_gider_pusulasi"] or s["has_return_request"]]
@@ -896,10 +895,10 @@ async def export_rooftr_return_orders(
     except Exception:
         status_label = {}
 
-    # Excel, EKRANDAKİ listeyle aynı nüfusu vermeli. Eski hâli yalnız ticimax
+    # Excel, EKRANDAKİ listeyle aynı nüfusu vermeli. Eski hâli yalnız eski altyapı
     # kaynaklı siparişleri alıyordu; liste ucu ise pazaryeri DIŞI her kaynağı
-    # (web + ticimax + boş) gösteriyor → Excel ekrandan eksik çıkıyordu.
-    base_filter = {"platform": {"$nin": ["trendyol", "hepsiburada"]}}
+    # (web + eski altyapı + boş) gösteriyor → Excel ekrandan eksik çıkıyordu.
+    base_filter = {"$nor": [_other_match()]}
     base_filter.update(_iade_tarih_filtresi(start_date, end_date))
     if status:
         _st = [s.strip() for s in status.split(",") if s.strip()]
@@ -921,7 +920,7 @@ async def export_rooftr_return_orders(
         }]
 
     proj = {
-        "_id": 0, "id": 1, "order_number": 1, "ticimax_order_id": 1, "status": 1,
+        "_id": 0, "id": 1, "order_number": 1, "status": 1,
         "payment_method": 1, "payment_method_raw": 1, "total": 1,
         "shipping_address": 1, "billing_address": 1, "customer_name": 1, "full_name": 1,
         "items": 1, "created_at": 1, "channel_source": 1,
@@ -962,7 +961,7 @@ async def export_rooftr_return_orders(
             o.get("order_number") or "",
             name,
             status_label.get(st, st),
-            o.get("channel_source") or "Ticimax",
+            o.get("channel_source") or "Web Sitesi",
             _payment_label(o.get("payment_method") or "", o.get("payment_method_raw") or ""),
         ])
 
@@ -987,7 +986,7 @@ async def export_rooftr_return_orders(
 
 
 # ============================================================================
-# BRIDGE — Ticimax iade siparişini zengin iade akışına (customer_returns) bağlar
+# BRIDGE — eski altyapı iade siparişini zengin iade akışına (customer_returns) bağlar
 # ============================================================================
 def _pick_return_record(recs):
     """MÜKERRER customer_returns kayıtlarında KANONİK kaydı seçer — liste, /open ve gider pusulası
@@ -1122,7 +1121,7 @@ async def dedupe_rooftr_returns(
 
 @router.post("/returns/{order_id}/open")
 async def open_rooftr_return(order_id: str, current_user: dict = Depends(require_admin)):
-    """Ticimax iade siparişinden, zengin iade akışı (onayla/reddet/gider/öde) için bir
+    """eski altyapı iade siparişinden, zengin iade akışı (onayla/reddet/gider/öde) için bir
     `customer_returns` köprü kaydı üretir. İDEMPOTENT: zaten varsa mevcut return_id'yi döndürür.
     PARA/İŞLEM YAPMAZ — sadece köprü kaydını oluşturur. Sonraki adımlar mevcut
     /api/orders/returns/{return_id}/{refund-preview,approve,reject,gider-pusulasi,refund-pay}
@@ -1198,7 +1197,7 @@ async def open_rooftr_return(order_id: str, current_user: dict = Depends(require
         "user_id": order.get("user_id"), "items": items, "reason": "",
         "return_code": rr.get("return_code", "") or "", "mng_ok": False,
         "cargo_provider_name": order.get("cargo_provider_name", "") or "",
-        "status": cr_status, "source": "ticimax_bridge",
+        "status": cr_status, "source": "order_bridge",
         "created_at": order.get("created_at") or datetime.now(timezone.utc).isoformat(),
     }
     await db.customer_returns.insert_one({**rec})

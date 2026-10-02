@@ -63,7 +63,7 @@ COVERAGE = [
          "Personel 'Kargoya ver' (takip no girişi, POST /orders/{id}/ship) — elle",
          "Personel durumu 'Kargoya Verildi'ye çekince (PUT /status) — elle",
      ],
-     "notes": "Pazaryeri (Trendyol/HB) siparişlerine site bildirimi gitmez — pazaryeri kendisi bilgilendirir (doğru davranış)."},
+     "notes": "Site dışı (geçmişten kalan) kanal kayıtlarına site bildirimi gitmez (doğru davranış)."},
     {"key": "order_in_transit", "name": "Kargo Taşınıyor", "scope": "customer", "mode": "manual",
      "channels_cfg": "Sipariş Durumları → in_transit (varsayılan KAPALI)",
      "triggers": ["Yalnız personel durum değişimi — elle"], "notes": "Kargo taraması bu durumu üretmez; pratikte tetiklenmez."},

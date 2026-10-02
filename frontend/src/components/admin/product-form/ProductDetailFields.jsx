@@ -9,8 +9,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 /**
  * Ürün kartı içindeki mevcut sekmelere gömülen, gruplu ek alan editörü.
  * `groupLabels` ile yalnızca ilgili gruplar render edilir; değerler
- * formData.ticimax_fields üzerinden okunur/yazılır (kullanıcıya görünür
- * herhangi bir "Ticimax" etiketi yoktur).
+ * formData.catalog_fields üzerinden okunur/yazılır.
  */
 export default function ProductDetailFields({ schema = [], groupLabels = [], values = {}, onChange }) {
   const groups = useMemo(

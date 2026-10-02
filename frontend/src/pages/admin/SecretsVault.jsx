@@ -90,9 +90,9 @@ export default function SecretsVault() {
         <div className="bg-white border rounded-lg p-4 space-y-3">
           <h3 className="font-medium flex items-center gap-2"><Plus className="w-4 h-4" /> Yeni / Güncelle</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <input data-testid="vault-key-input" value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value.toUpperCase().replace(/\s+/g, "_") })} placeholder="ANAHTAR (örn: TRENDYOL_API_KEY)" className="border rounded px-3 py-2 text-sm font-mono" />
+            <input data-testid="vault-key-input" value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value.toUpperCase().replace(/\s+/g, "_") })} placeholder="ANAHTAR (örn: MNG_API_KEY)" className="border rounded px-3 py-2 text-sm font-mono" />
             <input data-testid="vault-value-input" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} placeholder="Değer (şifrelenecek)" type="password" className="border rounded px-3 py-2 text-sm" />
-            <input data-testid="vault-scope-input" value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value })} placeholder="Kapsam (global / trendyol / iyzico ...)" className="border rounded px-3 py-2 text-sm" />
+            <input data-testid="vault-scope-input" value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value })} placeholder="Kapsam (global / mng / iyzico ...)" className="border rounded px-3 py-2 text-sm" />
             <input data-testid="vault-desc-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Açıklama (opsiyonel)" className="border rounded px-3 py-2 text-sm" />
           </div>
           <button data-testid="vault-save-btn" onClick={upsert} className="px-4 py-2 bg-emerald-700 text-white rounded-md text-sm hover:bg-emerald-800">

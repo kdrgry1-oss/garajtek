@@ -73,9 +73,9 @@ def test_user_triggered_sync_records_each_sku_without_fake_stock_delta():
         Db, product={"id": "p1", "name": "Elbise", "variants": [
             {"id": "v1", "stock_code": "SKU-S", "size": "S", "stock": 3},
             {"id": "v2", "stock_code": "SKU-M", "size": "M", "stock": 5},
-        ]}, platform="trendyol", status="submitted", batch_id="batch-1",
+        ]}, platform="sync", status="submitted", batch_id="batch-1",
     ))
     row = Db.stock_movements.rows[0]
     assert count == 2
-    assert row["sync_result"] == {"status": "submitted", "platform": "trendyol", "batch_id": "batch-1", "message": ""}
+    assert row["sync_result"] == {"status": "submitted", "platform": "sync", "batch_id": "batch-1", "message": ""}
     assert [(item["old"], item["new"], item["delta"]) for item in row["items"]] == [(3, 3, 0), (5, 5, 0)]

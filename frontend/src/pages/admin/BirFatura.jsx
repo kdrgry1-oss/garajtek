@@ -300,7 +300,7 @@ export default function BirFatura() {
             <span className="text-xs text-gray-500">BirFatura'nın geri gönderdiği fatura bağlantısı yalnız bu alan adlarından kabul edilir (https).</span>
           </label>
           <div className="sm:col-span-2 flex flex-col gap-1.5">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.only_site_orders} onChange={(e) => set("only_site_orders", e.target.checked)} /> Yalnız site siparişleri (pazaryeri siparişleri gönderilmez)</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.only_site_orders} onChange={(e) => set("only_site_orders", e.target.checked)} /> Yalnız site siparişleri (diğer kanal kayıtları gönderilmez)</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.skip_invoiced_elsewhere} onChange={(e) => set("skip_invoiced_elsewhere", e.target.checked)} /> Başka yoldan (manuel yükleme vb.) faturalanmış siparişleri gönderme</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.store_cargo_updates} onChange={(e) => set("store_cargo_updates", e.target.checked)} /> BirFatura'dan gelen kargo takip no'yu (boşsa) siparişe yaz</label>
           </div>

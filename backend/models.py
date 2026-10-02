@@ -37,8 +37,6 @@ class CategoryBase(BaseModel):
     image_url: Optional[str] = None
     is_active: bool = True
     sort_order: int = 0
-    trendyol_category_id: Optional[int] = None
-    trendyol_attributes: Dict[str, Any] = Field(default_factory=dict)
 
 class CategoryCreate(CategoryBase):
     pass
@@ -57,11 +55,11 @@ class ProductVariant(BaseModel):
     sku: Optional[str] = None
     stock: int = 0
     price_adjustment: float = 0
-    urun_id: Optional[str] = None  # Ticimax variant ID (URUNID)
+    urun_id: Optional[str] = None  # varyant ürün ID (URUNID)
     stock_code: Optional[str] = None  # variant stok kodu (varyantın kendi STOKKODU)
     model_config = ConfigDict(extra="allow")
 
-# Product Models - Extended with Ticimax fields
+# Product Models
 class ProductBase(BaseModel):
     name: str
     slug: str
@@ -84,13 +82,12 @@ class ProductBase(BaseModel):
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
     technical_details: Dict[str, str] = {}
-    # Ticimax 113-sütun export'unun ham (düzenlenebilir) tüm alanları.
-    # Anahtarlar orijinal Ticimax kolon adlarıdır (bkz. product_schema.py).
-    ticimax_fields: Dict[str, Any] = {}
+    # Ek katalog alanları (113 kolon; bkz. product_schema.py).
+    catalog_fields: Dict[str, Any] = {}
     size_chart_images: List[str] = []
     combo_product_ids: List[str] = []
     similar_product_ids: List[str] = []
-    # Ticimax Excel fields
+    # Excel içe aktarım alanları
     urun_karti_id: Optional[str] = None
     urun_id: Optional[str] = None
     stock_code: Optional[str] = None  # STOKKODU
@@ -104,7 +101,7 @@ class ProductBase(BaseModel):
     custom_field_1: Optional[str] = None
     custom_field_2: Optional[str] = None
     custom_field_3: Optional[str] = None
-    # Trendyol Markup fields
+    # Fiyat çarpanı alanları
     use_default_markup: bool = True
     markup_rate: float = 0  # Percentage multiplier (e.g. 20 for +20%)
     custom_field_4: Optional[str] = None
@@ -130,8 +127,6 @@ class ProductBase(BaseModel):
     estimated_delivery: Optional[str] = None  # TAHMINITESLIMSURESI
     marketplace_active: bool = False  # MARKETPLACEAKTIF
     publish_date: Optional[datetime] = None  # YAYINTARIHI
-    trendyol_product_id: Optional[str] = None
-    trendyol_status: Optional[str] = None
 
 class ProductCreate(ProductBase):
     pass
@@ -176,7 +171,7 @@ class OrderBase(BaseModel):
     total: float
     payment_method: str  # credit_card, bank_transfer, cash_on_delivery
     notes: Optional[str] = None
-    platform: str = "web"  # web (kendi sitesi), trendyol, etc.
+    platform: str = "web"  # web (kendi sitesi)
 
 class OrderCreate(OrderBase):
     pass

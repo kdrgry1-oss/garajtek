@@ -53,7 +53,7 @@ export const TRAINING = [
       {
         title: "Tüm Siparişler",
         path: "/admin/siparisler",
-        what: "Site siparişlerinin tamamı tek listede (geçmiş pazaryeri siparişleri de görüntülenir).",
+        what: "Web sitesi siparişlerinin tamamı tek listede.",
         where: "Siparişler → Tüm Siparişler.",
         how: [
           "Üstteki durum sekmelerinden (Yeni, Onaylı, Kargoda, Teslim, İade...) filtrele.",
@@ -171,7 +171,7 @@ export const TRAINING = [
       {
         title: "XML Feed'ler",
         path: "/admin/xml-feedler",
-        what: "Google/Meta/pazaryeri ürün feed'leri (dışa aktarım).",
+        what: "Google/Meta ürün feed'leri (dışa aktarım).",
         where: "Katalog → XML Feed'ler.",
         how: ["Feed adresini kopyalayıp ilgili platforma tanıt; kapsamı ayarla."],
         tips: ["Stoğu biten varyantlar feed'de 'stokta yok' olarak işaretlenir."],
@@ -208,7 +208,7 @@ export const TRAINING = [
         path: "/admin/raporlar/satis",
         what: "Tarih aralığına göre ciro, sipariş ve sepet ortalaması; gün/hafta/ay kırılımı.",
         where: "Raporlar → Satış Raporları.",
-        how: ["Tarih aralığı ve kaynağı (site/Trendyol/HB) seç; grafik ve tabloyu incele."],
+        how: ["Tarih aralığı ve kaynağı seç; grafik ve tabloyu incele."],
         tips: ["İptal ve iade ciroya dahil edilmez; kırılım için 'ciro kırılımı' kartına bak."],
       },
       {

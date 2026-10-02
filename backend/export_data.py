@@ -21,7 +21,7 @@ async def main():
     output_dir = os.path.join(os.path.dirname(__file__), "..", "data_export")
     os.makedirs(output_dir, exist_ok=True)
 
-    collections = ["products", "categories", "orders", "banners", "settings", "trendyol_category_mappings"]
+    collections = ["products", "categories", "orders", "banners", "settings"]
 
     for col_name in collections:
         docs = await db[col_name].find({}, {"_id": 0}).to_list(None)

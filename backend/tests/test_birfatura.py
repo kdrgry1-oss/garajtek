@@ -206,14 +206,14 @@ def test_custom_status_groups(env):
 def test_skips_marketplace_zero_total_and_invoiced_elsewhere(env):
     token = setup(env, orders=[
         order("W10001"),
-        order("W10002", platform="trendyol"),
+        order("W10002", platform="other"),
         order("W10003", total=0.0),
         order("W10004", invoice_issued=True, invoice_provider="manual", invoice_number="MANUEL-1"),
         order("W10005", invoice_issued=True, invoice_provider="birfatura", invoice_number="ARS1"),
     ])
     assert sorted(o["OrderCode"] for o in pull(env, token).json()["Orders"]) == ["W10001", "W10005"]
     logs = env.c.get("/api/integrations/birfatura/logs").json()["logs"]
-    assert "W10002 (pazaryeri siparişi)" in logs[0]["message"]
+    assert "W10002 (site dışı kanal kaydı)" in logs[0]["message"]
 
 
 def test_field_mapping_individual(env):

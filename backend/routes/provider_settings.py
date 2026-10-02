@@ -79,19 +79,6 @@ CARGO_PROVIDERS = {
                options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
         ],
     },
-    "yurtici": {
-        "name": "Yurtiçi Kargo",
-        "website": "https://www.yurticikargo.com",
-        "description": "Yurtiçi Kargo web servis entegrasyonu.",
-        "fields": [
-            _f("customer_code", "Müşteri Kodu", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("api_key", "API Key"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
     # Aras / PTT: CANLI SOAP entegrasyonu (backend/aras_kargo_client.py, ptt_kargo_client.py,
     # cargo_carriers/). Alan anahtarları cargo_carriers/registry.py tarafından okunur.
     "aras": {
@@ -147,42 +134,6 @@ CARGO_PROVIDERS = {
                options=[{"value": "", "label": "Hayır (PTT'de kayıtlı bilgi)"}, {"value": "true", "label": "Evet (Mağaza bilgileri)"}]),
             _f("default_desi", "Varsayılan Desi", type="number", placeholder="1"),
             _f("default_kg", "Varsayılan Ağırlık (kg)", type="number", placeholder="1"),
-        ],
-    },
-    "surat": {
-        "name": "Sürat Kargo",
-        "website": "https://www.suratkargo.com.tr",
-        "description": "Sürat Kargo web servis.",
-        "fields": [
-            _f("customer_code", "Müşteri Kodu", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "hepsijet": {
-        "name": "HepsiJet",
-        "website": "https://www.hepsijet.com",
-        "description": "Hepsiburada'nın kargo kolu.",
-        "fields": [
-            _f("customer_number", "Müşteri Numarası", required=True),
-            _f("api_key", "API Key", type="password", required=True),
-            _f("api_secret", "API Secret", type="password"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "trendyol-express": {
-        "name": "Trendyol Express",
-        "website": "https://www.trendyol.com",
-        "description": "Trendyol'un kargo hizmeti (Trendyol siparişleri için).",
-        "fields": [
-            _f("supplier_id", "Supplier ID (Tedarikçi No)", required=True),
-            _f("api_key", "API Key", type="password", required=True),
-            _f("api_secret", "API Secret", type="password", required=True),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
         ],
     },
     "sendeo": {

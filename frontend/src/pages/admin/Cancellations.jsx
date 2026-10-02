@@ -4,25 +4,10 @@ import { XCircle, Search, RefreshCw, X, Trash2 } from "lucide-react";
 import RefundBankBox from "../../components/admin/RefundBankBox";
 import { optimizeImg } from "../../lib/img";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { channelLabel, isOtherChannelOrder, channelBadge, OTHER_LABEL } from "../../lib/salesChannels";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Platform etiketi — en başta web sitemiz, sonra pazaryerleri
-const PLATFORM_LABELS = {
-  "": "Web Sitesi",
-  web: "Web Sitesi",
-  trendyol: "Trendyol",
-  hepsiburada: "Hepsiburada",
-  temu: "Temu",
-  n11: "N11",
-  amazon: "Amazon",
-  amazon_tr: "Amazon TR",
-  amazon_de: "Amazon DE",
-  aliexpress: "AliExpress",
-  etsy: "Etsy",
-  ciceksepeti: "Çiçek Sepeti",
-  pttavm: "PTT AVM",
-};
 
 // Sipariş durumları (backend order_statuses.py kataloğu ile birebir)
 const STATUS_OPTIONS = [
@@ -50,7 +35,7 @@ const STATUS_OPTIONS = [
 ];
 
 function platformLabel(p) {
-  return PLATFORM_LABELS[(p || "").toLowerCase()] || (p || "Web Sitesi");
+  return channelLabel(p);
 }
 
 function money(v) {
@@ -239,17 +224,9 @@ export default function Cancellations() {
               const pm = (o.payment_method || "").toLowerCase();
               const pmLabel = { credit_card:"Kredi Kartı", card:"Kredi Kartı", iyzico:"Kredi Kartı", cc:"Kredi Kartı",
                 bank_transfer:"Havale/EFT", transfer:"Havale/EFT", havale:"Havale/EFT", eft:"Havale/EFT",
-                cash_on_delivery:"Kapıda", cod:"Kapıda", kapida:"Kapıda", marketplace:"Marketplace" }[pm]
-                || (["trendyol","hepsiburada","temu","n11","amazon"].includes((o.platform||"").toLowerCase()) ? "Marketplace" : (o.payment_method || "—"));
-              const pMap = {
-                trendyol: { label: "Trendyol", bg: "bg-[#F27A1A]" },
-                hepsiburada: { label: "Hepsiburada", bg: "bg-[#FF6000]" },
-                temu: { label: "Temu", bg: "bg-[#FB7701]" },
-                amazon: { label: "Amazon", bg: "bg-[#232F3E]" },
-                amazon_tr: { label: "Amazon", bg: "bg-[#232F3E]" },
-                n11: { label: "n11", bg: "bg-[#EA0029]" },
-              };
-              const pb = pMap[(o.platform || "").toLowerCase()] || { label: "Web", bg: "bg-gray-800" };
+                cash_on_delivery:"Kapıda", cod:"Kapıda", kapida:"Kapıda", marketplace: OTHER_LABEL }[pm]
+                || (isOtherChannelOrder(o) ? OTHER_LABEL : (o.payment_method || "—"));
+              const pb = channelBadge(o);
               return (
                 <tr
                   key={o.id || o.order_number}

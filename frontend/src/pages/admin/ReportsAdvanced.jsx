@@ -104,7 +104,7 @@ export default function ReportsAdvanced() {
                   <th className="text-left pb-2">Ürün</th>
                   <th className="text-right pb-2">İptal Hariç Satış Ürün Adedi</th>
                   <th className="text-right pb-2">İade Ürün Adedi</th>
-                  <th className="text-right pb-2">İade % (Trendyol)</th>
+                  <th className="text-right pb-2">İade % (brüt)</th>
                 </tr>
               </thead>
               <tbody>
@@ -114,9 +114,9 @@ export default function ReportsAdvanced() {
                     <td className="py-2 text-right">{p.sold}</td>
                     <td className="py-2 text-right text-orange-600 font-semibold">{p.returned}</td>
                     <td className="py-2 text-right">
-                      {p.trendyol_return_rate_pct != null ? (
-                        <span title="İade / Brüt Satış; iptaller iade adedine eklenmez" className={`font-semibold ${p.trendyol_return_rate_pct >= 50 ? "text-red-600" : p.trendyol_return_rate_pct >= 20 ? "text-orange-500" : "text-gray-700"}`}>
-                          %{p.trendyol_return_rate_pct}
+                      {p.gross_return_rate_pct != null ? (
+                        <span title="İade / Brüt Satış; iptaller iade adedine eklenmez" className={`font-semibold ${p.gross_return_rate_pct >= 50 ? "text-red-600" : p.gross_return_rate_pct >= 20 ? "text-orange-500" : "text-gray-700"}`}>
+                          %{p.gross_return_rate_pct}
                         </span>
                       ) : "—"}
                     </td>

@@ -48,13 +48,9 @@ function MaintenanceSubscribers() {
 const CARGO_COMPANIES = [
   { key: "aras", label: "Aras Kargo" },
   { key: "mng", label: "MNG Kargo" },
-  { key: "yurtici", label: "Yurtiçi Kargo" },
-  { key: "surat", label: "Sürat Kargo" },
   { key: "ptt", label: "PTT Kargo" },
   { key: "ups", label: "UPS" },
   { key: "sendeo", label: "Sendeo" },
-  { key: "hepsijet", label: "HepsiJET" },
-  { key: "trendyol_express", label: "Trendyol Express" },
 ];
 
 export default function AdminSettings() {
@@ -78,7 +74,6 @@ export default function AdminSettings() {
     barcode_range_start: "",
     barcode_range_end: "",
     default_vat_rate: 10,
-    trendyol_markup: 0,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

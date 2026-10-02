@@ -240,7 +240,7 @@ def is_site_order(order: dict) -> bool:
 def skip_reason(order: dict, settings: dict) -> Optional[str]:
     """Faturalanmaması gereken sipariş için kısa sebep; uygunsa None."""
     if settings.get("only_site_orders", True) and not is_site_order(order):
-        return "pazaryeri siparişi"
+        return "site dışı kanal kaydı"
     if not (order.get("items") or []):
         return "kalem yok"
     if D(order.get("total")) <= Decimal("0.009"):

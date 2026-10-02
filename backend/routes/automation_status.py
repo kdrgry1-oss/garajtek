@@ -7,7 +7,7 @@ son loglarını görebilmesi için tek noktadan birleştirilmiş özet endpoint.
 
 Birleştirir:
   • APScheduler aktif job listesi (id, interval, next_run, last_run)
-  • Marketplace auto_sync ayarları (Trendyol/HB/Temu vs.) interval ve son tetikleme
+  • Marketplace auto_sync ayarları (harici kanal vs.) interval ve son tetikleme
   • integration_logs koleksiyonundan son N event
   • Bekleyen / başarısız işler özeti
 

@@ -3,8 +3,7 @@ integrations_common.py — entegrasyonlar arasında PAYLAŞILAN yardımcılar ve
 entegrasyon logları, kargo sağlayıcı ayarları (/{provider}/settings|status|test-connection),
 ve katalog bakım araçları (/site/*).
 
-Pazaryeri (Trendyol/Hepsiburada/Temu/Amazon) entegrasyonları kaldırıldı; geçmiş veriler
-veritabanında durur, yalnız okunur.
+Satış kanalı entegrasyonları yoktur; mağazanın tek satış kanalı web sitesidir.
 """
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
@@ -40,8 +39,8 @@ class _SkipPlatform(Exception):
     """on_product_deactivated: istenmeyen pazaryeri atlanır."""
 
 
-# Trendyol ms-epoch'u TÜRKİYE saatini taşır (UTC değil). Kanıt (23.09.2026, sipariş
-# listesi dışa aktarımı ile karşılaştırma): Trendyol'un TR 21:09 dediği sipariş bizde
+# harici kanal ms-epoch'u TÜRKİYE saatini taşır (UTC değil). Kanıt (23.09.2026, sipariş
+# listesi dışa aktarımı ile karşılaştırma): harici kanal TR 21:09 dediği sipariş bizde
 # "2026-09-01T21:08:57+00:00" olarak duruyordu — saat rakamı AYNI, etiket UTC.
 # Sonuç: raporlar UTC→TR dönüşümünde 3 saat DAHA ekliyor, 21:00 sonrası siparişler
 # ertesi güne (ay sonuysa ertesi aya) kayıyordu. Türkiye'de yaz saati uygulaması
@@ -92,13 +91,9 @@ def _generate_slug(name: str) -> str:
 @router.post("/site/categories/sync-missing-from-products")
 async def sync_missing_categories_from_products(current_user: dict = Depends(require_admin)):
     """
-    Ticimax kategori senkronizasyonunda kaçırılmış (örn. çok derin alt-kategori veya
-    silinmiş ama ürünleri kalmış) kategorileri ürünlerin `category_name` alanından
-    bulup yerel `categories` koleksiyonuna ekler ve ilgili ürünleri category_id ile
-    günceller.
-
-    Tipik kullanım: "Tulum kategorisi gelmemiş" gibi durumlarda; Ticimax API'sini
-    tekrar çağırmadan, mevcut veriden eksiklikleri tamamlar.
+    Ürünlerin `category_name` alanında geçen ama kategori ağacında olmayan kategorileri
+    yerel `categories` koleksiyonuna ekler ve ilgili ürünleri category_id ile günceller
+    (içe aktarım sonrası eksik kategori tamamlama).
     """
     # 1) Mevcut yerel kategoriler (isim → id)
     existing = {}
@@ -129,17 +124,15 @@ async def sync_missing_categories_from_products(current_user: dict = Depends(req
         slug = _generate_slug(nm)
         doc = {
             "id": new_id,
-            "ticimax_id": None,  # Ticimax'tan gelmediği için None
             "name": nm,
             "slug": slug,
             "parent_id": None,
             "is_active": True,
             "source": "products_backfill",
-            "ticimax_sub_count": 0,
-            "ticimax_sira": 999,
+            "sort_order": 999,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
-            "note": "Bu kategori Ticimax sync sırasında kaçırılmıştı; ürünlerden geri-yüklendi.",
+            "note": "Bu kategori ürünlerdeki kategori adından geri-yüklendi.",
         }
         await db.categories.insert_one(doc)
         existing[nm.lower()] = new_id
@@ -163,280 +156,6 @@ async def sync_missing_categories_from_products(current_user: dict = Depends(req
         "relinked_products": relinked,
         "message": f"{len(created)} kategori oluşturuldu, {relinked} ürün bağlandı.",
     }
-async def _kurtarma_match(uk, barkodlar, projection):
-    """Bir Ticimax kartı için canlı ürün(ler)i GÜVENLE bulur.
-    Öncelik: urun_karti_id (benzersiz). Tutmazsa BARKOD (varyant-benzersiz; bu export'ta
-    1086 distinct barkodun 0'ı birden çok karta düşüyor → güvenli yedek anahtar).
-    Döner: (prods, via) ; via ∈ {'kart_id','barkod',''}.
-    Eşleşen tüm ürünler aynı karttır (renk kardeşleri) → hepsine uygulamak güvenli."""
-    ukq = [str(uk)]
-    if str(uk).isdigit():
-        ukq.append(int(uk))
-    prods = await db.products.find(
-        {"urun_karti_id": {"$in": ukq}}, projection
-    ).to_list(length=30)
-    if prods:
-        return prods, "kart_id"
-    bl = [str(b).strip() for b in (barkodlar or []) if str(b).strip()]
-    if bl:
-        prods = await db.products.find(
-            {"$or": [{"barcode": {"$in": bl}}, {"variants.barcode": {"$in": bl}}]},
-            projection,
-        ).to_list(length=30)
-        if prods:
-            return prods, "barkod"
-    return [], ""
-@router.post("/site/teknik-detay/recover")
-async def recover_teknik_detay_from_snapshot(
-    apply: bool = Query(False, description="false=ÖNİZLEME (yazma yok) · true=UYGULA"),
-    current_user: dict = Depends(require_admin),
-):
-    """Silinen ürün-kartı teknik detaylarını, doğrulanmış Ticimax export snapshot'ından
-    (backend/data/teknik_detay_kurtarma.json) GERİ YÜKLER.
-
-    GÜVENLİK GARANTİLERİ:
-      • Eşleştirme YALNIZCA `urun_karti_id` üzerinden (benzersiz). StokKodu/barkod ASLA.
-      • Bir kart-ID birden çok ürüne denk gelirse (belirsiz) → ATLANIR, asla yazılmaz.
-      • Sadece BOŞ/eksik özellik doldurulur; mevcut (manuel) değer ASLA ezilmez.
-      • Fiyat/KDV/stok/barkod/varyantlara DOKUNULMAZ (yalnız `attributes`).
-      • apply=false → ne değişeceğini döner, HİÇBİR ŞEY yazmaz.
-    """
-    import json as _json
-    import os as _os
-    snap_path = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)),
-                              "data", "teknik_detay_kurtarma.json")
-    try:
-        with open(snap_path, "r", encoding="utf-8") as f:
-            snap = _json.load(f)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Kurtarma verisi okunamadı: {e}")
-    urunler = snap.get("urunler") or {}
-
-    matched = 0
-    via_kart = 0
-    via_barkod = 0
-    no_match = 0
-    too_many = 0
-    to_fill_total = 0
-    hb_total = 0
-    temu_total = 0
-    updated = 0
-    sample: list = []
-
-    PROJ = {"_id": 0, "id": 1, "attributes": 1, "name": 1,
-            "hepsiburada_attributes": 1, "temu_attributes": 1}
-
-    for uk, info in urunler.items():
-        ozet = (info or {}).get("ozellikler") or {}
-        if not ozet:
-            continue
-        prods, via = await _kurtarma_match(uk, (info or {}).get("barkodlar"), PROJ)
-        if not prods:
-            no_match += 1
-            continue
-        if len(prods) > 25:
-            too_many += 1   # GÜVENLİK: anormal eşleşme sayısı → dokunma
-            continue
-        if via == "kart_id":
-            via_kart += 1
-        elif via == "barkod":
-            via_barkod += 1
-
-        card_did = False
-        for p in prods:
-            cur = p.get("attributes")
-            existing_names: set = set()
-            existing_vals: dict = {}   # orijinal_ad -> deger (üründe ZATEN dolu genel/Trendyol özellikleri)
-            cur_list: list = []
-            if isinstance(cur, list):
-                for a in cur:
-                    if isinstance(a, dict):
-                        cur_list.append(a)
-                        nm = a.get("name") or a.get("label") or a.get("type")
-                        vv = a.get("value") or a.get("attribute_value")
-                        if nm and str(vv or "").strip():
-                            existing_names.add(_tr_norm(nm))
-                            existing_vals.setdefault(str(nm), str(vv).strip())
-            elif isinstance(cur, dict):
-                for k, v in cur.items():
-                    if isinstance(v, dict):
-                        nm = v.get("label") or v.get("name") or k
-                        vv = v.get("value") or v.get("attribute_value")
-                    else:
-                        nm, vv = k, v
-                    if nm and str(vv or "").strip():
-                        existing_names.add(_tr_norm(nm))
-                        existing_vals.setdefault(str(nm), str(vv).strip())
-
-            # 1) Snapshot'tan GENEL (attributes/Trendyol) BOŞ özellikleri doldur.
-            adds = []
-            for oz, dg in ozet.items():
-                if not str(dg or "").strip():
-                    continue
-                if _tr_norm(oz) in existing_names:
-                    continue   # zaten DOLU → dokunma
-                adds.append({"name": oz, "value": str(dg).strip()})
-
-            # 2) HB + Temu'ya AKTAR: ürünün TÜM genel özellikleri (mevcut dolu + kurtarılan) →
-            #    hepsiburada_attributes / temu_attributes'ta BOŞ olanı doldur (manuel değer ezilmez).
-            #    Push, bu ham değerleri gönderim anında HB enum'una çözer.
-            hb = dict(p.get("hepsiburada_attributes") or {})
-            temu = dict(p.get("temu_attributes") or {})
-            propagate: dict = {}
-            for nm, vv in existing_vals.items():
-                propagate[nm] = vv
-            for a in adds:
-                propagate.setdefault(a["name"], a["value"])
-            hb_keys_norm = {_tr_norm(k) for k, v in hb.items() if str(v or "").strip()}
-            temu_keys_norm = {_tr_norm(k) for k, v in temu.items() if str(v or "").strip()}
-            hb_fill = 0
-            temu_fill = 0
-            for nm, vv in propagate.items():
-                nn = _tr_norm(nm)
-                if nn and nn not in hb_keys_norm:
-                    hb[nm] = vv; hb_fill += 1; hb_keys_norm.add(nn)
-                if nn and nn not in temu_keys_norm:
-                    temu[nm] = vv; temu_fill += 1; temu_keys_norm.add(nn)
-
-            if not adds and hb_fill == 0 and temu_fill == 0:
-                continue   # bu üründe yapılacak bir şey yok
-            card_did = True
-            to_fill_total += len(adds)
-            hb_total += hb_fill
-            temu_total += temu_fill
-            if len(sample) < 12:
-                sample.append({"urun_karti_id": str(uk),
-                               "eslesme": via,
-                               "urun": (p.get("name") or info.get("urun_adi") or "")[:50],
-                               "genel_eklenecek": {a["name"]: a["value"] for a in adds},
-                               "hb_dolan": hb_fill, "temu_dolan": temu_fill})
-            if apply:
-                setdoc = {"hepsiburada_attributes": hb, "temu_attributes": temu}
-                if adds:
-                    # attributes FORMATINI KORU (Trendyol'u bozma): list ise list'e ekle, dict ise dict'e.
-                    if isinstance(cur, dict):
-                        new_attrs = dict(cur)
-                        for a in adds:
-                            new_attrs[a["name"]] = a["value"]
-                    else:
-                        new_attrs = (cur_list if isinstance(cur, list) else []) + adds
-                    setdoc["attributes"] = new_attrs
-                await db.products.update_one({"id": p["id"]}, {"$set": setdoc})
-                updated += 1
-        if card_did:
-            matched += 1
-
-    return {
-        "mode": "apply" if apply else "preview",
-        "snapshot_urun": len(urunler),
-        "eslesen_urun": matched,
-        "eslesen_kart_id_ile": via_kart,
-        "eslesen_barkod_ile": via_barkod,
-        "eslesmeyen_urun_karti": no_match,
-        "anormal_atlanmis": too_many,
-        "doldurulacak_ozellik_toplam": to_fill_total,
-        "hb_dolan_toplam": hb_total,
-        "temu_dolan_toplam": temu_total,
-        "guncellenen_urun": updated,
-        "ornek": sample,
-        "not": ("Eşleştirme: önce urun_karti_id, tutmazsa BARKOD (varyant-benzersiz, güvenli). "
-                "Yalnız BOŞ özellikler dolduruldu (genel + Hepsiburada + Temu); manuel değerler korundu. "
-                "attributes formatına dokunulmadı (Trendyol güvende). Fiyat/KDV/stok/barkoda dokunulmadı."
-                + ("" if apply else " — ÖNİZLEME: hiçbir şey yazılmadı.")),
-    }
-@router.post("/site/aciklama/recover")
-async def recover_aciklama_from_snapshot(
-    apply: bool = Query(False, description="false=ÖNİZLEME (yazma yok) · true=UYGULA"),
-    current_user: dict = Depends(require_admin),
-):
-    """Eksik ürün AÇIKLAMALARINI (description) doğrulanmış Ticimax export snapshot'ından
-    (backend/data/aciklama_kurtarma.json) doldurur.
-
-    GÜVENLİK GARANTİLERİ:
-      • Eşleştirme YALNIZCA `urun_karti_id` (benzersiz). StokKodu/barkod ASLA.
-      • Bir kart-ID birden çok ürüne denk gelirse → ATLANIR.
-      • Yalnız BOŞ açıklama doldurulur (içi boş "<p></p>" gibi HTML de boş sayılır);
-        dolu açıklama ASLA ezilmez.
-      • Yalnız `description` alanı; fiyat/KDV/stok/barkod/başlık/özelliklere DOKUNULMAZ.
-      • apply=false → önizleme, hiçbir şey yazmaz.
-    """
-    import json as _json
-    import os as _os
-    import re as _re
-    snap_path = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)),
-                              "data", "aciklama_kurtarma.json")
-    try:
-        with open(snap_path, "r", encoding="utf-8") as f:
-            snap = _json.load(f)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Açıklama verisi okunamadı: {e}")
-    urunler = snap.get("urunler") or {}
-
-    def _blank_html(s):
-        t = _re.sub(r"<[^>]+>", " ", str(s or ""))
-        t = t.replace("&nbsp;", " ").replace("\xa0", " ")
-        return not t.strip()
-
-    matched = 0
-    via_kart = 0
-    via_barkod = 0
-    no_match = 0
-    too_many = 0
-    already_full = 0
-    updated = 0
-    sample: list = []
-
-    PROJ = {"_id": 0, "id": 1, "description": 1, "name": 1}
-
-    for uk, info in urunler.items():
-        desc = (info or {}).get("description") or ""
-        if not str(desc).strip():
-            continue
-        prods, via = await _kurtarma_match(uk, (info or {}).get("barkodlar"), PROJ)
-        if not prods:
-            no_match += 1
-            continue
-        if len(prods) > 25:
-            too_many += 1   # GÜVENLİK: anormal → dokunma
-            continue
-        if via == "kart_id":
-            via_kart += 1
-        elif via == "barkod":
-            via_barkod += 1
-
-        card_did = False
-        for p in prods:
-            if not _blank_html(p.get("description")):
-                already_full += 1
-                continue   # zaten dolu → DOKUNMA
-            card_did = True
-            if len(sample) < 12:
-                sample.append({"urun_karti_id": str(uk),
-                               "eslesme": via,
-                               "urun": (p.get("name") or info.get("urun_adi") or "")[:50],
-                               "aciklama_onizleme": _re.sub(r"<[^>]+>", " ", desc)[:120].strip()})
-            if apply:
-                await db.products.update_one({"id": p["id"]}, {"$set": {"description": str(desc)}})
-                updated += 1
-        if card_did:
-            matched += 1
-
-    return {
-        "mode": "apply" if apply else "preview",
-        "snapshot_urun": len(urunler),
-        "doldurulacak_urun": matched,
-        "eslesen_kart_id_ile": via_kart,
-        "eslesen_barkod_ile": via_barkod,
-        "zaten_dolu": already_full,
-        "eslesmeyen_urun_karti": no_match,
-        "anormal_atlanmis": too_many,
-        "guncellenen_urun": updated,
-        "ornek": sample,
-        "not": ("Eşleştirme: önce urun_karti_id, tutmazsa BARKOD (varyant-benzersiz, güvenli). "
-                "Yalnız BOŞ açıklamalar dolduruldu (içi boş HTML dahil); dolu açıklamalar korundu. "
-                "Sadece description; fiyat/KDV/stok/başlık/özelliklere dokunulmadı."
-                + ("" if apply else " — ÖNİZLEME: hiçbir şey yazılmadı.")),
-    }
 async def restore_xml_missing_products_once():
     """OTOMATİK TELAFİ: kullanıcının SİLMEDİĞİ (is_deleted=True DEĞİL) hâlde pasif görünen tüm
     ürünleri geri AKTİF eder. Kullanıcı kuralı: "sil tuşuna basmadıysam ürün görünmeli."
@@ -450,7 +169,7 @@ async def restore_xml_missing_products_once():
 
     Settings bayrağı (v2) ile deploy başına BİR KEZ çalışır; sonraki elle pasifleştirmelerle
     savaşmaz (onlar manual_deactivated işaretli). v1'den v2'ye çıkıldı çünkü v1 yalnız
-    'ticimax_xml_missing' etiketlileri kapsıyordu; etiketsiz eski pasifler geri gelmiyordu."""
+    'eski altyapı' etiketlileri kapsıyordu; etiketsiz eski pasifler geri gelmiyordu."""
     try:
         flag = await db.settings.find_one({"id": "xml_missing_restore_v2"}, {"_id": 0})
         if flag and flag.get("done"):
@@ -480,14 +199,14 @@ async def restore_xml_missing_products_once():
 # DENETİM HATA-1: sipariş bu statülerdeyse iade işaretlemesi YAPILMAZ (zaten iptal/iade)
 
 
-ALLOWED_MARKETPLACES = {
+ALLOWED_PROVIDERS = {
     # kargo sağlayıcıları
-    "mng", "aras", "yurtici", "ptt", "hepsijet", "trendyol_express", "surat", "ups", "dhl",
+    "mng", "aras", "ptt", "ups", "dhl",
 }
 @router.get("/{marketplace}/settings")
 async def get_marketplace_settings(marketplace: str, current_user: dict = Depends(require_admin)):
     """Sağlayıcı ayarlarını getir (kargo / mesaj kanalları)."""
-    if marketplace not in ALLOWED_MARKETPLACES:
+    if marketplace not in ALLOWED_PROVIDERS:
         raise HTTPException(status_code=404, detail="Bilinmeyen pazaryeri")
     settings = await db.settings.find_one({"id": marketplace}, {"_id": 0})
     if not settings:
@@ -512,7 +231,7 @@ async def get_marketplace_settings(marketplace: str, current_user: dict = Depend
 @router.post("/{marketplace}/settings")
 async def save_marketplace_settings(marketplace: str, payload: dict, current_user: dict = Depends(require_permission("integrations.view"))):
     """Sağlayıcı ayarlarını kaydet (kargo / mesaj kanalları)."""
-    if marketplace not in ALLOWED_MARKETPLACES:
+    if marketplace not in ALLOWED_PROVIDERS:
         raise HTTPException(status_code=404, detail="Bilinmeyen pazaryeri")
 
     # Required alan validasyonu — is_active=True ise pazaryeri bazlı zorunlu alanlar
@@ -562,7 +281,7 @@ async def get_marketplace_status(marketplace: str, current_user: dict = Depends(
     """Sağlayıcı entegrasyon durumu.
     DENETİM SEC-5 F-12: eskiden PUBLIC'ti ve merchant_id/supplier_id + canlı mod sızdırıyordu →
     require_admin eklendi."""
-    if marketplace not in ALLOWED_MARKETPLACES:
+    if marketplace not in ALLOWED_PROVIDERS:
         raise HTTPException(status_code=404, detail="Bilinmeyen pazaryeri")
     settings = await db.settings.find_one({"id": marketplace}, {"_id": 0})
     if not settings:
@@ -579,7 +298,7 @@ async def get_marketplace_status(marketplace: str, current_user: dict = Depends(
 async def test_marketplace_connection(marketplace: str, current_user: dict = Depends(require_admin)):
     """Kimlik bilgisi kontrolü (kargo sağlayıcıları / mesaj kanalları).
     Eksik bilgi varsa success=False ve açıklayıcı mesaj döner."""
-    if marketplace not in ALLOWED_MARKETPLACES:
+    if marketplace not in ALLOWED_PROVIDERS:
         raise HTTPException(status_code=404, detail="Bilinmeyen pazaryeri")
     settings = await db.settings.find_one({"id": marketplace}, {"_id": 0})
     if not settings:
@@ -595,7 +314,7 @@ async def test_marketplace_connection(marketplace: str, current_user: dict = Dep
         pass
 
     try:
-        if marketplace in {"mng", "aras", "yurtici", "ptt", "hepsijet", "trendyol_express", "surat"}:
+        if marketplace in {"mng", "aras", "ptt"}:
             user = (settings.get("username") or "").strip()
             pw = (settings.get("password") or "").strip()
             key = (settings.get("api_key") or "").strip()

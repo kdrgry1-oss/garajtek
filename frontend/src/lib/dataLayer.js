@@ -341,7 +341,7 @@ function productToItem(p, variant = null, opts = {}) {
 
   const item = {
     item_id: String(p.id || p.product_id || p.sku || p.stock_code || ""),
-    // Meta katalog eşleşmesi: katalog beden başına Ticimax varyant ID'siyle beslendiği
+    // Meta katalog eşleşmesi: katalog beden başına eski altyapı varyant ID'siyle beslendiği
     // için Meta content_ids = SEÇİLİ varyantın id'si olmalı. Varyant id yoksa ana ürün
     // id'sine düşer. (GA4/Google ana id'de kalır; bunu yalnızca Meta kullanır.)
     content_id: String(
