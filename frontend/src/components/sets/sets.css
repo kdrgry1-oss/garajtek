@@ -122,3 +122,4 @@
 .gt-codq-check input { margin-top: 3px; }
 .gt-codq-submit { font-weight: 700; font-size: 16px; padding: 12px; border-radius: 1.5rem; margin-top: 6px; }
 @media (max-width: 575px) { .gt-codq-grid, .gt-codq-pds { grid-template-columns: 1fr; } .gt-codq-overlay { padding: 0; } .gt-codq { border-radius: 0; min-height: 100%; } }
+.gt-codq a, .electro .gt-codq a { color: #0062bd; text-decoration: underline; }
