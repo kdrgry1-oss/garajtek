@@ -30,7 +30,8 @@
  * =============================================================================
  */
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { usePreviewState } from "../lib/pagePreview";
+import { countdownEnd } from "./pageblocks/_shared/Countdown";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -74,19 +75,46 @@ const _readBarCache = () => {
   catch (e) { return null; }
 };
 
-export default function CountdownBar() {
-  const [block, setBlock] = useState(_readBarCache);   // önbellekten anında
+/** v2 şema (text, countdown{end, heading, labels, on_expire, expired_text}, background, text_color) →
+ * bu bileşenin iç alanları. Eski alanlar (left_text, end_at, …) doğrudan okunur (geri uyum). */
+function normalizeSettings(st) {
+  if (!st || !st.countdown || typeof st.countdown !== "object") return st || {};
+  const cd = st.countdown;
+  const end = cd.enabled === false ? null : countdownEnd(cd);
+  return {
+    left_text: st.text || "",
+    timer_label: cd.heading || "",
+    end_at: end ? end.toISOString() : "",
+    start_at: "",
+    bg_color: st.background,
+    text_color: st.text_color,
+    fallback_text: cd.on_expire === "show_text" ? cd.expired_text || "" : "",
+    labels: cd.labels || {},
+    units: Array.isArray(cd.units) && cd.units.length ? cd.units : ["days", "hours", "minutes", "seconds"],
+    timer_off: cd.enabled === false,
+  };
+}
+
+export default function CountdownBar({ block: forced }) {
+  const pv = usePreviewState();
+  const [fetched, setBlock] = useState(_readBarCache);   // önbellekten anında
   const [now, setNow] = useState(Date.now());
   const [msgIdx, setMsgIdx] = useState(0);
   const [loaded, setLoaded] = useState(() => _readBarCache() !== null); // cache varsa anında hazır
 
+  // Önizlemede taslaktaki blok; bileşene blok verildiyse o; yoksa yayındaki blok
+  const pvBlock = pv.active && Array.isArray(pv.blocks) ? (pv.blocks.find((b) => b && b.type === "countdown_bar" && b.is_active !== false) || null) : undefined;
+  const block = forced !== undefined ? forced : pvBlock !== undefined ? pvBlock : fetched;
+
   // Bloğu yükle (sayfa açılışında)
   useEffect(() => {
+    if (forced !== undefined || pv.active) { setLoaded(true); return undefined; }
     let mounted = true;
-    axios.get(`${API}/page-blocks?page=home`)
-      .then((r) => {
+    fetch(`${API}/page-blocks?page=home`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
         if (!mounted) return;
-        const cb = (r.data || []).find((b) => b.type === "countdown_bar" && b.is_active);
+        const cb = (Array.isArray(data) ? data : []).find((b) => b.type === "countdown_bar" && b.is_active);
         setBlock(cb || null);
         try {
           if (cb) localStorage.setItem(_CACHE_KEY, JSON.stringify(cb));
@@ -96,7 +124,7 @@ export default function CountdownBar() {
       .catch(() => {})
       .finally(() => { if (mounted) setLoaded(true); });
     return () => { mounted = false; };
-  }, []);
+  }, [forced, pv.active]);
 
   // Tick — saniye bazlı güncelleme (sadece aktif countdown varsa)
   useEffect(() => {
@@ -106,7 +134,7 @@ export default function CountdownBar() {
   }, [block]);
 
   // ── Geçerli metin alanını ve çoklu mesaj listesini belirle ──────────────────
-  const s = block?.settings || {};
+  const s = normalizeSettings(block?.settings);
   const startAt = _parseLocal(s.start_at);
   const endAt   = _parseLocal(s.end_at);
   const bg      = s.bg_color || "#000000"; // DENETİM FIX: panelde seçilen renk uygulanıyordu değildi
@@ -182,10 +210,10 @@ export default function CountdownBar() {
               {timerLbl}
             </span>
           )}
-          <CountUnit value={days}  label="GÜN"  fg={fg} bg={bg} />
-          <CountUnit value={hours} label="SAAT" fg={fg} bg={bg} />
-          <CountUnit value={mins}  label="DK"   fg={fg} bg={bg} />
-          <CountUnit value={secs}  label="SN"   fg={fg} bg={bg} />
+          {!s.timer_off && (s.units || ["days", "hours", "minutes", "seconds"]).map((u) => (
+            <CountUnit key={u} value={{ days, hours, minutes: mins, seconds: secs }[u]}
+              label={(s.labels || {})[u] || { days: "GÜN", hours: "SAAT", minutes: "DK", seconds: "SN" }[u]} fg={fg} bg={bg} />
+          ))}
         </div>
       </div>
     </div>

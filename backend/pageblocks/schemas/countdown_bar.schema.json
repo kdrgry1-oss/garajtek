@@ -1,0 +1,65 @@
+{
+  "key": "countdown_bar",
+  "version": 2,
+  "title": "Geri Sayım Şeridi",
+  "description": "Sayfanın en üstünde kampanya geri sayımı (tüm sayfalarda)",
+  "category": "ust_bar",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [],
+  "layout": "full_bleed",
+  "singleton": true,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "text",
+      "type": "textarea",
+      "label": "Metin",
+      "tab": "İçerik",
+      "max_length": 500,
+      "help": "Birden fazla mesaj için her mesajı yeni satıra yazın; sırayla döner."
+    },
+    {
+      "name": "countdown",
+      "type": "countdown",
+      "label": "Geri sayım",
+      "tab": "İçerik"
+    },
+    {
+      "name": "link",
+      "type": "link",
+      "label": "Bağlantı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "label": "Arka plan",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "width": "half"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

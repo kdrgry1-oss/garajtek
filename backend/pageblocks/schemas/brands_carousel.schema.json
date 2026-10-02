@@ -1,0 +1,135 @@
+{
+  "key": "brands_carousel",
+  "version": 2,
+  "title": "Marka Logoları Karuseli",
+  "description": "Marka logoları karuseli (şablon: brands-carousel)",
+  "category": "marka",
+  "group": "D",
+  "status": "ready",
+  "template_refs": [
+    "T1/inc/footer/brands-carousel.php"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "source",
+      "type": "select",
+      "label": "Kaynak",
+      "tab": "İçerik",
+      "options": [
+        {
+          "value": "catalog",
+          "label": "Katalogdaki markalar"
+        },
+        {
+          "value": "manual",
+          "label": "Elle eklenen logolar"
+        }
+      ]
+    },
+    {
+      "name": "brands",
+      "type": "repeater",
+      "label": "Logolar",
+      "tab": "İçerik",
+      "max": 30,
+      "item_label": "{{name}}",
+      "show_if": {
+        "source": [
+          "manual"
+        ]
+      },
+      "item_fields": [
+        {
+          "name": "logo",
+          "type": "image",
+          "label": "Logo",
+          "recommended": [
+            200,
+            60
+          ]
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "label": "Marka adı"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "kinds": [
+            "brand",
+            "search",
+            "category",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "logo": null,
+        "name": "",
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "item_noun": "Logo"
+    },
+    {
+      "name": "show_name_overlay",
+      "type": "bool",
+      "label": "Üzerine gelince adı göster",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "grayscale",
+      "type": "bool",
+      "label": "Gri tonlu (üzerine gelince renkli)",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "logo_max_height",
+      "type": "number",
+      "label": "Logo en fazla yüksekliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 20,
+      "max": 120
+    },
+    {
+      "name": "show_on_all_pages",
+      "type": "bool",
+      "label": "Tüm sayfalarda footer üstünde göster",
+      "tab": "Gelişmiş"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

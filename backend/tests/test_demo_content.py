@@ -161,6 +161,14 @@ def test_load_on_fresh_db_then_upgrade_from_v1(db, fake_store):
     assert lift["specs"].get("lifting_capacity_kg") == 4000 or lift["specs"].get("kapasite_ton") == 4
     assert lift["variant_labels"] == {"size": "Elektrik Bağlantısı"}
 
+    # Sayfa Tasarımı v2: boş görsel alanları demo görselleriyle dolar (yeni alan yolları)
+    pub = _run(db.page_layouts.find_one({"id": "home:published"}, {"_id": 0}))
+    by = {b["type"]: b["settings"] for b in pub["blocks"]}
+    assert all(s["background"]["url"].startswith("/api/upload/files/") for s in by["hero_slider"]["slides"])
+    assert by["ads_block"]["items"][0]["image"]["url"].startswith("/api/upload/files/")
+    assert by["full_banner"]["image"]["url"] and by["brands_carousel"]["source"] == "manual"
+    assert _run(db.page_blocks.count_documents({"type": "hero_slider"})) == 1  # yayın aynası
+
     # İkinci yükleme idempotent: sayılar aynı kalır
     _run(dc.load_demo(db, _creator(db)))
     st2 = _run(dc.demo_status(db))
@@ -171,3 +179,7 @@ def test_load_on_fresh_db_then_upgrade_from_v1(db, fake_store):
     assert rm["removed_products"] == len(dc.P) + len(dc.SETS)
     assert _run(db.products.count_documents({})) == 1  # yalnız gerçek ürün kaldı
     assert _run(db.files.count_documents({})) == 0
+    pub = _run(db.page_layouts.find_one({"id": "home:published"}, {"_id": 0}))
+    by = {b["type"]: b["settings"] for b in pub["blocks"]}
+    assert not any(s.get("background") for s in by["hero_slider"]["slides"])  # demo slaytları kaldırıldı
+    assert by["full_banner"]["image"] is None and by["brands_carousel"]["source"] == "catalog"

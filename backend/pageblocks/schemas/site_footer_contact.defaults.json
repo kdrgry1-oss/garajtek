@@ -1,0 +1,11 @@
+{
+  "show_logo": true,
+  "call_us_icon": {
+    "icon": "ec ec-support"
+  },
+  "call_us_text": "Sorunuz mu var? 7/24 arayın!",
+  "call_us_fallback": "İletişim",
+  "address_title": "İletişim Bilgileri",
+  "slogan": "",
+  "social": []
+}

@@ -1,1826 +1,620 @@
-import { SITE_NAME } from "../../lib/brand";
-import { useState, useEffect, useMemo } from "react";
-import { Plus, Edit, Trash2, GripVertical, Upload, X, Eye, EyeOff, Copy, Undo2, Redo2, Save, Search, Monitor, Smartphone } from "lucide-react";
+// Sayfa Tasarımı (SPEC §5.1) — vitrin ana sayfasıyla %100 eşdeğer, şemadan üretilen düzenleyici.
+//   Sol (360px): [Bloklar] sürükle-bırak liste (gizle/göster, cihaz görünürlüğü, zamanlama rozeti,
+//                "değiştirildi" noktası, çoğalt, sil) + seçili bloğun şemadan otomatik formu (sekmeli)
+//                [Genel Alanlar] tema, üst bar, header, dikey menü, menüler, e-bülten, footer…
+//   Sağ: GERÇEK vitrin önizlemesi (iframe /onizleme/sayfa/home) — postMessage ile anında senkron,
+//        tıkla-seç, bloklar arası "+ Blok ekle", cihaz genişlikleri 1440 / 1024 / 390.
+//   Üst çubuk: geri al / ileri al (100 adım), otomatik taslak kaydı (3 sn, If-Match), Yayınla (atomik),
+//              hata listesi, çakışma çözümü, revizyonlar, taslağı at, şablon düzenini yükle.
+// Blok tipi değiştirilemez; varyant değiştirilebilir. Her blok/alan "Şablon varsayılanına sıfırla".
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
+  AlertTriangle, ArrowDown, ArrowUp, Clock, Copy, ExternalLink, Eye, EyeOff, GripVertical, History, LayoutTemplate, Monitor,
+  Plus, Redo2, RotateCcw, Smartphone, Tablet, Trash2, Undo2, X,
+} from "lucide-react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import {
-  buildPageDesignSavePlan,
-  clonePageDesign,
-  createDraftBlock,
-  duplicateDraftBlock,
-  normalizeBlockOrder,
-  samePageDesign,
-} from "../../lib/pageDesignDraft";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "../../components/ui/dialog";
-import HomeBlockFields, { HOME_BLOCK_TYPES, ImageSlot, SizeHint } from "../../components/admin/HomeBlockFields";
+  allFields, applyVariant, CATEGORIES, defaultSettings, duplicateBlock, getBlock, getGlobal, getSchema, globalKeys, instantiate,
+  isModified, listBlocks, resetBlock, withDefaults, withGlobalDefaults,
+} from "../../components/pageblocks/registry";
+import SchemaForm from "../../components/pageblocks/_fields/SchemaForm";
+import { normErrPath } from "../../components/pageblocks/_fields/SchemaForm";
+import { clone } from "../../components/pageblocks/_shared/schema";
 import DemoContentCard from "../../components/admin/DemoContentCard";
-import { SIZES } from "../../lib/homeLayout";
+import { appConfirm } from "../../components/admin/AppConfirm";
+import { useAuth } from "../../context/AuthContext";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-// Origin'i dogru turet (API.replace('/api','') ilk //api'yi silip bozuk URL uretirdi).
-const BACKEND_ORIGIN = String(process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "").replace(/\/api$/, "");
+const PAGE = "home";
+const HISTORY = 100;
+const DEVICES = [["desktop", 1440, Monitor, "Masaüstü"], ["tablet", 1024, Tablet, "Tablet"], ["mobile", 390, Smartphone, "Mobil"]];
+const headers = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+const ask = (m) => (appConfirm ? appConfirm(m) : Promise.resolve(window.confirm(m)));
 
-const BLOCK_TYPES = [
-  { value: "countdown_bar", label: "Geri Sayım Barı (Üst Bar)", icon: "⏱️", description: "Sitenin EN ÜST'ünde, planlanabilir tarih/saatli countdown" },
-  { value: "hero_slider", label: "Ana Slider", icon: "🎠", description: "Tam genişlik dönen slaytlar (1920×466) — solda Tüm Kategoriler menüsü" },
-  { value: "ads_block", label: "Reklam Bannerları (3'lü)", icon: "🪧", description: "Görsel + yazılı 3 kart (410×281, 410×281, 714×486)" },
-  { value: "deals_tabs", label: "Günün Fırsatı + Ürün Sekmeleri", icon: "⏳", description: "Geri sayımlı fırsat kartı + 3 sekmeli ürün ızgarası" },
-  { value: "product_grid_212", label: "Kategori Ürün Izgarası (2-1-2)", icon: "🔲", description: "Gri zeminli, kategori sekmeli, ortada büyük ürün" },
-  { value: "best_sellers", label: "Çok Satanlar Karuseli", icon: "🏆", description: "Sekmeli, 6'lı kart grupları" },
-  { value: "rotating_text", label: "Dönen Yazı", icon: "📢", description: "Üst banner'da dönen metin" },
-  { value: "full_banner", label: "Tam Genişlik Banner", icon: "🖼️", description: "Tek görsel (önerilen 1170×207)" },
-  { value: "product_slider", label: "Ürün Karuseli", icon: "🛍️", description: "Yatay ürün listesi (ör. Son Eklenenler)" },
-  { value: "brands_carousel", label: "Markalar", icon: "🏷️", description: "Marka logoları (200×60); boşsa ürün markaları" },
-  { value: "product_columns", label: "Alt Ürün Sütunları", icon: "📋", description: "3 küçük ürün listesi (Öne çıkan / İndirimli / Çok satan)" },
-  { value: "half_banners", label: "Yarı Yarıya Banner", icon: "◧", description: "İki görsel yan yana" },
-  { value: "instashop", label: "Görsel Galeri", icon: "📸", description: "Kare görsel ızgarası (ürün bağlantılı)" },
-  { value: "text_block", label: "Yazı Bloğu", icon: "📝", description: "Başlık ve açıklama" },
-  { value: "video_banner", label: "Video Banner", icon: "🎬", description: "Video arka planlı banner" },
+const GLOBAL_GROUPS = [
+  ["site_theme", "Tema"], ["site_contact", "İletişim Bilgileri"], ["site_topbar", "Üst Bar"], ["site_header", "Header"],
+  ["site_departments_menu", "Dikey Menü"], ["site_secondary_menu", "Ana / İkincil Menü"], ["site_newsletter", "E-Bülten"],
+  ["site_footer_widgets", "Footer Ürün Sütunları"], ["site_footer_contact", "Footer İletişim"], ["site_footer_links", "Footer Bağlantıları"],
+  ["site_footer_bottom", "Footer Alt Şerit"],
 ];
+const MENU_LINKS = { site_topbar: "topbar", site_departments_menu: "departments", site_secondary_menu: "center" };
 
-// ── ZAMANLI YAYIN (banner/slayt zaman aralığı) ──────────────────────────────
-// Her slayt (ve istenirse bloğun tamamı) "şu tarih-saat aralığında yayında olsun"
-// kuralı alabilir. Saat YEREL duvar saati olarak saklanır + saat dilimi adı; süzmeyi
-// SUNUCU yapar (backend/routes/cms.py), burada yalnız girdi + durum rozeti var.
-const SCHED_TZ = [
-  { value: "Europe/Istanbul", label: "Türkiye (UTC+3)" },
-  { value: "Europe/London", label: "Londra" },
-  { value: "Europe/Berlin", label: "Berlin / Paris" },
-  { value: "America/New_York", label: "New York" },
-  { value: "Asia/Dubai", label: "Dubai" },
-];
-const DEFAULT_SCHED_TZ = "Europe/Istanbul";
+function ago(ts) {
+  if (!ts) return "";
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return `${s} sn önce`;
+  return `${Math.round(s / 60)} dk önce`;
+}
 
-// Slayta PARALEL giden settings dizileri — biri unutulursa slaytın zamanı/ölçüsü/yazısı
-// komşusuna kayar. TEK LİSTE: buraya ekle, ekleme/silme/sıralama otomatik uygular.
-const SLIDE_PARALLEL = ["img_dims", "slide_schedule", "captions"];
+function hasSchedule(b) {
+  const sc = b?.settings?._visibility?.schedule;
+  return !!(sc && (sc.start || sc.end));
+}
 
-// Seçilen saat diliminde "şu an" — 'YYYY-MM-DDTHH:MM' (input değeriyle aynı biçim).
-const nowInTz = (tz) => {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz || DEFAULT_SCHED_TZ, year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-    }).formatToParts(new Date());
-    const g = (t) => (parts.find((x) => x.type === t) || {}).value || "00";
-    return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}`;
-  } catch {
-    return "";
-  }
-};
-
-const schedState = (sc) => {
-  if (!sc || (!sc.start && !sc.end)) return { key: "none", label: "Sürekli", cls: "bg-gray-100 text-gray-600" };
-  const now = nowInTz(sc.tz);
-  if (!now) return { key: "live", label: "Yayında", cls: "bg-green-100 text-green-700" };
-  if (sc.start && now < sc.start) return { key: "waiting", label: "Beklemede", cls: "bg-amber-100 text-amber-800" };
-  if (sc.end && now > sc.end) return { key: "expired", label: "Süresi doldu", cls: "bg-red-100 text-red-700" };
-  return { key: "live", label: "Yayında", cls: "bg-green-100 text-green-700" };
-};
-
-const fmtSched = (sc) => {
-  if (!sc || (!sc.start && !sc.end)) return "";
-  const f = (v) => (v ? `${v.slice(8, 10)}.${v.slice(5, 7)}.${v.slice(0, 4)} ${v.slice(11, 16)}` : "");
-  if (sc.start && sc.end) return `${f(sc.start)} → ${f(sc.end)}`;
-  return sc.start ? `${f(sc.start)}'den itibaren` : `${f(sc.end)}'e kadar`;
-};
-
-function ScheduleEditor({ value, onChange }) {
-  const v = value || {};
-  const set = (patch) => onChange({ start: v.start || "", end: v.end || "", tz: v.tz || DEFAULT_SCHED_TZ, ...patch });
-  const st = schedState(v);
+// ------------------------------------------------------------------ blok satırı
+function BlockRow({ block, index, total, selected, errorCount, onSelect, onPatch, onDup, onDel, onMove }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+  const entry = getBlock(block.type);
+  const vis = block.settings?._visibility || {};
+  const legacy = block.settings?._legacy || !entry;
+  const setVis = (k) => onPatch({ settings: { ...block.settings, _visibility: { ...vis, [k]: vis[k] === false } } });
+  const devIcon = (k, Icon, label) => (
+    <button type="button" title={`${label}: ${vis[k] === false ? "gizli" : "görünür"}`} aria-label={`${label} görünürlüğü`} aria-pressed={vis[k] !== false}
+      onClick={(e) => { e.stopPropagation(); setVis(k); }} className={`p-0.5 ${vis[k] === false ? "text-gray-300" : "text-gray-600"}`} disabled={legacy}>
+      <Icon size={13} />
+    </button>
+  );
   return (
-    <div className="mt-1.5 border rounded bg-gray-50 p-2 space-y-1.5">
-      <div>
-        <label className="block text-[10px] text-gray-600 mb-0.5">Başlangıç</label>
-        <input
-          type="datetime-local"
-          value={v.start || ""}
-          onChange={(e) => set({ start: e.target.value })}
-          className="w-full text-[11px] border px-2 py-1 rounded"
-        />
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 }}
+      className={`group flex items-center gap-1 px-1.5 py-1.5 border rounded mb-1 bg-white ${selected ? "border-yellow-400 ring-1 ring-yellow-300" : "border-gray-200"} ${block.is_active === false ? "opacity-60" : ""}`}
+      data-testid={`block-row-${index}`} data-block-type={block.type}>
+      <button type="button" className="cursor-grab text-gray-400 p-0.5" aria-label="Sürükle" {...attributes} {...listeners}><GripVertical size={14} /></button>
+      <button type="button" className="flex-1 min-w-0 text-left" onClick={onSelect}>
+        <div className="flex items-center gap-1">
+          <span className="text-[13px] font-medium truncate">{block.title || entry?.schema.title || block.type}</span>
+          {isModified(block) && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" title="Şablon varsayılanından değiştirildi" data-testid="modified-dot" />}
+          {hasSchedule(block) && <Clock size={12} className="text-blue-600 shrink-0" title="Zamanlı yayın" />}
+          {errorCount > 0 && <span className="text-[10px] bg-red-100 text-red-700 rounded px-1 shrink-0">{errorCount} hata</span>}
+          {legacy && <AlertTriangle size={12} className="text-amber-500 shrink-0" title="Desteklenmeyen eski blok" />}
+        </div>
+        <div className="text-[10px] text-gray-500 truncate">{entry?.schema.title || block.type}{entry?.schema.status === "stub" ? " · hazırlanıyor" : ""}</div>
+      </button>
+      <div className="flex items-center">
+        {devIcon("desktop", Monitor, "Masaüstü")}{devIcon("tablet", Tablet, "Tablet")}{devIcon("mobile", Smartphone, "Mobil")}
+        <button type="button" className="p-0.5 text-gray-600" title={block.is_active === false ? "Göster" : "Gizle"} aria-label={block.is_active === false ? "Bloğu göster" : "Bloğu gizle"}
+          onClick={(e) => { e.stopPropagation(); onPatch({ is_active: block.is_active === false }); }} data-testid={`toggle-${index}`}>
+          {block.is_active === false ? <EyeOff size={13} /> : <Eye size={13} />}
+        </button>
+        <button type="button" className="p-0.5 text-gray-600 disabled:opacity-30" aria-label="Yukarı taşı" disabled={!index} onClick={(e) => { e.stopPropagation(); onMove(-1); }}><ArrowUp size={13} /></button>
+        <button type="button" className="p-0.5 text-gray-600 disabled:opacity-30" aria-label="Aşağı taşı" disabled={index === total - 1} onClick={(e) => { e.stopPropagation(); onMove(1); }}><ArrowDown size={13} /></button>
+        {!legacy && <button type="button" className="p-0.5 text-gray-600" title="Çoğalt" aria-label="Çoğalt" onClick={(e) => { e.stopPropagation(); onDup(); }} data-testid={`dup-${index}`}><Copy size={13} /></button>}
+        <button type="button" className="p-0.5 text-red-500" title="Sil" aria-label="Sil" onClick={(e) => { e.stopPropagation(); onDel(); }} data-testid={`del-${index}`}><Trash2 size={13} /></button>
       </div>
-      <div>
-        <label className="block text-[10px] text-gray-600 mb-0.5">Bitiş</label>
-        <input
-          type="datetime-local"
-          value={v.end || ""}
-          onChange={(e) => set({ end: e.target.value })}
-          className="w-full text-[11px] border px-2 py-1 rounded"
-        />
-      </div>
-      <div>
-        <label className="block text-[10px] text-gray-600 mb-0.5">Saat dilimi</label>
-        <select
-          value={v.tz || DEFAULT_SCHED_TZ}
-          onChange={(e) => set({ tz: e.target.value })}
-          className="w-full text-[11px] border px-2 py-1 rounded bg-white"
-        >
-          {SCHED_TZ.map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="flex items-center justify-between pt-0.5">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded ${st.cls}`}>{st.label}</span>
-        {(v.start || v.end) && (
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className="text-[10px] text-red-600 hover:underline"
-          >
-            Kuralı kaldır
-          </button>
-        )}
-      </div>
-      <p className="text-[10px] text-gray-500 leading-snug">
-        Boş bırakılan uç sınırsızdır. Aralık dışındaysa bu içerik sitede <b>hiç görünmez</b>;
-        süzme sunucuda yapılır, sayfa yenilenince otomatik kaybolur.
-      </p>
     </div>
   );
 }
 
-// Sortable Block Item Component
-function SortableBlockItem({ block, selected, onSelect, onEdit, onDelete, onToggleActive, onDuplicate, getBlockTypeInfo }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: block.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 1000 : 1,
-  };
-
-  const typeInfo = getBlockTypeInfo(block.type);
-  const thumb = block.images?.[0] || (block.settings?.items || []).find((x) => x && x.image)?.image || "";
-
+// ------------------------------------------------------------------ blok galerisi
+function Gallery({ onPick, onClose, existing }) {
+  const [cat, setCat] = useState("all");
+  const [showStubs, setShowStubs] = useState(false);
+  const [variant, setVariant] = useState({});
+  const all = listBlocks({ includeStubs: true, page: PAGE });
+  const list = all.filter((b) => (showStubs || b.schema.status !== "stub") && (cat === "all" || b.schema.category === cat));
+  const cats = CATEGORIES.filter((c) => all.some((b) => b.schema.category === c.key && (showStubs || b.schema.status !== "stub")));
   return (
-    <div 
-      ref={setNodeRef}
-      style={style}
-      onClick={() => onSelect(block.id)}
-      className={`bg-white rounded-xl shadow-sm border-2 transition-all ${
-        isDragging ? 'border-blue-500 shadow-lg' : selected ? 'border-gray-900' : 'border-gray-200 hover:border-gray-400'
-      } ${!block.is_active ? 'opacity-60' : ''}`}
-    >
-      <div className="flex items-start p-3 gap-3">
-        {/* Drag Handle */}
-        <div 
-          {...attributes} 
-          {...listeners}
-          className="mt-1 cursor-grab rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing"
-          aria-label={`${block.title || typeInfo.label} bloğunu sırala`}
-          title="Sürükleyerek sırala"
-        >
-          <GripVertical size={20} />
-        </div>
-
-        {/* Preview */}
-        <div className="hidden flex-shrink-0 sm:block sm:w-24">
-          {thumb ? (
-            /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(thumb) ? (
-              <div className="relative w-full h-20">
-                <video src={thumb} className="w-full h-16 object-cover rounded" muted playsInline preload="metadata" />
-                <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1 rounded">🎬</span>
-              </div>
-            ) : (
-              <img
-                src={thumb}
-                alt=""
-                className="w-full h-16 object-cover rounded"
-              />
-            )
-          ) : (
-            <div className="w-full h-16 bg-gray-100 rounded flex items-center justify-center text-2xl">
-              {typeInfo.icon || "📦"}
-            </div>
-          )}
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-medium">
-              {typeInfo.icon} {typeInfo.label}
-            </span>
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              block.is_active ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'
-            }`}>
-              {block.is_active ? 'Yayında' : 'Taslak'}
-            </span>
-            {block.show_desktop === false && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium" title="Masaüstünde gizli">
-                🖥️ Gizli
-              </span>
-            )}
-            {block.show_mobile === false && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium" title="Mobilde gizli">
-                📱 Gizli
-              </span>
-            )}
+    <div className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Blok ekle" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()} data-testid="block-gallery">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="font-semibold">Blok ekle</div>
+          <div className="flex items-center gap-3">
+            <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={showStubs} onChange={(e) => setShowStubs(e.target.checked)} /> Hazırlanan blokları da göster</label>
+            <button type="button" onClick={onClose} aria-label="Kapat"><X size={18} /></button>
           </div>
-          <h3 className="font-medium truncate">{block.title || "Başlıksız"}</h3>
-          <p className="text-sm text-gray-500">
-            {block.type === "countdown_bar"
-              ? (block.settings?.end_at
-                  ? `⏱️ Bitiş: ${new Date(block.settings.end_at).toLocaleString("tr-TR")} ${block.settings?.start_at ? `· Başlangıç: ${new Date(block.settings.start_at).toLocaleString("tr-TR")}` : ""}`
-                  : "⏱️ Tarih ayarlanmamış")
-              : block.type === "product_slider"
-              ? block.settings?.product_ids?.length
-                ? `${block.settings.product_ids.length} ürün seçili`
-                : `En yeni ürünler gösterilir`
-              : block.type === "text_block"
-              ? block.settings?.text
-                ? block.settings.text.slice(0, 60) + (block.settings.text.length > 60 ? "…" : "")
-                : "Metin girilmemiş"
-              : block.type === "video_banner"
-              ? block.settings?.video_url ? "Video eklendi ✓" : "Video eklenmemiş"
-              : block.type === "rotating_text"
-              ? `${block.settings?.texts?.length || 0} metin`
-              : block.type === "ads_block"
-              ? `${(block.settings?.items || []).filter((x) => x && x.image).length}/3 görsel · ${(block.settings?.items || []).map((x) => x?.strong).filter(Boolean).join(", ")}`
-              : block.type === "deals_tabs"
-              ? `Fırsat: ${block.settings?.special?.mode === "manual" ? "seçili ürün" : "otomatik"} · ${(block.settings?.tabs || []).map((t) => t?.label).filter(Boolean).join(" / ")}`
-              : block.type === "product_grid_212" || block.type === "best_sellers"
-              ? `${block.settings?.first_label || "İlk sekme"} + ${(block.settings?.category_ids || []).length || "otomatik"} kategori`
-              : block.type === "product_columns"
-              ? (block.settings?.columns || []).map((c) => c?.title).filter(Boolean).join(" · ")
-              : block.type === "brands_carousel"
-              ? (block.images?.length ? `${block.images.length} logo` : "Ürün markalarından otomatik")
-              : `${block.images?.length || 0} görsel`
-            }
-          </p>
-          {block.links?.[0] && (
-            <p className="text-xs text-gray-400 mt-1 truncate">
-              → {block.links[0]}
-            </p>
-          )}
         </div>
-
-        {/* Actions */}
-        <div className="flex flex-wrap justify-end gap-1" onClick={(event) => event.stopPropagation()}>
-          <button 
-            onClick={() => onToggleActive(block)}
-            className={`p-2 rounded transition-colors ${
-              block.is_active ? 'hover:bg-gray-100' : 'hover:bg-green-50 text-green-600'
-            }`}
-            title={block.is_active ? 'Taslağa Al' : 'Yayınla'}
-          >
-            {block.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-          <button 
-            onClick={() => onEdit(block)}
-            className="p-2 hover:bg-gray-100 rounded"
-            title="Düzenle"
-          >
-            <Edit size={16} />
-          </button>
-          <button
-            onClick={() => onDuplicate(block)}
-            className="p-2 hover:bg-gray-100 rounded"
-            title="Çoğalt"
-            aria-label="Bloğu çoğalt"
-          >
-            <Copy size={16} />
-          </button>
-          <button 
-            onClick={() => onDelete(block.id)}
-            className="p-2 hover:bg-red-50 rounded text-red-600"
-            title="Sil"
-          >
-            <Trash2 size={16} />
-          </button>
+        <div className="flex flex-wrap gap-1 px-4 py-2 border-b">
+          {[{ key: "all", label: "Tümü" }, ...cats].map((c) => (
+            <button key={c.key} type="button" onClick={() => setCat(c.key)} className={`px-2.5 py-1 rounded-full text-xs border ${cat === c.key ? "bg-gray-800 text-white border-gray-800" : "bg-white"}`}>{c.label}</button>
+          ))}
+        </div>
+        <div className="p-4 overflow-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {list.map((b) => {
+            const s = b.schema;
+            const single = s.singleton && existing.has(b.key);
+            return (
+              <div key={b.key} className={`border rounded-lg overflow-hidden flex flex-col ${single ? "opacity-50" : ""}`} data-testid={`gallery-${b.key}`}>
+                <div className="aspect-video bg-gray-100 flex items-center justify-center text-gray-400 text-xs relative">
+                  {b.thumb ? <img src={b.thumb} alt="" className="w-full h-full object-cover" loading="lazy" /> : <LayoutTemplate size={28} />}
+                  {s.status === "stub" && <span className="absolute top-1 right-1 text-[10px] bg-amber-100 text-amber-800 rounded px-1">hazırlanıyor</span>}
+                </div>
+                <div className="p-2 flex-1 flex flex-col gap-1">
+                  <div className="text-sm font-semibold">{s.title}</div>
+                  <div className="text-[11px] text-gray-600 flex-1">{s.description}</div>
+                  {(s.template_refs || []).length > 0 && <div className="text-[10px] text-gray-400 truncate" title={s.template_refs.join(", ")}>şablonda: {s.template_refs.map((r) => r.split("/").pop()).join(", ")}</div>}
+                  {(s.variants || []).length > 1 && (
+                    <select className="border rounded text-xs px-1 py-1" value={variant[b.key] ?? s.variants[0].value} onChange={(e) => setVariant({ ...variant, [b.key]: e.target.value })} aria-label="Görünüm">
+                      {s.variants.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                    </select>
+                  )}
+                  <button type="button" disabled={single} className="mt-1 inline-flex items-center justify-center gap-1 text-xs bg-yellow-400 hover:bg-yellow-300 rounded px-2 py-1.5 font-semibold disabled:cursor-not-allowed"
+                    onClick={() => onPick(b.key, variant[b.key] ?? s.variants?.[0]?.value)} data-testid={`gallery-add-${b.key}`}>
+                    <Plus size={13} /> {single ? "Sayfada zaten var" : "Ekle"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-export default function PageDesign() {
-  return <HomePageDesign />;
+// ------------------------------------------------------------------ revizyonlar
+function Revisions({ onClose, onRestore, onPreview }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    axios.get(`${API}/page-design/${PAGE}/revisions`, { headers: headers() }).then((r) => setItems(r.data?.items || [])).catch(() => setItems([]));
+  }, []);
+  return (
+    <div className="fixed inset-y-0 right-0 z-[80] w-96 bg-white shadow-2xl border-l flex flex-col" role="dialog" aria-label="Revizyonlar" data-testid="revisions-panel">
+      <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="font-semibold">Revizyonlar</div>
+        <button type="button" onClick={onClose} aria-label="Kapat"><X size={18} /></button>
+      </div>
+      <div className="flex-1 overflow-auto p-3 space-y-2">
+        {items === null && <div className="text-sm text-gray-500">Yükleniyor…</div>}
+        {items && !items.length && <div className="text-sm text-gray-500">Henüz revizyon yok.</div>}
+        {(items || []).map((r) => (
+          <div key={r.rev} className="border rounded p-2 text-xs" data-testid={`rev-${r.rev}`}>
+            <div className="flex justify-between font-semibold"><span>#{r.rev}</span><span>{r.published_at ? new Date(r.published_at).toLocaleString("tr-TR") : ""}</span></div>
+            <div className="text-gray-600">{r.published_by} — {r.summary}</div>
+            <div className="flex gap-1 mt-1">
+              <button type="button" className="border rounded px-2 py-0.5 hover:bg-gray-50" onClick={() => onPreview(r.rev)}>Bu sürümü önizle</button>
+              <button type="button" className="border rounded px-2 py-0.5 hover:bg-yellow-50" onClick={() => onRestore(r.rev)} data-testid={`restore-${r.rev}`}>Bu sürüme geri dön</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-function HomePageDesign() {
-  const [blocks, setBlocks] = useState([]);
-  const [savedBlocks, setSavedBlocks] = useState([]);
-  const [history, setHistory] = useState([[]]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  const [selectedId, setSelectedId] = useState(null);
-  const [librarySearch, setLibrarySearch] = useState("");
+// ------------------------------------------------------------------ ana bileşen
+export default function PageDesign() {
+  const { user } = useAuth();
+  const superAdmin = !!(user?.is_super_admin || user?.role === "super_admin" || user?.role_id === "super_admin");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingBlock, setEditingBlock] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  // Ürün slider "kategori" kaynağı için kategori listesi (bir kez çekilir)
-  const [sliderCategories, setSliderCategories] = useState([]);
-  useEffect(() => {
-    axios.get(`${API}/categories`)
-      .then((r) => {
-        const rows = Array.isArray(r.data) ? r.data : (r.data?.categories || []);
-        setSliderCategories(rows.map((c) => ({ id: String(c.id), name: c.name || c.title || c.slug })));
-      })
-      .catch(() => setSliderCategories([]));
-  }, []);
-  const [previewMode, setPreviewMode] = useState("mobile"); // "mobile" | "desktop"
-  const hasChanges = useMemo(() => !samePageDesign(savedBlocks, blocks), [savedBlocks, blocks]);
-  const selectedBlock = blocks.find((block) => block.id === selectedId) || null;
-  const filteredBlockTypes = BLOCK_TYPES.filter((type) =>
-    `${type.label} ${type.description}`.toLocaleLowerCase("tr").includes(librarySearch.toLocaleLowerCase("tr").trim())
-  );
+  const [doc, setDoc] = useState({ blocks: [], global: {} });
+  const [published, setPublished] = useState(null);
+  const [past, setPast] = useState([]);
+  const [future, setFuture] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [focusPath, setFocusPath] = useState(null);
+  const qAlan = (() => { try { return new URLSearchParams(window.location.search).get("alan") || ""; } catch { return ""; } })();
+  const [leftTab, setLeftTab] = useState(qAlan ? "global" : "blocks");
+  const [globalKey, setGlobalKey] = useState(qAlan && getGlobal(qAlan) ? qAlan : "site_theme");
+  const [device, setDevice] = useState("desktop");
+  const [gallery, setGallery] = useState(null);
+  const [showRevs, setShowRevs] = useState(false);
+  const [revPreview, setRevPreview] = useState(null);
+  const [rev, setRev] = useState(null);
+  const [saveState, setSaveState] = useState({ status: "idle", at: 0, changes: 0 });
+  const [errors, setErrors] = useState([]);
+  const [publishErrors, setPublishErrors] = useState(null);
+  const [conflict, setConflict] = useState(null);
+  const [, tick] = useState(0);
+  const iframeRef = useRef(null);
+  const boxRef = useRef(null);
+  const [boxW, setBoxW] = useState(1000);
+  const dirty = useRef(false);
+  const lastPush = useRef({ t: 0, key: "" });
+  const revRef = useRef(null);
+  revRef.current = rev;
 
-  const commitBlocks = (nextOrUpdater, nextSelectedId) => {
-    const next = normalizeBlockOrder(
-      typeof nextOrUpdater === "function" ? nextOrUpdater(blocks) : nextOrUpdater
-    );
-    setBlocks(next);
-    const branch = history.slice(0, historyIndex + 1);
-    const updated = [...branch, clonePageDesign(next)].slice(-50);
-    setHistory(updated);
-    setHistoryIndex(updated.length - 1);
-    if (nextSelectedId !== undefined) setSelectedId(nextSelectedId);
-  };
-
-  const undo = () => {
-    if (historyIndex <= 0) return;
-    const nextIndex = historyIndex - 1;
-    const next = clonePageDesign(history[nextIndex]);
-    setHistoryIndex(nextIndex);
-    setBlocks(next);
-    if (selectedId && !next.some((block) => block.id === selectedId)) setSelectedId(next[0]?.id || null);
-  };
-
-  const redo = () => {
-    if (historyIndex >= history.length - 1) return;
-    const nextIndex = historyIndex + 1;
-    const next = clonePageDesign(history[nextIndex]);
-    setHistoryIndex(nextIndex);
-    setBlocks(next);
-    if (selectedId && !next.some((block) => block.id === selectedId)) setSelectedId(next[0]?.id || null);
-  };
-  
-  const [formData, setFormData] = useState({
-    type: "hero_slider",
-    title: "",
-    images: [],
-    links: [],
-    settings: { texts: [""] },
-    sort_order: 0,
-    is_active: true,
-    page: "home"
-  });
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  useEffect(() => {
-    fetchBlocks();
-  }, []);
-
-  useEffect(() => {
-    const warnUnsaved = (event) => {
-      if (!hasChanges) return;
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warnUnsaved);
-    return () => window.removeEventListener("beforeunload", warnUnsaved);
-  }, [hasChanges]);
-
-  const fetchBlocks = async () => {
+  // ---------------------------------------------------------- yükle
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      // all=1: zamanı gelmemiş/süresi dolmuş slaytlar da gelsin (panelde düzenlenebilsin).
-      const res = await axios.get(`${API}/page-blocks?page=home&all=1`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      // Sort by sort_order
-      const sorted = (res.data || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-      const snapshot = normalizeBlockOrder(sorted);
-      setBlocks(snapshot);
-      setSavedBlocks(clonePageDesign(snapshot));
-      setHistory([clonePageDesign(snapshot)]);
-      setHistoryIndex(0);
-      setSelectedId((current) => snapshot.some((block) => block.id === current) ? current : snapshot[0]?.id || null);
-    } catch (err) {
-      // Yükleme hatasında mevcut içeriği örnek/default veriyle ASLA değiştirme.
-      toast.error("Sayfa blokları yüklenemedi; mevcut içerik korunuyor.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      const r = await axios.get(`${API}/page-design/${PAGE}`, { headers: headers() });
+      const pub = r.data.published;
+      const dr = r.data.draft;
+      setPublished(pub);
+      const src = dr || pub;
+      setDoc({ blocks: clone(src.blocks || []), global: withGlobalDefaults(src.global || pub.global || {}) });
+      setRev(dr ? dr.rev : null);
+      setPast([]); setFuture([]);
+      setSaveState({ status: dr ? "saved" : "idle", at: dr ? Date.parse(dr.updated_at) || Date.now() : 0, changes: 0 });
+      if (dr?.stale) toast.warning("Taslak, yayındaki sürümden eski bir temele dayanıyor. Yayınlarsanız yayındaki değişikliklerin üzerine yazılır.");
+      setSelectedId((cur) => cur || (src.blocks || [])[0]?.id || null);
+    } catch (e) {
+      toast.error(`Sayfa tasarımı yüklenemedi: ${e?.response?.data?.detail || e.message}`);
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 5000); return () => clearInterval(t); }, []);
 
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-
-    if (active.id !== over?.id) {
-      const oldIndex = blocks.findIndex((item) => item.id === active.id);
-      const newIndex = blocks.findIndex((item) => item.id === over.id);
-      commitBlocks(arrayMove(blocks, oldIndex, newIndex));
-    }
-  };
-
-  const handleSaveOrder = async () => {
-    if (!hasChanges) return;
-    setSaving(true);
-    try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-      const plan = buildPageDesignSavePlan(savedBlocks, blocks);
-      for (const id of plan.deletedIds) {
-        await axios.delete(`${API}/page-blocks/${id}`, { headers });
-      }
-      for (const block of plan.updates) {
-        await axios.put(`${API}/page-blocks/${block.id}`, block, { headers });
-      }
-      const createdIds = new Map();
-      for (const block of plan.creates) {
-        const res = await axios.post(`${API}/page-blocks`, block, { headers });
-        createdIds.set(block.id, res.data?.id);
-      }
-      const resolvedIds = blocks
-        .map((block) => createdIds.get(block.id) || block.id)
-        .filter(Boolean);
-      if (resolvedIds.length) {
-        await axios.post(`${API}/page-blocks/reorder`, { ids: resolvedIds }, { headers });
-      }
-      toast.success("Tüm sayfa değişiklikleri kaydedildi");
-      await fetchBlocks();
-    } catch (err) {
-      toast.error("Toplu kaydetme tamamlanamadı. Taslağınız ekranda korunuyor.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Büyük dosyaları (DSLR çıkışı 10-25MB) yüklemeden önce tarayıcıda küçült:
-  // uzun kenar 2400px, JPEG 0.86 — hem limit aşımını hem yavaş yüklemeyi önler.
-  // HEIC gibi canvas'ın decode edemediği formatlar olduğu gibi gönderilir.
-  const shrinkImageFile = (file) =>
-    new Promise((resolve) => {
-      if (!file.type.startsWith("image/") || file.type === "image/gif") return resolve(file);
-      // DİKKAT: 'Image' burada lucide-react ikonu (new Image() → "is not a constructor").
-      // DOM görsel nesnesi için window.Image kullanılır.
-      const img = new window.Image();
-      const objUrl = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(objUrl);
-        const MAXW = 2400;
-        const scale = Math.min(1, MAXW / Math.max(img.naturalWidth, img.naturalHeight));
-        if (scale >= 1 && file.size < 4 * 1024 * 1024) return resolve(file); // zaten küçük
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.naturalWidth * scale);
-        canvas.height = Math.round(img.naturalHeight * scale);
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) return resolve(file);
-            resolve(new File([blob], (file.name || "gorsel").replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" }));
-          },
-          "image/jpeg",
-          0.86
-        );
-      };
-      img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(file); }; // HEIC vb. → olduğu gibi
-      img.src = objUrl;
-    });
-
-  const handleImageUpload = async (e, index = null) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadMediaFile(file, index);
-    try { e.target.value = ""; } catch (_) { /* aynı dosya tekrar seçilebilsin */ }
-  };
-
-  // Görsel VEYA video yükler. Video ise optimize edilmeden Cloudflare R2/CDN'e gider
-  // ve aynı images[] dizisine eklenir → sürükleyerek sıralama ikisi için de çalışır.
-  const uploadMediaFile = async (rawFile, index = null) => {
-    if (!rawFile) return;
-    const isVideo = (rawFile.type || "").startsWith("video/");
-    setUploading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (isVideo) {
-        const fd = new FormData();
-        fd.append('file', rawFile);
-        const res = await axios.post(`${API}/upload/video`, fd, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 300000, // video büyük olabilir
-        });
-        if (res.data.url || res.data.path) {
-          const raw = res.data.url || `/api/upload/files/${res.data.path}`;
-          const url = raw.startsWith('http') ? raw : `${BACKEND_ORIGIN}${raw}`;
-          const newImages = [...formData.images];
-          const newLinks = [...formData.links];
-          if (index !== null) {
-            newImages[index] = url;
-          } else {
-            newImages.push(url);
-            newLinks.push("/");
-          }
-          // Paralel diziler yeni slayt sayısına hizalansın (zaman kuralı/yazı kaymasın).
-          const vidSettings = { ...formData.settings };
-          SLIDE_PARALLEL.forEach((key) => {
-            if (Array.isArray(vidSettings[key])) {
-              const arr = [...vidSettings[key]];
-              while (arr.length < newImages.length) arr.push(null);
-              vidSettings[key] = arr;
-            }
-          });
-          setFormData({ ...formData, images: newImages, links: newLinks, settings: vidSettings });
-          toast.success("Video yüklendi");
-        }
-        return;
-      }
-
-      let file = await shrinkImageFile(rawFile);
-      // Görselin gerçek piksel boyutunu client-side oku — kaydedilince storefront'ta
-      // (HeroSlider/FullBanner) doğru en-boy oranında, kırpılmadan gösterilsin.
-      const dims = await new Promise((resolve) => {
-        const probe = new window.Image();
-        const objUrl = URL.createObjectURL(file);
-        probe.onload = () => { resolve([probe.naturalWidth, probe.naturalHeight]); URL.revokeObjectURL(objUrl); };
-        probe.onerror = () => { resolve(null); URL.revokeObjectURL(objUrl); };
-        probe.src = objUrl;
-      });
-
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await axios.post(`${API}/upload/image`, fd, {
-        headers: { Authorization: `Bearer ${token}` }, // Content-Type + boundary'yi tarayıcı koyar
-        timeout: 90000,
-      });
-      
-      if (res.data.url || res.data.path) {
-        const raw = res.data.url || `/api/upload/files/${res.data.path}`;
-        const url = raw.startsWith('http') ? raw : `${BACKEND_ORIGIN}${raw}`;
-        const newImages = [...formData.images];
-        const newLinks = [...formData.links];
-        const targetIndex = index !== null ? index : newImages.length;
-        
-        if (index !== null) {
-          newImages[index] = url;
-        } else {
-          newImages.push(url);
-          newLinks.push("/");
-        }
-
-        const newSettings = { ...formData.settings };
-        // Paralel diziler yeni slayt sayısına hizalansın (aksi halde sonraki slaytın
-        // zaman kuralı/yazısı bir öncekine kayardı).
-        SLIDE_PARALLEL.forEach((key) => {
-          if (Array.isArray(newSettings[key])) {
-            const arr = [...newSettings[key]];
-            while (arr.length < newImages.length) arr.push(null);
-            newSettings[key] = arr;
-          }
-        });
-        if (dims) {
-          const imgDims = Array.isArray(newSettings.img_dims) ? [...newSettings.img_dims] : [];
-          imgDims[targetIndex] = dims;
-          newSettings.img_dims = imgDims;
-          if (targetIndex === 0) {
-            newSettings.img_width = dims[0];
-            newSettings.img_height = dims[1];
-          }
-        }
-        
-        setFormData({ ...formData, images: newImages, links: newLinks, settings: newSettings });
-        toast.success("Görsel yüklendi");
-      }
-    } catch (err) {
-      const detail = err?.response?.data?.detail;
-      const code = err?.response?.status || err?.code || err?.message || "";
-      toast.error(detail ? `Görsel yüklenemedi: ${detail}` : `Görsel yüklenemedi (${code || "ağ hatası"})`);
-      console.error("[upload]", err);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const removeImage = (index) => {
-    const newImages = [...formData.images];
-    const newLinks = [...formData.links];
-    newImages.splice(index, 1);
-    newLinks.splice(index, 1);
-    const newSettings = { ...formData.settings };
-    SLIDE_PARALLEL.forEach((key) => {
-      if (Array.isArray(newSettings[key])) {
-        const arr = [...newSettings[key]];
-        arr.splice(index, 1);
-        newSettings[key] = arr;
-      }
-    });
-    setFormData({ ...formData, images: newImages, links: newLinks, settings: newSettings });
-  };
-
-  // Slaytın zaman kuralı (settings.slide_schedule[index])
-  const slideSched = (index) => {
-    const arr = formData.settings?.slide_schedule;
-    return (Array.isArray(arr) ? arr[index] : null) || null;
-  };
-  const setSlideSched = (index, val) => {
-    const arr = Array.isArray(formData.settings?.slide_schedule)
-      ? [...formData.settings.slide_schedule] : [];
-    while (arr.length <= index) arr.push(null);
-    arr[index] = val && (val.start || val.end) ? val : null;
-    setFormData({ ...formData, settings: { ...formData.settings, slide_schedule: arr } });
-  };
-
-  // Slaytları SÜRÜKLEYEREK yeniden sırala (görsel + video birlikte). images/links/img_dims
-  // paralel taşınır ki her slaytın linki ve en-boy oranı doğru kalsın.
-  const [dragIdx, setDragIdx] = useState(null);
-  const [schedOpen, setSchedOpen] = useState(null);   // açık zaman-aralığı paneli (slayt index'i)
-  const isVideoUrl = (u) => typeof u === "string" && /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(u);
-  const moveSlide = (from, to) => {
-    if (from == null || to == null || from === to) return;
-    const imgs = [...formData.images];
-    const lnks = formData.links && formData.links.length ? [...formData.links] : imgs.map(() => "/");
-    while (lnks.length < imgs.length) lnks.push("/");
-    const [mi] = imgs.splice(from, 1); imgs.splice(to, 0, mi);
-    const [ml] = lnks.splice(from, 1); lnks.splice(to, 0, ml);
-    const newSettings = { ...formData.settings };
-    SLIDE_PARALLEL.forEach((key) => {
-      if (!Array.isArray(newSettings[key])) return;
-      const arr = [...newSettings[key]];
-      while (arr.length < imgs.length) arr.push(null);
-      const [mv] = arr.splice(from, 1); arr.splice(to, 0, mv);
-      newSettings[key] = arr;
-    });
-    setFormData({ ...formData, images: imgs, links: lnks, settings: newSettings });
-  };
-
-  const [productSearch, setProductSearch] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchingProducts, setSearchingProducts] = useState(false);
-  const [selectedProductDetails, setSelectedProductDetails] = useState([]);
-
-  // Load details for already selected products when editing
+  // ---------------------------------------------------------- değişiklik + geçmiş
+  const docRef = useRef(doc);
+  docRef.current = doc;
+  const markDirty = (n = 1) => { dirty.current = true; setSaveState((st) => ({ ...st, status: "dirty", changes: st.changes + n })); };
+  const commit = useCallback((updater, coalesceKey = "") => {
+    const cur = docRef.current;
+    const next = typeof updater === "function" ? updater(cur) : updater;
+    if (!next || next === cur) return;
+    const now = Date.now();
+    const merge = !!coalesceKey && lastPush.current.key === coalesceKey && now - lastPush.current.t < 800;
+    if (!merge) { setPast((p) => [...p.slice(-(HISTORY - 1)), cur]); setFuture([]); }
+    lastPush.current = { t: now, key: coalesceKey };
+    docRef.current = next;
+    setDoc(next);
+    markDirty(merge ? 0 : 1);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const undo = useCallback(() => {
+    if (!past.length) return;
+    const prev = past[past.length - 1];
+    setPast(past.slice(0, -1));
+    setFuture([docRef.current, ...future].slice(0, HISTORY));
+    docRef.current = prev; setDoc(prev); lastPush.current = { t: 0, key: "" }; markDirty(1);
+  }, [past, future]); // eslint-disable-line react-hooks/exhaustive-deps
+  const redo = useCallback(() => {
+    if (!future.length) return;
+    const nxt = future[0];
+    setFuture(future.slice(1));
+    setPast([...past, docRef.current].slice(-HISTORY));
+    docRef.current = nxt; setDoc(nxt); lastPush.current = { t: 0, key: "" }; markDirty(1);
+  }, [past, future]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (modalOpen && editingBlock && editingBlock.type === "product_slider" && editingBlock.settings?.product_ids?.length > 0) {
-      loadSelectedProducts(editingBlock.settings.product_ids);
-    } else if (modalOpen && !editingBlock) {
-      setSelectedProductDetails([]);
-    }
-  }, [modalOpen, editingBlock]);
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      const tag = (e.target?.tagName || "").toLowerCase();
+      if ((tag === "input" || tag === "textarea" || e.target?.isContentEditable)) return;
+      e.preventDefault();
+      if (e.shiftKey) redo(); else undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
-  const loadSelectedProducts = async (ids) => {
+  const patchBlock = (id, patch, key) => commit((d) => ({ ...d, blocks: d.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) }), key);
+  const setSettings = (id, settings) => patchBlock(id, { settings }, `settings:${id}`);
+  const setGlobal = (k, v) => commit((d) => ({ ...d, global: { ...d.global, [k]: v } }), `global:${k}`);
+
+  // ---------------------------------------------------------- otomatik taslak (3 sn)
+  const saveDraft = useCallback(async (force = false, overrideRev) => {
+    if (!dirty.current && !force) return true;
+    dirty.current = false;
+    setSaveState((s) => ({ ...s, status: "saving" }));
+    const body = { blocks: docRef.current.blocks, global: docRef.current.global };
+    const r0 = overrideRev !== undefined ? overrideRev : revRef.current;
     try {
-      const token = localStorage.getItem('token');
-      // A quick parallel fetch for each id (since we don't have a bulk endpoint in admin by default)
-      const details = [];
-      for (const id of ids) {
-        const res = await axios.get(`${API}/products/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.data) details.push(res.data);
-      }
-      setSelectedProductDetails(details);
-    } catch (err) {
-      console.error(err);
+      const r = await axios.put(`${API}/page-design/${PAGE}/draft`, body, { headers: { ...headers(), ...(r0 != null ? { "If-Match": String(r0) } : {}) } });
+      setRev(r.data.rev);
+      setErrors(r.data.errors || []);
+      setSaveState((s) => ({ ...s, status: "saved", at: Date.now() }));
+      return true;
+    } catch (e) {
+      if (e?.response?.status === 409) { setConflict(e.response.data?.draft || {}); setSaveState((s) => ({ ...s, status: "conflict" })); }
+      else { dirty.current = true; setSaveState((s) => ({ ...s, status: "error" })); toast.error(`Taslak kaydedilemedi: ${e?.response?.data?.detail || e.message}`); }
+      return false;
     }
+  }, []);
+  useEffect(() => {
+    if (loading || !dirty.current) return undefined;
+    const t = setTimeout(() => { saveDraft(); }, 3000);
+    return () => clearTimeout(t);
+  }, [doc, loading, saveDraft]);
+  useEffect(() => {
+    const warn = (e) => { if (dirty.current) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+
+  // ---------------------------------------------------------- önizleme köprüsü
+  const previewDoc = revPreview || doc;
+  const postDraft = useCallback(() => {
+    const w = iframeRef.current?.contentWindow;
+    if (!w) return;
+    w.postMessage({ type: "pd:draft", layout: { blocks: previewDoc.blocks }, global: previewDoc.global, selectedId }, window.location.origin);
+  }, [previewDoc, selectedId]);
+  useEffect(() => { const t = setTimeout(postDraft, 150); return () => clearTimeout(t); }, [postDraft]);
+  useEffect(() => {
+    const onMsg = (e) => {
+      if (e.origin !== window.location.origin || e.source !== iframeRef.current?.contentWindow) return;
+      const m = e.data || {};
+      if (m.type === "pd:ready") postDraft();
+      else if (m.type === "pd:select") { setLeftTab("blocks"); setSelectedId(m.blockId); setFocusPath(m.field ? `${m.field}#${Date.now()}` : null); }
+      else if (m.type === "pd:insert") setGallery({ index: m.index });
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [postDraft]);
+  const selectBlock = (id) => {
+    setSelectedId(id); setFocusPath(null);
+    iframeRef.current?.contentWindow?.postMessage({ type: "pd:select", blockId: id }, window.location.origin);
+  };
+  useEffect(() => {
+    if (!boxRef.current || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(([en]) => setBoxW(en.contentRect.width));
+    ro.observe(boxRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  // ---------------------------------------------------------- blok işlemleri
+  const insertAt = (key, variant, index) => {
+    const b = instantiate(key, variant || undefined);
+    commit((d) => {
+      const i = index == null ? d.blocks.length : Math.max(0, Math.min(d.blocks.length, index));
+      return { ...d, blocks: [...d.blocks.slice(0, i), b, ...d.blocks.slice(i)] };
+    });
+    setSelectedId(b.id);
+    setGallery(null);
+    setTimeout(() => iframeRef.current?.contentWindow?.postMessage({ type: "pd:select", blockId: b.id }, window.location.origin), 400);
+  };
+  const dupBlock = (id) => {
+    const d = docRef.current;
+    const i = d.blocks.findIndex((b) => b.id === id);
+    const c = duplicateBlock(d.blocks[i]);
+    commit({ ...d, blocks: [...d.blocks.slice(0, i + 1), c, ...d.blocks.slice(i + 1)] });
+    setSelectedId(c.id);
+  };
+  const delBlock = async (id) => {
+    const b = doc.blocks.find((x) => x.id === id);
+    if (!(await ask(`“${b?.title || b?.type}” bloğu silinsin mi? (Geri al ile geri getirebilirsiniz)`))) return;
+    commit((d) => ({ ...d, blocks: d.blocks.filter((x) => x.id !== id) }));
+    if (selectedId === id) setSelectedId(null);
+  };
+  const moveBlock = (id, dir) => commit((d) => {
+    const i = d.blocks.findIndex((b) => b.id === id);
+    const j = i + dir;
+    if (j < 0 || j >= d.blocks.length) return d;
+    return { ...d, blocks: arrayMove(d.blocks, i, j) };
+  });
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  const onDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    commit((d) => {
+      const ids = d.blocks.map((b) => b.id);
+      return { ...d, blocks: arrayMove(d.blocks, ids.indexOf(active.id), ids.indexOf(over.id)) };
+    });
   };
 
-  const handleProductSearch = async (e) => {
-    e.preventDefault();
-    if (!productSearch.trim()) return;
-    setSearchingProducts(true);
+  // ---------------------------------------------------------- yayın / at / geri yükle
+  const publish = async () => {
+    if (!(await saveDraft(true))) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/products?search=${productSearch}&limit=10`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setSearchResults(res.data.products || []);
-    } catch (err) {
-      toast.error("Arama yapılamadı");
-    } finally {
-      setSearchingProducts(false);
+      await axios.post(`${API}/page-design/${PAGE}/publish`, {}, { headers: headers() });
+      toast.success("Yayınlandı — vitrin güncellendi.");
+      setPublishErrors(null);
+      dirty.current = false;
+      await load();
+    } catch (e) {
+      if (e?.response?.status === 422) { setPublishErrors(e.response.data?.errors || []); setErrors(e.response.data?.errors || []); toast.error("Yayınlanamadı — hataları düzeltin."); }
+      else toast.error(`Yayınlanamadı: ${e?.response?.data?.detail || e.message}`);
     }
   };
-
-  const addProductToBlock = (product) => {
-    const currentIds = formData.settings?.product_ids || [];
-    const pid = product.id || product._id;
-    if (currentIds.includes(pid)) {
-      return toast.error("Bu ürün zaten ekli");
+  const discard = async () => {
+    if (!(await ask("Taslak atılsın mı? Yayındaki sürüme dönülür; kaydedilmemiş tüm değişiklikler kaybolur."))) return;
+    await axios.delete(`${API}/page-design/${PAGE}/draft`, { headers: headers() }).catch(() => {});
+    dirty.current = false;
+    await load();
+    toast.success("Taslak atıldı.");
+  };
+  const restore = async (r) => {
+    if (!(await ask(`#${r} numaralı sürüm taslağa yüklensin mi? (Yayınlamadan önce kontrol edebilirsiniz)`))) return;
+    await saveDraft(true);
+    await axios.post(`${API}/page-design/${PAGE}/revisions/${r}/restore`, {}, { headers: headers() });
+    setRevPreview(null); setShowRevs(false);
+    dirty.current = false;
+    await load();
+    toast.success(`#${r} sürümü taslağa yüklendi.`);
+  };
+  const previewRev = async (r) => {
+    const res = await axios.get(`${API}/page-design/${PAGE}/revisions/${r}`, { headers: headers() });
+    setRevPreview({ blocks: res.data.blocks || [], global: withGlobalDefaults(res.data.global || {}), rev: r });
+  };
+  const installDefault = async () => {
+    if (!(await ask("Şablon (v1.0 ana sayfa) düzeni yüklensin mi? Üst barlar dışındaki bloklar şablon bloklarıyla değiştirilir — geri al ile dönebilirsiniz."))) return;
+    const top = doc.blocks.filter((b) => b.type === "rotating_text" || b.type === "countdown_bar");
+    const fresh = [["hero_slider", "v1", "Ana Slider"], ["ads_block", "v1", "Reklam Kutuları"], ["deals_tabs", "v1", "Özel Teklif ve Ürün Sekmeleri"],
+      ["product_grid_212", "2_1_2", "Kategori Fırsatları (2-1-2)"], ["best_sellers", "", "Çok Satanlar"], ["full_banner", "image", "Tam Genişlik Banner"],
+      ["product_slider", "", "Yeni Eklenenler"], ["brands_carousel", "", "Markalar"], ["product_columns", "", "Alt Ürün Sütunları"]].map(([k, v, t]) => instantiate(k, v || undefined, t));
+    commit((d) => ({ ...d, blocks: [...top, ...fresh] }));
+  };
+  const resolveConflict = async (mode) => {
+    const server = conflict || {};
+    setConflict(null);
+    if (mode === "theirs") { dirty.current = false; await load(); return; }
+    if (mode === "merge") {
+      const mine = new Map(doc.blocks.map((b) => [b.id, b]));
+      const merged = (server.blocks || []).map((b) => mine.get(b.id) || b);
+      doc.blocks.forEach((b) => { if (!merged.some((x) => x.id === b.id)) merged.push(b); });
+      commit((d) => ({ ...d, blocks: merged }));
     }
-    const newIds = [...currentIds, pid];
-    setFormData({ 
-      ...formData, 
-      settings: { ...formData.settings, product_ids: newIds } 
-    });
-    setSelectedProductDetails([...selectedProductDetails, product]);
+    setRev(server.rev);
+    await saveDraft(true, server.rev);
   };
 
-  const removeProductFromBlock = (index) => {
-    const currentIds = [...(formData.settings?.product_ids || [])];
-    currentIds.splice(index, 1);
-    setFormData({ 
-      ...formData, 
-      settings: { ...formData.settings, product_ids: currentIds } 
-    });
-    const newDetails = [...selectedProductDetails];
-    newDetails.splice(index, 1);
-    setSelectedProductDetails(newDetails);
-  };
+  // ---------------------------------------------------------- türetilmiş
+  const selected = doc.blocks.find((b) => b.id === selectedId) || null;
+  const entry = selected ? getBlock(selected.type) : null;
+  const blockErrors = (id) => errors.filter((e) => e.block_id === id);
+  const fields = useMemo(() => (entry ? allFields(entry.schema) : []), [entry]);
+  const tabs = useMemo(() => [...(entry?.schema.tabs || ["İçerik"]), "Görünürlük"], [entry]);
+  const defaults = useMemo(() => (selected && entry ? defaultSettings(selected.type, selected.settings?._variant) : {}), [selected?.type, selected?.settings?._variant, entry]); // eslint-disable-line react-hooks/exhaustive-deps
+  const existing = useMemo(() => new Set(doc.blocks.map((b) => b.type)), [doc.blocks]);
+  const devW = DEVICES.find((d) => d[0] === device)[1];
+  const scale = Math.min(1, (boxW - 16) / devW);
+  const status = {
+    idle: "Yayındaki sürüm — değişiklik yok",
+    dirty: `Taslak — ${saveState.changes} değişiklik, kaydediliyor…`,
+    saving: "Taslak kaydediliyor…",
+    saved: `Taslak — ${saveState.changes} değişiklik, ${ago(saveState.at)} otomatik kaydedildi`,
+    error: "Taslak kaydedilemedi — tekrar denenecek",
+    conflict: "Çakışma — başka bir yönetici değişiklik yaptı",
+  }[saveState.status];
+  const hasDraft = rev != null || saveState.status === "dirty";
 
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const id = editingBlock?.id || createDraftBlock(formData.type, blocks.length).id;
-    const payload = { ...formData, id, sort_order: editingBlock ? formData.sort_order : blocks.length + 1 };
-    const next = editingBlock
-      ? blocks.map((block) => block.id === editingBlock.id ? payload : block)
-      : [...blocks, payload];
-    commitBlocks(next, id);
-    toast.success(editingBlock ? "Değişiklik taslağa alındı" : "Blok taslağa eklendi");
-    setModalOpen(false);
-    resetForm();
-  };
-
-  const handleDelete = async (id) => {
-    const confirmDelete = window.appConfirm
-      ? await window.appConfirm("Blok taslaktan kaldırılsın mı? Kaydetmeden geri alabilirsiniz.")
-      : window.confirm("Blok taslaktan kaldırılsın mı? Kaydetmeden geri alabilirsiniz.");
-    if (!confirmDelete) return;
-    const next = blocks.filter((block) => block.id !== id);
-    commitBlocks(next, selectedId === id ? next[0]?.id || null : selectedId);
-  };
-
-  const handleToggleActive = async (block) => {
-    commitBlocks(blocks.map((item) => item.id === block.id ? { ...item, is_active: !item.is_active } : item));
-  };
-
-  const addBlockFromLibrary = (type) => {
-    const block = createDraftBlock(type, blocks.length);
-    commitBlocks([...blocks, block], block.id);
-  };
-
-  const duplicateBlock = (block) => {
-    const index = blocks.findIndex((item) => item.id === block.id);
-    const copy = duplicateDraftBlock(block, index + 1);
-    const next = [...blocks];
-    next.splice(index + 1, 0, copy);
-    commitBlocks(next, copy.id);
-  };
-
-  const updateSelectedBlock = (patch) => {
-    if (!selectedBlock) return;
-    commitBlocks(blocks.map((block) => block.id === selectedBlock.id ? { ...block, ...patch } : block));
-  };
-
-  const openEditModal = (block) => {
-    setEditingBlock(block);
-    setFormData({
-      type: block.type,
-      title: block.title || "",
-      images: block.images || [],
-      links: block.links || [],
-      settings: block.settings || {},
-      sort_order: block.sort_order || 0,
-      is_active: block.is_active ?? true,
-      show_desktop: block.show_desktop !== false,
-      show_mobile: block.show_mobile !== false,
-      page: block.page || "home"
-    });
-    setModalOpen(true);
-  };
-
-  const resetForm = () => {
-    setEditingBlock(null);
-    setFormData({
-      type: "hero_slider",
-      title: "",
-      images: [],
-      links: [],
-      settings: { texts: [""] },
-      sort_order: 0,
-      is_active: true,
-      show_desktop: true,
-      show_mobile: true,
-      page: "home"
-    });
-    setProductSearch("");
-    setSearchResults([]);
-    setSelectedProductDetails([]);
-  };
-
-  // Kaydedilmemiş taslağı sitede önizle: taslak localStorage'a yazılır, ana sayfa ?onizleme=taslak ile okur.
-  const previewDraft = () => {
-    try { localStorage.setItem("page_design_draft", JSON.stringify(blocks)); } catch (_) { /* kota */ }
-    window.open("/?onizleme=taslak", "_blank", "noopener");
-  };
-
-  // Şablonun v1.0 ana sayfa düzenini blok olarak ekle (mevcutları koru ya da değiştir)
-  const installTemplateLayout = async () => {
-    if (hasChanges) { toast.error("Önce taslaktaki değişiklikleri kaydedin."); return; }
-    const ask = (m) => (window.appConfirm ? window.appConfirm(m) : Promise.resolve(window.confirm(m)));
-    const replace = blocks.some((b) => !["rotating_text", "countdown_bar"].includes(b.type))
-      ? await ask("Mevcut ana sayfa blokları (üst barlar hariç) kaldırılıp şablon düzeni kurulsun mu? 'İptal' derseniz bloklar mevcutların sonuna eklenir.")
-      : false;
-    try {
-      const token = localStorage.getItem("token");
-      const r = await axios.post(`${API}/page-blocks/install-default-home?replace=${replace ? "true" : "false"}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success(`${r.data?.created || 0} blok eklendi`);
-      await fetchBlocks();
-    } catch (err) {
-      toast.error("Şablon düzeni yüklenemedi");
-    }
-  };
-
-  const getBlockTypeInfo = (type) => {
-    return BLOCK_TYPES.find(t => t.value === type) || { label: type, icon: "📦" };
-  };
-
-  // text_block'a görsel eklenebilir (görsel + yazı kompozisyonu); rotating_text ve
-  // countdown salt metin barları olduğundan görsel alanı almaz.
-  const needsImages = ["hero_slider", "full_banner", "half_banners", "instashop", "video_banner", "text_block", "brands_carousel"].includes(formData.type);
-
+  if (loading && !published) return <div className="p-8 text-gray-500" data-testid="page-design-loading">Sayfa tasarımı yükleniyor…</div>;
 
   return (
-    <div data-testid="page-design" className="min-h-screen bg-gray-50 pb-20">
-      <header className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold">Sayfa Tasarımı</h1>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${hasChanges ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`} data-testid="unsaved-indicator">
-              {hasChanges ? "Kaydedilmemiş değişiklikler" : "Tüm değişiklikler kayıtlı"}
-            </span>
-          </div>
-          <p className="mt-0.5 text-xs text-gray-500">Blokları taslakta düzenleyin, tamamını tek seferde kaydedin.</p>
+    <div className="flex flex-col h-[calc(100vh-64px)] -m-4 md:-m-6 bg-gray-100" data-testid="page-design">
+      {/* üst çubuk */}
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-white border-b">
+        <select className="border rounded px-2 py-1 text-sm" value={PAGE} aria-label="Sayfa" onChange={() => {}}><option value="home">Sayfa: Ana Sayfa</option></select>
+        <div className="inline-flex rounded border overflow-hidden" role="group" aria-label="Cihaz">
+          {DEVICES.map(([k, w, Icon, l]) => (
+            <button key={k} type="button" onClick={() => setDevice(k)} aria-pressed={device === k} title={`${l} (${w}px)`}
+              className={`px-2 py-1 flex items-center gap-1 text-xs ${device === k ? "bg-gray-800 text-white" : "bg-white"}`} data-testid={`device-${k}`}><Icon size={14} />{l}</button>
+          ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={previewDraft} data-testid="preview-draft-btn"
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" title="Kaydetmeden, taslağı sitede yeni sekmede göster">
-            <Eye size={16} /> Taslağı Sitede Önizle
-          </button>
-          <button type="button" onClick={installTemplateLayout} data-testid="install-layout-btn"
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" title="Şablonun ana sayfa düzenini (tüm bölümler) blok olarak ekler">
-            <Plus size={16} /> Şablon Düzenini Yükle
-          </button>
-          <button type="button" onClick={undo} disabled={historyIndex <= 0} aria-label="Geri al" title="Geri al"
-            className="rounded-lg border bg-white p-2 text-gray-700 disabled:opacity-30"><Undo2 size={17} /></button>
-          <button type="button" onClick={redo} disabled={historyIndex >= history.length - 1} aria-label="Yinele" title="Yinele"
-            className="rounded-lg border bg-white p-2 text-gray-700 disabled:opacity-30"><Redo2 size={17} /></button>
-          <button type="button" onClick={handleSaveOrder} disabled={!hasChanges || saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-            data-testid="save-order-btn">
-            <Save size={16} /> {saving ? "Kaydediliyor…" : "Tümünü Kaydet"}
-          </button>
+        <button type="button" className="p-1.5 border rounded disabled:opacity-30" onClick={undo} disabled={!past.length} title="Geri al (Ctrl+Z)" aria-label="Geri al" data-testid="undo"><Undo2 size={15} /></button>
+        <button type="button" className="p-1.5 border rounded disabled:opacity-30" onClick={redo} disabled={!future.length} title="İleri al (Ctrl+Shift+Z)" aria-label="İleri al" data-testid="redo"><Redo2 size={15} /></button>
+        <button type="button" className="px-2 py-1 border rounded text-xs flex items-center gap-1" onClick={() => setShowRevs(true)} data-testid="open-revisions"><History size={14} /> Revizyonlar</button>
+        <span className={`text-xs ml-2 ${saveState.status === "error" || saveState.status === "conflict" ? "text-red-600" : "text-gray-600"}`} data-testid="save-status">{status}</span>
+        <div className="flex-1" />
+        {revPreview && <span className="text-xs bg-blue-50 text-blue-800 border border-blue-200 rounded px-2 py-1">#{revPreview.rev} önizleniyor <button type="button" className="underline ml-1" onClick={() => setRevPreview(null)}>kapat</button></span>}
+        <button type="button" className="px-2 py-1 border rounded text-xs flex items-center gap-1" onClick={installDefault} title="Şablon v1.0 ana sayfa düzeni"><LayoutTemplate size={14} /> Şablon düzeni</button>
+        {hasDraft && <button type="button" className="px-2 py-1 border rounded text-xs text-red-600" onClick={discard} data-testid="discard-draft">Taslağı at</button>}
+        <a href={`/onizleme/sayfa/${PAGE}`} target="_blank" rel="noreferrer" className="px-2 py-1 border rounded text-xs flex items-center gap-1" onClick={() => saveDraft(true)}><ExternalLink size={14} /> Önizle</a>
+        <button type="button" onClick={publish} disabled={saveState.status === "saving"} className="px-3 py-1.5 rounded bg-yellow-400 hover:bg-yellow-300 font-semibold text-sm disabled:opacity-50" data-testid="publish">
+          Yayınla{errors.length ? ` (${errors.length} hata)` : ""}
+        </button>
+      </div>
+      {publishErrors && publishErrors.length > 0 && (
+        <div className="bg-red-50 border-b border-red-200 px-3 py-2 text-xs text-red-800" data-testid="publish-errors">
+          <div className="flex justify-between font-semibold">Yayınlanamadı — şu alanları düzeltin:<button type="button" onClick={() => setPublishErrors(null)} aria-label="Kapat"><X size={14} /></button></div>
+          <ul className="list-disc ml-5 mt-1 max-h-24 overflow-auto">
+            {publishErrors.map((e, i) => (
+              <li key={i}><button type="button" className="underline text-left" onClick={() => { if (e.block_id) { setLeftTab("blocks"); selectBlock(e.block_id); setFocusPath(`${normErrPath(e.path)}#${Date.now()}`); } else if (e.global_key) { setLeftTab("global"); setGlobalKey(e.global_key); } }}>{e.label} — {e.message}</button></li>
+            ))}
+          </ul>
         </div>
-      </header>
-
-      <div className="grid gap-4 px-4 xl:grid-cols-[240px_minmax(420px,1fr)_360px]">
-        <aside className="h-fit rounded-xl border border-gray-200 bg-white p-3 xl:sticky xl:top-24" aria-label="Blok kütüphanesi">
-          <h2 className="mb-2 text-sm font-semibold">Blok Kütüphanesi</h2>
-          <div className="relative mb-3">
-            <Search size={15} className="absolute left-2.5 top-2.5 text-gray-400" />
-            <input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)}
-              placeholder="Blok ara…" aria-label="Blok ara"
-              className="w-full rounded-lg border border-gray-300 py-2 pl-8 pr-2 text-sm" />
-          </div>
-          <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">
-            {filteredBlockTypes.map((type) => (
-              <button key={type.value} type="button" onClick={() => addBlockFromLibrary(type.value)}
-                className="group flex items-start gap-2 rounded-lg border border-gray-200 p-2 text-left hover:border-gray-400 hover:bg-gray-50">
-                <span className="text-lg" aria-hidden="true">{type.icon}</span>
-                <span className="min-w-0">
-                  <span className="block text-xs font-semibold text-gray-800">{type.label}</span>
-                  <span className="mt-0.5 block text-[10px] leading-tight text-gray-500">{type.description}</span>
-                </span>
-                <Plus size={14} className="ml-auto shrink-0 text-gray-400 group-hover:text-gray-900" />
-              </button>
+      )}
+      <div className="flex flex-1 min-h-0">
+        {/* sol panel */}
+        <aside className="w-[360px] shrink-0 bg-white border-r flex flex-col min-h-0" aria-label="Düzenleyici">
+          <div className="flex border-b" role="tablist">
+            {[["blocks", "Bloklar"], ["global", "Genel Alanlar"]].map(([k, l]) => (
+              <button key={k} type="button" role="tab" aria-selected={leftTab === k} onClick={() => setLeftTab(k)}
+                className={`flex-1 py-2 text-sm ${leftTab === k ? "border-b-2 border-yellow-400 font-semibold" : "text-gray-600"}`} data-testid={`tab-${k}`}>{l}</button>
             ))}
           </div>
-          {!filteredBlockTypes.length && <p className="py-6 text-center text-xs text-gray-500">Eşleşen blok yok.</p>}
-          <div className="mt-4"><DemoContentCard onChanged={fetchBlocks} /></div>
-        </aside>
-
-        <main className="min-w-0 rounded-xl border border-gray-200 bg-white p-4" aria-label="Sayfa akışı">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold">Ana Sayfa Akışı</h2>
-              <p className="text-xs text-gray-500">{blocks.length} blok · tutma noktasından sürükleyin</p>
-            </div>
-          </div>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-2">
-                {loading ? (
-                  <div className="py-12 text-center text-sm text-gray-500">Yükleniyor…</div>
-                ) : blocks.length === 0 ? (
-                  <div className="rounded-xl border-2 border-dashed border-gray-200 px-4 py-12 text-center">
-                    <p className="font-medium text-gray-700">Bu sayfada henüz blok yok</p>
-                    <p className="mt-1 text-xs text-gray-500">Sol kütüphaneden bir blok ekleyin. Otomatik içerik yüklenmez.</p>
-                  </div>
-                ) : blocks.map((block) => (
-                  <SortableBlockItem key={block.id} block={block} selected={block.id === selectedId}
-                    onSelect={setSelectedId} onEdit={openEditModal} onDelete={handleDelete}
-                    onToggleActive={handleToggleActive} onDuplicate={duplicateBlock} getBlockTypeInfo={getBlockTypeInfo} />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </main>
-
-        <aside className="space-y-4 xl:sticky xl:top-24 xl:h-[calc(100vh-7rem)] xl:overflow-y-auto" aria-label="Özellikler ve önizleme">
-          <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-semibold">Blok Özellikleri</h2>
-            {selectedBlock ? (
-              <div className="space-y-3">
-                <div>
-                  <label htmlFor="selected-block-title" className="mb-1 block text-xs font-medium text-gray-600">Başlık</label>
-                  <input id="selected-block-title" value={selectedBlock.title || ""}
-                    onChange={(event) => updateSelectedBlock({ title: event.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <label className="flex items-center gap-1.5 rounded-lg border p-2"><input type="checkbox" checked={selectedBlock.is_active !== false} onChange={(e) => updateSelectedBlock({ is_active: e.target.checked })} /> Yayında</label>
-                  <label className="flex items-center gap-1.5 rounded-lg border p-2"><input type="checkbox" checked={selectedBlock.show_desktop !== false} onChange={(e) => updateSelectedBlock({ show_desktop: e.target.checked })} /> Masaüstü</label>
-                  <label className="flex items-center gap-1.5 rounded-lg border p-2"><input type="checkbox" checked={selectedBlock.show_mobile !== false} onChange={(e) => updateSelectedBlock({ show_mobile: e.target.checked })} /> Mobil</label>
-                </div>
-                <button type="button" onClick={() => openEditModal(selectedBlock)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50">
-                  <Edit size={15} /> Gelişmiş İçeriği Düzenle
-                </button>
-              </div>
-            ) : <p className="text-sm text-gray-500">Özelliklerini düzenlemek için akıştan bir blok seçin.</p>}
-          </section>
-
-          <section className="rounded-xl border border-gray-200 bg-white p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold">Gerçek Zamanlı Önizleme</h2>
-                <p className="text-[10px] text-gray-500">Kaydedilmemiş taslağı gösterir</p>
-              </div>
-              <div className="flex rounded-lg bg-gray-100 p-1">
-                <button type="button" onClick={() => setPreviewMode("mobile")} aria-label="Mobil önizleme"
-                  className={`rounded p-1.5 ${previewMode === "mobile" ? "bg-white shadow" : "text-gray-400"}`}><Smartphone size={15} /></button>
-                <button type="button" onClick={() => setPreviewMode("desktop")} aria-label="Masaüstü önizleme"
-                  className={`rounded p-1.5 ${previewMode === "desktop" ? "bg-white shadow" : "text-gray-400"}`}><Monitor size={15} /></button>
-              </div>
-            </div>
-            <div className={`mx-auto overflow-hidden border-[5px] border-gray-900 bg-gray-50 shadow-inner transition-all ${previewMode === "mobile" ? "max-w-[230px] rounded-[24px]" : "w-full rounded-lg"}`} data-testid="draft-preview">
-              <div className="flex h-7 items-center justify-center bg-gray-900 text-[8px] tracking-[0.2em] text-white">{SITE_NAME}</div>
-              <div className="max-h-[420px] min-h-[260px] overflow-y-auto bg-white">
-                {blocks.filter((block) => block.is_active !== false && (previewMode === "mobile" ? block.show_mobile !== false : block.show_desktop !== false)).map((block) => {
-                  const info = getBlockTypeInfo(block.type);
-                  const image = block.images?.[0] || (block.settings?.items || []).find((x) => x && x.image)?.image;
-                  return (
-                    <div key={block.id} className={`relative border-b border-gray-100 ${block.id === selectedId ? "ring-2 ring-inset ring-blue-500" : ""}`} onClick={() => setSelectedId(block.id)}>
-                      {image ? <img src={image} alt="" className={`w-full object-cover ${block.type === "hero_slider" ? "h-28" : "h-20"}`} /> : (
-                        <div className="flex h-16 items-center justify-center bg-gray-100 text-xl">{info.icon}</div>
-                      )}
-                      <div className="px-2 py-1.5">
-                        <p className="truncate text-[9px] font-semibold">{block.title || info.label}</p>
-                        <p className="text-[7px] text-gray-400">{info.label}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {!blocks.some((block) => block.is_active !== false && (previewMode === "mobile" ? block.show_mobile !== false : block.show_desktop !== false)) && (
-                  <div className="flex min-h-[230px] items-center justify-center px-6 text-center text-[10px] text-gray-400">Bu cihazda gösterilecek aktif blok yok.</div>
-                )}
-              </div>
-            </div>
-          </section>
-        </aside>
-      </div>
-
-      {/* Block Modal */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingBlock ? "Blok Düzenle" : "Yeni Blok Ekle"}</DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Block Type Selection */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Blok Tipi</label>
-              <div className="grid grid-cols-2 gap-2">
-                {BLOCK_TYPES.map(type => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: type.value })}
-                    className={`p-3 border rounded-lg text-left transition-all ${
-                      formData.type === type.value 
-                        ? 'border-black bg-gray-50 ring-1 ring-black' 
-                        : 'border-gray-200 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{type.icon}</span>
-                      <div>
-                        <p className="text-sm font-medium">{type.label}</p>
-                        <p className="text-xs text-gray-500">{type.description}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Başlık</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Blok başlığı (opsiyonel)"
-                className="w-full border px-3 py-2 rounded"
-              />
-            </div>
-
-            {/* Active Toggle */}
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm">Yayında (Ana sayfada müşterilere göster)</span>
-              </label>
-              <p className="text-xs text-gray-500 ml-6 block w-full">- Seçilmezse &quot;Taslak&quot; olur, sadece önizlemede görünür.</p>
-            </div>
-
-            {/* BLOK ZAMAN ARALIĞI — tüm blok için (slayt ızgarası olmayan tiplerde de çalışır) */}
-            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-600">
-                  ⏱ Bloğun Yayın Aralığı
-                </p>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ${schedState(formData.settings?.schedule).cls}`}>
-                  {schedState(formData.settings?.schedule).label}
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-500 mb-1">
-                Bloğun TAMAMI yalnız bu aralıkta yayında olur. Tek tek bannerlar için her
-                görselin altındaki <b>Zaman aralığı</b> butonunu kullan.
-              </p>
-              <ScheduleEditor
-                value={formData.settings?.schedule || null}
-                onChange={(nv) => setFormData({
-                  ...formData,
-                  settings: { ...formData.settings, schedule: nv && (nv.start || nv.end) ? nv : null },
-                })}
-              />
-            </div>
-
-            {/* Visibility Toggles (Mobile / Desktop) */}
-            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">Cihaz Görünürlüğü</p>
-              <div className="flex items-center gap-6 flex-wrap">
-                <label className="flex items-center gap-2 cursor-pointer" data-testid="block-show-desktop">
-                  <input
-                    type="checkbox"
-                    checked={formData.show_desktop !== false}
-                    onChange={(e) => setFormData({ ...formData, show_desktop: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm">🖥️ Masaüstünde Göster</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer" data-testid="block-show-mobile">
-                  <input
-                    type="checkbox"
-                    checked={formData.show_mobile !== false}
-                    onChange={(e) => setFormData({ ...formData, show_mobile: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm">📱 Mobilde Göster</span>
-                </label>
-              </div>
-              <p className="text-[11px] text-gray-500 mt-2">İkisi de seçili değilse blok hiçbir cihazda görünmez (etkin olarak gizlenir).</p>
-            </div>
-
-            {/* Dynamic Block Settings */}
-            
-            {needsImages && (
-              <div>
-                {formData.type === "hero_slider" && (
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Slider Stili</label>
-                    <select
-                      value={formData.settings?.hero_style || "klasik"}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, hero_style: e.target.value } })}
-                      className="w-full border px-3 py-2 rounded text-sm"
-                    >
-                      <option value="klasik">Şablon (tam genişlik, yazılı slaytlar)</option>
-                      <option value="dikey">Dikey Editorial (Zara) — tam ekran, dikey kaydırma</option>
-                    </select>
-                    <p className="text-[11px] text-gray-500 mt-1">
-                      Dikey Editorial'de her slayt ekranı doldurur; sayfa kaydırıldıkça slaytlar birbiri ardına gelir. Her slayta üst yazı + başlık girebilirsin (aşağıda).
-                    </p>
-                  </div>
-                )}
-                <label className="block text-sm font-medium mb-2">Görseller</label>
-                {formData.type === "hero_slider" && <div className="mb-2"><SizeHint size={SIZES.hero} extra={<>mobil görsel: <b>800 × 860 px</b> (isteğe bağlı)</>} /></div>}
-                {formData.type === "full_banner" && <div className="mb-2"><SizeHint size={SIZES.fullBanner} /></div>}
-                {formData.type === "brands_carousel" && <div className="mb-2"><SizeHint size={SIZES.brand} extra="şeffaf PNG; bağlantı: marka/kategori sayfası" /></div>}
-                <p className="text-[11px] text-gray-500 mb-2">Slaytları <b>sürükleyerek</b> sıralayabilirsin. Görsel veya <b>video</b> (mp4/webm) yükleyebilir, kutuya <b>sürükleyip bırakarak</b> da ekleyebilirsin.</p>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                  {formData.images.map((img, index) => (
-                    <div
-                      key={index}
-                      className={`relative group cursor-move ${dragIdx === index ? "opacity-40" : ""}`}
-                      draggable
-                      onDragStart={() => setDragIdx(index)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => { e.preventDefault(); moveSlide(dragIdx, index); setDragIdx(null); }}
-                      onDragEnd={() => setDragIdx(null)}
-                    >
-                      {isVideoUrl(img) ? (
-                        <div className="relative">
-                          <video src={img} className="w-full aspect-video object-cover rounded border" muted playsInline preload="metadata" />
-                          <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1">🎬 Video</span>
-                        </div>
-                      ) : (
-                        <img src={img} alt="" className="w-full aspect-video object-cover rounded border" />
-                      )}
-                      <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded">{index + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={14} />
-                      </button>
-                      <input
-                        type="text"
-                        value={formData.links[index] || ""}
-                        onChange={(e) => {
-                          const newLinks = [...formData.links];
-                          newLinks[index] = e.target.value;
-                          setFormData({ ...formData, links: newLinks });
-                        }}
-                        placeholder="/kategori/..."
-                        className="w-full text-xs border px-2 py-1.5 rounded mt-2"
-                      />
-                      {/* Bu banner'a özel yayın aralığı — girilen tarih/saat dışında sitede görünmez */}
-                      {(() => {
-                        const sc = slideSched(index);
-                        const st = schedState(sc);
-                        const open = schedOpen === index;
-                        return (
-                          <div className="mt-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setSchedOpen(open ? null : index)}
-                              className={`w-full text-[11px] px-2 py-1 rounded border flex items-center justify-between gap-1 ${
-                                st.key === "none" ? "border-gray-300 text-gray-600 hover:border-black"
-                                  : "border-black bg-gray-50 text-black"}`}
-                              title={fmtSched(sc) || "Bu banner için özel aktif aralık gir"}
-                            >
-                              <span className="flex items-center gap-1">⏱ Zaman aralığı</span>
-                              <span className={`px-1.5 py-0.5 rounded ${st.cls}`}>{st.label}</span>
-                            </button>
-                            {!open && fmtSched(sc) && (
-                              <p className="text-[10px] text-gray-500 mt-0.5 truncate" title={fmtSched(sc)}>{fmtSched(sc)}</p>
-                            )}
-                            {open && (
-                              <ScheduleEditor value={sc} onChange={(nv) => setSlideSched(index, nv)} />
-                            )}
-                          </div>
-                        );
-                      })()}
-                      {formData.type === "hero_slider" && formData.settings?.hero_style !== "dikey" && (() => {
-                        const caps = Array.isArray(formData.settings?.captions) ? formData.settings.captions : [];
-                        const cap = caps[index] || {};
-                        const mob = Array.isArray(formData.settings?.mobile_images) ? formData.settings.mobile_images : [];
-                        const setCap = (patch) => {
-                          const next = [...caps];
-                          while (next.length <= index) next.push({});
-                          next[index] = { ...next[index], ...patch };
-                          setFormData({ ...formData, settings: { ...formData.settings, captions: next } });
-                        };
-                        const setMob = (url) => {
-                          const next = [...mob];
-                          while (next.length <= index) next.push("");
-                          next[index] = url;
-                          setFormData({ ...formData, settings: { ...formData.settings, mobile_images: next } });
-                        };
-                        return (
-                          <div className="mt-1.5 space-y-1" data-testid={`hero-caption-${index}`}>
-                            <input type="text" value={cap.title || ""} onChange={(e) => setCap({ title: e.target.value })}
-                              placeholder="Başlık (ör. İki Sütunlu Liftlerde Fırsat)" className="w-full text-[11px] border px-2 py-1 rounded" />
-                            <input type="text" value={cap.subtitle || ""} onChange={(e) => setCap({ subtitle: e.target.value })}
-                              placeholder="Alt başlık (ör. 4 TON — %15 İNDİRİM)" className="w-full text-[11px] border px-2 py-1 rounded" />
-                            <div className="flex gap-1">
-                              <input type="text" value={cap.price_label || ""} onChange={(e) => setCap({ price_label: e.target.value })}
-                                placeholder="Fiyat etiketi" className="w-1/2 text-[11px] border px-2 py-1 rounded" />
-                              <input type="number" value={cap.price ?? ""} onChange={(e) => setCap({ price: e.target.value === "" ? "" : Number(e.target.value) })}
-                                placeholder="Fiyat ₺" className="w-1/2 text-[11px] border px-2 py-1 rounded" />
-                            </div>
-                            <input type="text" value={cap.cta || ""} onChange={(e) => setCap({ cta: e.target.value })}
-                              placeholder="Buton yazısı (ör. Hemen İncele)" className="w-full text-[11px] border px-2 py-1 rounded" />
-                            <details className="text-[11px]">
-                              <summary className="cursor-pointer text-gray-600">Mobil görsel (800×860)</summary>
-                              <div className="mt-1"><ImageSlot value={mob[index] || ""} onChange={setMob} size={SIZES.heroMobile} /></div>
-                            </details>
-                          </div>
-                        );
-                      })()}
-                      {formData.type === "hero_slider" && formData.settings?.hero_style === "dikey" && (() => {
-                        const caps = Array.isArray(formData.settings?.captions) ? formData.settings.captions : [];
-                        const cap = caps[index] || {};
-                        const setCap = (patch) => {
-                          const next = [...(Array.isArray(formData.settings?.captions) ? formData.settings.captions : [])];
-                          while (next.length <= index) next.push({});
-                          next[index] = { ...next[index], ...patch };
-                          setFormData({ ...formData, settings: { ...formData.settings, captions: next } });
-                        };
-                        return (
-                          <div className="mt-1.5 space-y-1">
-                            <input type="text" value={cap.eyebrow || ""} onChange={(e) => setCap({ eyebrow: e.target.value })}
-                              placeholder="Üst yazı (ör. YENİ SEZON)" className="w-full text-[11px] border px-2 py-1 rounded" />
-                            <input type="text" value={cap.title || ""} onChange={(e) => setCap({ title: e.target.value })}
-                              placeholder="Başlık (ör. Deniz Kıyısı)" className="w-full text-[11px] border px-2 py-1 rounded" />
-                            <input type="text" value={cap.cta || ""} onChange={(e) => setCap({ cta: e.target.value })}
-                              placeholder="Buton yazısı (varsayılan: Keşfet)" className="w-full text-[11px] border px-2 py-1 rounded" />
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  ))}
-
-                  {/* Upload — görsel VEYA video; sürükle-bırak destekli */}
-                  <label
-                    className="aspect-video border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-gray-50 rounded transition-colors"
-                    onDragOver={(e) => { e.preventDefault(); }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const f = e.dataTransfer?.files?.[0];
-                      if (f) uploadMediaFile(f);
-                    }}
-                  >
-                    <input
-                      type="file"
-                      accept="image/*,video/*"
-                      onChange={(e) => handleImageUpload(e)}
-                      className="hidden"
-                    />
-                    {uploading ? (
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black mx-auto mb-2"></div>
-                        <span className="text-xs text-gray-500">Yükleniyor...</span>
+          <div className="flex-1 overflow-auto p-2">
+            {leftTab === "blocks" ? (
+              <>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                  <SortableContext items={doc.blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+                    {doc.blocks.map((b, i) => (
+                      <BlockRow key={b.id} block={b} index={i} total={doc.blocks.length} selected={b.id === selectedId} errorCount={blockErrors(b.id).length}
+                        onSelect={() => selectBlock(b.id)} onPatch={(p) => patchBlock(b.id, p)} onDup={() => dupBlock(b.id)} onDel={() => delBlock(b.id)} onMove={(d) => moveBlock(b.id, d)} />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+                <button type="button" className="w-full mt-1 py-2 border-2 border-dashed rounded text-sm text-gray-700 hover:border-yellow-400 flex items-center justify-center gap-1"
+                  onClick={() => setGallery({ index: selected ? doc.blocks.indexOf(selected) + 1 : null })} data-testid="add-block"><Plus size={15} /> Blok Ekle</button>
+                {selected && (
+                  <div className="mt-3 border-t pt-3" data-testid="block-editor">
+                    {!entry || selected.settings?._legacy ? (
+                      <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
+                        <b>Desteklenmeyen eski blok</b> ({selected.type}). Vitrinde gösterilmez. Silmek size kalmış; verisi yedekte korunur.
                       </div>
                     ) : (
                       <>
-                        <Upload size={24} className="text-gray-400 mb-1" />
-                        <span className="text-xs text-gray-500">Görsel / Video Ekle</span>
-                        <span className="text-[10px] text-gray-400 mt-0.5">sürükle-bırak</span>
+                        <div className="flex items-center gap-2 mb-2">
+                          <input className="flex-1 border rounded px-2 py-1 text-sm font-semibold" value={selected.title || ""} placeholder={entry.schema.title}
+                            onChange={(e) => patchBlock(selected.id, { title: e.target.value }, `title:${selected.id}`)} aria-label="Blok adı (yalnız panelde)" />
+                          <button type="button" className="text-xs border rounded px-2 py-1 flex items-center gap-1 hover:bg-yellow-50" title="Şablon varsayılanına sıfırla"
+                            onClick={async () => { if (await ask("Bu blok şablon varsayılanına sıfırlansın mı? (Geri al ile dönebilirsiniz)")) commit((d) => ({ ...d, blocks: d.blocks.map((b) => (b.id === selected.id ? resetBlock(b) : b)) })); }}
+                            data-testid="reset-block"><RotateCcw size={12} /> Şablon varsayılanına sıfırla</button>
+                        </div>
+                        <div className="text-[11px] text-gray-500 mb-2">Blok tipi: <b>{entry.schema.title}</b> (değiştirilemez)</div>
+                        {(entry.schema.variants || []).length > 1 && (
+                          <label className="block text-xs mb-3">Görünüm
+                            <select className="mt-1 w-full border rounded px-2 py-1 text-sm" value={selected.settings?._variant || entry.schema.variants[0].value}
+                              onChange={async (e) => { const v = e.target.value; if (await ask("Görünüm değiştirilsin mi? Bu görünüme özgü varsayılan ayarlar uygulanır, diğer alanlarınız korunur.")) commit((d) => ({ ...d, blocks: d.blocks.map((b) => (b.id === selected.id ? applyVariant(b, v) : b)) })); }}
+                              data-testid="variant-select">
+                              {entry.schema.variants.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                            </select>
+                          </label>
+                        )}
+                        {selected.settings?._migration_errors?.length > 0 && (
+                          <div className="text-[11px] bg-amber-50 border border-amber-200 rounded p-2 mb-2 text-amber-800">Geçiş uyarıları: {selected.settings._migration_errors.join(" · ")}</div>
+                        )}
+                        <SchemaForm key={selected.id} fields={fields} tabs={tabs} value={withDefaults(selected.type, selected.settings)} defaults={defaults}
+                          onChange={(s) => setSettings(selected.id, s)} errors={blockErrors(selected.id)} ctx={{ superAdmin }}
+                          focusPath={focusPath ? focusPath.split("#")[0] : null} testId="block-form" />
                       </>
                     )}
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {HOME_BLOCK_TYPES.includes(formData.type) && <HomeBlockFields formData={formData} setFormData={setFormData} />}
-
-            {formData.type === "text_block" && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Açıklama Metni</label>
-                <textarea
-                  value={formData.settings?.text || ""}
-                  onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, text: e.target.value } })}
-                  placeholder="Yazı bloğu içeriği..."
-                  className="w-full border px-3 py-2 rounded h-24"
-                />
-                <div className="mt-2 text-xs text-gray-500">Buton Linki eklemek isterseniz Görseller altındaki link yapısını veya doğrudan buraya buton şeklinde eklemeyi desteklemediğimiz için, text bloklarında ilk link URL&apos;i buton linki olarak kullanılır.</div>
-                <input
-                  type="text"
-                  value={formData.links[0] || ""}
-                  onChange={(e) => {
-                    const newLinks = [...formData.links];
-                    newLinks[0] = e.target.value;
-                    setFormData({ ...formData, links: newLinks });
-                  }}
-                  placeholder="Buton Linki URL (örn: /iletisim)"
-                  className="w-full border px-3 py-2 rounded mt-2 text-sm"
-                />
-              </div>
-            )}
-
-            {formData.type === "video_banner" && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Video URL (m3u8 veya mp4)</label>
-                <input
-                  type="text"
-                  value={formData.settings?.video_url || ""}
-                  onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, video_url: e.target.value } })}
-                  placeholder="https://.../video.mp4"
-                  className="w-full border px-3 py-2 rounded text-sm"
-                />
-              </div>
-            )}
-
-            {/* COUNTDOWN BAR — sitenin en üstünde admin tarafından planlanabilen geri sayım */}
-            {formData.type === "countdown_bar" && (
-              <div className="space-y-4 p-4 bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-lg" data-testid="countdown-form">
-                <div className="text-xs text-amber-800 leading-relaxed">
-                  ⏱️ Bu blok sitenin <strong>EN ÜST barı</strong>nda görünür.
-                  <ul className="mt-1 ml-4 list-disc space-y-0.5">
-                    <li><strong>Başlangıç tarihi</strong> gelene kadar bar gizli kalır.</li>
-                    <li>Başlangıç gelince countdown otomatik aktifleşir.</li>
-                    <li><strong>Bitiş tarihi</strong>nde bar otomatik kaybolur (yedek metin tanımlıysa o gösterilir).</li>
-                  </ul>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Sol Metin</label>
-                    <input
-                      type="text"
-                      value={formData.settings?.left_text || ""}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, left_text: e.target.value } })}
-                      placeholder="TÜM ALIŞVERİŞLERDE KARGO BEDAVA"
-                      className="w-full border border-gray-300 px-3 py-2 rounded text-sm"
-                      data-testid="countdown-left-text"
-                    />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Sayaç Etiketi</label>
-                    <input
-                      type="text"
-                      value={formData.settings?.timer_label || ""}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, timer_label: e.target.value } })}
-                      placeholder="KALAN SÜRE:"
-                      className="w-full border border-gray-300 px-3 py-2 rounded text-sm"
-                      data-testid="countdown-timer-label"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">
-                      🟢 Başlangıç Tarihi/Saati (planlama)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={formData.settings?.start_at || ""}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, start_at: e.target.value } })}
-                      className="w-full border border-gray-300 px-3 py-2 rounded text-sm font-mono"
-                      data-testid="countdown-start-at"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1">Boş bırakılırsa hemen aktif olur.</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">
-                      🔴 Bitiş Tarihi/Saati (countdown hedef)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={formData.settings?.end_at || ""}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, end_at: e.target.value } })}
-                      className="w-full border border-gray-300 px-3 py-2 rounded text-sm font-mono"
-                      data-testid="countdown-end-at"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1">Bu tarihte sayaç sıfırlanıp bar gizlenir.</p>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Arkaplan Rengi</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={formData.settings?.bg_color || "#000000"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, bg_color: e.target.value } })}
-                        className="w-10 h-10 border border-gray-300 rounded cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={formData.settings?.bg_color || "#000000"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, bg_color: e.target.value } })}
-                        className="flex-1 border border-gray-300 px-2 py-2 rounded text-sm font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Yazı Rengi</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={formData.settings?.text_color || "#ffffff"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, text_color: e.target.value } })}
-                        className="w-10 h-10 border border-gray-300 rounded cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={formData.settings?.text_color || "#ffffff"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, text_color: e.target.value } })}
-                        className="flex-1 border border-gray-300 px-2 py-2 rounded text-sm font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Yedek Metin (bar pasifken)</label>
-                    <input
-                      type="text"
-                      value={formData.settings?.fallback_text || ""}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, fallback_text: e.target.value } })}
-                      placeholder="Bar pasifken gösterilecek metin (opsiyonel)"
-                      className="w-full border border-gray-300 px-3 py-2 rounded text-sm"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1">Boşsa pasif iken bar tamamen gizli.</p>
-                  </div>
-                </div>
-
-                {/* Canlı Önizleme */}
-                <div className="border-t border-amber-200 pt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-800">📺 Canlı Önizleme</p>
-                  <div
-                    className="text-center py-2.5 rounded"
-                    style={{ backgroundColor: formData.settings?.bg_color || "#000000", color: formData.settings?.text_color || "#ffffff" }}
-                  >
-                    <div className="flex items-center justify-center gap-3 flex-wrap text-xs uppercase tracking-[0.2em]">
-                      {formData.settings?.left_text && <span>{formData.settings.left_text}</span>}
-                      {formData.settings?.timer_label && <span className="hidden md:inline">{formData.settings.timer_label}</span>}
-                      <CountdownPreviewMini endAt={formData.settings?.end_at} bg={formData.settings?.bg_color || "#000"} fg={formData.settings?.text_color || "#fff"} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-
-            {formData.type === "rotating_text" && (
-              <div className="space-y-4 bg-amber-50/40 border border-amber-200 rounded-lg p-4">
-                <p className="text-xs text-amber-800">
-                  📢 Bu blok sitenin <strong>üst duyuru barında</strong> (header altı) görünür.
-                  Birden fazla metin eklersen sırayla döner.
-                </p>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-2">Duyuru Metinleri</label>
-                  <div className="space-y-2">
-                    {(formData.settings?.texts || [""]).map((txt, i) => (
-                      <div key={i} className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          value={txt}
-                          onChange={(e) => {
-                            const arr = [...(formData.settings?.texts || [""])];
-                            arr[i] = e.target.value;
-                            setFormData({ ...formData, settings: { ...formData.settings, texts: arr } });
-                          }}
-                          placeholder="Örn: Yeni Sezon Geldi"
-                          className="flex-1 border border-gray-300 px-3 py-2 rounded text-sm"
-                          data-testid={`rotating-text-input-${i}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const arr = [...(formData.settings?.texts || [""])];
-                            arr.splice(i, 1);
-                            setFormData({ ...formData, settings: { ...formData.settings, texts: arr.length ? arr : [""] } });
-                          }}
-                          className="text-red-500 hover:text-red-700 px-2 py-2 shrink-0"
-                          title="Sil"
-                          data-testid={`rotating-text-remove-${i}`}
-                        >✕</button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, settings: { ...formData.settings, texts: [...(formData.settings?.texts || [""]), ""] } })}
-                    className="mt-2 text-xs bg-stone-800 text-white px-3 py-1.5 rounded hover:bg-black"
-                    data-testid="rotating-text-add"
-                  >+ Metin Ekle</button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Arka Plan</label>
-                    <div className="flex gap-2">
-                      <input type="color" value={formData.settings?.bg_color || "#ffffff"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, bg_color: e.target.value } })}
-                        className="w-10 h-10 border border-gray-300 rounded cursor-pointer" />
-                      <input type="text" value={formData.settings?.bg_color || "#ffffff"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, bg_color: e.target.value } })}
-                        className="flex-1 border border-gray-300 px-2 py-2 rounded text-sm font-mono" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Yazı Rengi</label>
-                    <div className="flex gap-2">
-                      <input type="color" value={formData.settings?.text_color || "#374151"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, text_color: e.target.value } })}
-                        className="w-10 h-10 border border-gray-300 rounded cursor-pointer" />
-                      <input type="text" value={formData.settings?.text_color || "#374151"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, text_color: e.target.value } })}
-                        className="flex-1 border border-gray-300 px-2 py-2 rounded text-sm font-mono" />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Dönüş Süresi (saniye)</label>
-                  <input type="number" min="2" value={formData.settings?.interval || 4}
-                    onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, interval: Number(e.target.value) } })}
-                    className="w-28 border border-gray-300 px-3 py-2 rounded text-sm" />
-                </div>
-
-                {/* Canlı Önizleme */}
-                <div className="border-t border-amber-200 pt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-800">📺 Canlı Önizleme</p>
-                  <div className="text-center py-1.5 rounded border border-gray-200"
-                    style={{ backgroundColor: formData.settings?.bg_color || "#ffffff" }}>
-                    <p className="text-[10px] tracking-[0.3em] uppercase font-light"
-                      style={{ color: formData.settings?.text_color || "#374151" }}>
-                      {(formData.settings?.texts || []).filter((t) => (t || "").trim())[0] || "Metin girilmedi"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-
-            {formData.type === "product_slider" && (
-              <div>
-                {/* Kaynak seçimi: elle seçim yerine dinamik listeler (favori/indirim/kategori) */}
-                <label className="block text-sm font-medium mb-2">Ürün Kaynağı</label>
-                <select
-                  value={formData.settings?.source || "manual"}
-                  onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, source: e.target.value } })}
-                  className="w-full border px-3 py-2 rounded text-sm mb-3"
-                  data-testid="slider-source-select"
-                >
-                  <option value="manual">Elle Seçim (aşağıdan ürün ekle)</option>
-                  <option value="newest">En Yeni Ürünler (otomatik)</option>
-                  <option value="featured">Öne Çıkan Ürünler (otomatik)</option>
-                  <option value="popular">Çok Satanlar (otomatik)</option>
-                  <option value="favorites">En Çok Favorilenenler (otomatik)</option>
-                  <option value="discounted">İndirimdeki Ürünler (sale + kampanya, otomatik)</option>
-                  <option value="category">Seçili Kategorilerden (otomatik)</option>
+                )}
+                <div className="mt-6"><DemoContentCard onChanged={load} /></div>
+              </>
+            ) : (
+              <div data-testid="global-editor">
+                <select className="w-full border rounded px-2 py-1.5 text-sm mb-3" value={globalKey} onChange={(e) => setGlobalKey(e.target.value)} aria-label="Genel alan">
+                  {GLOBAL_GROUPS.filter(([k]) => globalKeys().includes(k)).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                 </select>
-
-                <div className="flex gap-3 mb-3">
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium mb-1 text-gray-600">Gösterilecek Ürün Adedi</label>
-                    <input
-                      type="number" min={1} max={24}
-                      value={formData.settings?.limit || 8}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, limit: Math.max(1, Math.min(24, Number(e.target.value) || 8)) } })}
-                      className="w-full border px-3 py-2 rounded text-sm"
-                    />
-                  </div>
-                  <div className="w-32">
-                    <label className="block text-xs font-medium mb-1 text-gray-600">Kaç Satır (alt alta)</label>
-                    <select
-                      value={formData.settings?.rows || 1}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, rows: Number(e.target.value) } })}
-                      className="w-full border px-3 py-2 rounded text-sm"
-                    >
-                      <option value={1}>1 satır</option>
-                      <option value={2}>2 satır</option>
-                      <option value={3}>3 satır</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Başlık bloğu (2. görsel tarzı): Başlık = üstteki "Blok Başlığı" alanı.
-                    Alt yazı + "Tümünü Gör" bağlantısı buradan. Başlık girilmezse blok başlıksız çıkar. */}
-                <div className="grid grid-cols-1 gap-2 mb-3 bg-gray-50 border rounded-lg p-3">
-                  <p className="text-[11px] text-gray-500">Üstteki <b>Blok Başlığı</b> girilirse ürünlerin üstünde büyük başlık olarak çıkar (ör. "Senin için seçtik."). Aşağıdakiler opsiyonel:</p>
-                  <input
-                    type="text"
-                    value={formData.settings?.subtitle || ""}
-                    onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, subtitle: e.target.value } })}
-                    placeholder="Alt yazı (ör. Atölyenizi tamamlayacak ekipmanlar.)"
-                    className="w-full border px-3 py-2 rounded text-sm"
-                  />
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={formData.settings?.cta_label || ""}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, cta_label: e.target.value } })}
-                      placeholder="Buton yazısı (varsayılan: Tümünü Gör)"
-                      className="flex-1 border px-3 py-2 rounded text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={formData.settings?.cta_link || ""}
-                      onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, cta_link: e.target.value } })}
-                      placeholder="Buton linki (ör. /elbise)"
-                      className="flex-1 border px-3 py-2 rounded text-sm"
-                    />
-                  </div>
-                  <div className="w-44">
-                    <label className="block text-xs font-medium mb-1 text-gray-600">Arka Plan Rengi <span className="text-gray-400">(boş = şeffaf)</span></label>
-                    <div className="flex gap-1.5">
-                      <input type="color" value={formData.settings?.bg_color || "#ffffff"}
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, bg_color: e.target.value } })}
-                        className="w-10 h-9 border rounded cursor-pointer" />
-                      <input type="text" value={formData.settings?.bg_color || ""}
-                        placeholder="#EFECE6"
-                        onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, bg_color: e.target.value } })}
-                        className="flex-1 border px-2 py-2 rounded text-sm font-mono" />
-                    </div>
-                  </div>
-                </div>
-
-                {(formData.settings?.source === "category") && (
-                  <div className="mb-4">
-                    <label className="block text-xs font-medium mb-1 text-gray-600">Kategoriler (çoklu seçim: ⌘/Ctrl ile)</label>
-                    <select
-                      multiple
-                      value={formData.settings?.category_ids || []}
-                      onChange={(e) => {
-                        const vals = Array.from(e.target.selectedOptions).map((o) => o.value);
-                        setFormData({ ...formData, settings: { ...formData.settings, category_ids: vals } });
-                      }}
-                      className="w-full border px-3 py-2 rounded text-sm h-40"
-                      data-testid="slider-category-select"
-                    >
-                      {sliderCategories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                {getGlobal(globalKey)?.schema.description && <div className="text-[11px] text-gray-500 mb-2">{getGlobal(globalKey).schema.description}</div>}
+                {MENU_LINKS[globalKey] && (
+                  <Link to={`/admin/menu-yonetimi?grup=${MENU_LINKS[globalKey]}`} className="inline-block text-xs text-blue-700 underline mb-3">Menü öğelerini düzenle → Menü Yönetimi</Link>
                 )}
-
-                {(formData.settings?.source || "manual") === "manual" && (
-                <>
-                <label className="block text-sm font-medium mb-2">Ürün Seçimi</label>
-                <div className="bg-gray-50 p-4 rounded-lg border">
-                  
-                  {/* Search */}
-                  <div className="flex gap-2 mb-4">
-                    <input
-                      type="text"
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      placeholder="Ürün adı veya barkod ile ara..."
-                      className="flex-1 border px-3 py-2 rounded text-sm"
-                      onKeyDown={(e) => e.key === 'Enter' && handleProductSearch(e)}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleProductSearch}
-                      disabled={searchingProducts}
-                      className="px-4 py-2 bg-black text-white rounded text-sm disabled:opacity-50"
-                    >
-                      {searchingProducts ? "Aranıyor..." : "Ara"}
-                    </button>
-                  </div>
-
-                  {/* Search Results */}
-                  {searchResults.length > 0 && (
-                    <div className="mb-4 max-h-40 overflow-y-auto border bg-white rounded shadow-sm">
-                      {searchResults.map(p => (
-                        <div key={p._id} className="flex items-center justify-between p-2 border-b last:border-0 hover:bg-gray-50 text-sm">
-                          <div className="flex items-center gap-2">
-                            <img src={p.images?.[0]?.url || ""} alt="" className="w-8 h-8 rounded object-cover bg-gray-100" />
-                            <span className="truncate max-w-[200px]">{p.name}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => addProductToBlock(p)}
-                            className="text-blue-600 text-xs font-semibold px-2 py-1 bg-blue-50 rounded hover:bg-blue-100"
-                          >
-                            Ekle
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Selected Products */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Seçili Ürünler ({selectedProductDetails.length})</h4>
-                    <div className="space-y-2">
-                      {selectedProductDetails.length === 0 && (
-                        <p className="text-sm text-gray-400 italic">Henüz ürün seçilmedi. (Boş bırakılırsa en yeni ürünler gösterilir)</p>
-                      )}
-                      {selectedProductDetails.map((p, index) => (
-                        <div key={`${p._id}-${index}`} className="flex items-center justify-between p-2 bg-white border rounded shadow-sm text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-400 font-mono text-xs">{index + 1}.</span>
-                            <img src={p.images?.[0]?.url || ""} alt="" className="w-8 h-8 rounded object-cover bg-gray-100" />
-                            <span className="truncate max-w-[200px]">{p.name}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeProductFromBlock(index)}
-                            className="text-red-500 hover:text-red-700 p-1"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                </div>
-                </>
-                )}
+                {globalKey === "site_theme" && <ThemePresets value={doc.global.site_theme} onChange={(v) => setGlobal("site_theme", v)} />}
+                <SchemaForm key={globalKey} fields={getSchema(globalKey)?.fields || []} tabs={getSchema(globalKey)?.tabs || ["İçerik"]}
+                  value={withDefaults(globalKey, doc.global[globalKey])} defaults={defaultSettings(globalKey)}
+                  onChange={(v) => setGlobal(globalKey, v)} errors={errors.filter((e) => e.global_key === globalKey).map((e) => ({ ...e, path: e.path.replace(`${globalKey}.`, "") }))}
+                  ctx={{ superAdmin }} testId="global-form" />
+                <button type="button" className="mt-3 text-xs border rounded px-2 py-1 flex items-center gap-1" onClick={async () => { if (await ask("Bu alan şablon varsayılanına sıfırlansın mı?")) setGlobal(globalKey, defaultSettings(globalKey)); }}>
+                  <RotateCcw size={12} /> Şablon varsayılanına sıfırla
+                </button>
               </div>
             )}
-
-
-            {/* Footer */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2 border rounded hover:bg-gray-50"
-              >
-                İptal
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800"
-              >
-                {editingBlock ? "Taslağa Uygula" : "Taslağa Ekle"}
-              </button>
+          </div>
+        </aside>
+        {/* önizleme */}
+        <section ref={boxRef} className="flex-1 min-w-0 overflow-auto p-2" aria-label="Canlı önizleme">
+          <div style={{ width: devW * scale, height: `calc((100vh - 130px))`, margin: "0 auto" }}>
+            <iframe ref={iframeRef} title="Canlı önizleme" src={`/onizleme/sayfa/${PAGE}`} data-testid="preview-frame"
+              style={{ width: devW, height: `calc((100vh - 130px) / ${scale})`, transform: `scale(${scale})`, transformOrigin: "0 0", border: 0, background: "#fff", boxShadow: "0 1px 6px rgba(0,0,0,.15)" }}
+              onLoad={() => setTimeout(postDraft, 50)} />
+          </div>
+        </section>
+      </div>
+      {gallery && <Gallery existing={existing} onClose={() => setGallery(null)} onPick={(k, v) => insertAt(k, v, gallery.index)} />}
+      {showRevs && <Revisions onClose={() => { setShowRevs(false); setRevPreview(null); }} onRestore={restore} onPreview={previewRev} />}
+      {conflict && (
+        <div className="fixed inset-0 z-[95] bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" data-testid="conflict-dialog">
+          <div className="bg-white rounded-lg shadow-xl p-5 max-w-md w-full">
+            <div className="font-semibold mb-2">Başka bir yönetici değişiklik yaptı</div>
+            <p className="text-sm text-gray-600 mb-4">Taslak siz düzenlerken başka bir oturumda değiştirildi ({conflict.updated_by || "bilinmiyor"}). Ne yapalım?</p>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button type="button" className="border rounded px-3 py-1.5 text-sm" onClick={() => resolveConflict("theirs")}>Vazgeç (onların sürümü)</button>
+              <button type="button" className="border rounded px-3 py-1.5 text-sm" onClick={() => resolveConflict("merge")}>Birleştir</button>
+              <button type="button" className="rounded px-3 py-1.5 text-sm bg-yellow-400 font-semibold" onClick={() => resolveConflict("mine")}>Üzerine yaz</button>
             </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Mini countdown kutusu (modül seviyesinde — render içinde tanımlanmaz)
-function MiniCountBox({ v, l, bg, fg }) {
-  const pad = (n) => String(n).padStart(2, "0");
+function ThemePresets({ value, onChange }) {
+  const opts = (getSchema("site_theme")?.fields || []).find((f) => f.name === "preset")?.options || [];
   return (
-    <span className="inline-flex items-center gap-1">
-      <span className="inline-flex items-center justify-center min-w-[26px] h-6 px-1 text-xs font-semibold tabular-nums"
-        style={{ backgroundColor: fg, color: bg }}>{pad(v)}</span>
-      <span className="text-[10px] tracking-wider">{l}</span>
-    </span>
-  );
-}
-
-// Mini preview countdown for the form (admin-side, isolated)
-function CountdownPreviewMini({ endAt, bg, fg }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  if (!endAt) return <span className="opacity-60 italic">— bitiş tarihi giriniz —</span>;
-  const target = new Date(endAt).getTime();
-  let ms = target - now;
-  if (ms < 0) ms = 0;
-  const d = Math.floor(ms / 86400000);
-  const h = Math.floor((ms % 86400000) / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return (
-    <span className="flex items-center gap-2">
-      <MiniCountBox v={d} l="GÜN" bg={bg} fg={fg} />
-      <MiniCountBox v={h} l="SAAT" bg={bg} fg={fg} />
-      <MiniCountBox v={m} l="DK" bg={bg} fg={fg} />
-      <MiniCountBox v={s} l="SN" bg={bg} fg={fg} />
-    </span>
+    <div className="mb-3">
+      <div className="text-xs font-semibold mb-1">Renk ön ayarları</div>
+      <div className="flex flex-wrap gap-1.5">
+        {opts.filter((o) => o.primary).map((o) => (
+          <button key={o.value} type="button" title={o.label} aria-label={o.label} onClick={() => onChange({ ...value, preset: o.value, primary_color: o.primary, primary_dark: o.primary_dark, text_on_primary: o.text_on_primary })}
+            className={`w-7 h-7 rounded-full border-2 ${value?.preset === o.value ? "border-gray-900" : "border-white shadow"}`} style={{ background: o.primary }} data-testid={`preset-${o.value}`} />
+        ))}
+      </div>
+    </div>
   );
 }

@@ -1,0 +1,64 @@
+{
+  "header": {
+    "title": "Yeni Eklenenler",
+    "tag": "h2",
+    "align": "left",
+    "right": "arrows",
+    "pills": [],
+    "link": {
+      "label": "Tümünü gör",
+      "link": {
+        "kind": "url",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    "underline": true
+  },
+  "source": {
+    "kind": "newest",
+    "product_ids": [],
+    "category_ids": [],
+    "include_children": true,
+    "tag": "",
+    "brand_ids": [],
+    "limit": 14,
+    "sort": "default",
+    "exclude_out_of_stock": false,
+    "exclude_ids": [],
+    "fill_with": "none"
+  },
+  "card": "grid_small",
+  "show_discount_badge": false,
+  "carousel": {
+    "per_view": {
+      "0": 2,
+      "480": 2,
+      "768": 3,
+      "992": 4,
+      "1200": 5,
+      "1480": 7
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": true,
+    "arrows": "header",
+    "drag": true,
+    "last_active_divider": true
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 60,
+      "tablet": 50,
+      "mobile": 40
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "enabled": true,
+  "columns": [
+    {
+      "title": "Öne Çıkan Ürünler",
+      "source": {
+        "kind": "featured",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 3,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "title": "İndirimdeki Ürünler",
+      "source": {
+        "kind": "discounted",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 3,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "title": "Çok Satanlar",
+      "source": {
+        "kind": "best_sellers",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 3,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    }
+  ]
+}

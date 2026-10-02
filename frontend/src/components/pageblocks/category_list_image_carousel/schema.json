@@ -1,0 +1,32 @@
+{
+  "key": "category_list_image_carousel",
+  "version": 2,
+  "title": "Kategori Listesi + Büyük Görsel Karuseli",
+  "description": "",
+  "category": "kategori",
+  "group": "D",
+  "status": "stub",
+  "template_refs": [
+    "T2/html/home/home-v9.html"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

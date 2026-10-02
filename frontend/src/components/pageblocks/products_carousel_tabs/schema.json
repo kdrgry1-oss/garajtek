@@ -1,0 +1,32 @@
+{
+  "key": "products_carousel_tabs",
+  "version": 2,
+  "title": "Sekmeli Ürün Karuseli",
+  "description": "",
+  "category": "urun",
+  "group": "C",
+  "status": "stub",
+  "template_refs": [
+    "T1/inc/blocks/homepage/product-carousel-tab.php"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

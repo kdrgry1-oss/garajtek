@@ -1,0 +1,177 @@
+{
+  "key": "site_topbar",
+  "version": 2,
+  "title": "Üst Bar",
+  "description": "",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "enabled",
+      "type": "bool",
+      "label": "Üst barı göster",
+      "tab": "İçerik"
+    },
+    {
+      "name": "left_mode",
+      "type": "select",
+      "label": "Sol taraf",
+      "tab": "İçerik",
+      "options": [
+        {
+          "value": "welcome",
+          "label": "Hoş geldiniz yazısı"
+        },
+        {
+          "value": "phone_email",
+          "label": "Telefon + e-posta"
+        }
+      ]
+    },
+    {
+      "name": "welcome_text",
+      "type": "text",
+      "label": "Hoş geldiniz yazısı",
+      "tab": "İçerik",
+      "show_if": {
+        "left_mode": [
+          "welcome"
+        ]
+      },
+      "help": "Boşsa “<Mağaza adı>'e Hoş Geldiniz” yazılır."
+    },
+    {
+      "name": "welcome_link",
+      "type": "link",
+      "label": "Hoş geldiniz bağlantısı",
+      "tab": "İçerik",
+      "show_if": {
+        "left_mode": [
+          "welcome"
+        ]
+      }
+    },
+    {
+      "name": "right_items",
+      "type": "repeater",
+      "label": "Sağ bağlantılar",
+      "tab": "İçerik",
+      "max": 8,
+      "item_label": "{{label}}",
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Yazı",
+          "width": "half"
+        },
+        {
+          "name": "icon",
+          "type": "icon",
+          "label": "İkon",
+          "width": "half",
+          "set": "electro"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        },
+        {
+          "name": "special",
+          "type": "select",
+          "label": "Özel davranış",
+          "options": [
+            {
+              "value": "",
+              "label": "Yok"
+            },
+            {
+              "value": "account",
+              "label": "Hesabım / Giriş Yap"
+            }
+          ]
+        },
+        {
+          "name": "guest_text",
+          "type": "text",
+          "label": "Misafir yazısı (Hesabım için)",
+          "show_if": {
+            "special": [
+              "account"
+            ]
+          }
+        }
+      ],
+      "item_default": {
+        "label": "Yeni bağlantı",
+        "icon": {
+          "icon": ""
+        },
+        "link": {
+          "kind": "url",
+          "url": "/",
+          "new_tab": false
+        },
+        "special": "",
+        "guest_text": ""
+      },
+      "item_noun": "Bağlantı"
+    },
+    {
+      "name": "currency_text",
+      "type": "text",
+      "label": "Para birimi yazısı",
+      "tab": "İçerik",
+      "help": "Boşsa gizlenir."
+    },
+    {
+      "name": "style",
+      "type": "select",
+      "label": "Görünüm",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "white",
+          "label": "Beyaz"
+        },
+        {
+          "value": "gray",
+          "label": "Gri"
+        },
+        {
+          "value": "primary",
+          "label": "Ana renk"
+        },
+        {
+          "value": "transparent",
+          "label": "Şeffaf"
+        }
+      ]
+    },
+    {
+      "name": "hide_below",
+      "type": "select",
+      "label": "Şu genişliğin altında gizle",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "lg",
+          "label": "992 px"
+        },
+        {
+          "value": "xl",
+          "label": "1200 px"
+        }
+      ]
+    }
+  ],
+  "common": []
+}

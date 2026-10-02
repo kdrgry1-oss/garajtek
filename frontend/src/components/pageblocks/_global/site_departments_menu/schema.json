@@ -1,0 +1,112 @@
+{
+  "key": "site_departments_menu",
+  "version": 2,
+  "title": "Dikey Menü (Tüm Kategoriler)",
+  "description": "Menü öğeleri Menü Yönetimi'nde düzenlenir.",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "enabled",
+      "type": "bool",
+      "label": "Göster",
+      "tab": "İçerik"
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık (ana sayfa)",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "title_shop",
+      "type": "text",
+      "label": "Başlık (iç sayfalar)",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "title_icon",
+      "type": "icon",
+      "label": "Başlık ikonu",
+      "tab": "İçerik",
+      "set": "electro"
+    },
+    {
+      "name": "header_style",
+      "type": "select",
+      "label": "Başlık stili",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "primary_rounded",
+          "label": "Ana renk, yuvarlak"
+        },
+        {
+          "value": "primary_square",
+          "label": "Ana renk, köşeli"
+        },
+        {
+          "value": "transparent_topline",
+          "label": "Şeffaf, üst çizgili"
+        }
+      ]
+    },
+    {
+      "name": "open_on_home",
+      "type": "bool",
+      "label": "Ana sayfada açık",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "open_elsewhere",
+      "type": "bool",
+      "label": "Diğer sayfalarda açık",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "toggle_event",
+      "type": "select",
+      "label": "Açma",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "click",
+          "label": "Tıklayınca"
+        },
+        {
+          "value": "hover",
+          "label": "Üzerine gelince"
+        }
+      ]
+    },
+    {
+      "name": "width",
+      "type": "number",
+      "label": "Genişlik",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 200,
+      "max": 360,
+      "width": "half"
+    },
+    {
+      "name": "overlay_hero",
+      "type": "bool",
+      "label": "Slider üzerine binsin",
+      "tab": "Görünüm"
+    }
+  ],
+  "common": []
+}

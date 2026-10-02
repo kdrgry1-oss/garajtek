@@ -1,0 +1,113 @@
+{
+  "key": "site_footer_links",
+  "version": 2,
+  "title": "Footer Bağlantı Sütunları",
+  "description": "",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "mode",
+      "type": "select",
+      "label": "Biçim",
+      "tab": "İçerik",
+      "options": [
+        {
+          "value": "structured",
+          "label": "Sütunlar"
+        },
+        {
+          "value": "html",
+          "label": "Özel HTML (eski)"
+        }
+      ]
+    },
+    {
+      "name": "custom_html",
+      "type": "html",
+      "label": "Özel HTML",
+      "tab": "Gelişmiş",
+      "super_admin": true,
+      "sanitize": "strict",
+      "show_if": {
+        "mode": [
+          "html"
+        ]
+      }
+    },
+    {
+      "name": "auto_fill_from_categories",
+      "type": "bool",
+      "label": "İlk sütunlara kök kategorileri ekle",
+      "tab": "İçerik"
+    },
+    {
+      "name": "categories_title",
+      "type": "text",
+      "label": "Kategori sütunu başlığı",
+      "tab": "İçerik",
+      "show_if": {
+        "auto_fill_from_categories": [
+          true
+        ]
+      }
+    },
+    {
+      "name": "columns",
+      "type": "repeater",
+      "label": "Sütunlar",
+      "tab": "İçerik",
+      "max": 4,
+      "item_label": "{{title}}",
+      "item_fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık",
+          "help": "Boş bırakılabilir (önceki sütunun devamı)."
+        },
+        {
+          "name": "links",
+          "type": "repeater",
+          "label": "Bağlantılar",
+          "max": 20,
+          "item_label": "{{label}}",
+          "item_fields": [
+            {
+              "name": "label",
+              "type": "text",
+              "label": "Yazı"
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı"
+            }
+          ],
+          "item_default": {
+            "label": "",
+            "link": {
+              "kind": "url",
+              "url": "/",
+              "new_tab": false
+            }
+          },
+          "item_noun": "Bağlantı"
+        }
+      ],
+      "item_default": {
+        "title": "Yeni sütun",
+        "links": []
+      },
+      "item_noun": "Sütun"
+    }
+  ],
+  "common": []
+}

@@ -1,0 +1,163 @@
+{
+  "height": {
+    "desktop": 485,
+    "tablet": 400,
+    "mobile": 300
+  },
+  "background_color": "#f9f9f9",
+  "caption_column": "offset3_5",
+  "caption_padding_top": {
+    "desktop": 85,
+    "tablet": 60,
+    "mobile": 20
+  },
+  "slides": [
+    {
+      "background": null,
+      "product_image": null,
+      "layout": "price",
+      "pretitle": "",
+      "title": "YENİ NESİL<br>LİFT SİSTEMLERİ",
+      "subtitle": "PROFESYONEL SERVİSLER İÇİN",
+      "price_prefix": "başlayan fiyatlarla",
+      "price": "₺49.900",
+      "button": {
+        "text": "Alışverişe Başla",
+        "style": "primary",
+        "link": {
+          "kind": "category",
+          "url": "/liftler",
+          "new_tab": false,
+          "slug": "liftler"
+        }
+      },
+      "text_color": "#333e48",
+      "text_align": "left",
+      "animation": {
+        "effect": "fadeInDown",
+        "delay_step": 200,
+        "duration": 1000
+      }
+    },
+    {
+      "background": null,
+      "product_image": null,
+      "layout": "promo",
+      "pretitle": "ATÖLYENİZE DEĞER KATIN",
+      "title": "Kompresörlerde <strong>%40'a varan</strong> indirim",
+      "subtitle": "",
+      "price_prefix": "",
+      "price": "",
+      "button": {
+        "text": "Alışverişe Başla",
+        "style": "primary",
+        "link": {
+          "kind": "category",
+          "url": "/kompresorler",
+          "new_tab": false,
+          "slug": "kompresorler"
+        }
+      },
+      "text_color": "#333e48",
+      "text_align": "left",
+      "animation": {
+        "effect": "fadeInDown",
+        "delay_step": 200,
+        "duration": 1000
+      }
+    },
+    {
+      "background": null,
+      "product_image": null,
+      "layout": "promo",
+      "pretitle": "ATÖLYENİZE DEĞER KATIN",
+      "title": "Lastik ekipmanlarında <strong>yeni sezon</strong>",
+      "subtitle": "",
+      "price_prefix": "",
+      "price": "",
+      "button": {
+        "text": "Alışverişe Başla",
+        "style": "primary",
+        "link": {
+          "kind": "category",
+          "url": "/lastik-ekipmanlari",
+          "new_tab": false,
+          "slug": "lastik-ekipmanlari"
+        }
+      },
+      "text_color": "#333e48",
+      "text_align": "left",
+      "animation": {
+        "effect": "fadeInLeft",
+        "delay_step": 200,
+        "duration": 1000
+      }
+    }
+  ],
+  "side_banners": [],
+  "side_deals": {
+    "source": {
+      "kind": "discounted",
+      "product_ids": [],
+      "category_ids": [],
+      "include_children": true,
+      "tag": "",
+      "brand_ids": [],
+      "limit": 4,
+      "sort": "default",
+      "exclude_out_of_stock": false,
+      "exclude_ids": [],
+      "fill_with": "none"
+    },
+    "countdown": {
+      "enabled": true,
+      "end": "",
+      "rolling_days": 0,
+      "units": [
+        "days",
+        "hours",
+        "minutes",
+        "seconds"
+      ],
+      "hide_zero_days": true,
+      "labels": {
+        "days": "Gün",
+        "hours": "Saat",
+        "minutes": "Dk",
+        "seconds": "Sn"
+      },
+      "heading": "",
+      "on_expire": "hide_timer",
+      "expired_text": "Kampanya sona erdi",
+      "pad": true
+    }
+  },
+  "category_strip": [],
+  "carousel": {
+    "per_view": {
+      "0": 1
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": true,
+    "interval": 5000,
+    "pause_on_hover": false,
+    "loop": true,
+    "rewind": false,
+    "transition": "fade",
+    "speed": 250,
+    "dots": true,
+    "arrows": "none",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "easing": "easeOutCubic",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 35,
+      "tablet": 35,
+      "mobile": 35
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "key": "banner_grid_text_image",
+  "version": 2,
+  "title": "Metinli/Görselli Banner Izgarası",
+  "description": "",
+  "category": "banner",
+  "group": "A",
+  "status": "stub",
+  "template_refs": [
+    "T2/html/home/home-v5.html"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

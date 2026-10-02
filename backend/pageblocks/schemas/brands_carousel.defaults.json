@@ -1,0 +1,38 @@
+{
+  "source": "catalog",
+  "brands": [],
+  "show_name_overlay": true,
+  "grayscale": true,
+  "logo_max_height": 50,
+  "show_on_all_pages": false,
+  "carousel": {
+    "per_view": {
+      "0": 2,
+      "480": 3,
+      "768": 4,
+      "992": 5,
+      "1200": 6
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": true,
+    "transition": "slide",
+    "speed": 300,
+    "dots": false,
+    "arrows": "outer",
+    "drag": false,
+    "last_active_divider": false
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 85,
+      "tablet": 50,
+      "mobile": 40
+    }
+  }
+}

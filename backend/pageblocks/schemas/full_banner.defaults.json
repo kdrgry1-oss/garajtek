@@ -1,0 +1,19 @@
+{
+  "image": null,
+  "link": {
+    "kind": "url",
+    "url": "/sale",
+    "new_tab": false
+  },
+  "title": "ATÖLYENİZİ <strong>YENİLEYİN</strong>, KAZANÇLI ÇIKIN",
+  "price_label": "BAŞLAYAN FİYATLARLA",
+  "price": "₺7.999",
+  "price_box_color": "var(--primary)",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 70,
+      "tablet": 50,
+      "mobile": 40
+    }
+  }
+}

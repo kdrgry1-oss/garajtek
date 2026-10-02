@@ -1,0 +1,60 @@
+{
+  "title": "Kategori fırsatları",
+  "nav_mode": "tabs",
+  "nav_items": [
+    {
+      "label": "En İyi Fırsatlar",
+      "link": {
+        "kind": "url",
+        "url": "",
+        "new_tab": false
+      },
+      "source": {
+        "kind": "discounted",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 5,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    }
+  ],
+  "nav_auto_categories": {
+    "enabled": true,
+    "max": 6,
+    "exclude": []
+  },
+  "main_product_mode": "first_of_source",
+  "main_product": "",
+  "main_thumbnails": false,
+  "lightbox": false,
+  "column_widths": "23_52_23",
+  "empty_text": "Bu kategoride henüz ürün bulunmuyor.",
+  "_section": {
+    "background": "#f9f9f9",
+    "padding": {
+      "desktop": {
+        "top": 58,
+        "bottom": 58
+      },
+      "tablet": {
+        "top": 40,
+        "bottom": 40
+      },
+      "mobile": {
+        "top": 30,
+        "bottom": 30
+      }
+    },
+    "margin_bottom": {
+      "desktop": 85,
+      "tablet": 50,
+      "mobile": 40
+    }
+  }
+}

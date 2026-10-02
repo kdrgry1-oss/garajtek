@@ -1,0 +1,32 @@
+{
+  "key": "category_icon_cards",
+  "version": 2,
+  "title": "Kategori Kartları",
+  "description": "",
+  "category": "kategori",
+  "group": "D",
+  "status": "stub",
+  "template_refs": [
+    "T2/html/home/home-v4.html"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

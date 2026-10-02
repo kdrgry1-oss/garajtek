@@ -1,0 +1,64 @@
+{
+  "columns": "3",
+  "ratio": "60_40",
+  "text_size": 1.286,
+  "card_background": "#f5f5f5",
+  "items": [
+    {
+      "image": null,
+      "text": "Atölyeniz için<br><strong>BÜYÜK</strong> fırsatlar",
+      "action_type": "link",
+      "action_text": "Hemen İncele",
+      "action_prefix": "",
+      "action_value": "",
+      "action_suffix": "",
+      "currency": "₺",
+      "link": {
+        "kind": "url",
+        "url": "/sale",
+        "new_tab": false
+      },
+      "image_rotation": 0
+    },
+    {
+      "image": null,
+      "text": "Lift ve<br><strong>Kompresörlerde</strong>",
+      "action_type": "upto",
+      "action_text": "Hemen İncele",
+      "action_prefix": "%'ye varan",
+      "action_value": "20",
+      "action_suffix": "indirim",
+      "currency": "₺",
+      "link": {
+        "kind": "category",
+        "url": "/liftler",
+        "new_tab": false,
+        "slug": "liftler"
+      },
+      "image_rotation": 0
+    },
+    {
+      "image": null,
+      "text": "En<br><strong>Çok Satan</strong><br>Ürünler",
+      "action_type": "link",
+      "action_text": "Hemen İncele",
+      "action_prefix": "",
+      "action_value": "",
+      "action_suffix": "",
+      "currency": "₺",
+      "link": {
+        "kind": "url",
+        "url": "/tum-urunler?sort=popular&order=desc",
+        "new_tab": false
+      },
+      "image_rotation": 0
+    }
+  ],
+  "_section": {
+    "margin_bottom": {
+      "desktop": 74,
+      "tablet": 50,
+      "mobile": 40
+    }
+  }
+}

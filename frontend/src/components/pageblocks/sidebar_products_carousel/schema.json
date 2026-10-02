@@ -1,0 +1,30 @@
+{
+  "key": "sidebar_products_carousel",
+  "version": 2,
+  "title": "Kenar Çubuğu Ürün Karuseli",
+  "description": "",
+  "category": "kenar",
+  "group": "D",
+  "status": "stub",
+  "template_refs": [],
+  "layout": "sidebar",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

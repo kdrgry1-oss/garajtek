@@ -1,0 +1,30 @@
+{
+  "key": "sidebar_features",
+  "version": 2,
+  "title": "Kenar Çubuğu Avantajlar",
+  "description": "",
+  "category": "kenar",
+  "group": "D",
+  "status": "stub",
+  "template_refs": [],
+  "layout": "sidebar",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

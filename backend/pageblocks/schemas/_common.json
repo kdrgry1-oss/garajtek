@@ -1,0 +1,270 @@
+{
+  "section": {
+    "tab": "Görünüm",
+    "fields": [
+      {
+        "name": "_section",
+        "type": "group",
+        "label": "Bölüm",
+        "fields": [
+          {
+            "name": "width",
+            "type": "select",
+            "label": "Genişlik",
+            "width": "half",
+            "options": [
+              {
+                "value": "container",
+                "label": "Kutulu (1200 px)"
+              },
+              {
+                "value": "full_bleed",
+                "label": "Tam genişlik"
+              },
+              {
+                "value": "wide",
+                "label": "Geniş (1430 px)"
+              }
+            ]
+          },
+          {
+            "name": "background",
+            "type": "color",
+            "label": "Bant rengi",
+            "width": "half",
+            "palette": "theme",
+            "allow_transparent": true
+          },
+          {
+            "name": "background_image",
+            "type": "image",
+            "label": "Bant arka plan görseli",
+            "recommended": [
+              1920,
+              600
+            ]
+          },
+          {
+            "name": "padding",
+            "type": "spacing",
+            "label": "İç boşluk",
+            "responsive": true
+          },
+          {
+            "name": "margin_bottom",
+            "type": "number",
+            "label": "Alt boşluk",
+            "unit": "px",
+            "min": 0,
+            "max": 300,
+            "responsive": true
+          },
+          {
+            "name": "text_color",
+            "type": "color",
+            "label": "Yazı rengi",
+            "width": "half"
+          },
+          {
+            "name": "anchor_id",
+            "type": "text",
+            "label": "Bağlantı hedefi (#)",
+            "width": "half",
+            "max_length": 60,
+            "help": "Örn. kampanyalar → /#kampanyalar"
+          },
+          {
+            "name": "css_class",
+            "type": "text",
+            "label": "Ek CSS sınıfı",
+            "super_admin": true,
+            "max_length": 120
+          }
+        ]
+      }
+    ]
+  },
+  "visibility": {
+    "tab": "Görünürlük",
+    "fields": [
+      {
+        "name": "_visibility",
+        "type": "group",
+        "label": "Görünürlük",
+        "fields": [
+          {
+            "name": "desktop",
+            "type": "bool",
+            "label": "Masaüstü (≥1200 px)",
+            "width": "third"
+          },
+          {
+            "name": "tablet",
+            "type": "bool",
+            "label": "Tablet (768–1199 px)",
+            "width": "third"
+          },
+          {
+            "name": "mobile",
+            "type": "bool",
+            "label": "Mobil (<768 px)",
+            "width": "third"
+          },
+          {
+            "name": "schedule",
+            "type": "group",
+            "label": "Yayın zamanı",
+            "fields": [
+              {
+                "name": "start",
+                "type": "date_time",
+                "label": "Başlangıç",
+                "width": "half"
+              },
+              {
+                "name": "end",
+                "type": "date_time",
+                "label": "Bitiş",
+                "width": "half"
+              }
+            ]
+          },
+          {
+            "name": "audience",
+            "type": "select",
+            "label": "Kimler görsün",
+            "options": [
+              {
+                "value": "all",
+                "label": "Herkes"
+              },
+              {
+                "value": "guests",
+                "label": "Yalnız misafirler"
+              },
+              {
+                "value": "members",
+                "label": "Yalnız üyeler"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "reveal": {
+    "tab": "Görünüm",
+    "fields": [
+      {
+        "name": "_reveal",
+        "type": "group",
+        "label": "Giriş animasyonu",
+        "collapsible": true,
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool",
+            "label": "Açık",
+            "width": "half"
+          },
+          {
+            "name": "effect",
+            "type": "select",
+            "label": "Efekt",
+            "width": "half",
+            "options": [
+              {
+                "value": "fadeIn",
+                "label": "Belir"
+              },
+              {
+                "value": "fadeInUp",
+                "label": "Aşağıdan belir"
+              },
+              {
+                "value": "fadeInDown",
+                "label": "Yukarıdan belir"
+              },
+              {
+                "value": "fadeInLeft",
+                "label": "Soldan belir"
+              },
+              {
+                "value": "fadeInRight",
+                "label": "Sağdan belir"
+              },
+              {
+                "value": "zoomIn",
+                "label": "Yakınlaş"
+              },
+              {
+                "value": "slideInUp",
+                "label": "Aşağıdan kay"
+              }
+            ]
+          },
+          {
+            "name": "offset",
+            "type": "number",
+            "label": "Tetikleme noktası",
+            "unit": "%",
+            "min": 0,
+            "max": 100,
+            "width": "half"
+          },
+          {
+            "name": "once",
+            "type": "bool",
+            "label": "Yalnız bir kez",
+            "width": "half"
+          }
+        ]
+      }
+    ]
+  },
+  "defaults": {
+    "_section": {
+      "width": "",
+      "background": "",
+      "background_image": null,
+      "padding": {
+        "desktop": {
+          "top": 0,
+          "bottom": 0
+        },
+        "tablet": {
+          "top": 0,
+          "bottom": 0
+        },
+        "mobile": {
+          "top": 0,
+          "bottom": 0
+        }
+      },
+      "margin_bottom": {
+        "desktop": 50,
+        "tablet": 50,
+        "mobile": 40
+      },
+      "text_color": "",
+      "anchor_id": "",
+      "css_class": ""
+    },
+    "_visibility": {
+      "desktop": true,
+      "tablet": true,
+      "mobile": true,
+      "schedule": {
+        "start": "",
+        "end": ""
+      },
+      "audience": "all"
+    },
+    "_reveal": {
+      "enabled": true,
+      "effect": "fadeIn",
+      "offset": 90,
+      "once": true
+    }
+  }
+}

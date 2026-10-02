@@ -1,0 +1,115 @@
+{
+  "deal": {
+    "enabled": true,
+    "mode": "auto",
+    "product": "",
+    "title": "Özel Teklif",
+    "title_override": "",
+    "image_override": null,
+    "savings": {
+      "show": true,
+      "label": "Kazancınız",
+      "mode": "auto",
+      "amount": ""
+    },
+    "stock": {
+      "show": true,
+      "sold_label": "Satılan:",
+      "available_label": "Kalan:",
+      "mode": "auto",
+      "sold": 2,
+      "available": 26
+    },
+    "countdown": {
+      "enabled": true,
+      "end": "",
+      "rolling_days": 7,
+      "units": [
+        "days",
+        "hours",
+        "minutes",
+        "seconds"
+      ],
+      "hide_zero_days": true,
+      "labels": {
+        "days": "Gün",
+        "hours": "Saat",
+        "minutes": "Dk",
+        "seconds": "Sn"
+      },
+      "heading": "Acele edin! Kampanya bitimine:",
+      "on_expire": "zero",
+      "expired_text": "Kampanya sona erdi",
+      "pad": true
+    },
+    "border_color": "var(--primary)",
+    "link": {
+      "kind": "url",
+      "url": "",
+      "new_tab": false
+    }
+  },
+  "tabs": [
+    {
+      "label": "Öne Çıkanlar",
+      "source": {
+        "kind": "featured",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 6,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "label": "İndirimdekiler",
+      "source": {
+        "kind": "discounted",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 6,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "label": "Çok Satanlar",
+      "source": {
+        "kind": "best_sellers",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 6,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    }
+  ],
+  "default_tab": 0,
+  "columns": "3",
+  "card": "grid",
+  "tab_animation": "fade",
+  "tab_align": "center",
+  "empty_text": "Bu sekmede henüz ürün yok.",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 70,
+      "tablet": 50,
+      "mobile": 40
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "text": "",
+  "countdown": {
+    "enabled": true,
+    "end": "",
+    "rolling_days": 0,
+    "units": [
+      "days",
+      "hours",
+      "minutes",
+      "seconds"
+    ],
+    "hide_zero_days": false,
+    "labels": {
+      "days": "GÜN",
+      "hours": "SAAT",
+      "minutes": "DK",
+      "seconds": "SN"
+    },
+    "heading": "KALAN SÜRE:",
+    "on_expire": "hide_block",
+    "expired_text": "Kampanya sona erdi",
+    "pad": true
+  },
+  "link": {
+    "kind": "url",
+    "url": "",
+    "new_tab": false
+  },
+  "background": "#000000",
+  "text_color": "#ffffff"
+}

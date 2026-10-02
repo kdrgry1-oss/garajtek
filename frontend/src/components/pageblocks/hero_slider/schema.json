@@ -1,0 +1,618 @@
+{
+  "key": "hero_slider",
+  "version": 2,
+  "title": "Ana Slider",
+  "description": "Tam genişlik görsel slider (şablon: home-v1-slider)",
+  "category": "slider",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [
+    "T1/inc/blocks/homepage/home-v1-slider.php",
+    "T1/inc/blocks/homepage/home-v2-slider.php",
+    "T1/inc/blocks/homepage/homepage-3/home-v3-slider.php"
+  ],
+  "layout": "full_bleed",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1 – Ana sayfa (dikey menüye yer bırakır)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2",
+      "label": "v2 – Sol kenar çubuklu düzen",
+      "defaults_patch": {
+        "caption_column": "left4"
+      }
+    },
+    {
+      "value": "v3",
+      "label": "v3 – Menüsüz geniş açıklama",
+      "defaults_patch": {
+        "caption_column": "wide8"
+      }
+    },
+    {
+      "value": "v2_product",
+      "label": "Ürün görselli slider (v2.0)",
+      "defaults_patch": {
+        "caption_column": "left4"
+      }
+    },
+    {
+      "value": "boxed_side_banners",
+      "label": "Kutulu slider + yan bannerlar",
+      "defaults_patch": {}
+    },
+    {
+      "value": "rounded_with_deals",
+      "label": "Yuvarlak köşeli + fırsat kartları",
+      "defaults_patch": {}
+    },
+    {
+      "value": "fullscreen",
+      "label": "Tam ekran (şeffaf header altında)",
+      "defaults_patch": {
+        "height": {
+          "desktop": 660,
+          "tablet": 500,
+          "mobile": 360
+        }
+      }
+    },
+    {
+      "value": "menu_strip",
+      "label": "Menü + slider + kategori şeridi",
+      "defaults_patch": {}
+    }
+  ],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "slides",
+      "type": "repeater",
+      "label": "Slaytlar",
+      "tab": "İçerik",
+      "min": 1,
+      "max": 10,
+      "item_label": "{{title}}",
+      "item_schedule": true,
+      "item_fields": [
+        {
+          "name": "background",
+          "type": "image",
+          "label": "Arka plan görseli",
+          "tab": "İçerik",
+          "recommended": [
+            1920,
+            466
+          ],
+          "allow_mobile": true,
+          "mobile_recommended": [
+            800,
+            860
+          ],
+          "accept": "image/*,video/*",
+          "help": "Slaytın tam genişlik arka planı. Mobil için ayrı görsel seçebilirsiniz."
+        },
+        {
+          "name": "product_image",
+          "type": "image",
+          "label": "Ürün görseli",
+          "tab": "İçerik",
+          "recommended": [
+            416,
+            420
+          ],
+          "show_if": {
+            "_variant": [
+              "v2_product",
+              "boxed_side_banners",
+              "menu_strip"
+            ]
+          }
+        },
+        {
+          "name": "layout",
+          "type": "select",
+          "label": "Slayt düzeni",
+          "tab": "İçerik",
+          "options": [
+            {
+              "value": "price",
+              "label": "Başlık + alt başlık + fiyat + düğme"
+            },
+            {
+              "value": "promo",
+              "label": "Üst başlık + vurgulu başlık + düğme"
+            },
+            {
+              "value": "image_only",
+              "label": "Yalnız görsel"
+            }
+          ]
+        },
+        {
+          "name": "pretitle",
+          "type": "text",
+          "label": "Üst başlık",
+          "tab": "İçerik",
+          "show_if": {
+            "layout": [
+              "promo"
+            ]
+          }
+        },
+        {
+          "name": "title",
+          "type": "rich_text",
+          "label": "Başlık",
+          "tab": "İçerik",
+          "marks": [
+            "strong",
+            "em",
+            "br",
+            "span_highlight"
+          ],
+          "max_length": 300
+        },
+        {
+          "name": "subtitle",
+          "type": "text",
+          "label": "Alt başlık",
+          "tab": "İçerik",
+          "show_if": {
+            "layout": [
+              "price"
+            ]
+          }
+        },
+        {
+          "name": "price_prefix",
+          "type": "text",
+          "label": "Fiyat ön yazısı",
+          "tab": "İçerik",
+          "show_if": {
+            "layout": [
+              "price"
+            ]
+          },
+          "width": "half"
+        },
+        {
+          "name": "price",
+          "type": "text",
+          "label": "Fiyat",
+          "tab": "İçerik",
+          "show_if": {
+            "layout": [
+              "price"
+            ]
+          },
+          "width": "half",
+          "help": "Örn. ₺49.900 — boş bırakılırsa fiyat satırı gizlenir."
+        },
+        {
+          "name": "button",
+          "type": "group",
+          "label": "Düğme",
+          "tab": "İçerik",
+          "fields": [
+            {
+              "name": "text",
+              "type": "text",
+              "label": "Düğme yazısı",
+              "width": "half",
+              "help": "Boş bırakılırsa düğme gizlenir; slayt yine tıklanabilir."
+            },
+            {
+              "name": "style",
+              "type": "select",
+              "label": "Düğme stili",
+              "options": [
+                {
+                  "value": "primary",
+                  "label": "Ana renk"
+                },
+                {
+                  "value": "dark",
+                  "label": "Koyu"
+                },
+                {
+                  "value": "outline",
+                  "label": "Çerçeveli"
+                }
+              ],
+              "width": "half"
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "text_color",
+          "type": "color",
+          "label": "Yazı rengi",
+          "tab": "Görünüm",
+          "palette": "theme",
+          "width": "half"
+        },
+        {
+          "name": "text_align",
+          "type": "select",
+          "label": "Hizalama",
+          "tab": "Görünüm",
+          "width": "half",
+          "options": [
+            {
+              "value": "left",
+              "label": "Sol"
+            },
+            {
+              "value": "center",
+              "label": "Orta"
+            },
+            {
+              "value": "right",
+              "label": "Sağ"
+            }
+          ]
+        },
+        {
+          "name": "animation",
+          "type": "group",
+          "label": "Katman animasyonları",
+          "tab": "Görünüm",
+          "collapsible": true,
+          "fields": [
+            {
+              "name": "effect",
+              "type": "select",
+              "label": "Efekt",
+              "width": "half",
+              "options": [
+                {
+                  "value": "fadeInDown",
+                  "label": "Yukarıdan belir"
+                },
+                {
+                  "value": "fadeInUp",
+                  "label": "Aşağıdan belir"
+                },
+                {
+                  "value": "fadeIn",
+                  "label": "Belir"
+                },
+                {
+                  "value": "fadeInLeft",
+                  "label": "Soldan belir"
+                },
+                {
+                  "value": "fadeInRight",
+                  "label": "Sağdan belir"
+                },
+                {
+                  "value": "zoomIn",
+                  "label": "Yakınlaş"
+                },
+                {
+                  "value": "none",
+                  "label": "Animasyon yok"
+                }
+              ]
+            },
+            {
+              "name": "delay_step",
+              "type": "number",
+              "label": "Katmanlar arası gecikme",
+              "unit": "ms",
+              "min": 0,
+              "max": 3000,
+              "step": 50,
+              "width": "half"
+            },
+            {
+              "name": "duration",
+              "type": "number",
+              "label": "Süre",
+              "unit": "ms",
+              "min": 0,
+              "max": 5000,
+              "step": 50,
+              "width": "half"
+            }
+          ]
+        }
+      ],
+      "item_default": {
+        "background": null,
+        "product_image": null,
+        "layout": "promo",
+        "pretitle": "",
+        "title": "Yeni slayt",
+        "subtitle": "",
+        "price_prefix": "",
+        "price": "",
+        "button": {
+          "text": "Alışverişe Başla",
+          "style": "primary",
+          "link": {
+            "kind": "category",
+            "url": "/liftler",
+            "new_tab": false,
+            "slug": "liftler"
+          }
+        },
+        "text_color": "#333e48",
+        "text_align": "left",
+        "animation": {
+          "effect": "fadeInDown",
+          "delay_step": 200,
+          "duration": 1000
+        }
+      },
+      "item_noun": "Slayt"
+    },
+    {
+      "name": "height",
+      "type": "number",
+      "label": "Yükseklik",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 200,
+      "max": 900,
+      "responsive": true
+    },
+    {
+      "name": "background_color",
+      "type": "color",
+      "label": "Arka plan rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "caption_column",
+      "type": "select",
+      "label": "Açıklama sütunu",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "offset3_5",
+          "label": "Menüden sonra (şablon v1)"
+        },
+        {
+          "value": "wide8",
+          "label": "Geniş (8 sütun)"
+        },
+        {
+          "value": "center",
+          "label": "Ortada"
+        },
+        {
+          "value": "left4",
+          "label": "Solda dar (4 sütun)"
+        }
+      ]
+    },
+    {
+      "name": "caption_padding_top",
+      "type": "number",
+      "label": "Açıklama üst boşluğu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 300,
+      "responsive": true
+    },
+    {
+      "name": "side_banners",
+      "type": "repeater",
+      "label": "Yan bannerlar",
+      "tab": "İçerik",
+      "max": 3,
+      "item_label": "{{cta}}",
+      "show_if": {
+        "_variant": [
+          "boxed_side_banners",
+          "menu_strip"
+        ]
+      },
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            246,
+            176
+          ]
+        },
+        {
+          "name": "text",
+          "type": "rich_text",
+          "label": "Metin",
+          "marks": [
+            "strong",
+            "br"
+          ]
+        },
+        {
+          "name": "cta",
+          "type": "text",
+          "label": "Düğme yazısı",
+          "width": "half"
+        },
+        {
+          "name": "style",
+          "type": "select",
+          "label": "Stil",
+          "width": "half",
+          "options": [
+            {
+              "value": "gray",
+              "label": "Gri kart"
+            },
+            {
+              "value": "white_rotated",
+              "label": "Beyaz, döndürülmüş görsel"
+            }
+          ]
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "text": "",
+        "cta": "Hemen Al",
+        "style": "gray",
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "item_noun": "Banner"
+    },
+    {
+      "name": "side_deals",
+      "type": "group",
+      "label": "Yan fırsat kartları",
+      "tab": "Ürünler",
+      "show_if": {
+        "_variant": [
+          "rounded_with_deals"
+        ]
+      },
+      "fields": [
+        {
+          "name": "source",
+          "type": "product_source",
+          "label": "Ürün kaynağı",
+          "allowed_kinds": [
+            "manual",
+            "category",
+            "discounted",
+            "newest",
+            "best_sellers",
+            "featured",
+            "top_rated",
+            "tag",
+            "brand",
+            "recently_viewed"
+          ],
+          "default_limit": 4
+        },
+        {
+          "name": "countdown",
+          "type": "countdown",
+          "label": "Geri sayım"
+        }
+      ]
+    },
+    {
+      "name": "category_strip",
+      "type": "repeater",
+      "label": "Kategori şeridi",
+      "tab": "İçerik",
+      "max": 8,
+      "show_if": {
+        "_variant": [
+          "menu_strip"
+        ]
+      },
+      "item_label": "{{label}}",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            300,
+            300
+          ]
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Ad"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "label": "",
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "item_noun": "Kategori"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "hide": [
+        "per_view",
+        "rows",
+        "last_active_divider"
+      ]
+    },
+    {
+      "name": "easing",
+      "type": "select",
+      "label": "Geçiş eğrisi",
+      "tab": "Karusel",
+      "options": [
+        {
+          "value": "easeOutCubic",
+          "label": "Yumuşak (easeOutCubic)"
+        },
+        {
+          "value": "linear",
+          "label": "Doğrusal"
+        }
+      ]
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

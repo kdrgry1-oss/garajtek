@@ -1,0 +1,76 @@
+{
+  "key": "site_footer_widgets",
+  "version": 2,
+  "title": "Footer Ürün Sütunları",
+  "description": "",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "enabled",
+      "type": "bool",
+      "label": "Göster",
+      "tab": "İçerik",
+      "help": "Ana sayfada “Alt Ürün Sütunları” bloğu varsa orada gizlenir."
+    },
+    {
+      "name": "columns",
+      "type": "repeater",
+      "label": "Sütunlar",
+      "tab": "İçerik",
+      "min": 1,
+      "max": 4,
+      "item_label": "{{title}}",
+      "item_fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık"
+        },
+        {
+          "name": "source",
+          "type": "product_source",
+          "label": "Ürün kaynağı",
+          "allowed_kinds": [
+            "manual",
+            "category",
+            "discounted",
+            "newest",
+            "best_sellers",
+            "featured",
+            "top_rated",
+            "tag",
+            "brand",
+            "recently_viewed"
+          ],
+          "default_limit": 3
+        }
+      ],
+      "item_default": {
+        "title": "Yeni sütun",
+        "source": {
+          "kind": "featured",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 3,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        }
+      },
+      "item_noun": "Sütun"
+    }
+  ],
+  "common": []
+}

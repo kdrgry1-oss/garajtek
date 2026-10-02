@@ -1,0 +1,265 @@
+{
+  "key": "ads_block",
+  "version": 2,
+  "title": "Reklam Kutuları",
+  "description": "3'lü / 2'li / 4'lü görselli reklam kutuları (şablon: home-v1-ads-block)",
+  "category": "banner",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [
+    "T1/inc/blocks/homepage/home-v1-ads-block.php",
+    "T1/inc/blocks/homepage/home-v2-ads-block.php"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1 – 3 sütun",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2",
+      "label": "v2 – 2 sütun",
+      "defaults_patch": {
+        "columns": "2",
+        "text_size": 1.571
+      }
+    },
+    {
+      "value": "v3",
+      "label": "v3 – 2 sütun (62/38)",
+      "defaults_patch": {
+        "columns": "2",
+        "ratio": "62_38"
+      }
+    },
+    {
+      "value": "v2_cards",
+      "label": "4 sütun gri kartlar (v2.0)",
+      "defaults_patch": {
+        "columns": "4"
+      }
+    },
+    {
+      "value": "wide_plus_two",
+      "label": "1 geniş + 2 (v2.0)",
+      "defaults_patch": {}
+    }
+  ],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Kutular",
+      "tab": "İçerik",
+      "max": 4,
+      "item_label": "{{text}}",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            410,
+            281
+          ]
+        },
+        {
+          "name": "text",
+          "type": "rich_text",
+          "label": "Metin",
+          "marks": [
+            "strong",
+            "em",
+            "br"
+          ],
+          "max_length": 200
+        },
+        {
+          "name": "action_type",
+          "type": "select",
+          "label": "Alt satır",
+          "options": [
+            {
+              "value": "link",
+              "label": "Bağlantı yazısı"
+            },
+            {
+              "value": "upto",
+              "label": "% indirime varan"
+            },
+            {
+              "value": "from_price",
+              "label": "Başlayan fiyat"
+            }
+          ]
+        },
+        {
+          "name": "action_text",
+          "type": "text",
+          "label": "Bağlantı yazısı",
+          "show_if": {
+            "action_type": [
+              "link"
+            ]
+          }
+        },
+        {
+          "name": "action_prefix",
+          "type": "text",
+          "label": "Ön yazı",
+          "width": "half",
+          "show_if": {
+            "action_type": [
+              "upto",
+              "from_price"
+            ]
+          }
+        },
+        {
+          "name": "action_value",
+          "type": "text",
+          "label": "Değer",
+          "width": "half",
+          "show_if": {
+            "action_type": [
+              "upto",
+              "from_price"
+            ]
+          }
+        },
+        {
+          "name": "action_suffix",
+          "type": "text",
+          "label": "Son ek",
+          "width": "half",
+          "show_if": {
+            "action_type": [
+              "upto",
+              "from_price"
+            ]
+          }
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "label": "Para birimi",
+          "width": "half",
+          "show_if": {
+            "action_type": [
+              "from_price"
+            ]
+          }
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        },
+        {
+          "name": "image_rotation",
+          "type": "number",
+          "label": "Görsel açısı",
+          "unit": "derece",
+          "min": -45,
+          "max": 45,
+          "tab": "Görünüm"
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "text": "Yeni <strong>kampanya</strong>",
+        "action_type": "link",
+        "action_text": "Hemen İncele",
+        "action_prefix": "",
+        "action_value": "",
+        "action_suffix": "",
+        "currency": "₺",
+        "link": {
+          "kind": "url",
+          "url": "/sale",
+          "new_tab": false
+        },
+        "image_rotation": 0
+      },
+      "item_noun": "Kutu"
+    },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Sütun sayısı",
+      "tab": "Görünüm",
+      "width": "third",
+      "options": [
+        {
+          "value": "2",
+          "label": "2"
+        },
+        {
+          "value": "3",
+          "label": "3"
+        },
+        {
+          "value": "4",
+          "label": "4"
+        }
+      ]
+    },
+    {
+      "name": "ratio",
+      "type": "select",
+      "label": "Görsel / metin oranı",
+      "tab": "Görünüm",
+      "width": "third",
+      "options": [
+        {
+          "value": "60_40",
+          "label": "%60 / %40"
+        },
+        {
+          "value": "62_38",
+          "label": "%62 / %38"
+        },
+        {
+          "value": "50_50",
+          "label": "%50 / %50"
+        }
+      ]
+    },
+    {
+      "name": "text_size",
+      "type": "number",
+      "label": "Metin boyutu",
+      "tab": "Görünüm",
+      "unit": "em",
+      "min": 0.8,
+      "max": 3,
+      "step": 0.001,
+      "width": "third"
+    },
+    {
+      "name": "card_background",
+      "type": "color",
+      "label": "Kart arka planı",
+      "tab": "Görünüm",
+      "palette": "theme"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

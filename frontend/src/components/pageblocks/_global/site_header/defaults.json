@@ -1,0 +1,53 @@
+{
+  "variant": "v1",
+  "logo": {
+    "image": null,
+    "width": 176,
+    "max_height": 43,
+    "mobile_image": null,
+    "footer_image": null,
+    "alt": "",
+    "link": {
+      "kind": "url",
+      "url": "/",
+      "new_tab": false
+    }
+  },
+  "search": {
+    "enabled": true,
+    "show_category_select": true,
+    "placeholder": "Ürün, marka veya kategori ara…",
+    "all_label": "Tüm Kategoriler",
+    "button_label": "Ara",
+    "style": "pill_bordered",
+    "button_color": "primary",
+    "live_suggestions": true
+  },
+  "icons": {
+    "compare": true,
+    "wishlist": true,
+    "account_mobile": true,
+    "cart": true,
+    "cart_show_total": true,
+    "badge_style": "primary",
+    "texts": {
+      "view_cart": "Sepeti Gör",
+      "checkout": "Ödeme",
+      "subtotal": "Ara Toplam",
+      "empty": "Sepetiniz boş"
+    }
+  },
+  "support": {
+    "enabled": true,
+    "icon": {
+      "icon": "ec ec-support"
+    },
+    "label": "Destek",
+    "email_label": "E-posta:",
+    "fallback_text": "Bize ulaşın"
+  },
+  "transparent_on_home": false,
+  "mobile_band_primary": true,
+  "sticky": true,
+  "bottom_margin": 0
+}

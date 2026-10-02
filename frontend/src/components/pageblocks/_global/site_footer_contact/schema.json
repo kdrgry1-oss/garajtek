@@ -1,0 +1,112 @@
+{
+  "key": "site_footer_contact",
+  "version": 2,
+  "title": "Footer İletişim",
+  "description": "Telefon / e-posta / adres “İletişim Bilgileri”nden okunur.",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "show_logo",
+      "type": "bool",
+      "label": "Logoyu göster",
+      "tab": "İçerik"
+    },
+    {
+      "name": "call_us_icon",
+      "type": "icon",
+      "label": "Telefon ikonu",
+      "tab": "İçerik",
+      "set": "electro"
+    },
+    {
+      "name": "call_us_text",
+      "type": "text",
+      "label": "Telefon üstü yazı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "call_us_fallback",
+      "type": "text",
+      "label": "Telefon yoksa bağlantı yazısı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "address_title",
+      "type": "text",
+      "label": "Adres başlığı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "slogan",
+      "type": "textarea",
+      "label": "Kısa tanıtım yazısı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "social",
+      "type": "repeater",
+      "label": "Sosyal medya",
+      "tab": "İçerik",
+      "max": 8,
+      "item_label": "{{network}}",
+      "item_fields": [
+        {
+          "name": "network",
+          "type": "select",
+          "label": "Ağ",
+          "width": "half",
+          "options": [
+            {
+              "value": "facebook",
+              "label": "Facebook"
+            },
+            {
+              "value": "instagram",
+              "label": "Instagram"
+            },
+            {
+              "value": "twitter",
+              "label": "X / Twitter"
+            },
+            {
+              "value": "youtube",
+              "label": "YouTube"
+            },
+            {
+              "value": "tiktok",
+              "label": "TikTok"
+            },
+            {
+              "value": "linkedin",
+              "label": "LinkedIn"
+            },
+            {
+              "value": "pinterest",
+              "label": "Pinterest"
+            }
+          ]
+        },
+        {
+          "name": "url",
+          "type": "text",
+          "label": "Adres (URL)",
+          "width": "half"
+        }
+      ],
+      "item_default": {
+        "network": "instagram",
+        "url": ""
+      },
+      "item_noun": "Hesap"
+    }
+  ],
+  "common": []
+}

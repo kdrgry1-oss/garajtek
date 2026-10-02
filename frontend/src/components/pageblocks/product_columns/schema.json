@@ -1,0 +1,137 @@
+{
+  "key": "product_columns",
+  "version": 2,
+  "title": "Alt Ürün Sütunları",
+  "description": "Footer üstü 3 sütun küçük ürün listesi (şablon: footer widget'ları)",
+  "category": "urun",
+  "group": "C",
+  "status": "ready",
+  "template_refs": [
+    "T1/inc/footer/footer-widgets.php"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "columns",
+      "type": "repeater",
+      "label": "Sütunlar",
+      "tab": "Ürünler",
+      "min": 1,
+      "max": 4,
+      "item_label": "{{title}}",
+      "item_fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık"
+        },
+        {
+          "name": "source",
+          "type": "product_source",
+          "label": "Ürün kaynağı",
+          "allowed_kinds": [
+            "manual",
+            "category",
+            "discounted",
+            "newest",
+            "best_sellers",
+            "featured",
+            "top_rated",
+            "tag",
+            "brand",
+            "recently_viewed"
+          ],
+          "default_limit": 3
+        },
+        {
+          "name": "show_rating",
+          "type": "bool",
+          "label": "Puanı göster",
+          "width": "half"
+        },
+        {
+          "name": "show_old_price",
+          "type": "bool",
+          "label": "Eski fiyatı göster",
+          "width": "half"
+        }
+      ],
+      "item_default": {
+        "title": "Yeni sütun",
+        "source": {
+          "kind": "featured",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 3,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        },
+        "show_rating": false,
+        "show_old_price": true
+      },
+      "item_noun": "Sütun"
+    },
+    {
+      "name": "promo",
+      "type": "group",
+      "label": "Tanıtım görseli (≥1480 px)",
+      "tab": "İçerik",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "label": "Göster"
+        },
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            330,
+            360
+          ]
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        }
+      ]
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "list_small",
+          "label": "Küçük liste"
+        }
+      ]
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

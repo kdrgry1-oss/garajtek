@@ -1,0 +1,32 @@
+{
+  "key": "products_carousel_with_image",
+  "version": 2,
+  "title": "Arka Plan Görselli Ürün Karuseli",
+  "description": "",
+  "category": "urun",
+  "group": "C",
+  "status": "stub",
+  "template_refs": [
+    "T1/inc/blocks/homepage/homepage-3/products-carousel-with-image.php"
+  ],
+  "layout": "full_bleed",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

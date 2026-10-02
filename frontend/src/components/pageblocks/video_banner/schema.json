@@ -1,0 +1,105 @@
+{
+  "key": "video_banner",
+  "version": 2,
+  "title": "Video Banner",
+  "description": "Video veya poster görseli + yazı",
+  "category": "banner",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "video",
+      "type": "image",
+      "label": "Video dosyası",
+      "tab": "İçerik",
+      "accept": "video/*"
+    },
+    {
+      "name": "poster",
+      "type": "image",
+      "label": "Kapak görseli",
+      "tab": "İçerik",
+      "recommended": [
+        1170,
+        500
+      ]
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik"
+    },
+    {
+      "name": "text",
+      "type": "textarea",
+      "label": "Metin",
+      "tab": "İçerik"
+    },
+    {
+      "name": "button",
+      "type": "group",
+      "label": "Düğme",
+      "tab": "İçerik",
+      "fields": [
+        {
+          "name": "text",
+          "type": "text",
+          "label": "Düğme yazısı"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        }
+      ]
+    },
+    {
+      "name": "play_label",
+      "type": "text",
+      "label": "Oynat düğmesi etiketi (ekran okuyucu)",
+      "tab": "Gelişmiş"
+    },
+    {
+      "name": "autoplay",
+      "type": "bool",
+      "label": "Otomatik oynat",
+      "tab": "Görünüm",
+      "width": "third"
+    },
+    {
+      "name": "muted",
+      "type": "bool",
+      "label": "Sessiz",
+      "tab": "Görünüm",
+      "width": "third"
+    },
+    {
+      "name": "loop",
+      "type": "bool",
+      "label": "Döngü",
+      "tab": "Görünüm",
+      "width": "third"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

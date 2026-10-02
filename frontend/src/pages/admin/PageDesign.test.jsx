@@ -1,62 +1,76 @@
+import "../../components/pageblocks/testMocks";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import PageDesign from "./PageDesign";
+import { defaultHome, defaultGlobal } from "../../components/pageblocks/registry";
 
-jest.mock("axios", () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() }));
-jest.mock("sonner", () => ({ toast: { error: jest.fn(), success: jest.fn() } }));
-jest.mock("../../components/ui/dialog", () => {
-  const React = require("react");
-  return {
-    Dialog: ({ children }) => React.createElement("div", null, children),
-    DialogContent: ({ children }) => React.createElement("div", null, children),
-    DialogHeader: ({ children }) => React.createElement("div", null, children),
-    DialogTitle: ({ children }) => React.createElement("h2", null, children),
-  };
-});
+jest.mock("sonner", () => ({ toast: { error: () => {}, success: () => {}, warning: () => {} } }));
+jest.mock("../../context/AuthContext", () => ({ useAuth: () => ({ user: { is_admin: true } }) }));
+jest.mock("../../components/admin/DemoContentCard", () => () => null);
+jest.mock("../../components/admin/AppConfirm", () => ({ appConfirm: () => Promise.resolve(true) }));
+jest.mock("../../components/admin/CategoryTreeSelect", () => ({ CategoryTreeSelect: () => null }));
 
 const axios = require("axios");
 
-describe("PageDesign workspace", () => {
+describe("Sayfa Tasarımı düzenleyicisi", () => {
   let container;
   let root;
-
+  let puts;
   beforeAll(() => { global.IS_REACT_ACT_ENVIRONMENT = true; });
-  afterAll(() => { delete global.IS_REACT_ACT_ENVIRONMENT; });
-
-  beforeEach(() => {
+  beforeEach(async () => {
+    puts = [];
+    const pub = { rev: 1, blocks: defaultHome(), global: defaultGlobal() };
+    axios.get = (url) => Promise.resolve({ data: url.includes("/page-design/home") ? { published: pub, draft: null } : [] });
+    axios.put = (url, body, cfg) => { puts.push({ url, body, cfg }); return Promise.resolve({ data: { rev: puts.length, errors: [] } }); };
+    axios.post = () => Promise.resolve({ data: {} });
+    axios.delete = () => Promise.resolve({ data: {} });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
-    axios.get.mockImplementation((url) => Promise.resolve({
-      data: url.includes("/categories") ? [] : [
-        { id: "hero-1", type: "hero_slider", title: "Ana Slider", images: [], links: [], settings: {}, sort_order: 1, is_active: true, page: "home" },
-      ],
-    }));
+    await act(async () => { root.render(<PageDesign />); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  });
+  afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+
+  const q = (s) => container.querySelector(s);
+  const click = async (el) => { await act(async () => { el.dispatchEvent(new MouseEvent("click", { bubbles: true })); }); };
+
+  test("şablon ana sayfası blok listesi + seçili bloğun şema formu + canlı önizleme çerçevesi", async () => {
+    const rows = container.querySelectorAll('[data-testid^="block-row-"]');
+    expect(rows).toHaveLength(9);
+    expect(rows[0].getAttribute("data-block-type")).toBe("hero_slider");
+    expect(q('[data-testid="block-form"]')).toBeTruthy();
+    expect(q('[data-testid="preview-frame"]').getAttribute("src")).toBe("/onizleme/sayfa/home");
+    expect(q('[data-testid="save-status"]').textContent).toMatch(/Yayındaki sürüm/);
   });
 
-  afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
-    jest.clearAllMocks();
+  test("gizle → taslak değişikliği; geri al / ileri al", async () => {
+    await click(q('[data-testid="toggle-1"]'));
+    expect(q('[data-testid="block-row-1"]').className).toMatch(/opacity-60/);
+    expect(q('[data-testid="save-status"]').textContent).toMatch(/Taslak/);
+    await click(q('[data-testid="undo"]'));
+    expect(q('[data-testid="block-row-1"]').className).not.toMatch(/opacity-60/);
+    await click(q('[data-testid="redo"]'));
+    expect(q('[data-testid="block-row-1"]').className).toMatch(/opacity-60/);
   });
 
-  test("renders library, flow, properties and draft preview without mutating loaded content", async () => {
-    await act(async () => root.render(<PageDesign />));
-    await act(async () => Promise.resolve());
-    expect(container.textContent).toContain("Blok Kütüphanesi");
-    expect(container.textContent).toContain("Ana Sayfa Akışı");
-    expect(container.textContent).toContain("Blok Özellikleri");
-    expect(container.textContent).toContain("Gerçek Zamanlı Önizleme");
-    expect(container.textContent).toContain("Ana Slider");
-    expect(container.querySelector('[data-testid="unsaved-indicator"]').textContent).toContain("kayıtlı");
+  test("galeriden blok ekle (varsayılanlarla dolu) ve çoğalt", async () => {
+    await click(q('[data-testid="add-block"]'));
+    expect(q('[data-testid="block-gallery"]')).toBeTruthy();
+    await click(q('[data-testid="gallery-add-text_block"]'));
+    expect(container.querySelectorAll('[data-testid^="block-row-"]')).toHaveLength(10);
+    await click(q('[data-testid="dup-0"]'));
+    expect(container.querySelectorAll('[data-testid^="block-row-"]')).toHaveLength(11);
+  });
 
-    const textBlockButton = [...container.querySelectorAll("button")]
-      .find((button) => button.textContent.includes("Yazı Bloğu"));
-    await act(async () => textBlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    expect(container.querySelector('[data-testid="unsaved-indicator"]').textContent).toContain("Kaydedilmemiş");
-    expect(container.textContent).toContain("2 blok");
-    expect(axios.post).not.toHaveBeenCalled();
-    expect(axios.put).not.toHaveBeenCalled();
-    expect(axios.delete).not.toHaveBeenCalled();
+  test("otomatik taslak kaydı (3 sn) If-Match ile", async () => {
+    jest.useFakeTimers();
+    await click(q('[data-testid="toggle-2"]'));
+    await act(async () => { jest.advanceTimersByTime(3200); });
+    jest.useRealTimers();
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(puts.length).toBe(1);
+    expect(puts[0].url).toMatch(/\/page-design\/home\/draft$/);
+    expect(puts[0].body.blocks[2].is_active).toBe(false);
   });
 });

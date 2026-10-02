@@ -1,0 +1,101 @@
+{
+  "key": "rotating_text",
+  "version": 2,
+  "title": "Dönen Duyuru Şeridi",
+  "description": "Sayfanın en üstünde dönen duyuru metinleri (tüm sayfalarda)",
+  "category": "ust_bar",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [],
+  "layout": "full_bleed",
+  "singleton": true,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "messages",
+      "type": "repeater",
+      "label": "Mesajlar",
+      "tab": "İçerik",
+      "max": 10,
+      "item_label": "{{text}}",
+      "item_fields": [
+        {
+          "name": "text",
+          "type": "text",
+          "label": "Metin",
+          "max_length": 160
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        }
+      ],
+      "item_default": {
+        "text": "",
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "item_noun": "Mesaj"
+    },
+    {
+      "name": "interval",
+      "type": "number",
+      "label": "Değişim aralığı",
+      "tab": "Görünüm",
+      "unit": "ms",
+      "min": 1500,
+      "max": 20000,
+      "step": 500
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "label": "Arka plan",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "position",
+      "type": "select",
+      "label": "Konum",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "above_topbar",
+          "label": "Üst barın üstünde"
+        },
+        {
+          "value": "below_topbar",
+          "label": "Üst barın altında"
+        }
+      ]
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

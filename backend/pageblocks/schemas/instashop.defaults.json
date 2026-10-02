@@ -1,0 +1,14 @@
+{
+  "title": "Atölyemizden",
+  "show_follow": true,
+  "follow_text": "Takip Edin",
+  "items": [],
+  "columns": "6",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 50,
+      "tablet": 40,
+      "mobile": 30
+    }
+  }
+}

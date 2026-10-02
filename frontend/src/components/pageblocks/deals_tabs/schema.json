@@ -1,0 +1,384 @@
+{
+  "key": "deals_tabs",
+  "version": 2,
+  "title": "Özel Teklif + Ürün Sekmeleri",
+  "description": "Solda geri sayımlı özel teklif, sağda sekmeli ürün ızgarası (şablon: deals-and-tabs)",
+  "category": "firsat",
+  "group": "B",
+  "status": "ready",
+  "template_refs": [
+    "T1/inc/blocks/homepage/deals-and-tabs.php"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1 (varsayılan)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2",
+      "label": "v2 – geniş kart (v2.0)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "discount_tabs",
+      "label": "İndirim sekmeleri (v2.0 v6)",
+      "defaults_patch": {}
+    }
+  ],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "deal",
+      "type": "group",
+      "label": "Özel teklif",
+      "tab": "İçerik",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "label": "Özel teklifi göster"
+        },
+        {
+          "name": "mode",
+          "type": "select",
+          "label": "Ürün seçimi",
+          "width": "half",
+          "options": [
+            {
+              "value": "auto",
+              "label": "Otomatik (en yüksek indirimli)"
+            },
+            {
+              "value": "manual",
+              "label": "Elle seç"
+            }
+          ]
+        },
+        {
+          "name": "product",
+          "type": "product_picker",
+          "label": "Ürün",
+          "multiple": false,
+          "show_if": {
+            "mode": [
+              "manual"
+            ]
+          }
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık",
+          "width": "half"
+        },
+        {
+          "name": "title_override",
+          "type": "rich_text",
+          "label": "Ürün adı yerine yazı",
+          "marks": [
+            "strong",
+            "br"
+          ],
+          "help": "Boşsa ürün adı gösterilir."
+        },
+        {
+          "name": "image_override",
+          "type": "image",
+          "label": "Ürün görseli yerine",
+          "recommended": [
+            250,
+            232
+          ]
+        },
+        {
+          "name": "savings",
+          "type": "group",
+          "label": "Kazanç rozeti",
+          "collapsible": true,
+          "fields": [
+            {
+              "name": "show",
+              "type": "bool",
+              "label": "Göster",
+              "width": "third"
+            },
+            {
+              "name": "label",
+              "type": "text",
+              "label": "Etiket",
+              "width": "third"
+            },
+            {
+              "name": "mode",
+              "type": "select",
+              "label": "Tutar",
+              "width": "third",
+              "options": [
+                {
+                  "value": "auto",
+                  "label": "Otomatik"
+                },
+                {
+                  "value": "manual",
+                  "label": "Elle"
+                }
+              ]
+            },
+            {
+              "name": "amount",
+              "type": "text",
+              "label": "Tutar",
+              "show_if": {
+                "mode": [
+                  "manual"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "stock",
+          "type": "group",
+          "label": "Stok çubuğu",
+          "collapsible": true,
+          "fields": [
+            {
+              "name": "show",
+              "type": "bool",
+              "label": "Göster",
+              "width": "third"
+            },
+            {
+              "name": "sold_label",
+              "type": "text",
+              "label": "Satılan etiketi",
+              "width": "third"
+            },
+            {
+              "name": "available_label",
+              "type": "text",
+              "label": "Kalan etiketi",
+              "width": "third"
+            },
+            {
+              "name": "mode",
+              "type": "select",
+              "label": "Değerler",
+              "options": [
+                {
+                  "value": "auto",
+                  "label": "Stok verisinden"
+                },
+                {
+                  "value": "manual",
+                  "label": "Elle"
+                }
+              ]
+            },
+            {
+              "name": "sold",
+              "type": "number",
+              "label": "Satılan",
+              "width": "half",
+              "min": 0,
+              "show_if": {
+                "mode": [
+                  "manual"
+                ]
+              }
+            },
+            {
+              "name": "available",
+              "type": "number",
+              "label": "Kalan",
+              "width": "half",
+              "min": 0,
+              "show_if": {
+                "mode": [
+                  "manual"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "countdown",
+          "type": "countdown",
+          "label": "Geri sayım"
+        },
+        {
+          "name": "border_color",
+          "type": "color",
+          "label": "Çerçeve rengi",
+          "palette": "theme"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "help": "Boşsa ürün sayfasına gider."
+        }
+      ]
+    },
+    {
+      "name": "tabs",
+      "type": "repeater",
+      "label": "Ürün sekmeleri",
+      "tab": "Ürünler",
+      "min": 1,
+      "max": 6,
+      "item_label": "{{label}}",
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Sekme adı"
+        },
+        {
+          "name": "source",
+          "type": "product_source",
+          "label": "Ürün kaynağı",
+          "allowed_kinds": [
+            "manual",
+            "category",
+            "discounted",
+            "newest",
+            "best_sellers",
+            "featured",
+            "top_rated",
+            "tag",
+            "brand",
+            "recently_viewed"
+          ],
+          "default_limit": 6
+        }
+      ],
+      "item_default": {
+        "label": "Yeni sekme",
+        "source": {
+          "kind": "featured",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 6,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        }
+      },
+      "item_noun": "Sekme"
+    },
+    {
+      "name": "default_tab",
+      "type": "number",
+      "label": "Açık sekme (0 = ilk)",
+      "tab": "Ürünler",
+      "min": 0,
+      "max": 5,
+      "width": "half"
+    },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Sütun",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "2",
+          "label": "2"
+        },
+        {
+          "value": "3",
+          "label": "3"
+        },
+        {
+          "value": "4",
+          "label": "4"
+        }
+      ]
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "grid",
+          "label": "Izgara kartı"
+        },
+        {
+          "value": "grid_small",
+          "label": "Küçük ızgara kartı"
+        }
+      ]
+    },
+    {
+      "name": "tab_animation",
+      "type": "select",
+      "label": "Sekme geçişi",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "none",
+          "label": "Yok"
+        },
+        {
+          "value": "fade",
+          "label": "Belir"
+        },
+        {
+          "value": "slideInUp",
+          "label": "Aşağıdan kay"
+        }
+      ]
+    },
+    {
+      "name": "tab_align",
+      "type": "select",
+      "label": "Sekme hizası",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "center",
+          "label": "Orta"
+        },
+        {
+          "value": "left",
+          "label": "Sol"
+        }
+      ]
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Boş sekme yazısı",
+      "tab": "Gelişmiş"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

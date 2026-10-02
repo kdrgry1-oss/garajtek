@@ -1,0 +1,117 @@
+{
+  "key": "full_banner",
+  "version": 2,
+  "title": "Tam Genişlik Banner",
+  "description": "Tek görsel bağlantılı geniş banner (şablon: home-banner)",
+  "category": "banner",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [
+    "T1/inc/blocks/homepage/home-banner.php",
+    "T1/inc/blocks/homepage/home-banner-v2.php"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [
+    {
+      "value": "image",
+      "label": "Yalnız görsel (v1)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "text_overlay",
+      "label": "Metin + fiyat kutulu (v2.0)",
+      "defaults_patch": {}
+    }
+  ],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Görsel",
+      "tab": "İçerik",
+      "recommended": [
+        1170,
+        207
+      ],
+      "allow_mobile": true,
+      "mobile_recommended": [
+        750,
+        300
+      ]
+    },
+    {
+      "name": "link",
+      "type": "link",
+      "label": "Bağlantı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "title",
+      "type": "rich_text",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "marks": [
+        "strong",
+        "br"
+      ],
+      "show_if": {
+        "_variant": [
+          "text_overlay"
+        ]
+      }
+    },
+    {
+      "name": "price_label",
+      "type": "text",
+      "label": "Fiyat etiketi",
+      "tab": "İçerik",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "text_overlay"
+        ]
+      }
+    },
+    {
+      "name": "price",
+      "type": "text",
+      "label": "Fiyat",
+      "tab": "İçerik",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "text_overlay"
+        ]
+      }
+    },
+    {
+      "name": "price_box_color",
+      "type": "color",
+      "label": "Fiyat kutusu rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "show_if": {
+        "_variant": [
+          "text_overlay"
+        ]
+      }
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

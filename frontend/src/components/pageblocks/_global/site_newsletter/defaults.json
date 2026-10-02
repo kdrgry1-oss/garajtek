@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "icon": {
+    "icon": "ec ec-newsletter"
+  },
+  "title": "Bültene Abone Olun",
+  "marketing_text": "...ve <strong>ilk alışverişinize 250 TL indirim</strong> kazanın",
+  "placeholder": "E-posta adresiniz",
+  "button_text": "Abone Ol",
+  "success_text": "Teşekkürler, aboneliğiniz alındı.",
+  "error_text": "Lütfen geçerli bir e-posta girin.",
+  "consent_required_text": "Devam etmek için KVKK / ticari ileti onayını işaretlemelisiniz.",
+  "consent_text": "<a href=\"/sayfa/kvkk\">KVKK Aydınlatma Metni</a>'ni okudum; kampanya ve fırsatlar için ticari elektronik ileti almayı kabul ediyorum.",
+  "background": "var(--primary)"
+}

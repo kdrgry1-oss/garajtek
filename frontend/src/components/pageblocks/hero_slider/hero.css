@@ -1,0 +1,14 @@
+/* hero_slider — yükseklik (responsive) ve açıklama üst boşluğu. --el-hero-h: açık dikey menü hero'dan uzunsa. */
+.electro .pd-hero .el-hero-v1__slide, .electro .pd-hero .el-hero-v1__row { min-height: var(--el-hero-h, var(--pd-hero-h-d, 485px)); }
+.electro .pd-hero .pd-hero__caption { padding-top: var(--pd-hero-pt-d, 0); }
+@media (max-width: 1199.98px) {
+  .electro .pd-hero .el-hero-v1__slide, .electro .pd-hero .el-hero-v1__row { min-height: var(--pd-hero-h-t, var(--pd-hero-h-d, 400px)); }
+  .electro .pd-hero .pd-hero__caption { padding-top: var(--pd-hero-pt-t, 0); }
+}
+@media (max-width: 767.98px) {
+  .electro .pd-hero .el-hero-v1__slide, .electro .pd-hero .el-hero-v1__row { min-height: var(--pd-hero-h-m, var(--pd-hero-h-t, 300px)); }
+  .electro .pd-hero .pd-hero__caption { padding-top: var(--pd-hero-pt-m, 0); }
+}
+.electro .pd-hero .el-hero-v1__img { object-fit: cover; }
+.electro .pd-hero .pd-hero__pretitle { color: #34bcec; font-size: 1.125em; font-weight: 600; text-transform: uppercase; }
+.electro .pd-hero .pd-hero__title strong { font-weight: 700; }

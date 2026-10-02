@@ -16,7 +16,6 @@ import AdminCampaigns from "./pages/admin/Campaigns";
 import AdminPages from "./pages/admin/Pages";
 import AdminPageDesign from "./pages/admin/PageDesign";
 import AdminCategoryOrder from "./pages/admin/CategoryOrder";
-import AdminFooterDesign from "./pages/admin/FooterDesign";
 import AdminMenu from "./pages/admin/MenuAdmin";
 import EmailMarketing from "./pages/admin/EmailMarketing";
 import AdminIntegrations from "./pages/admin/Integrations";
@@ -77,7 +76,8 @@ export default function AdminApp() {
         <Route path="varyantlar" element={<AdminVariants />} />
         <Route path="xml-feedler" element={<XmlFeeds />} />
         <Route path="sayfa-tasarimi" element={<AdminPageDesign />} />
-        <Route path="footer-tasarim" element={<AdminFooterDesign />} />
+        {/* Footer artık Sayfa Tasarımı › Genel Alanlar'da (SPEC §4.7) */}
+        <Route path="footer-tasarim" element={<Navigate to="/admin/sayfa-tasarimi?alan=site_footer_links" replace />} />
         <Route path="menu-yonetimi" element={<AdminMenu />} />
         <Route path="eposta-pazarlama" element={<EmailMarketing />} />
         <Route path="bannerlar" element={<AdminBanners />} />

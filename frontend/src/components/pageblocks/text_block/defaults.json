@@ -1,0 +1,21 @@
+{
+  "title": "",
+  "body": "",
+  "image": null,
+  "link": {
+    "kind": "url",
+    "url": "",
+    "new_tab": false
+  },
+  "button_text": "Keşfet",
+  "align": "left",
+  "max_width": 900,
+  "legacy_html": "",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 50,
+      "tablet": 40,
+      "mobile": 30
+    }
+  }
+}

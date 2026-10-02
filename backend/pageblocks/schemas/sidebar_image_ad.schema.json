@@ -1,0 +1,32 @@
+{
+  "key": "sidebar_image_ad",
+  "version": 2,
+  "title": "Kenar Çubuğu Reklam Görseli",
+  "description": "",
+  "category": "kenar",
+  "group": "D",
+  "status": "stub",
+  "template_refs": [
+    "T1/inc/blocks/homepage/home-v2-sidebar.php"
+  ],
+  "layout": "sidebar",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

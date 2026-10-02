@@ -1,0 +1,84 @@
+/* Sayfa Tasarımı blok çerçevesi (BlockFrame) + önizleme yardımcıları. Tamamı .electro kapsamında. */
+
+/* ---- boşluklar (responsive CSS değişkenleri; BlockFrame yazar) ---- */
+.electro .pd-block { padding-top: var(--pd-pt-d, 0); padding-bottom: var(--pd-pb-d, 0); margin-bottom: var(--pd-mb-d, 0); position: relative; }
+@media (max-width: 1199.98px) { .electro .pd-block { padding-top: var(--pd-pt-t, var(--pd-pt-d, 0)); padding-bottom: var(--pd-pb-t, var(--pd-pb-d, 0)); margin-bottom: var(--pd-mb-t, var(--pd-mb-d, 0)); } }
+@media (max-width: 767.98px) { .electro .pd-block { padding-top: var(--pd-pt-m, var(--pd-pt-t, 0)); padding-bottom: var(--pd-pb-m, var(--pd-pb-t, 0)); margin-bottom: var(--pd-mb-m, var(--pd-mb-t, 0)); } }
+.electro .pd-block--bgimg { background-size: cover; background-position: center; }
+.electro .pd-wide { max-width: 1430px; }
+
+/* ---- cihaz görünürlüğü: masaüstü ≥1200, tablet 768–1199, mobil <768 ---- */
+@media (min-width: 1200px) { .electro .pd-hide-desktop { display: none !important; } }
+@media (min-width: 768px) and (max-width: 1199.98px) { .electro .pd-hide-tablet { display: none !important; } }
+@media (max-width: 767.98px) { .electro .pd-hide-mobile { display: none !important; } }
+
+/* ---- giriş animasyonu (waypoint benzeri) ---- */
+.electro .pd-reveal { opacity: 0; }
+.electro .pd-reveal.pd-reveal--in { opacity: 1; animation-duration: .7s; animation-fill-mode: both; animation-timing-function: ease-out; }
+.electro .pd-reveal--in.pd-anim-fadeIn { animation-name: pdFadeIn; }
+.electro .pd-reveal--in.pd-anim-fadeInUp { animation-name: pdFadeInUp; }
+.electro .pd-reveal--in.pd-anim-fadeInDown { animation-name: pdFadeInDown; }
+.electro .pd-reveal--in.pd-anim-fadeInLeft { animation-name: pdFadeInLeft; }
+.electro .pd-reveal--in.pd-anim-fadeInRight { animation-name: pdFadeInRight; }
+.electro .pd-reveal--in.pd-anim-zoomIn { animation-name: pdZoomIn; }
+.electro .pd-reveal--in.pd-anim-slideInUp { animation-name: pdSlideInUp; }
+@keyframes pdFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pdFadeInUp { from { opacity: 0; transform: translate3d(0, 30px, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdFadeInDown { from { opacity: 0; transform: translate3d(0, -30px, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdFadeInLeft { from { opacity: 0; transform: translate3d(-30px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdFadeInRight { from { opacity: 0; transform: translate3d(30px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes pdZoomIn { from { opacity: 0; transform: scale3d(.92, .92, .92); } to { opacity: 1; transform: none; } }
+@keyframes pdSlideInUp { from { transform: translate3d(0, 100%, 0); visibility: visible; } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .electro .pd-reveal { opacity: 1 !important; animation: none !important; } }
+html.pd-no-anim .electro .pd-reveal { opacity: 1 !important; animation: none !important; }
+
+/* ---- katman animasyonları (hero vb.) ---- */
+.electro .pd-layer { animation-fill-mode: both; }
+.electro .pd-layer.pd-anim-fadeIn { animation-name: pdFadeIn; }
+.electro .pd-layer.pd-anim-fadeInUp { animation-name: pdFadeInUp; }
+.electro .pd-layer.pd-anim-fadeInDown { animation-name: pdFadeInDown; }
+.electro .pd-layer.pd-anim-fadeInLeft { animation-name: pdFadeInLeft; }
+.electro .pd-layer.pd-anim-fadeInRight { animation-name: pdFadeInRight; }
+.electro .pd-layer.pd-anim-zoomIn { animation-name: pdZoomIn; }
+html.pd-no-anim .electro .pd-layer { animation: none !important; }
+
+/* ---- zengin metin vurgusu ---- */
+.electro .pd-rt .hl, .electro .hl { color: var(--electro-primary, #fed700); }
+
+/* ---- karusel ---- */
+.electro .pd-carousel--fade .pd-fade-track { display: grid; }
+.electro .pd-carousel--fade .pd-fade-slide { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity var(--pd-speed, 300ms) ease, visibility 0s linear var(--pd-speed, 300ms); }
+.electro .pd-carousel--fade .pd-fade-slide.is-active { opacity: 1; visibility: visible; transition: opacity var(--pd-speed, 300ms) ease; z-index: 1; }
+@media (min-width: 768px) { .electro .pd-dots-mobile { display: none !important; } }
+.electro .pd-carousel__arrows-header { display: flex; gap: .25rem; }
+.electro .pd-carousel__arrows-header button { background: none; border: 0; padding: 0 .25rem; color: #aeaeae; font-size: 1.429em; line-height: 1; cursor: pointer; }
+.electro .pd-carousel__arrows-header button:hover:not(:disabled) { color: #333e48; }
+.electro .pd-carousel__arrows-header button:disabled { opacity: .4; cursor: default; }
+
+/* ---- section header ---- */
+.electro .pd-sh { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #dadada; flex-wrap: wrap; }
+.electro .pd-sh--center { justify-content: center; text-align: center; }
+.electro .pd-sh__title { position: relative; margin-bottom: -1px; }
+.electro .pd-sh--underline .pd-sh__title::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; border-bottom: 2px solid var(--electro-primary, #fed700); }
+.electro .pd-sh--no-line { border-bottom: 0; }
+
+/* ---- yer tutucu / taslak blok ---- */
+.electro .pd-stub { border: 2px dashed #d5d9e0; border-radius: 8px; background: #f8fafd; color: #77838f; text-align: center; padding: 28px 16px; font-size: 14px; }
+.electro .pd-stub strong { display: block; color: #333e48; font-size: 16px; margin-bottom: 4px; }
+.electro .pd-legacy { border-color: #f1c27d; background: #fff8ec; }
+
+/* ---- önizleme (iframe): seç, + ekle ---- */
+.pd-preview .electro .pd-block { cursor: pointer; }
+.pd-preview:not(.pd-no-anim) .electro .pd-block:hover { outline: 2px dashed rgba(254, 215, 0, .9); outline-offset: -2px; }
+.pd-preview .electro .pd-block.pd-selected { outline: 3px solid #fed700; outline-offset: -3px; }
+.pd-preview .pd-block__label { position: absolute; top: 0; left: 0; z-index: 30; background: #fed700; color: #333e48; font: 600 12px/1 system-ui, sans-serif; padding: 5px 8px; border-bottom-right-radius: 6px; pointer-events: none; }
+.pd-preview .pd-insert { position: relative; height: 0; z-index: 25; }
+.pd-preview .pd-insert button { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); opacity: 0; transition: opacity .15s; background: #333e48; color: #fff; border: 0; border-radius: 14px; font: 600 12px/1 system-ui, sans-serif; padding: 7px 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+.pd-preview .pd-insert:hover button, .pd-preview .pd-insert button:focus { opacity: 1; }
+.pd-preview .pd-insert::before { content: ""; position: absolute; left: 0; right: 0; top: -14px; height: 28px; }
+.pd-preview .pd-insert:hover::after { content: ""; position: absolute; left: 0; right: 0; top: -1px; border-top: 2px dashed #333e48; }
+.pd-preview:not(.pd-no-anim) [data-pd-field]:hover { outline: 1px dotted #0077d0; }
+
+/* ---- yukarı çık düğmesi ---- */
+.electro .pd-gotop { position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--electro-primary, #fed700); color: var(--pd-on-primary, #333e48); box-shadow: 0 4px 12px rgba(0,0,0,.18); z-index: 1040; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; }
+.electro .pd-gotop--left { right: auto; left: 24px; }

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { Plus, Trash2, Edit2, Search, X, ExternalLink, Package } from "lucide-react";
-import { uploadImageFile } from "../../components/admin/HomeBlockFields";
+import { uploadImageFile } from "../../lib/uploadImage";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const auth = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });

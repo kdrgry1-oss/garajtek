@@ -1,0 +1,33 @@
+{
+  "key": "deal_slider",
+  "version": 2,
+  "title": "Haftanın Fırsatı Slider",
+  "description": "",
+  "category": "firsat",
+  "group": "A",
+  "status": "stub",
+  "template_refs": [
+    "T2/html/home/home-v5.html",
+    "T2/html/home/home-v8.html"
+  ],
+  "layout": "full_bleed",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

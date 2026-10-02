@@ -158,6 +158,65 @@ def _filter(items, blocked):
     return out
 
 
+def _link_url(v):
+    return (v or {}).get("url") if isinstance(v, dict) else str(v or "")
+
+
+async def _site_design_overlay(out: dict):
+    """Sayfa Tasarımı v2: üst bar metni/bağlantıları ve orta menü sağ yazısı artık site_design'da
+    (Genel Alanlar). Eski uç bir sürüm boyunca yeni belgeden okur (SPEC §6.2/6)."""
+    try:
+        sd = await db.settings.find_one({"id": "site_design"}, {"_id": 0}) or {}
+        pub = sd.get("published") if isinstance(sd.get("published"), dict) else {}
+        tb = pub.get("site_topbar")
+        if isinstance(tb, dict):
+            out["topbar"]["welcome"] = str(tb.get("welcome_text") or "")
+            items = []
+            for i, it in enumerate(tb.get("right_items") or []):
+                if not isinstance(it, dict) or not it.get("label") or it.get("_hidden"):
+                    continue
+                node = {"id": str(it.get("_id") or f"tb-{i}"), "label": it["label"], "link": _link_url(it.get("link")) or "/",
+                        "icon": ((it.get("icon") or {}).get("icon") if isinstance(it.get("icon"), dict) else "") or "", "style": "normal"}
+                if it.get("special") == "account":
+                    node["special"] = "account"
+                items.append(node)
+            out["topbar"]["items"] = items
+        sm = pub.get("site_secondary_menu")
+        if isinstance(sm, dict):
+            out["center"]["right_text"] = str(sm.get("right_text") or "")
+            out["center"]["right_link"] = _link_url(sm.get("right_link")) or "/"
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[site-menus] site_design okunamadı: {e}")
+
+
+async def _site_design_write(group: str, clean: dict):
+    """Menü Yönetimi'nden üst bar / orta menü kaydı → site_design yayın + varsa taslak (aynı anda)."""
+    if group == "topbar":
+        key, val = "site_topbar", {"welcome_text": clean.get("welcome", ""), "right_items": [
+            {"_id": it.get("id"), "label": it.get("label"), "icon": {"icon": it.get("icon") or ""},
+             "link": {"kind": "url", "url": it.get("link") or "/", "new_tab": False},
+             "special": it.get("special") or "", "guest_text": "Üye Ol veya Giriş Yap" if it.get("special") == "account" else ""}
+            for it in clean.get("items") or []]}
+    elif group == "center":
+        key, val = "site_secondary_menu", {"right_text": clean.get("right_text", ""),
+                                           "right_link": {"kind": "url", "url": clean.get("right_link") or "/", "new_tab": False}}
+    else:
+        return
+    try:
+        sd = await db.settings.find_one({"id": "site_design"}, {"_id": 0}) or {}
+        pub = sd.get("published") if isinstance(sd.get("published"), dict) else {}
+        pub[key] = {**(pub.get(key) or {}), **val}
+        await db.settings.update_one({"id": "site_design"}, {"$set": {"published": pub}}, upsert=True)
+        for lid in ("home:published", "home:draft"):
+            doc = await db.page_layouts.find_one({"id": lid}, {"_id": 0, "global": 1})
+            if doc is not None:
+                g = doc.get("global") or {}
+                g[key] = {**(g.get(key) or {}), **val}
+                await db.page_layouts.update_one({"id": lid}, {"$set": {"global": g}})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[site-menus] site_design yazılamadı: {e}")
+
+
 @router.get("")
 async def get_site_menus(request: Request):
     """Tüm menü grupları (public). Kayıtsız grup varsayılanla döner. Misafire üyelere özel
@@ -168,6 +227,7 @@ async def get_site_menus(request: Request):
         g = doc.get(k)
         out[k] = _clean_group(k, g) if isinstance(g, dict) else _clean_group(k, DEFAULTS[k])
         out[k]["customized"] = isinstance(g, dict)
+    await _site_design_overlay(out)
     try:
         from .products import request_is_member
         if not request_is_member(request):
@@ -195,6 +255,7 @@ async def save_site_menu(group: str, payload: dict, request: Request,
                   "updated_by": current_user.get("email") or current_user.get("id")}},
         upsert=True,
     )
+    await _site_design_write(group, clean)
     await record_admin_audit(db, action="site_menu.update", entity_type="content", entity_id=f"site_menus.{group}",
                              before={group: before.get(group)}, after={group: clean},
                              current_user=current_user, request=request, source="content.menu")

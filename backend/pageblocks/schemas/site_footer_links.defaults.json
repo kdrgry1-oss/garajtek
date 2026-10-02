@@ -1,0 +1,154 @@
+{
+  "mode": "structured",
+  "custom_html": "",
+  "auto_fill_from_categories": true,
+  "categories_title": "Hızlı Erişim",
+  "columns": [
+    {
+      "title": "Müşteri Hizmetleri",
+      "links": [
+        {
+          "label": "Hesabım",
+          "link": {
+            "kind": "url",
+            "url": "/hesabim",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Sipariş Takibi",
+          "link": {
+            "kind": "url",
+            "url": "/siparis-takip",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Favorilerim",
+          "link": {
+            "kind": "url",
+            "url": "/favoriler",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "İade Talebi",
+          "link": {
+            "kind": "url",
+            "url": "/iade-islemleri",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "İade ve Değişim Koşulları",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/iade-kosullari",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Teslimat ve Kargo",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/kargo-ve-teslimat",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Garanti ve Teknik Servis",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/garanti-kosullari",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Sıkça Sorulan Sorular",
+          "link": {
+            "kind": "url",
+            "url": "/sikca-sorulan-sorular",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "İletişim",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/iletisim",
+            "new_tab": false
+          }
+        }
+      ]
+    },
+    {
+      "title": "Kurumsal",
+      "links": [
+        {
+          "label": "Hakkımızda",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/hakkimizda",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Mesafeli Satış Sözleşmesi",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/mesafeli-satis",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Ön Bilgilendirme Formu",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/on-bilgilendirme",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Üyelik Sözleşmesi",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/uyelik-sozlesmesi",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Kullanım Koşulları",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/kullanim-kosullari",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "KVKK Aydınlatma Metni",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/kvkk",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Gizlilik Politikası",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/gizlilik",
+            "new_tab": false
+          }
+        },
+        {
+          "label": "Çerez Politikası",
+          "link": {
+            "kind": "url",
+            "url": "/sayfa/cerez-politikasi",
+            "new_tab": false
+          }
+        }
+      ]
+    }
+  ]
+}

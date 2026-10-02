@@ -1,0 +1,319 @@
+{
+  "key": "site_theme",
+  "version": 2,
+  "title": "Tema",
+  "description": "",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "preset",
+      "type": "select",
+      "label": "Renk ön ayarı",
+      "tab": "İçerik",
+      "options": [
+        {
+          "value": "yellow",
+          "label": "Sarı (şablon)",
+          "primary": "#fed700",
+          "primary_dark": "#e7c400",
+          "text_on_primary": "dark"
+        },
+        {
+          "value": "blue",
+          "label": "Mavi",
+          "primary": "#0787ea",
+          "primary_dark": "#067ad4",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "red",
+          "label": "Kırmızı",
+          "primary": "#ea1b25",
+          "primary_dark": "#da141e",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "orange",
+          "label": "Turuncu",
+          "primary": "#f89a20",
+          "primary_dark": "#f7900a",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "green",
+          "label": "Yeşil",
+          "primary": "#a3d133",
+          "primary_dark": "#96c12c",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "dark_green",
+          "label": "Koyu yeşil",
+          "primary": "#21b68e",
+          "primary_dark": "#1da37f",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "flat_blue",
+          "label": "Düz mavi",
+          "primary": "#00abc5",
+          "primary_dark": "#0097ae",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "gold",
+          "label": "Altın",
+          "primary": "#dab26d",
+          "primary_dark": "#d5a85b",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "pink",
+          "label": "Pembe",
+          "primary": "#ce1d76",
+          "primary_dark": "#ba1a6a",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "black",
+          "label": "Siyah",
+          "primary": "#000000",
+          "primary_dark": "#333e48",
+          "text_on_primary": "white"
+        },
+        {
+          "value": "custom",
+          "label": "Özel"
+        }
+      ],
+      "help": "Ön ayar seçmek ana rengi, koyu tonu ve üzerindeki yazı rengini birlikte değiştirir."
+    },
+    {
+      "name": "primary_color",
+      "type": "color",
+      "label": "Ana renk",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "primary_dark",
+      "type": "color",
+      "label": "Ana rengin koyu tonu",
+      "tab": "İçerik",
+      "width": "half",
+      "help": "Boşsa otomatik hesaplanır."
+    },
+    {
+      "name": "text_on_primary",
+      "type": "select",
+      "label": "Ana renk üzerindeki yazı",
+      "tab": "İçerik",
+      "width": "half",
+      "options": [
+        {
+          "value": "dark",
+          "label": "Koyu (#333e48)"
+        },
+        {
+          "value": "white",
+          "label": "Beyaz"
+        }
+      ]
+    },
+    {
+      "name": "body_text",
+      "type": "color",
+      "label": "Gövde yazı rengi",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "sale_color",
+      "type": "color",
+      "label": "İndirim rengi",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "link_color",
+      "type": "color",
+      "label": "Bağlantı rengi",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "font_family",
+      "type": "select",
+      "label": "Yazı tipi",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "Open Sans",
+          "label": "Open Sans (şablon)"
+        },
+        {
+          "value": "Roboto",
+          "label": "Roboto"
+        },
+        {
+          "value": "Inter",
+          "label": "Inter"
+        },
+        {
+          "value": "Montserrat",
+          "label": "Montserrat"
+        },
+        {
+          "value": "Rubik",
+          "label": "Rubik"
+        },
+        {
+          "value": "Nunito Sans",
+          "label": "Nunito Sans"
+        }
+      ]
+    },
+    {
+      "name": "base_font_size",
+      "type": "number",
+      "label": "Temel yazı boyutu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 12,
+      "max": 18,
+      "width": "half"
+    },
+    {
+      "name": "container_width",
+      "type": "select",
+      "label": "Sayfa genişliği",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "1200",
+          "label": "1200 px (şablon)"
+        },
+        {
+          "value": "1430",
+          "label": "1430 px (geniş)"
+        }
+      ]
+    },
+    {
+      "name": "card",
+      "type": "group",
+      "label": "Ürün kartları (tüm site)",
+      "tab": "Görünüm",
+      "fields": [
+        {
+          "name": "show_wishlist",
+          "type": "bool",
+          "label": "Favori",
+          "width": "third"
+        },
+        {
+          "name": "show_compare",
+          "type": "bool",
+          "label": "Karşılaştır",
+          "width": "third"
+        },
+        {
+          "name": "show_category",
+          "type": "bool",
+          "label": "Kategori etiketi",
+          "width": "third"
+        },
+        {
+          "name": "show_old_price",
+          "type": "bool",
+          "label": "Eski fiyat",
+          "width": "third"
+        },
+        {
+          "name": "show_discount_badge",
+          "type": "bool",
+          "label": "İndirim rozeti",
+          "width": "third"
+        },
+        {
+          "name": "add_to_cart_text",
+          "type": "text",
+          "label": "“Sepete Ekle” yazısı"
+        },
+        {
+          "name": "wishlist_text",
+          "type": "text",
+          "label": "Favori yazısı",
+          "width": "half"
+        },
+        {
+          "name": "compare_text",
+          "type": "text",
+          "label": "Karşılaştır yazısı",
+          "width": "half"
+        }
+      ]
+    },
+    {
+      "name": "reveal_default",
+      "type": "bool",
+      "label": "Bölüm giriş animasyonları",
+      "tab": "Gelişmiş"
+    },
+    {
+      "name": "lazy_images",
+      "type": "bool",
+      "label": "Görselleri gerektikçe yükle",
+      "tab": "Gelişmiş"
+    },
+    {
+      "name": "go_to_top",
+      "type": "group",
+      "label": "Yukarı çık düğmesi",
+      "tab": "Gelişmiş",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "label": "Göster",
+          "width": "third"
+        },
+        {
+          "name": "offset",
+          "type": "number",
+          "label": "Görünme mesafesi",
+          "unit": "px",
+          "min": 0,
+          "max": 3000,
+          "width": "third"
+        },
+        {
+          "name": "position",
+          "type": "select",
+          "label": "Konum",
+          "width": "third",
+          "options": [
+            {
+              "value": "bottom-right",
+              "label": "Sağ alt"
+            },
+            {
+              "value": "bottom-left",
+              "label": "Sol alt"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "common": []
+}

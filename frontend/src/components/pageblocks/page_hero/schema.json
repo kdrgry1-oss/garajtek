@@ -1,0 +1,32 @@
+{
+  "key": "page_hero",
+  "version": 2,
+  "title": "Sayfa Başlığı (Hero)",
+  "description": "",
+  "category": "icerik",
+  "group": "D",
+  "status": "stub",
+  "template_refs": [
+    "T1/HTML/about.html"
+  ],
+  "layout": "full_bleed",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

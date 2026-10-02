@@ -1,0 +1,29 @@
+{
+  "preset": "yellow",
+  "primary_color": "#fed700",
+  "primary_dark": "#e7c400",
+  "text_on_primary": "dark",
+  "body_text": "#333e48",
+  "sale_color": "#df3737",
+  "link_color": "#0077d0",
+  "font_family": "Open Sans",
+  "base_font_size": 14,
+  "container_width": "1200",
+  "card": {
+    "show_wishlist": true,
+    "show_compare": true,
+    "show_category": true,
+    "show_old_price": true,
+    "show_discount_badge": false,
+    "add_to_cart_text": "Sepete Ekle",
+    "wishlist_text": "Favori",
+    "compare_text": "Karşılaştır"
+  },
+  "reveal_default": true,
+  "lazy_images": true,
+  "go_to_top": {
+    "enabled": true,
+    "offset": 400,
+    "position": "bottom-right"
+  }
+}

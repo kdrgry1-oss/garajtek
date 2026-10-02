@@ -1,0 +1,68 @@
+{
+  "key": "site_secondary_menu",
+  "version": 2,
+  "title": "İkincil / Ana Menü",
+  "description": "Menü öğeleri Menü Yönetimi'nde düzenlenir.",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "enabled",
+      "type": "bool",
+      "label": "Göster",
+      "tab": "İçerik"
+    },
+    {
+      "name": "right_text",
+      "type": "text",
+      "label": "Sağ yazı",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "right_link",
+      "type": "link",
+      "label": "Sağ yazı bağlantısı",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "highlight_color",
+      "type": "color",
+      "label": "Vurgu rengi",
+      "tab": "Görünüm"
+    },
+    {
+      "name": "max_visible_home",
+      "type": "number",
+      "label": "Ana sayfada görünen öğe",
+      "tab": "Görünüm",
+      "min": 3,
+      "max": 12,
+      "width": "half"
+    },
+    {
+      "name": "max_visible_shop",
+      "type": "number",
+      "label": "İç sayfalarda görünen öğe",
+      "tab": "Görünüm",
+      "min": 3,
+      "max": 12,
+      "width": "half"
+    },
+    {
+      "name": "more_label",
+      "type": "text",
+      "label": "Taşan öğeler etiketi",
+      "tab": "Gelişmiş"
+    }
+  ],
+  "common": []
+}

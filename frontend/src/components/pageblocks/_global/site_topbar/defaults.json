@@ -1,0 +1,67 @@
+{
+  "enabled": true,
+  "left_mode": "welcome",
+  "welcome_text": "",
+  "welcome_link": {
+    "kind": "url",
+    "url": "",
+    "new_tab": false
+  },
+  "right_items": [
+    {
+      "label": "Mağazamız",
+      "icon": {
+        "icon": "ec ec-map-pointer"
+      },
+      "link": {
+        "kind": "url",
+        "url": "/sayfa/iletisim",
+        "new_tab": false
+      },
+      "special": "",
+      "guest_text": ""
+    },
+    {
+      "label": "Sipariş Takibi",
+      "icon": {
+        "icon": "ec ec-transport"
+      },
+      "link": {
+        "kind": "url",
+        "url": "/siparis-takip",
+        "new_tab": false
+      },
+      "special": "",
+      "guest_text": ""
+    },
+    {
+      "label": "Mağaza",
+      "icon": {
+        "icon": "ec ec-shopping-bag"
+      },
+      "link": {
+        "kind": "url",
+        "url": "/tum-urunler",
+        "new_tab": false
+      },
+      "special": "",
+      "guest_text": ""
+    },
+    {
+      "label": "Hesabım",
+      "icon": {
+        "icon": "ec ec-user"
+      },
+      "link": {
+        "kind": "url",
+        "url": "/hesabim",
+        "new_tab": false
+      },
+      "special": "account",
+      "guest_text": "Üye Ol veya Giriş Yap"
+    }
+  ],
+  "currency_text": "Türk Lirası (₺)",
+  "style": "white",
+  "hide_below": "xl"
+}

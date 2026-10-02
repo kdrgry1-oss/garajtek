@@ -1,0 +1,144 @@
+{
+  "key": "site_footer_bottom",
+  "version": 2,
+  "title": "Footer Alt Şerit",
+  "description": "",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "copyright",
+      "type": "rich_text",
+      "label": "Telif yazısı",
+      "tab": "İçerik",
+      "marks": [
+        "strong",
+        "em",
+        "link"
+      ],
+      "help": "{yıl} ve {mağaza} otomatik doldurulur."
+    },
+    {
+      "name": "payment_mode",
+      "type": "select",
+      "label": "Ödeme logoları",
+      "tab": "İçerik",
+      "options": [
+        {
+          "value": "default",
+          "label": "iyzico bandı (varsayılan)"
+        },
+        {
+          "value": "band_image",
+          "label": "Tek görsel"
+        },
+        {
+          "value": "logos",
+          "label": "Logo listesi"
+        },
+        {
+          "value": "none",
+          "label": "Gizle"
+        }
+      ]
+    },
+    {
+      "name": "payment_band_image",
+      "type": "image",
+      "label": "Ödeme bandı görseli",
+      "tab": "İçerik",
+      "show_if": {
+        "payment_mode": [
+          "band_image"
+        ]
+      }
+    },
+    {
+      "name": "payment_logos",
+      "type": "repeater",
+      "label": "Ödeme logoları",
+      "tab": "İçerik",
+      "max": 10,
+      "show_if": {
+        "payment_mode": [
+          "logos"
+        ]
+      },
+      "item_label": "{{alt}}",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Logo",
+          "recommended": [
+            52,
+            32
+          ]
+        },
+        {
+          "name": "alt",
+          "type": "text",
+          "label": "Ad"
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "alt": ""
+      },
+      "item_noun": "Logo"
+    },
+    {
+      "name": "extra_links",
+      "type": "repeater",
+      "label": "Ek bağlantılar",
+      "tab": "İçerik",
+      "max": 8,
+      "item_label": "{{label}}",
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Yazı"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        }
+      ],
+      "item_default": {
+        "label": "",
+        "link": {
+          "kind": "url",
+          "url": "/",
+          "new_tab": false
+        }
+      },
+      "item_noun": "Bağlantı"
+    },
+    {
+      "name": "etbis_qr",
+      "type": "image",
+      "label": "ETBİS karekodu",
+      "tab": "İçerik",
+      "recommended": [
+        80,
+        80
+      ]
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "label": "Arka plan",
+      "tab": "Görünüm"
+    }
+  ],
+  "common": []
+}

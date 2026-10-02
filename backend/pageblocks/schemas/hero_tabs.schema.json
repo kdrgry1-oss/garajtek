@@ -1,0 +1,32 @@
+{
+  "key": "hero_tabs",
+  "version": 2,
+  "title": "Sekmeli Hero + Ürün Karuseli",
+  "description": "",
+  "category": "slider",
+  "group": "A",
+  "status": "stub",
+  "template_refs": [
+    "T2/html/home/home-v6.html"
+  ],
+  "layout": "full_bleed",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

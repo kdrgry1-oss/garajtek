@@ -1,0 +1,115 @@
+{
+  "key": "text_block",
+  "version": 2,
+  "title": "Metin Bloğu",
+  "description": "Başlık + zengin metin (+ opsiyonel görsel)",
+  "category": "icerik",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik"
+    },
+    {
+      "name": "body",
+      "type": "rich_text",
+      "label": "Metin",
+      "tab": "İçerik",
+      "marks": [
+        "strong",
+        "em",
+        "br",
+        "span_highlight",
+        "sup",
+        "sub",
+        "link"
+      ],
+      "max_length": 5000
+    },
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Görsel",
+      "tab": "İçerik",
+      "recommended": [
+        570,
+        400
+      ]
+    },
+    {
+      "name": "link",
+      "type": "link",
+      "label": "Bağlantı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "button_text",
+      "type": "text",
+      "label": "Düğme yazısı",
+      "tab": "İçerik",
+      "help": "Bağlantı varsa düğme bu yazıyla gösterilir."
+    },
+    {
+      "name": "align",
+      "type": "select",
+      "label": "Hizalama",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "left",
+          "label": "Sol"
+        },
+        {
+          "value": "center",
+          "label": "Orta"
+        },
+        {
+          "value": "right",
+          "label": "Sağ"
+        }
+      ]
+    },
+    {
+      "name": "max_width",
+      "type": "number",
+      "label": "En fazla genişlik",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 300,
+      "max": 1430,
+      "width": "half"
+    },
+    {
+      "name": "legacy_html",
+      "type": "html",
+      "label": "Eski HTML içerik",
+      "tab": "Gelişmiş",
+      "super_admin": true,
+      "sanitize": "strict"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

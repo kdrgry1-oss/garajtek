@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "right_text": "Ücretsiz Kargo Fırsatları",
+  "right_link": {
+    "kind": "url",
+    "url": "/sayfa/kargo-ve-teslimat",
+    "new_tab": false
+  },
+  "highlight_color": "#df3737",
+  "max_visible_home": 7,
+  "max_visible_shop": 6,
+  "more_label": "Diğer"
+}

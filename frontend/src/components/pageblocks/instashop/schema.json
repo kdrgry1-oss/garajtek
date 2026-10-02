@@ -1,0 +1,111 @@
+{
+  "key": "instashop",
+  "version": 2,
+  "title": "Atölyemizden (görsel ızgara)",
+  "description": "Instagram tarzı görsel ızgarası",
+  "category": "icerik",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik"
+    },
+    {
+      "name": "show_follow",
+      "type": "bool",
+      "label": "“Takip Edin” bağlantısını göster",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "follow_text",
+      "type": "text",
+      "label": "Takip bağlantısı yazısı",
+      "tab": "İçerik",
+      "width": "half",
+      "show_if": {
+        "show_follow": [
+          true
+        ]
+      }
+    },
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Görseller",
+      "tab": "İçerik",
+      "max": 12,
+      "item_label": "{{alt}}",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            600,
+            600
+          ]
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        },
+        {
+          "name": "alt",
+          "type": "text",
+          "label": "Alternatif metin"
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        },
+        "alt": ""
+      },
+      "item_noun": "Öğe"
+    },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Sütun",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "4",
+          "label": "4"
+        },
+        {
+          "value": "6",
+          "label": "6"
+        }
+      ]
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "video": null,
+  "poster": null,
+  "title": "",
+  "text": "",
+  "button": {
+    "text": "",
+    "link": {
+      "kind": "url",
+      "url": "",
+      "new_tab": false
+    }
+  },
+  "play_label": "Videoyu oynat",
+  "autoplay": true,
+  "muted": true,
+  "loop": true,
+  "_section": {
+    "margin_bottom": {
+      "desktop": 50,
+      "tablet": 40,
+      "mobile": 30
+    }
+  }
+}

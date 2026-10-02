@@ -1,0 +1,71 @@
+{
+  "key": "half_banners",
+  "version": 2,
+  "title": "İki Banner (eski)",
+  "description": "Yan yana iki görsel banner (eski blok)",
+  "category": "banner",
+  "group": "A",
+  "status": "ready",
+  "template_refs": [],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Bannerlar",
+      "tab": "İçerik",
+      "max": 4,
+      "item_label": "{{alt}}",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            570,
+            300
+          ]
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı"
+        },
+        {
+          "name": "alt",
+          "type": "text",
+          "label": "Alternatif metin"
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        },
+        "alt": ""
+      },
+      "item_noun": "Öğe"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ],
+  "legacy": true
+}

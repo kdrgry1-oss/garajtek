@@ -1,0 +1,225 @@
+{
+  "key": "product_grid_212",
+  "version": 2,
+  "title": "2-1-2 Ürün Izgarası",
+  "description": "Kategori sekmeli 2 + 1 büyük + 2 ürün ızgarası (şablon: 2-1-2-product-grid)",
+  "category": "urun",
+  "group": "B",
+  "status": "ready",
+  "template_refs": [
+    "T1/inc/blocks/homepage/2-1-2-product-grid.php"
+  ],
+  "layout": "full_bleed",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [
+    {
+      "value": "2_1_2",
+      "label": "2-1-2 (v1)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "4_1_4",
+      "label": "4-1-4 (v2.0)",
+      "defaults_patch": {
+        "main_thumbnails": true
+      }
+    }
+  ],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık (ekran okuyucu)",
+      "tab": "İçerik"
+    },
+    {
+      "name": "nav_mode",
+      "type": "select",
+      "label": "Gezinme",
+      "tab": "İçerik",
+      "options": [
+        {
+          "value": "tabs",
+          "label": "Sekmeler (ürünleri değiştirir)"
+        },
+        {
+          "value": "links",
+          "label": "Kategori bağlantıları"
+        }
+      ]
+    },
+    {
+      "name": "nav_items",
+      "type": "repeater",
+      "label": "Sabit sekmeler",
+      "tab": "İçerik",
+      "max": 10,
+      "item_label": "{{label}}",
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Ad"
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "show_if": {
+            "$parent.nav_mode": [
+              "links"
+            ]
+          }
+        },
+        {
+          "name": "source",
+          "type": "product_source",
+          "label": "Ürün kaynağı",
+          "allowed_kinds": [
+            "manual",
+            "category",
+            "discounted",
+            "newest",
+            "best_sellers",
+            "featured",
+            "top_rated",
+            "tag",
+            "brand",
+            "recently_viewed"
+          ],
+          "default_limit": 5
+        }
+      ],
+      "item_default": {
+        "label": "Yeni sekme",
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        },
+        "source": {
+          "kind": "featured",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 5,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        }
+      },
+      "item_noun": "Sekme"
+    },
+    {
+      "name": "nav_auto_categories",
+      "type": "group",
+      "label": "Kök kategorilerden otomatik sekmeler",
+      "tab": "İçerik",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "label": "Açık",
+          "width": "half"
+        },
+        {
+          "name": "max",
+          "type": "number",
+          "label": "En fazla",
+          "min": 0,
+          "max": 12,
+          "width": "half"
+        },
+        {
+          "name": "exclude",
+          "type": "category_picker",
+          "label": "Hariç tutulacak kategoriler",
+          "multiple": true
+        }
+      ]
+    },
+    {
+      "name": "main_product_mode",
+      "type": "select",
+      "label": "Ortadaki büyük ürün",
+      "tab": "Ürünler",
+      "options": [
+        {
+          "value": "first_of_source",
+          "label": "Kaynağın ilk ürünü"
+        },
+        {
+          "value": "manual",
+          "label": "Elle seç"
+        }
+      ]
+    },
+    {
+      "name": "main_product",
+      "type": "product_picker",
+      "label": "Büyük ürün",
+      "tab": "Ürünler",
+      "multiple": false,
+      "show_if": {
+        "main_product_mode": [
+          "manual"
+        ]
+      }
+    },
+    {
+      "name": "main_thumbnails",
+      "type": "bool",
+      "label": "Büyük üründe küçük resimler",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "lightbox",
+      "type": "bool",
+      "label": "Görsel büyütme",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "column_widths",
+      "type": "select",
+      "label": "Sütun genişlikleri",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "23_52_23",
+          "label": "%23 / %52 / %23 (şablon)"
+        },
+        {
+          "value": "25_50_25",
+          "label": "%25 / %50 / %25"
+        }
+      ]
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Boş sekme yazısı",
+      "tab": "Gelişmiş"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

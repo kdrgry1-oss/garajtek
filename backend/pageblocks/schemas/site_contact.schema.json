@@ -1,0 +1,61 @@
+{
+  "key": "site_contact",
+  "version": 2,
+  "title": "İletişim Bilgileri (tek kaynak)",
+  "description": "",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "phone",
+      "type": "text",
+      "label": "Telefon",
+      "tab": "İçerik",
+      "width": "half",
+      "help": "Boşsa Ayarlar › Firma Bilgileri'ndeki telefon kullanılır."
+    },
+    {
+      "name": "phone_2",
+      "type": "text",
+      "label": "İkinci telefon",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "email",
+      "type": "text",
+      "label": "E-posta",
+      "tab": "İçerik",
+      "width": "half",
+      "help": "Boşsa Firma Bilgileri'ndeki e-posta kullanılır."
+    },
+    {
+      "name": "whatsapp",
+      "type": "text",
+      "label": "WhatsApp",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "address",
+      "type": "textarea",
+      "label": "Adres",
+      "tab": "İçerik",
+      "help": "Boşsa Firma Bilgileri'ndeki adres kullanılır."
+    },
+    {
+      "name": "working_hours",
+      "type": "text",
+      "label": "Çalışma saatleri",
+      "tab": "İçerik"
+    }
+  ],
+  "common": []
+}

@@ -1,0 +1,92 @@
+{
+  "key": "product_slider",
+  "version": 2,
+  "title": "Ürün Karuseli",
+  "description": "Başlık + oklu ürün karuseli (şablon: recently-added-products-carousel)",
+  "category": "urun",
+  "group": "C",
+  "status": "ready",
+  "template_refs": [
+    "T1/inc/blocks/homepage/recently-added-products-carousel.php"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık satırı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "source",
+      "type": "product_source",
+      "label": "Ürün kaynağı",
+      "tab": "Ürünler",
+      "allowed_kinds": [
+        "manual",
+        "category",
+        "discounted",
+        "newest",
+        "best_sellers",
+        "featured",
+        "top_rated",
+        "tag",
+        "brand",
+        "recently_viewed"
+      ],
+      "default_limit": 14
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "grid_small",
+          "label": "Küçük ızgara kartı (6'lı)"
+        },
+        {
+          "value": "grid",
+          "label": "Izgara kartı"
+        },
+        {
+          "value": "horizontal",
+          "label": "Yatay kart"
+        }
+      ]
+    },
+    {
+      "name": "show_discount_badge",
+      "type": "bool",
+      "label": "İndirim rozetini göster",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel"
+    }
+  ],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

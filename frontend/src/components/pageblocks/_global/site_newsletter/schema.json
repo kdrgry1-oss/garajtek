@@ -1,0 +1,98 @@
+{
+  "key": "site_newsletter",
+  "version": 2,
+  "title": "E-Bülten Şeridi",
+  "description": "",
+  "scope": "global",
+  "category": "genel",
+  "group": "F",
+  "status": "ready",
+  "tabs": [
+    "İçerik",
+    "Görünüm",
+    "Gelişmiş"
+  ],
+  "fields": [
+    {
+      "name": "enabled",
+      "type": "bool",
+      "label": "Göster",
+      "tab": "İçerik"
+    },
+    {
+      "name": "icon",
+      "type": "icon",
+      "label": "İkon",
+      "tab": "İçerik",
+      "set": "electro"
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik"
+    },
+    {
+      "name": "marketing_text",
+      "type": "rich_text",
+      "label": "Açıklama",
+      "tab": "İçerik",
+      "marks": [
+        "strong",
+        "em",
+        "br"
+      ]
+    },
+    {
+      "name": "placeholder",
+      "type": "text",
+      "label": "Yer tutucu",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "button_text",
+      "type": "text",
+      "label": "Düğme",
+      "tab": "İçerik",
+      "width": "half"
+    },
+    {
+      "name": "success_text",
+      "type": "text",
+      "label": "Başarı mesajı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "error_text",
+      "type": "text",
+      "label": "Hata mesajı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "consent_required_text",
+      "type": "text",
+      "label": "Onay eksik mesajı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "consent_text",
+      "type": "rich_text",
+      "label": "KVKK / İYS onay metni",
+      "tab": "İçerik",
+      "marks": [
+        "strong",
+        "em",
+        "link"
+      ]
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "label": "Arka plan",
+      "tab": "Görünüm",
+      "palette": "theme"
+    }
+  ],
+  "common": []
+}

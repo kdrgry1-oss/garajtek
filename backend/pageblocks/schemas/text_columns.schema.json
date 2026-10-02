@@ -1,0 +1,32 @@
+{
+  "key": "text_columns",
+  "version": 2,
+  "title": "Metin Sütunları",
+  "description": "",
+  "category": "icerik",
+  "group": "D",
+  "status": "stub",
+  "template_refs": [
+    "T1/HTML/about.html"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

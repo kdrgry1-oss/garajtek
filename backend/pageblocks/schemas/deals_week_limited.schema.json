@@ -1,0 +1,32 @@
+{
+  "key": "deals_week_limited",
+  "version": 2,
+  "title": "Sınırlı Haftalık Fırsatlar",
+  "description": "",
+  "category": "firsat",
+  "group": "B",
+  "status": "stub",
+  "template_refs": [
+    "T2/html/home/home-v4.html"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

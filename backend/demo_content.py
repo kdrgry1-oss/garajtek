@@ -301,35 +301,86 @@ def _is_demo(url, urls):
     return bool(u) and (u in urls or any(u.endswith(x) for x in urls if x.startswith("/api/")))
 
 
+async def _layout_docs(db):
+    """Ana sayfa yayın + taslak belgeleri (Sayfa Tasarımı v2, page_layouts)."""
+    try:
+        from pageblocks import store
+        await store.ensure(db, "home")
+    except Exception:  # noqa: BLE001
+        pass
+    return [d for d in [await db.page_layouts.find_one({"id": "home:published"}, {"_id": 0}),
+                        await db.page_layouts.find_one({"id": "home:draft"}, {"_id": 0})] if d]
+
+
+async def _save_layout(db, doc, *, mirror: bool):
+    await db.page_layouts.replace_one({"id": doc["id"]}, doc, upsert=True)
+    if mirror:
+        await db.page_blocks.delete_many({"$or": [{"page": "home"}, {"page": None}, {"page": {"$exists": False}}]})
+        for b in doc.get("blocks") or []:
+            await db.page_blocks.insert_one({**b, "page": "home"})
+    try:
+        from pageblocks.products import clear_cache
+        clear_cache()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _strip_value(v, urls):
+    """Ayar ağacında demo görsellerini kaldırır. Dönüş: (yeni_değer, değişti_mi)."""
+    if isinstance(v, dict):
+        if "url" in v and _is_demo(v.get("url"), urls) and set(v) <= {"url", "alt", "w", "h", "focal", "mobile_url",
+                                                                      "mobile_focal", "crop"}:
+            return None, True
+        ch = False
+        out = {}
+        for k, x in v.items():
+            nx, c = _strip_value(x, urls)
+            out[k] = nx
+            ch = ch or c
+        return out, ch
+    if isinstance(v, list):
+        ch = False
+        out = []
+        for x in v:
+            nx, c = _strip_value(x, urls)
+            ch = ch or c
+            out.append(nx)
+        return out, ch
+    return v, False
+
+
 async def _strip_from_blocks(db, urls) -> int:
-    """Ana sayfa bloklarından YALNIZ demo görsellerini çıkarır (yöneticinin eklediklerine dokunmaz)."""
+    """Ana sayfa bloklarından YALNIZ demo görsellerini çıkarır (yöneticinin eklediklerine dokunmaz).
+    Görseli demo olan hero slaytları ve marka logoları tümden kaldırılır."""
     if not urls:
         return 0
     n = 0
-    for b in await db.page_blocks.find({}, {"_id": 0}).to_list(500):
-        imgs = b.get("images") or []
-        st = dict(b.get("settings") or {})
-        changed = False
-        if any(_is_demo(u, urls) for u in imgs):
-            keep = [i for i, u in enumerate(imgs) if not _is_demo(u, urls)]
-            links = b.get("links") or []
-            b["images"] = [imgs[i] for i in keep]
-            b["links"] = [links[i] if i < len(links) else "/" for i in keep]
-            for key in ("captions", "mobile_images", "img_dims", "slide_schedule"):
-                if isinstance(st.get(key), list):
-                    st[key] = [st[key][i] if i < len(st[key]) else None for i in keep]
-            changed = True
-        items = st.get("items")
-        if isinstance(items, list):
-            for it in items:
-                if isinstance(it, dict) and _is_demo(it.get("image"), urls):
-                    it["image"] = ""
-                    changed = True
-        if changed:
-            st.pop("demo_filled", None)
-            await db.page_blocks.update_one({"id": b["id"]}, {"$set": {"images": b["images"], "links": b["links"],
-                                                                       "settings": st}})
-            n += 1
+    for doc in await _layout_docs(db):
+        changed_doc = False
+        for blk in doc.get("blocks") or []:
+            st = blk.get("settings") or {}
+            ch = False
+            if blk.get("type") == "hero_slider" and isinstance(st.get("slides"), list):
+                keep = [x for x in st["slides"] if not _is_demo(((x or {}).get("background") or {}).get("url"), urls)]
+                if len(keep) != len(st["slides"]):
+                    st["slides"], ch = keep, True
+            if blk.get("type") == "brands_carousel" and isinstance(st.get("brands"), list):
+                keep = [x for x in st["brands"] if not _is_demo(((x or {}).get("logo") or {}).get("url"), urls)]
+                if len(keep) != len(st["brands"]):
+                    st["brands"], ch = keep, True
+                    if not keep:
+                        st["source"] = "catalog"
+            st2, c2 = _strip_value(st, urls)
+            if ch or c2:
+                st2.pop("_demo", None)
+                if blk.get("type") == "hero_slider" and not st2.get("slides"):
+                    from pageblocks import default_settings
+                    st2["slides"] = default_settings("hero_slider", st2.get("_variant"))["slides"]
+                blk["settings"] = st2
+                changed_doc = True
+                n += 1
+        if changed_doc:
+            await _save_layout(db, doc, mirror=doc["id"].endswith(":published"))
     return n
 
 
@@ -503,61 +554,83 @@ async def _load_sets(db, create_product, cats, by_key, upload, tag, now) -> list
     return out
 
 
+def _img(url, w, h, alt=""):
+    return {"url": url, "alt": alt, "w": w, "h": h}
+
+
+def _link(url):
+    return {"kind": "url", "url": url, "new_tab": False}
+
+
 async def _fill_blocks(db, upload) -> int:
     """Sayfa Tasarımı'ndaki ana sayfa bloklarının BOŞ görsel alanlarını demo görselleriyle doldurur
-    (dolu alanlara dokunmaz). Blok yoksa önce varsayılan düzen kurulur (home_layout)."""
-    try:
-        from home_layout import ensure_default_home
-        await ensure_default_home(db)
-    except Exception:  # noqa: BLE001
-        pass
-    blocks = await db.page_blocks.find({"page": "home"}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    (dolu alanlara dokunmaz). Yayın belgesi (ve varsa taslak) güncellenir; v2 alan yolları:
+    hero_slider.slides[].background, ads_block.items[].image, full_banner.image, brands_carousel.brands[]."""
+    from pageblocks import assign_item_ids, all_fields, get_schema
     n = 0
-    hero = next((b for b in blocks if b.get("type") == "hero_slider" and not (b.get("images") or [])), None)
-    if hero:
-        st = dict(hero.get("settings") or {})
-        imgs, links, mob, caps = [], [], [], []
-        for key, title, subtitle, link in HEROES:
-            imgs.append(await upload(f"banners/{key}.webp"))
-            mob.append(await upload(f"banners/{key}-m.webp"))
-            links.append(link)
-            caps.append({"title": title, "subtitle": subtitle, "cta": "Hemen İncele"})
-        st.update({"captions": caps, "mobile_images": mob, "img_dims": [[1920, 422]] * len(imgs), "demo_filled": True})
-        await db.page_blocks.update_one({"id": hero["id"]}, {"$set": {"images": imgs, "links": links, "settings": st}})
-        n += 1
-    ads = next((b for b in blocks if b.get("type") == "ads_block"), None)
-    if ads:
-        st = dict(ads.get("settings") or {})
-        items = [dict(x) for x in (st.get("items") or [])]
-        while len(items) < len(ADS):
-            items.append({})
-        ch = False
-        for i, (key, link) in enumerate(ADS):
-            if not items[i].get("image"):
-                items[i]["image"] = await upload(f"banners/{key}.webp")
-                items[i].setdefault("link", link)
-                ch = True
-        if ch:
-            st["items"] = items
-            await db.page_blocks.update_one({"id": ads["id"]}, {"$set": {"settings": st}})
-            n += 1
-    full = next((b for b in blocks if b.get("type") == "full_banner" and not (b.get("images") or [])), None)
-    if full:
-        await db.page_blocks.update_one({"id": full["id"]}, {"$set": {
-            "images": [await upload(f"banners/{WIDE[0]}.webp")], "links": [WIDE[2]],
-            "settings": {**(full.get("settings") or {}), "img_dims": [[1170, 207]], "demo_filled": True}}})
-        n += 1
-    brands = next((b for b in blocks if b.get("type") == "brands_carousel" and not (b.get("images") or [])), None)
-    if brands:
-        imgs = []
-        for i, name in enumerate(BRANDS):
-            with open(os.path.join(IMG_DIR, "brands", f"brand-{i + 1}.png"), "rb") as f:
+    cache: dict = {}
+
+    async def up(rel):
+        if rel not in cache:
+            cache[rel] = await upload(rel)
+        return cache[rel]
+
+    for doc in await _layout_docs(db):
+        changed = False
+        for blk in doc.get("blocks") or []:
+            st = blk.setdefault("settings", {})
+            t = blk.get("type")
+            if t == "hero_slider" and not any((x or {}).get("background") for x in st.get("slides") or []):
+                slides = []
+                for key, title, subtitle, link in HEROES:
+                    bg = _img(await up(f"banners/{key}.webp"), 1920, 422, title)
+                    bg["mobile_url"] = await up(f"banners/{key}-m.webp")
+                    slides.append({"background": bg, "layout": "price", "title": title, "subtitle": subtitle,
+                                   "pretitle": "", "price_prefix": "", "price": "",
+                                   "button": {"text": "Hemen İncele", "style": "primary", "link": _link(link)}})
+                st["slides"] = slides
+                st["_demo"] = True
+                changed = True
+            elif t == "ads_block":
+                items = st.get("items") or []
+                ch = False
+                for i, (key, link) in enumerate(ADS):
+                    if i < len(items) and isinstance(items[i], dict) and not items[i].get("image"):
+                        items[i]["image"] = _img(await up(f"banners/{key}.webp"), 410, 281)
+                        if not ((items[i].get("link") or {}).get("url")):
+                            items[i]["link"] = _link(link)
+                        ch = True
+                if ch:
+                    st["items"] = items
+                    changed = True
+            elif t == "full_banner" and not st.get("image"):
+                st["image"] = _img(await up(f"banners/{WIDE[0]}.webp"), 1170, 207, WIDE[1])
+                if not ((st.get("link") or {}).get("url")):
+                    st["link"] = _link(WIDE[2])
+                st["_demo"] = True
+                changed = True
+            elif t == "brands_carousel" and not st.get("brands"):
                 from routes.upload import store_image_bytes
-                res = await store_image_bytes(f.read(), "image/png", "png", f"demo-brand-{i + 1}.png",
-                                              extra={"demo": True, "seed_source": DEMO_TAG})
-            imgs.append(res["url"])
-        await db.page_blocks.update_one({"id": brands["id"]}, {"$set": {
-            "images": imgs, "links": [f"/arama?q={name}" for name in BRANDS],
-            "settings": {**(brands.get("settings") or {}), "demo_filled": True}}})
-        n += 1
+                brands = []
+                for i, name in enumerate(BRANDS):
+                    rel = f"brands/brand-{i + 1}.png"
+                    if rel not in cache:
+                        with open(os.path.join(IMG_DIR, rel), "rb") as f:
+                            res = await store_image_bytes(f.read(), "image/png", "png", f"demo-brand-{i + 1}.png",
+                                                          extra={"demo": True, "seed_source": DEMO_TAG})
+                        cache[rel] = res["url"]
+                    brands.append({"logo": _img(cache[rel], 200, 60, name), "name": name,
+                                   "link": {"kind": "search", "url": f"/arama?q={name}", "new_tab": False}})
+                st["brands"] = brands
+                st["source"] = "manual"
+                st["_demo"] = True
+                changed = True
+            else:
+                continue
+            sch = get_schema(t)
+            if sch:
+                assign_item_ids(all_fields(sch), st)
+        if changed:
+            await _save_layout(db, doc, mirror=doc["id"].endswith(":published"))
+            n += 1
     return n

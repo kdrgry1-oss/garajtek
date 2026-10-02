@@ -1,0 +1,32 @@
+{
+  "key": "products_6_1",
+  "version": 2,
+  "title": "6+1 Çok Satanlar Izgarası",
+  "description": "",
+  "category": "urun",
+  "group": "B",
+  "status": "stub",
+  "template_refs": [
+    "T1/inc/blocks/homepage/homepage-3/products-6-1.php"
+  ],
+  "layout": "full_bleed",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

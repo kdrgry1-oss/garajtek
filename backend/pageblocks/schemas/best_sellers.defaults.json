@@ -1,0 +1,77 @@
+{
+  "header": {
+    "title": "Çok Satanlar",
+    "tag": "h2",
+    "align": "left",
+    "right": "pills",
+    "pills": [
+      {
+        "label": "İlk 20",
+        "link": {
+          "kind": "url",
+          "url": "",
+          "new_tab": false
+        },
+        "active": true,
+        "as_tab": true
+      }
+    ],
+    "link": {
+      "label": "Tümünü gör",
+      "link": {
+        "kind": "url",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    "underline": true
+  },
+  "pills_auto_categories": {
+    "enabled": true,
+    "max": 3
+  },
+  "pills_as_tabs": true,
+  "source": {
+    "kind": "best_sellers",
+    "product_ids": [],
+    "category_ids": [],
+    "include_children": true,
+    "tag": "",
+    "brand_ids": [],
+    "limit": 12,
+    "sort": "default",
+    "exclude_out_of_stock": false,
+    "exclude_ids": [],
+    "fill_with": "none"
+  },
+  "columns": "3",
+  "rows_per_slide": 2,
+  "card": "horizontal",
+  "carousel": {
+    "per_view": {
+      "0": 1
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": true,
+    "arrows": "none",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "empty_text": "Bu kategoride ürün bulunamadı.",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 60,
+      "tablet": 50,
+      "mobile": 40
+    }
+  }
+}

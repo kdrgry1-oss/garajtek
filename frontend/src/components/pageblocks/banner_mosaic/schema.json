@@ -1,0 +1,32 @@
+{
+  "key": "banner_mosaic",
+  "version": 2,
+  "title": "Banner Mozaiği (1 büyük + 6 küçük)",
+  "description": "",
+  "category": "banner",
+  "group": "A",
+  "status": "stub",
+  "template_refs": [
+    "T2/html/home/home-v9.html"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "title": "Tüm Kategoriler",
+  "title_shop": "Kategoriler",
+  "title_icon": {
+    "icon": "fa fa-list-ul"
+  },
+  "header_style": "primary_rounded",
+  "open_on_home": true,
+  "open_elsewhere": false,
+  "toggle_event": "click",
+  "width": 270,
+  "overlay_hero": true
+}

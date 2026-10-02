@@ -30,6 +30,7 @@ const GuestReturn = lazy(() => import("./pages/GuestReturn"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Compare = lazy(() => import("./pages/Compare"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const PagePreview = lazy(() => import("./pages/PagePreview"));
 
 import MarketingPixelsInjector from "./components/MarketingPixelsInjector";
 import SlugRouter from "./components/SlugRouter";
@@ -49,6 +50,8 @@ import "./storefront.css";
 // Electro vitrin teması — uyum kuralları (tamamı `.electro` kapsamlı; admin etkilenmez)
 import "./components/electro/electro.css";
 import ElectroStyles from "./components/electro/ElectroStyles";
+// Sayfa Tasarımı › Genel Alanlar › Tema: ana renk / yazı tipi / kart anahtarları → .electro CSS değişkenleri
+import ThemeVars from "./components/pageblocks/_shared/ThemeVars";
 
 // Rota değişiminde sayfayı anında en üste al — 2./3. sayfaya geçişte veya yeni
 // sayfa açıldığında footer'ın önce görünüp sonra yukarı zıplaması engellenir.
@@ -140,6 +143,7 @@ function App() {
             <CookieConsent />
             <StorefrontScope>
             <ElectroStyles />
+            <ThemeVars />
             {/* Storefront Duyuru barı + Popup + SEO. Bu bileşenler güvenli (aktif
                 popup/duyuru/yönlendirme yoksa hiçbir şey render etmez). */}
             <Suspense fallback={null}>
@@ -180,6 +184,8 @@ function App() {
                 <Route path="/karsilastir" element={<Compare />} />
 
                 {/* Tema önizleme */}
+                {/* Sayfa Tasarımı canlı önizleme (yalnız yönetici oturumu; noindex) */}
+                <Route path="/onizleme/sayfa/:page" element={<PagePreview />} />
 
                 {/* Admin — lazy yüklenen ayrı chunk. /admin/login dahil tüm admin
                     rotaları AdminApp içindeki kendi <Routes>'unda tanımlı. */}

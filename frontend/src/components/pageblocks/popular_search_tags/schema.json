@@ -1,0 +1,32 @@
+{
+  "key": "popular_search_tags",
+  "version": 2,
+  "title": "Popüler Aramalar",
+  "description": "",
+  "category": "icerik",
+  "group": "D",
+  "status": "stub",
+  "template_refs": [
+    "T2/html/home/home-v8.html"
+  ],
+  "layout": "container",
+  "singleton": false,
+  "allowed_pages": [
+    "home",
+    "*"
+  ],
+  "variants": [],
+  "tabs": [
+    "İçerik",
+    "Ürünler",
+    "Görünüm",
+    "Karusel",
+    "Gelişmiş"
+  ],
+  "fields": [],
+  "common": [
+    "section",
+    "visibility",
+    "reveal"
+  ]
+}

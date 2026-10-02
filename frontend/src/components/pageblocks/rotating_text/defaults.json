@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "text": "2.500 TL üzeri siparişlerde ücretsiz kargo",
+      "link": {
+        "kind": "url",
+        "url": "",
+        "new_tab": false
+      }
+    }
+  ],
+  "interval": 4000,
+  "background": "#ffffff",
+  "text_color": "#374151",
+  "position": "above_topbar"
+}
