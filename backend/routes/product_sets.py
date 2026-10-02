@@ -7,6 +7,7 @@ Vitrin:
   POST /api/storefront/cart-stock      sepet kalemlerinin güncel stoğu (tükenen kalem → "değiştir")
   GET  /api/storefront/alternatives    tükenen ürün için aynı EN ALT kategoriden stoklu öneriler
   POST /api/storefront/quick-order     Hızlı Sipariş: stok kodu/barkod + adet listesi tek istekte çözülür
+  POST /api/storefront/cod-quote       "Kapıda Ödeme ile Sipariş Ver" tutar önizlemesi (sipariş kurallarıyla aynı)
 Panel (Katalog › Ürün Setleri):
   GET/POST /api/admin/product-sets, GET/PUT/DELETE /api/admin/product-sets/{id}
   POST /api/admin/product-sets/preview  canlı fiyat/stok önizlemesi
@@ -168,6 +169,79 @@ async def quick_order(payload: dict):
                                    "barcode": v.get("barcode"), "stock_code": v.get("stock_code")} if v else None),
                       "stock": ps.item_stock(p, v.get("id") if v else None)})
     return {"found": found, "missing": missing}
+
+
+@router.post("/storefront/cod-quote")
+async def cod_quote(payload: dict):
+    """Ürün sayfası "Kapıda Ödeme ile Sipariş Ver" — sipariş oluşturmayla (routes/orders.create_order)
+    AYNI fiyat/kampanya/kargo/hizmet bedeli kurallarıyla tutar hesaplar ve gönderilecek kalemleri
+    döner. Sipariş yine normal POST /api/orders ile (payment_method=cash_on_delivery) açılır;
+    sunucu tutarı ve kuralları orada tekrar doğrular. payload: {product_id, variant_id?, quantity, email?}"""
+    from .coupons import evaluate_cart_promotions
+    from .settings import resolve_shipping_fee, resolve_free_shipping_threshold
+    from shipping_rules import shipping_quote
+
+    cfg = await cod_config(db)
+    pid = str(payload.get("product_id") or "")
+    qty = max(1, min(99, int(ps._f(payload.get("quantity"), 1) or 1)))
+    prod = await db.products.find_one({"id": pid}, {"_id": 0})
+    if not prod or prod.get("is_active") is False or prod.get("is_deleted"):
+        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+    lines = []
+    if ps.is_set(prod):
+        comps = await ps.set_components(db, prod)
+        if any(not c["in_stock"] or c["stock"] < c["quantity"] * qty for c in comps):
+            return {"available": False, "reason": "Setteki bir ürün şu an stokta yok. Seti sepete ekleyip ürünü değiştirebilirsiniz."}
+        for c in comps:
+            lines.append({"product_id": c["product_id"], "variant_id": c["variant_id"], "quantity": c["quantity"] * qty,
+                          "price": c["unit_price"], "name": c["name"], "image": c["image"],
+                          "size": (c.get("variant") or {}).get("size"), "category_id": c.get("category_id"),
+                          "set_id": prod["id"], "set_slot": c["product_id"]})
+        check_prods = await db.products.find({"id": {"$in": [ln["product_id"] for ln in lines]}}, {"_id": 0}).to_list(300)
+    else:
+        vid = str(payload.get("variant_id") or "") or None
+        if prod.get("variants") and not vid:
+            return {"available": False, "reason": "Lütfen bir seçenek seçin."}
+        stock = ps.item_stock(prod, vid)
+        if stock < qty:
+            return {"available": False, "reason": ("Bu ürün stokta bulunmamaktadır." if stock <= 0
+                                                    else f"Bu üründen en fazla {stock} adet sipariş verebilirsiniz.")}
+        var = next((v for v in prod.get("variants") or [] if v.get("id") == vid), None) if vid else None
+        lines.append({"product_id": pid, "variant_id": vid, "quantity": qty, "price": ps.unit_price(prod, vid),
+                      "name": prod.get("name"), "image": (prod.get("images") or [""])[0],
+                      "size": (var or {}).get("size"), "category_id": prod.get("category_id")})
+        check_prods = [prod]
+    subtotal = round(sum(ln["price"] * ln["quantity"] for ln in lines), 2)
+    reason = ""
+    if not cfg["enabled"]:
+        reason = "Kapıda ödeme şu anda kullanılamıyor."
+    else:
+        blocked = [p.get("name") for p in check_prods if product_cod_blocked(p, cfg["excluded_category_ids"])]
+        if blocked:
+            reason = "Bu ürün kapıda ödemeye uygun değildir: " + ", ".join(blocked[:3])
+        elif cfg["min_total"] and subtotal < cfg["min_total"]:
+            reason = f"Kapıda ödeme {cfg['min_total']:.0f} ₺ ve üzeri siparişlerde geçerlidir."
+        elif cfg["max_total"] and subtotal > cfg["max_total"]:
+            reason = f"Kapıda ödeme en fazla {cfg['max_total']:.0f} ₺ tutarındaki siparişlerde geçerlidir."
+    ev = await evaluate_cart_promotions(
+        cart_total=subtotal,
+        items=[{"product_id": ln["product_id"], "category_id": ln.get("category_id"), "qty": ln["quantity"],
+                "price": ln["price"], **({"set_id": ln["set_id"], "set_slot": ln["set_slot"]} if ln.get("set_id") else {})}
+               for ln in lines],
+        user_id=None, email=str(payload.get("email") or ""), entered_code="", payment_method="cash_on_delivery",
+        excluded_ids=[])
+    discount = min(subtotal, round(float(ev.get("total_discount") or 0), 2))
+    sset = await db.settings.find_one({"id": "main"}, {"_id": 0, "shipping_fee": 1, "free_shipping_threshold": 1,
+                                                       "cargo_fees": 1, "default_cargo_company": 1}) or {}
+    fee = float(resolve_shipping_fee(sset) or 0)
+    thr = await resolve_free_shipping_threshold(sset)
+    thr = float(thr) if thr not in (None, "") else None
+    sq = shipping_quote(subtotal, [discount], thr, fee, bool(ev.get("free_shipping")))
+    total = round(subtotal - discount + sq["cost"] + cfg["fee"], 2)
+    return {"available": not reason, "reason": reason, "lines": lines, "subtotal": subtotal, "discount": discount,
+            "promotions": [{"title": a.get("title"), "discount": a.get("discount")} for a in ev.get("applied") or []
+                           if float(a.get("discount") or 0) > 0],
+            "shipping": sq["cost"], "cod_fee": cfg["fee"], "total": total}
 
 
 # ───────────────────────────── Panel ─────────────────────────────

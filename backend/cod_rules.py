@@ -23,7 +23,10 @@ def _truthy(v) -> bool:
 
 async def cod_config(db) -> Dict[str, Any]:
     from business_rules import get_rule
-    s = await db.settings.find_one({"id": "main"}, {"_id": 0, "payment_methods": 1}) or {}
+    s = await db.settings.find_one({"id": "main"}, {"_id": 0, "payment_methods": 1, "cod_default_applied": 1}) or {}
+    if s and not s.get("cod_default_applied"):
+        await ensure_cod_default(db)  # tek seferlik varsayılan (yönetici seçimi korunur)
+        s = await db.settings.find_one({"id": "main"}, {"_id": 0, "payment_methods": 1}) or {}
     enabled = ((s.get("payment_methods") or {}).get("cash_on_delivery")) is True
 
     async def num(key, d):
@@ -66,3 +69,32 @@ async def blocked_names(db, products: List[dict]) -> List[str]:
     cfg_ex = [str(c["id"]) for c in await db.categories.find(
         {"cod_disabled": True}, {"_id": 0, "id": 1}).to_list(2000) if c.get("id") is not None]
     return [p.get("name") or p.get("id") for p in products if product_cod_blocked(p, cfg_ex)]
+
+
+async def ensure_cod_default(db) -> str:
+    """Açılış kancası (idempotent, tek seferlik): kapıda ödemeyi varsayılan olarak AÇAR —
+    yalnız yönetici bu ayarı hiç açıkça değiştirmediyse. settings.main.cod_default_applied
+    işareti yazılır; yönetici sonradan kapatırsa bir daha açılmaz.
+    "Açıkça değiştirildi" = audit_logs'ta payment_methods'u değiştiren settings.update kaydı var.
+    Dönüş: "enabled" | "kept" (yönetici seçimi korundu) | "done" (önceden uygulandı) | "no-settings"."""
+    import json
+    doc = await db.settings.find_one({"id": "main"}, {"_id": 0, "payment_methods": 1, "cod_default_applied": 1})
+    if not doc:
+        return "no-settings"  # ilk GET /settings varsayılanı (kapıda ödeme açık + işaret) yazar
+    if doc.get("cod_default_applied"):
+        return "done"
+    pm = dict(doc.get("payment_methods") or {})
+    explicit = False
+    if "cash_on_delivery" in pm:
+        async for a in db.audit_logs.find({"action": "settings.update", "entity.id": "main"}, {"_id": 0, "diff": 1}):
+            if "payment_methods" in json.dumps(a.get("diff") or {}, ensure_ascii=False, default=str):
+                explicit = True
+                break
+    upd = {"cod_default_applied": True}
+    if not explicit:
+        pm.setdefault("credit_card", True)
+        pm.setdefault("bank_transfer", True)
+        pm["cash_on_delivery"] = True
+        upd["payment_methods"] = pm
+    await db.settings.update_one({"id": "main"}, {"$set": upd})
+    return "kept" if explicit else "enabled"

@@ -309,3 +309,34 @@ def test_public_set_endpoint_and_cod_check(client, db):
     assert c["available"] is False and c["blocked"] == ["Tork Anahtarı"]
     ok = client.post("/api/storefront/cod-check", json={"product_ids": ["C"], "subtotal": 500}).json()
     assert ok["available"] is True
+
+
+# ── Kapıda ödeme varsayılanı (tek seferlik açılış göçü) ─────────────────────────
+
+def test_cod_default_enables_once_and_respects_admin(db):
+    # ayar kaydı yok → dokunma (ilk GET /settings varsayılanı yazar)
+    assert run(cod_rules.ensure_cod_default(db)) == "no-settings"
+    # yönetici hiç dokunmamış (anahtar yok) → aç
+    run(db.settings.insert_one({"id": "main", "payment_methods": {"credit_card": True, "bank_transfer": True}}))
+    assert run(cod_rules.ensure_cod_default(db)) == "enabled"
+    doc = run(db.settings.find_one({"id": "main"}))
+    assert doc["payment_methods"]["cash_on_delivery"] is True and doc["cod_default_applied"] is True
+    # yönetici sonra kapattı → göç bir daha AÇMAZ
+    run(db.settings.update_one({"id": "main"}, {"$set": {"payment_methods": {"cash_on_delivery": False}}}))
+    assert run(cod_rules.ensure_cod_default(db)) == "done"
+    assert run(db.settings.find_one({"id": "main"}))["payment_methods"]["cash_on_delivery"] is False
+
+
+def test_cod_default_keeps_explicit_admin_choice(db):
+    run(db.settings.insert_one({"id": "main", "payment_methods": {"cash_on_delivery": False}}))
+    run(db.audit_logs.insert_one({"action": "settings.update", "entity": {"type": "settings", "id": "main"},
+                                  "diff": {"payment_methods": {"before": {"cash_on_delivery": True},
+                                                               "after": {"cash_on_delivery": False}}}}))
+    assert run(cod_rules.ensure_cod_default(db)) == "kept"
+    doc = run(db.settings.find_one({"id": "main"}))
+    assert doc["payment_methods"]["cash_on_delivery"] is False and doc["cod_default_applied"] is True
+    # varsayılan kayıt (anahtar False) ama yönetici hiç kaydetmemiş → açılır
+    run(db.settings.delete_many({}))
+    run(db.audit_logs.delete_many({}))
+    run(db.settings.insert_one({"id": "main", "payment_methods": {"credit_card": True, "cash_on_delivery": False}}))
+    assert run(cod_rules.ensure_cod_default(db)) == "enabled"

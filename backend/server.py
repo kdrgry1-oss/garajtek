@@ -106,6 +106,13 @@ from routes.iys_integration import router as iys_router
 # Database
 from routes.deps import client, db
 
+async def ensure_cod_default_once():
+    from cod_rules import ensure_cod_default
+    res = await ensure_cod_default(db)
+    if res in ("enabled", "kept"):
+        logger.info(f"[kapıda ödeme] varsayılan uygulandı: {res}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown"""
@@ -420,6 +427,12 @@ async def lifespan(app: FastAPI):
         _asyncio.create_task(_seed_categories_if_empty())
     except Exception as e:
         logger.warning(f"Category seed start warning: {e}")
+
+    # Kapıda ödeme varsayılanı: yönetici hiç değiştirmediyse BİR KEZ açılır (cod_rules.ensure_cod_default).
+    try:
+        await ensure_cod_default_once()
+    except Exception as e:
+        logger.warning(f"COD default start warning: {e}")
 
     # Kupon ilk-sipariş istisna listesi (müşteri destek istisnası) — idempotent seed.
     try:

@@ -116,6 +116,14 @@ async def get_maintenance_status():
 async def get_settings():
     """Get global settings"""
     settings = await db.settings.find_one({"id": "main"}, {"_id": 0})
+    if settings and not settings.get("cod_default_applied"):
+        # Kapıda ödeme varsayılanı (tek seferlik; yönetici seçimi korunur) — cod_rules.ensure_cod_default
+        try:
+            from cod_rules import ensure_cod_default
+            await ensure_cod_default(db)
+            settings = await db.settings.find_one({"id": "main"}, {"_id": 0})
+        except Exception:
+            pass
     if not settings:
         settings = {
             "id": "main",
@@ -126,7 +134,10 @@ async def get_settings():
             "contact_email": "",
             "contact_phone": "",
             "address": "",
-            "payment_methods": {"credit_card": True, "bank_transfer": True, "cash_on_delivery": False},
+            # Kapıda ödeme ilk kurulumda AÇIK (yönetici Ayarlar › Ödeme'den kapatabilir); işaret,
+            # açılış göçünün (cod_rules.ensure_cod_default) yöneticinin seçimini ezmemesi içindir.
+            "payment_methods": {"credit_card": True, "bank_transfer": True, "cash_on_delivery": True},
+            "cod_default_applied": True,
             "barcode_range_start": "",
             "barcode_range_end": "",
             "default_vat_rate": 10,
