@@ -4,7 +4,7 @@ notifications.py — Admin bildirim ayarları ve şablon CRUD
 =============================================================================
 Endpoints:
   GET  /api/notifications/providers           → mevcut config
-  POST /api/notifications/providers           → kaydet (sms_active, whatsapp_active, email_active, providers{})
+  POST /api/notifications/providers           → kaydet (sms_active, email_active, providers{})
   GET  /api/notifications/providers/catalog   → kanal+sağlayıcı listesi (UI için)
 
   GET  /api/notifications/templates           → tüm event×channel şablonları
@@ -38,14 +38,13 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 class ProviderConfigReq(BaseModel):
     sms_active: Optional[str] = None
-    whatsapp_active: bool = False
     email_active: bool = True
     providers: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
 
 class TemplateReq(BaseModel):
     event: str
-    channel: str  # sms|email|whatsapp
+    channel: str  # sms|email
     enabled: bool = True
     subject: Optional[str] = ""
     body: str = ""
@@ -72,7 +71,7 @@ class TestReq(BaseModel):
 
 class TestTemplateReq(BaseModel):
     event: str
-    channel: str  # sms|whatsapp|email
+    channel: str  # sms|email
     to: str
     order_number: Optional[str] = None  # verilirse bu siparişi baz al; boşsa en son kargolanan
 
@@ -93,7 +92,6 @@ async def get_providers(current_user: dict = Depends(require_admin)):
         cfg = {
             "id": "notification_providers",
             "sms_active": None,
-            "whatsapp_active": False,
             "email_active": True,
             "providers": {},
         }
@@ -147,7 +145,6 @@ async def save_providers(req: ProviderConfigReq, current_user: dict = Depends(re
     data = {
         "id": "notification_providers",
         "sms_active": req.sms_active,
-        "whatsapp_active": req.whatsapp_active,
         "email_active": req.email_active,
         "providers": merged_provs,
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -571,7 +568,7 @@ async def apply_sms_defaults(current_user: dict = Depends(require_admin)):
     """SMS şablonlarını GÜNCEL varsayılan metinlere ZORLA uygular (manually_edited olsa bile üzerine yazar).
     Kullanıcı isteği: sipariş SMS'leri isim/soyisim, sipariş no ve kargo LİNKİ çekmiyordu ({tracking_number}
     yerine {tracking_url}) → tüm sipariş-döngüsü SMS metinleri değişken-dolu yeni sürüme çekilir.
-    Yalnız 'sms' kanalı; e-posta/whatsapp'a dokunmaz."""
+    Yalnız 'sms' kanalı; e-postaya dokunmaz."""
     applied, items = 0, []
     for (ev, ch), body in _DEFAULT_TEMPLATES.items():
         if ch != "sms" or not body:
@@ -657,7 +654,7 @@ async def send_test_template(req: TestTemplateReq, current_user: dict = Depends(
         "cart_url": (await _site_base()) + "/sepet",
     }
 
-    to_phone = req.to.strip() if req.channel in ("sms", "whatsapp") else None
+    to_phone = req.to.strip() if req.channel == "sms" else None
     to_email = req.to.strip() if req.channel == "email" else None
 
     res = await send_notification(

@@ -702,13 +702,8 @@ function VideoBanner({ block }) {
 function InstaShop({ block }) {
   const store = useStoreInfo();
   const igUrl = socialUrl("instagram", store.instagram);
-  const [feed, setFeed] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    axios.get(`${API}/instagram/feed?limit=12`).then((r) => { if (alive) setFeed(r.data?.posts || []); }).catch(() => { if (alive) setFeed([]); });
-    return () => { alive = false; };
-  }, []);
-  const posts = (Array.isArray(feed) && feed.length ? feed : (block?.images || []).map((img, i) => ({ image: img, product_link: block.links?.[i] || "/" }))).slice(0, 12);
+  // Instagram API akışı kaldırıldı — yalnız panelden seçilen görseller gösterilir.
+  const posts = (block?.images || []).map((img, i) => ({ image: img, product_link: block.links?.[i] || "/" })).slice(0, 12);
   if (!posts.length) return null;
   return (
     <div className="mb-6" data-testid="instashop">

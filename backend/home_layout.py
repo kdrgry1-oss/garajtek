@@ -22,7 +22,7 @@ _MIGRATION_KEY = "electro_home_v1"
 _TOP_BAR_TYPES = {"rotating_text", "countdown_bar"}
 # Eski seed-default-home iskeleti (görselsiz) — "el değmemiş" sayılır.
 _OLD_DEFAULT = {("hero_slider", "Ana Slider"), ("full_banner", "Tek Banner"), ("half_banners", "İki Banner"),
-                ("product_slider", "Yeni Sezon"), ("instashop", "Stilini Yarat")}
+                ("product_slider", "Yeni Sezon"), ("instashop", "Atölyemizden")}
 
 # Önerilen görsel ölçüleri (panelde gösterilir; vitrin yer tutucusu da bu oranı kullanır)
 SIZES = {

@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { Save, RefreshCw, Mail, MessageSquare, Phone, Send, FileText } from "lucide-react";
+import { Save, RefreshCw, Mail, Phone, Send, FileText } from "lucide-react";
 import { openAdminDocument } from "../../lib/adminDocuments";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -21,7 +21,6 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const CHANNEL_META = {
   sms: { label: "SMS", icon: Phone, color: "text-blue-600" },
   email: { label: "E-posta", icon: Mail, color: "text-purple-600" },
-  whatsapp: { label: "WhatsApp", icon: MessageSquare, color: "text-green-600" },
 };
 
 // Değişken paleti — tıkla-ekle. Her değişken ilgili bildirim türünde dolar
@@ -247,8 +246,8 @@ export default function NotificationTemplates() {
         {catalog.events.map(ev => (
           <div key={ev.key} className="bg-white border border-gray-200 rounded-lg">
             <div className="bg-gray-50 px-4 py-3 border-b font-semibold">{ev.name} <span className="text-xs text-gray-500">({ev.key})</span></div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 divide-x divide-gray-100">
-              {["sms", "email", "whatsapp"].map(ch => {
+            <div className="grid grid-cols-1 lg:grid-cols-2 divide-x divide-gray-100">
+              {["sms", "email"].map(ch => {
                 const meta = CHANNEL_META[ch];
                 const Ico = meta.icon;
                 const t = map[`${ev.key}|${ch}`] || { enabled: false, subject: "", body: "" };
@@ -301,7 +300,7 @@ export default function NotificationTemplates() {
           Bir sipariş durumu seçin, <b>sipariş no</b> ve telefon/e-posta girin: o durumun <b>gerçek şablonu</b>,
           girdiğiniz siparişin <b>gerçek verisiyle</b> (isim, sipariş no, takip no…) doldurulup gönderilir —
           böylece her durumda bildirimin tam nasıl gideceğini görürsünüz. Sipariş no boş bırakılırsa
-          en son kargoya verilen sipariş baz alınır. SMS/WhatsApp için telefon, e-posta testi için e-posta girin.
+          en son kargoya verilen sipariş baz alınır. SMS için telefon, e-posta testi için e-posta girin.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <select value={testEvent} onChange={(e) => setTestEvent(e.target.value)}
@@ -321,7 +320,7 @@ export default function NotificationTemplates() {
             data-testid="notif-test-to" />
         </div>
         <div className="flex flex-wrap gap-2">
-          {["sms", "whatsapp", "email"].map(ch => {
+          {["sms", "email"].map(ch => {
             const meta = CHANNEL_META[ch];
             const Ico = meta.icon;
             return (

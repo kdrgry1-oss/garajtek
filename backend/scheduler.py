@@ -17,7 +17,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # kullanmadığı büyük alanlar hariç (görseller, açıklamalar, Ticimax ham alanları, SEO metinleri).
 _LIGHT_PRODUCT_PROJ = {"_id": 0, "images": 0, "description": 0, "short_description": 0,
                        "long_description": 0, "ticimax_fields": 0, "seo_description": 0,
-                       "meta_description": 0, "size_table_html": 0, "video_url": 0, "videos": 0}
+                       "meta_description": 0, "video_url": 0, "videos": 0}
 
 logger = logging.getLogger(__name__)
 
@@ -1638,66 +1638,6 @@ def _lead(fn):
     return _w
 
 
-async def _refresh_instagram_token():
-    """SINIRSIZ Instagram feed: 60 günlük kullanıcı token'ı ~45 günde bir otomatik yeniden
-    exchange edilir (fb_exchange_token → taze 60 gün). Kullanıcı bir daha dokunmaz.
-    token_obtained_at 45 günden yeniyse hiçbir şey yapmaz; app_id sayısal değilse (bozuk kayıt) atlar.
-    Ödeme/sipariş akışıyla ilgisi yoktur — tamamen bağımsız görev."""
-    from routes.deps import db
-    try:
-        from security.crypto import encrypt, decrypt
-    except Exception:
-        def encrypt(x): return x
-        def decrypt(x): return x
-    try:
-        s = await db.settings.find_one({"id": "instagram"}, {"_id": 0}) or {}
-        tok_enc = s.get("access_token")
-        app_id = str(s.get("app_id") or "").strip()
-        app_secret_enc = s.get("app_secret")
-        obtained = s.get("token_obtained_at")
-        if not (tok_enc and app_id and app_secret_enc and obtained) or not app_id.isdigit():
-            return
-        try:
-            _dt = datetime.fromisoformat(obtained)
-            if _dt.tzinfo is None:
-                _dt = _dt.replace(tzinfo=timezone.utc)
-        except Exception:
-            return
-        if (datetime.now(timezone.utc) - _dt).days < 45:
-            return  # henüz erken
-        cur_token = decrypt(tok_enc)
-        app_secret = decrypt(app_secret_enc)
-        import httpx
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.get("https://graph.facebook.com/v23.0/oauth/access_token", params={
-                "grant_type": "fb_exchange_token", "client_id": app_id,
-                "client_secret": app_secret, "fb_exchange_token": cur_token})
-        if r.status_code == 200 and (r.json() or {}).get("access_token"):
-            new_tok = r.json()["access_token"]
-            await db.settings.update_one({"id": "instagram"}, {"$set": {
-                "access_token": encrypt(new_tok),
-                "token_obtained_at": datetime.now(timezone.utc).isoformat(),
-                "token_refreshed_at": datetime.now(timezone.utc).isoformat(),
-                "last_error": ""}})
-            logger.info("[instagram] uzun ömürlü token otomatik yenilendi (+60 gün)")
-        else:
-            _t = r.text[:200] if hasattr(r, "text") else str(r.status_code)
-            logger.warning(f"[instagram] token yenilenemedi: {_t}")
-    except Exception as e:
-        logger.warning(f"[instagram] token refresh hata: {e}")
-
-
-async def _run_visual_index_refresh():
-    """WhatsApp görselden-ürün-tanıma hafızasını OTOMATİK doldurur/günceller.
-    Yalnız EKSİK (indekslenmemiş) aktif ürünleri işler → ilk çalışmada tümünü kurar,
-    sonraki çalışmalarda yeni eklenenleri tamamlar (token/manuel tetik gerekmez)."""
-    try:
-        from routes.whatsapp_webhook import _run_visual_index_build
-        await _run_visual_index_build(force=False)
-    except Exception as e:
-        logger.error(f"[cron] görsel indeks yenileme hatası: {e}")
-
-
 async def _run_member_stats_refresh():
     """Üye sipariş istatistiklerini (users.cached_*) yeniden hesapla — üye listesi/segment/stats
     sayfaları bu önbellekten okur (per-üye aggregation kaldırıldı → sayfalar anında açılır)."""
@@ -1729,28 +1669,6 @@ def start_scheduler():
         minutes=15,
         id="member_stats_refresh",
         next_run_time=datetime.now(timezone.utc) + timedelta(seconds=60),
-        max_instances=1,
-        coalesce=True,
-    )
-    # SINIRSIZ Instagram feed: token'ı günde bir kontrol et, 45 günü geçince otomatik yenile.
-    _add(
-        _refresh_instagram_token,
-        "interval",
-        hours=24,
-        id="instagram_token_refresh",
-        next_run_time=datetime.now(timezone.utc) + timedelta(seconds=120),
-        max_instances=1,
-        coalesce=True,
-    )
-    # WhatsApp görsel hafızası (görselden ürün tanıma) — OTOMATİK doldur/güncelle.
-    # İlk çalışma boot+3dk'da tüm eksikleri kurar; 12 saatte bir yeni ürünleri tamamlar
-    # (yalnız indekslenmemişleri işler → tekrar tarama yapmaz, maliyet düşük).
-    _add(
-        _run_visual_index_refresh,
-        "interval",
-        hours=12,
-        id="wa_visual_index_refresh",
-        next_run_time=datetime.now(timezone.utc) + timedelta(seconds=180),
         max_instances=1,
         coalesce=True,
     )
@@ -1818,23 +1736,6 @@ def start_scheduler():
         max_instances=1,
         coalesce=True,
     )
-    # Instagram akışı — auto_sync açık + token varsa her 30 dk mağazanın Instagram gönderilerini tazeler.
-    try:
-        from routes.instagram import auto_sync_instagram
-        # İşletme isteği: Instagram feed'i 2 GÜNDE BİR arka planda otomatik tara (elle "şimdi çek" dışında).
-        # Boot'tan 2 dk sonra bir kez, sonra her 48 saatte bir. (Önceden 30 dk idi — IG API'ye
-        # gereksiz yüktü ve etkili çalışmıyordu; istenen kadans 2 gün.)
-        _add(
-            auto_sync_instagram,
-            "interval",
-            days=2,
-            id="instagram_auto_sync",
-            next_run_time=datetime.now(timezone.utc) + timedelta(seconds=120),
-            max_instances=1,
-            coalesce=True,
-        )
-    except Exception as _e:
-        logging.getLogger("scheduler").warning("[scheduler] instagram job eklenemedi: %s", _e)
     # Tek seferlik: konsinye stok alanını veritabanından da kaldır (ölü alan).
     _add(
         _ensure_consignment_removed,

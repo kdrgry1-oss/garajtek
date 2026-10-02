@@ -16,33 +16,6 @@ export const TRAINING_UPDATES = [
     intro: "Beyaz etiket ayarları, birleşik ekranlar, rapor tanımları ve salt-okunur kontroller için güncel başvuru.",
     items: [
       {
-        key: "full-look-mobile-2026-09-09",
-        title: "Full Look mobil görünümü",
-        path: "/admin/sayfa-tasarimi?tab=full-look",
-        what: "Mobilde kombin fotoğrafı tam genişlikte, parçalar altında iki sütunlu kartlarla gösterilir. Fotoğraf kırpılmaz; Parçaları keşfet bağlantısı ilgili ürün grubuna kaydırır.",
-        where: "Full Look düzenleyici → Mobil önizleme; müşteride Koleksiyonlar → Full Look.",
-        how: [
-          "Kaynak üründen seçilen aynı fotoğraf mobilde de kullanılır. Alt ve üstü birlikte gösteren bir fotoğraf seçin; yakın plan bir fotoğrafı sistem kendiliğinden tam boy fotoğrafa dönüştürmez.",
-          "İki ürün tek sıra, dört ürün iki sıra halinde görünür. Kartın tamamına dokunmak ürün detayını açar; fiyatlar katalogdan gelir.",
-          "Mobil önizleme düğmesi yalnız görünümü değiştirir. Ürün/kombin sırası masaüstüyle ortaktır; Yayında ve Kaydet kontrolleri her iki görünümü birlikte yönetir.",
-        ],
-      },
-      {
-        key: "full-look-editor-2026-09-09",
-        title: "Full Look: kombin fotoğrafı ve ürünlerini birlikte yayınlama",
-        path: "/admin/sayfa-tasarimi?tab=full-look",
-        what: "Full Look sayfasında büyük kombin fotoğrafının yanında o görseldeki ürünler güncel fiyatlarıyla listelenir. Mobilde fotoğraf üstte, ürünler altta görünür.",
-        where: "Tasarım → Sayfa Tasarımı → Full Look Sayfası Düzenleme. Sayfa Tasarımı yetkisi gerekir.",
-        how: [
-          "Kombin Ekle'ye basın. Solda kaynak ürünü adı veya stok koduyla arayın; galerisindeki hangi fotoğrafı kullanacağınızı seçin. Fotoğraf kırpılmadan gösterilir.",
-          "Sağdaki aramayla görselde bulunan alt, üst ve aksesuarları ekleyin. En fazla 8 ürün seçilebilir; oklarla ürünleri ve kombinleri sıralayın.",
-          "Mobil/Masaüstü önizlemede görünümü kontrol edin. Yayında seçeneği kapalı kombinler taslak olarak saklanır. Değişiklikleri Kaydet'e basmadan hiçbir değişiklik müşteriye yansımaz.",
-          "Koleksiyonlar → Full Look veya /full-look üzerinden yayını kontrol edin. Kartlar ürün detayına gider; beden seçimi ve sepete ekleme normal ürün sayfasındadır.",
-          "Fiyatlar elle girilmez: mevcut ürün fiyatları ve geçerli ürün kampanyaları kullanılır. Kupon ve havale indirimleri sepet aşamasına aittir. Pasif/silinmiş/üyeye özel ürünler herkese açık görünümde listelenmez; kaynak fotoğrafı kaldırılan kombin gizlenir.",
-          "Başka bir kullanıcı aynı sayfayı kaydettiyse sürüm çakışması uyarısı çıkar. Taslağınız otomatik silinmez; yaptığınız değişiklikleri not alıp sayfayı yeniden yükleyerek güncel sürüme uygulayın.",
-        ],
-      },
-      {
         key: "promotion-calculation-order-2026-09-08",
         title: "Kampanya ve kupon indirim sırası",
         path: "/admin/kampanyalar",

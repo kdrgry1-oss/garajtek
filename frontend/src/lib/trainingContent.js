@@ -123,7 +123,7 @@ export const TRAINING = [
     key: "katalog",
     title: "Katalog",
     icon: "Package",
-    intro: "Ürünler, kategoriler, varyantlar, ölçü tabloları, toplu stok/fiyat.",
+    intro: "Ürünler, kategoriler, varyantlar, teknik özellikler, toplu stok/fiyat.",
     items: [
       {
         title: "Tüm Ürünler",
@@ -175,18 +175,6 @@ export const TRAINING = [
         where: "Katalog → XML Feed'ler.",
         how: ["Feed adresini kopyalayıp ilgili platforma tanıt; kapsamı ayarla."],
         tips: ["Stoğu biten varyantlar feed'de 'stokta yok' olarak işaretlenir."],
-      },
-      {
-        title: "Ölçü Tabloları",
-        path: "/admin/olcu-tablolari",
-        what: "Ürün beden/ölçü tablosu; suud-tarzı görsel tablo ve 1200x1800 JPEG üretimi.",
-        where: "Katalog → Ölçü Tabloları (veya ürün içinden).",
-        how: [
-          "Bedenleri ve ölçü sütunlarını (göğüs, bel, boy...) gir.",
-          "Ürün bedeni ve manken boy/kilo bilgisini ekle.",
-          "'Görsel Üret' ile 1200x1800 tabloyu oluştur; indir ve ürüne son resim olarak ata.",
-        ],
-        tips: ["Üretilen görsel indirilebilir; ürünün son görseli olarak da atanır."],
       },
       {
         title: "Stok & Fiyat Alarm / Stok Uyarıları",
@@ -293,13 +281,6 @@ export const TRAINING = [
         how: ["Kolon başlıkları ve linklerini düzenle; KVKK/iletişim linklerini ekle."],
       },
       {
-        title: "Instagram Akışı",
-        path: "/admin/instagram",
-        what: "Anasayfada Instagram gönderi akışı (dossha-tarzı ızgara).",
-        where: "Tasarım → Instagram Akışı.",
-        how: ["Hesabı bağla veya gönderi görsellerini/linklerini ekle; ızgarayı yayınla."],
-      },
-      {
         title: "Sayfalar (CMS) & Sayfa Tasarımı",
         path: "/admin/sayfalar",
         what: "Hakkımızda, iade koşulları, mesafeli satış vb. statik sayfalar.",
@@ -312,7 +293,7 @@ export const TRAINING = [
     key: "uyeler",
     title: "Üyeler",
     icon: "Users",
-    intro: "Üye listesi, B2B grupları, segmentler, sorular ve destek talepleri.",
+    intro: "Üye listesi, B2B grupları, segmentler ve destek talepleri.",
     items: [
       {
         title: "Üye Listesi",
@@ -330,11 +311,11 @@ export const TRAINING = [
         how: ["Segmentleri kampanyada hedefle."],
       },
       {
-        title: "Müşteri Soruları & Destek Talepleri",
-        path: "/admin/sorular",
-        what: "Ürün soruları ve destek (ticket) yönetimi.",
-        where: "Üyeler → Müşteri Soruları / Destek Talepleri.",
-        how: ["Soruyu/talebi aç, yanıtla; ürün sorusunu yayınla veya gizle."],
+        title: "Destek Talepleri",
+        path: "/admin/tickets",
+        what: "Destek (ticket) yönetimi.",
+        where: "Üyeler → Destek Talepleri.",
+        how: ["Talebi aç, yanıtla ve durumunu güncelle."],
       },
       {
         title: "Bloklu Müşteriler",
@@ -455,13 +436,6 @@ export const TRAINING = [
         what: "Ticari elektronik ileti izinlerinin İYS'ye bildirimi.",
         where: "Entegrasyonlar → İYS.",
         how: ["İzinleri senkronize et; onay/ret durumlarını gör."],
-      },
-      {
-        title: "AI Asistan",
-        path: "/admin/ai-asistan",
-        what: "Ürün açıklaması, başlık ve içerik için yapay zeka desteği.",
-        where: "Sistem → AI Asistan.",
-        how: ["İstemi yaz; öneriyi düzenleyip ürüne uygula."],
       },
     ],
   },

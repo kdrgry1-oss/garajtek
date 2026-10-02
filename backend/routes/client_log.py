@@ -6,11 +6,9 @@ Akış: index.html'deki küçük ES5 beacon, sayfa açılınca / hata olunca / u
 MOUNT olamayınca buraya POST atar. Sunucu IP + UA damgalar. Admin panelden
 (GET /admin/client-load-events) cihaz/IP/hata dökümü görülür.
 """
-import hmac
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request, Depends
-from fastapi.responses import PlainTextResponse
 
 from .deps import db, logger, require_admin, limiter
 
@@ -137,49 +135,3 @@ async def list_client_load_events(limit: int = 200, status: str = "",
     return {"events": rows, "summary": summary}
 
 
-@router.get("/client-load-events/peek")
-async def peek_client_load_events(key: str = "", limit: int = 120, only_fail: bool = True):
-    """Uygulama MOUNT olmasa da (admin panel açılmasa da) olayları görebilmek için token-gated
-    okuma. Anahtar = WhatsApp verify_token (ayrı sır tutmadan hızlı teşhis)."""
-    try:
-        s = await db.settings.find_one({"id": "notification_providers"}, {"_id": 0}) or {}
-        vt = ((s.get("providers") or {}).get("whatsapp_meta") or {}).get("verify_token") or ""
-    except Exception:
-        vt = ""
-    if not vt or not hmac.compare_digest(str(key), str(vt)):
-        return PlainTextResponse("forbidden", status_code=403)
-    q = {}
-    if only_fail:
-        q["status"] = {"$in": ["mount_fail", "error", "unhandledrejection"]}
-    rows = await db.client_load_events.find(q, {"_id": 0}).sort("at", -1)\
-        .limit(min(int(limit or 120), 400)).to_list(400)
-    # Hata mesajlarını grupla (en sık çıkan hata neyse o kök sebep).
-    buckets = {}
-    for r in rows:
-        msg = (r.get("message") or r.get("status") or "").strip()
-        key2 = msg[:160]
-        b = buckets.setdefault(key2, {"message": key2, "count": 0, "os": {}, "browser": {}, "sample": None})
-        b["count"] += 1
-        b["os"][r.get("os", "?")] = b["os"].get(r.get("os", "?"), 0) + 1
-        b["browser"][r.get("browser", "?")] = b["browser"].get(r.get("browser", "?"), 0) + 1
-        if not b["sample"]:
-            b["sample"] = {"ua": r.get("ua", ""), "url": r.get("url", ""), "at": r.get("at"),
-                           "source": r.get("source", ""), "line": r.get("line")}
-    top = sorted(buckets.values(), key=lambda x: x["count"], reverse=True)[:12]
-    async def _c(qq):
-        try:
-            return await db.client_load_events.count_documents(qq)
-        except Exception:
-            return -1
-    return {
-        "summary": {
-            "ok": await _c({"status": "ok"}),
-            "mount_fail": await _c({"status": "mount_fail"}),
-            "error": await _c({"status": "error"}),
-            "unhandledrejection": await _c({"status": "unhandledrejection"}),
-            "heal_reload": await _c({"status": "heal_reload"}),
-            "total": await _c({}),
-        },
-        "top_errors": top,
-        "recent": rows[:40],
-    }

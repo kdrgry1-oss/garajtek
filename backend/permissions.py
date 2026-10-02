@@ -27,7 +27,6 @@ PERMISSION_TREE = [
             {"key": "products.import_xlsx", "label": "Excel İçe Aktar"},
             {"key": "products.import_technical", "label": "Teknik Özellik Yükle"},
             {"key": "products.attributes", "label": "Özellik Kütüphanesi"},
-            {"key": "products.size_table", "label": "Ölçü Tablosu Düzenle"},
             {"key": "products.categories", "label": "Kategori Yönet"},
         ],
     },
@@ -56,15 +55,6 @@ PERMISSION_TREE = [
             {"key": "returns.iyzico_refund", "label": "Iyzico Kart İadesi"},
             {"key": "returns.cargo_rebook", "label": "Yeni Kargo Barkodu"},
             {"key": "returns.refund_pay", "label": "İade Ödemesi Yap (Bedeli Ödendi)"},
-        ],
-    },
-    {
-        "key": "questions",
-        "label": "Müşteri Soruları",
-        "children": [
-            {"key": "questions.view", "label": "Görüntüle"},
-            {"key": "questions.answer", "label": "Yanıtla"},
-            {"key": "questions.sync", "label": "Senkronize Et"},
         ],
     },
     {
@@ -118,7 +108,6 @@ PERMISSION_TREE = [
             {"key": "tasarim.menu", "label": "Menü Yönetimi"},
             {"key": "tasarim.page_design", "label": "Sayfa Tasarımı"},
             {"key": "tasarim.footer", "label": "Footer Tasarımı"},
-            {"key": "tasarim.instagram", "label": "Instagram Akışı"},
             {"key": "tasarim.email", "label": "E-posta Pazarlama"},
             {"key": "tasarim.cms", "label": "Sayfalar (CMS)"},
         ],
@@ -191,7 +180,6 @@ DEFAULT_ROLES = [
             "orders.cargo", "orders.cancelled_tab",
             "returns.view", "returns.approve", "returns.reject", "returns.expense_note",
             "returns.cargo_rebook",
-            "questions.view", "questions.answer", "questions.sync",
             "customers.view",
         ],
         "is_system": True,
@@ -213,12 +201,11 @@ DEFAULT_ROLES = [
     {
         "id": "customer_service",
         "name": "Müşteri Hizmetleri",
-        "description": "Müşteri soruları ve iade ön onayı.",
+        "description": "Sipariş notları ve iade ön onayı.",
         "permissions": [
             "dashboard.view",
             "orders.view", "orders.note",
             "returns.view", "returns.approve", "returns.reject",
-            "questions.view", "questions.answer", "questions.sync",
             "customers.view",
         ],
         "is_system": True,

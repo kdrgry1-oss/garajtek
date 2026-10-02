@@ -1,6 +1,6 @@
 """
 =============================================================================
-notification_service.py — Çok kanallı (SMS + Mail + WhatsApp) bildirim servisi
+notification_service.py — Çok kanallı (SMS + Mail) bildirim servisi
 =============================================================================
 
 AMAÇ:
@@ -11,7 +11,6 @@ AMAÇ:
 Kanallar:
   - SMS  : Netgsm, İletiMerkezi, Twilio, Vatansms, Verimor, Mutlucep,
            Mobildev, Postagüvercini (kargo gibi çoklu — sadece birisi aktif)
-  - WhatsApp : Meta Cloud API (Business phone number)
   - E-posta : Resend (mevcut altyapıyı kullanır)
 
 Events (template keys):
@@ -23,7 +22,7 @@ Events (template keys):
   {customer_name}, {order_number}, {amount}, {tracking_number}, {otp_code}
 
 Her provider için credential'lar MongoDB `settings` koleksiyonunda:
-  settings.id = "notification_providers"  → {sms_active, whatsapp_active, providers: {...}}
+  settings.id = "notification_providers"  → {sms_active, email_active, providers: {...}}
 
 Template'ler MongoDB `notification_templates` koleksiyonunda.
 =============================================================================
@@ -87,7 +86,7 @@ DEFAULT_EVENTS = [
     {"key": "admin_new_order", "name": "Yeni Sipariş (Admin)"},
 ]
 
-CHANNELS = ["sms", "email", "whatsapp"]
+CHANNELS = ["sms", "email"]
 
 
 _TRUSTED_HTML_VARS = frozenset({"coupon_block"})
@@ -305,51 +304,6 @@ _sms_generic = _sms_guard(_sms_generic)
 
 
 # =============================================================================
-# WHATSAPP (META CLOUD API)
-# =============================================================================
-
-async def _whatsapp_send(cfg: Dict, to: str, message: str, template_name: Optional[str] = None,
-                         template_params: Optional[List[str]] = None, lang: str = "tr") -> Dict:
-    """Meta WhatsApp Cloud API — text (24-h window) veya template message.
-    Credential: phone_number_id, access_token.
-    """
-    pnid = cfg.get("phone_number_id", "")
-    token = cfg.get("access_token", "")
-    api_ver = cfg.get("api_version", "v23.0")
-    if not pnid or not token:
-        return {"success": False, "response": "credentials_missing"}
-    url = f"https://graph.facebook.com/{api_ver}/{pnid}/messages"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-    if template_name:
-        payload: Dict[str, Any] = {
-            "messaging_product": "whatsapp",
-            "to": to,
-            "type": "template",
-            "template": {
-                "name": template_name,
-                "language": {"code": lang},
-            },
-        }
-        if template_params:
-            payload["template"]["components"] = [{
-                "type": "body",
-                "parameters": [{"type": "text", "text": str(p)} for p in template_params]
-            }]
-    else:
-        payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": to,
-            "type": "text",
-            "text": {"preview_url": False, "body": message},
-        }
-    async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.post(url, headers=headers, json=payload)
-        return {"success": r.status_code in (200, 201), "response": r.text[:700]}
-
-
-# =============================================================================
 # EMAIL (RESEND)
 # =============================================================================
 
@@ -394,7 +348,7 @@ async def _order_sender(db, event: str) -> Dict:
 # ORCHESTRATION
 # =============================================================================
 
-# DENETİM (kimlik B-1): providers.* sırları (Netgsm password, WhatsApp/Meta
+# DENETİM (kimlik B-1): providers.* sırları (Netgsm password, sağlayıcı
 # page_access_token & app_secret, Telegram auth_token …) DB'de AÇIK yazılıyordu.
 # Kaydederken Fernet ile şifrelenir (notifications.save_providers), okuyan HER yer
 # aşağıdaki yardımcılarla çözer. decrypt legacy düz-metni olduğu gibi döndürür →
@@ -434,7 +388,7 @@ def decrypt_providers_doc(doc: Optional[Dict]) -> Dict:
 async def _get_providers_config(db) -> Dict:
     doc = await db.settings.find_one({"id": "notification_providers"}, {"_id": 0})
     if not doc:
-        return {"sms_active": None, "whatsapp_active": False, "email_active": True,
+        return {"sms_active": None, "email_active": True,
                 "providers": {}}
     return decrypt_providers_doc(doc)
 
@@ -537,7 +491,7 @@ async def send_notification(
         "login_verification_code": "{store_name} giris dogrulama kodunuz: {otp_code} (5 dk gecerli).",
     }
     def _tpl_on(_tpl) -> bool:
-        # Şablon VARSA (WhatsApp/email için de güvenli): aktif olmalı VEYA kritik event.
+        # Şablon VARSA (e-posta için de güvenli): aktif olmalı VEYA kritik event.
         return bool(_tpl) and (_tpl.get("enabled", True) or event in _CRITICAL_EVENTS)
 
     def _sms_on(_tpl) -> bool:
@@ -572,29 +526,6 @@ async def send_notification(
             results["sms"] = {"success": False, "response": "sms-template-missing-or-disabled"}
             await _log_event(db, event=event, channel="sms", to=to, status="skipped",
                              response="şablon yok veya pasif (event=%s)" % event, variables=variables)
-
-    # --- WhatsApp ---
-    if "whatsapp" in active_channels and to_phone and cfg.get("whatsapp_active"):
-        to = normalize_phone_tr(to_phone)
-        tpl = await _get_template(db, event, "whatsapp")
-        if _tpl_on(tpl):
-            msg = render_template(tpl.get("body", ""), variables)
-            wa_cfg = providers.get("whatsapp_meta", {})
-            try:
-                res = await _whatsapp_send(
-                    wa_cfg, to, msg,
-                    template_name=tpl.get("meta_template_name") or None,
-                    template_params=[render_template(p, variables) for p in (tpl.get("meta_template_params") or [])],
-                    lang=tpl.get("meta_template_lang", "tr"),
-                )
-                results["whatsapp"] = res
-                await _log_event(db, event=event, channel="whatsapp", to=to,
-                                 status="success" if res.get("success") else "failed",
-                                 response=str(res.get("response", "")), variables=variables)
-            except Exception as e:
-                results["whatsapp"] = {"success": False, "response": str(e)}
-                await _log_event(db, event=event, channel="whatsapp", to=to, status="error",
-                                 response=str(e), variables=variables)
 
     # --- Email ---
     if "email" in active_channels and to_email and cfg.get("email_active", True):
@@ -641,8 +572,6 @@ async def test_provider(db, channel: str, provider_key: Optional[str], to: str, 
     if channel == "sms":
         impl = SMS_IMPL.get(provider_key or "", _sms_generic)
         return await impl(prov_cfg, normalize_phone_tr(to), message)
-    if channel == "whatsapp":
-        return await _whatsapp_send(providers.get("whatsapp_meta", {}), normalize_phone_tr(to), message)
     if channel == "email":
         return await _email_send(db, to, "Test Bildirim", f"<p>{message}</p>")
     return {"success": False, "response": "unknown_channel"}

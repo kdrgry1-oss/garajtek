@@ -153,9 +153,7 @@ GAPS = [
     "Teslimattan N gün sonra 'Ürününüzü değerlendirin / yorum yazın' bildirimi yok.",
     "DHL taramasında 'dağıtımda' ve 'teslim edilemedi (şubede)' hareketleri otomatik bildirime bağlanmıyor (yalnız kargoya verildi + teslim edildi).",
     "Havale onayında yalnız 'Ödemenizi Aldık' gider; kart siparişindeki 'Sipariş Onaylandı' ile içerik birleştirilebilir (tek şablon).",
-    "WhatsApp kanalı: hiçbir şablon aktif değil ve sağlayıcı yapılandırılmamış görünüyor; kullanılmayacaksa panelden gizlenebilir.",
     "Hoş geldin bildirimi yalnız e-posta; SMS istenirse kod tarafında kanal açılmalı.",
-    "Pazaryeri (Trendyol/Hepsiburada) siparişlerine site SMS'i gitmez — bilinçli tercih; raporda bilgi amaçlı.",
 ]
 
 DUPLICATES = [

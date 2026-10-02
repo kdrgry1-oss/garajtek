@@ -12,7 +12,6 @@ import Home from "./pages/Home";
 const GizlilikPolitikasi = lazy(() => import("./pages/GizlilikPolitikasi"));
 const Category = lazy(() => import("./pages/Category"));
 const CampaignProducts = lazy(() => import("./pages/CampaignProducts"));
-const FullLook = lazy(() => import("./pages/FullLook"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Cart = lazy(() => import("./pages/Cart"));
 const Checkout = lazy(() => import("./pages/Checkout"));
@@ -155,9 +154,6 @@ function App() {
                 <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/kategori/:slug" element={<Category />} />
-                <Route path="/full-look" element={<FullLook />} />
-                <Route path="/full-look/:lookRef" element={<FullLook />} />
-                <Route path="/kategori/full-look" element={<FullLook />} />
                 <Route path="/sepet" element={<Cart />} />
                 <Route path="/odeme" element={<Checkout />} />
                 <Route path="/arama" element={<Search />} />

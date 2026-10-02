@@ -1,4 +1,4 @@
-// TEK KAYNAK — ürün fiyat/indirim görünümü. Vitrin kartı, arama, menü, kombin, öneri,
+// TEK KAYNAK — ürün fiyat/indirim görünümü. Vitrin kartı, arama, menü, benzer ürün, öneri,
 // kasa-önü, ürün detay… HER YER burayı kullanır ki indirimler tutarlı görünsün.
 //
 // İndirim sırası (sepet motoruyla AYNI mantık):

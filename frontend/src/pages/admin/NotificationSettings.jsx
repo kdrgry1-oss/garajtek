@@ -3,7 +3,6 @@
  * NotificationSettings.jsx — Bildirim sağlayıcı ayarları
  * =============================================================================
  * SMS sağlayıcıları (Netgsm, İletiMerkezi, Twilio, VatanSMS, Verimor...)
- * WhatsApp Meta Cloud API credential
  * E-posta (Resend - mevcut) aktif/pasif
  *
  * Endpoint'ler:
@@ -17,7 +16,7 @@ import { SITE_NAME } from "../../lib/brand";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { Save, Send, MessageSquare, Mail, Phone } from "lucide-react";
+import { Save, Send, Mail, Phone } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -35,7 +34,7 @@ const FIELD_MAP = {
 export default function NotificationSettings() {
   const [catalog, setCatalog] = useState({ sms_providers: [], events: [] });
   const [cfg, setCfg] = useState({
-    sms_active: null, whatsapp_active: false, email_active: true, providers: {},
+    sms_active: null, email_active: true, providers: {},
   });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -52,7 +51,6 @@ export default function NotificationSettings() {
       const d = r.data || {};
       setCfg({
         sms_active: d.sms_active || null,
-        whatsapp_active: !!d.whatsapp_active,
         email_active: d.email_active !== false,
         providers: d.providers || {},
       });
@@ -99,7 +97,7 @@ export default function NotificationSettings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Bildirim Ayarları</h1>
-          <p className="text-sm text-gray-500 mt-1">SMS, E-posta ve WhatsApp kanalları için sağlayıcı kimlik bilgileri.</p>
+          <p className="text-sm text-gray-500 mt-1">SMS ve E-posta kanalları için sağlayıcı kimlik bilgileri.</p>
         </div>
         <button onClick={handleSave} disabled={saving}
           className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-60"
@@ -139,113 +137,6 @@ export default function NotificationSettings() {
         )}
       </section>
 
-      {/* WhatsApp */}
-      <section className="bg-white rounded-lg border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <MessageSquare size={18} className="text-green-600" />
-            <h2 className="font-semibold">WhatsApp Business (Meta Cloud API)</h2>
-          </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={cfg.whatsapp_active}
-              onChange={(e) => setCfg(c => ({ ...c, whatsapp_active: e.target.checked }))}
-              data-testid="whatsapp-active-toggle" />
-            Aktif
-          </label>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[["phone_number_id", "Phone Number ID"], ["access_token", "Permanent Access Token"], ["api_version", "API Versiyon (ör. v23.0)"], ["verify_token", "Webhook Verify Token (kendin belirle)"], ["app_secret", "App Secret (imza doğrulama, ops.)"]].map(([f, lbl]) => (
-            <div key={f} className={f === "access_token" ? "md:col-span-2" : ""}>
-              <label className="block text-xs text-gray-600 mb-1">{lbl}</label>
-              <input value={cfg.providers?.whatsapp_meta?.[f] || ""}
-                onChange={(e) => setProvField("whatsapp_meta", f, e.target.value)}
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
-                data-testid={`wa-field-${f}`} />
-            </div>
-          ))}
-        </div>
-        <label className="flex items-center gap-2 text-sm cursor-pointer mt-4 pt-4 border-t border-gray-100">
-          <input type="checkbox"
-            checked={cfg.providers?.whatsapp_meta?.ai_autoreply === true}
-            onChange={(e) => setProvField("whatsapp_meta", "ai_autoreply", e.target.checked)}
-            data-testid="whatsapp-ai-autoreply-toggle" />
-          <span><strong>AI otomatik yanıt</strong> — gelen WhatsApp mesajlarına yapay zekâ, gerçek bir müşteri temsilcisi gibi cevap versin (düşük güvende insana devreder). Webhook Meta'da tanımlı olmalı.</span>
-        </label>
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <label className="block text-xs text-gray-600 mb-1">Temsilci (canlı devir) numarası</label>
-          <input value={cfg.providers?.whatsapp_meta?.handoff_notify_phone || ""}
-            onChange={(e) => setProvField("whatsapp_meta", "handoff_notify_phone", e.target.value)}
-            placeholder="ör. +90 5xx xxx xx xx"
-            className="w-full md:w-1/2 border border-gray-200 rounded px-3 py-2 text-sm"
-            data-testid="wa-field-handoff_notify_phone" />
-          <p className="text-[11px] text-gray-500 mt-2">
-            AI bir soruyu cevaplayamadığında, müşterinin sorusunu <strong>bu numaraya</strong> WhatsApp'tan iletir.
-            O alarm mesajını <strong>yanıtlayıp</strong> (kaydır/reply) cevabı yazdığınızda, cevap otomatik olarak
-            müşteriye gönderilir. (Bu esnada müşteriye mesaj gitmez; sessiz beklenir.) Alarm ulaşmazsa
-            firma e-postası ile de haber verilir. <strong>Not:</strong> işletme hattının kendi numarası olmamalı;
-            cevap verecek temsilcinin kişisel WhatsApp numarası olmalı.
-          </p>
-        </div>
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <label className="block text-xs text-gray-600 mb-1">WhatsApp'tan sipariş aldırma</label>
-          <div className="flex flex-col md:flex-row gap-3 md:items-center">
-            <select value={cfg.providers?.whatsapp_meta?.ordering_mode || "off"}
-              onChange={(e) => setProvField("whatsapp_meta", "ordering_mode", e.target.value)}
-              className="border border-gray-200 rounded px-3 py-2 text-sm"
-              data-testid="wa-ordering-mode">
-              <option value="off">Kapalı</option>
-              <option value="test">Test (sadece izinli numaralar)</option>
-              <option value="live">Canlı (tüm müşteriler)</option>
-            </select>
-            <input value={cfg.providers?.whatsapp_meta?.ordering_test_phones || ""}
-              onChange={(e) => setProvField("whatsapp_meta", "ordering_test_phones", e.target.value)}
-              placeholder="Test numaraları (virgülle): +90 5xx…, +90 5yy…"
-              className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm"
-              data-testid="wa-ordering-test-phones" />
-          </div>
-          <p className="text-[11px] text-gray-500 mt-2">
-            Açıkken Buse, müşterinin bilgilerini (ad-soyad, adres, beden, adet, e-posta + izin) alıp
-            <strong> siparişi sizin adınıza oluşturur</strong> (fiyat sunucudan; <strong>kart bilgisi asla istenmez</strong>).
-            <strong>Havale/EFT</strong> (banka bilgisi otomatik) ve <strong>kredi kartı</strong> (iyzico güvenli ödeme linki —
-            kart yalnız iyzico'da girilir) desteklenir; isteyen müşteriye <strong>üyelik</strong> de açılır.
-            <strong> Test</strong> modunda yalnız buraya yazdığınız numaralar (ve temsilci numarası) sipariş oluşturabilir —
-            canlı müşteriler etkilenmez. E-posta/SMS izinleri İYS'ye bildirilir.
-          </p>
-        </div>
-        <p className="text-[11px] text-gray-500 mt-2">
-          Webhook Callback URL: <code>{`${(process.env.REACT_APP_BACKEND_URL||'').replace(/\/$/,'')}/api/whatsapp/webhook`}</code> — Meta uygulamasında bu URL + yukarıdaki Verify Token ile "messages" alanına abone olun.
-        </p>
-      </section>
-
-      {/* Messenger + Instagram (Meta Messenger Platform) */}
-      <section className="bg-white rounded-lg border border-gray-200 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <MessageSquare size={18} className="text-pink-600" />
-          <h2 className="font-semibold">Messenger + Instagram DM (Meta)</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {[["page_access_token", "Page Access Token (Sayfa + bağlı IG)"], ["verify_token", "Webhook Verify Token (kendin belirle)"], ["app_secret", "App Secret (imza doğrulama, ops.)"], ["page_id", "Page ID (ops.)"]].map(([f, lbl]) => (
-            <div key={f} className={f === "page_access_token" ? "md:col-span-2" : ""}>
-              <label className="block text-xs text-gray-600 mb-1">{lbl}</label>
-              <input value={cfg.providers?.meta_messaging?.[f] || ""}
-                onChange={(e) => setProvField("meta_messaging", f, e.target.value)}
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
-                data-testid={`meta-msg-field-${f}`} />
-            </div>
-          ))}
-        </div>
-        <label className="flex items-center gap-2 text-sm cursor-pointer mt-4 pt-4 border-t border-gray-100">
-          <input type="checkbox"
-            checked={cfg.providers?.meta_messaging?.ai_autoreply === true}
-            onChange={(e) => setProvField("meta_messaging", "ai_autoreply", e.target.checked)}
-            data-testid="meta-msg-ai-autoreply-toggle" />
-          <span><strong>AI otomatik yanıt</strong> — Instagram ve Messenger DM'lerine yapay zekâ, gerçek bir müşteri temsilcisi gibi cevap versin (düşük güvende insana devreder).</span>
-        </label>
-        <p className="text-[11px] text-gray-500 mt-2">
-          Webhook Callback URL: <code>{`${(process.env.REACT_APP_BACKEND_URL||'').replace(/\/$/,'')}/api/meta-messaging/webhook`}</code> — Meta uygulamasında Messenger ve Instagram ürünlerinin Webhooks bölümünde bu URL + Verify Token ile "messages" alanına abone olun. IG hesabı, Sayfa'ya bağlı olmalı.
-        </p>
-      </section>
-
       {/* Email */}
       <section className="bg-white rounded-lg border border-gray-200 p-5">
         <div className="flex items-center justify-between">
@@ -273,7 +164,6 @@ export default function NotificationSettings() {
               className="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-white"
               data-testid="test-channel-select">
               <option value="sms">SMS</option>
-              <option value="whatsapp">WhatsApp</option>
               <option value="email">E-posta</option>
             </select>
           </div>
@@ -287,7 +177,7 @@ export default function NotificationSettings() {
           <button onClick={handleTest} disabled={testing}
             className="bg-blue-600 text-white px-4 py-2 rounded text-sm disabled:opacity-60"
             data-testid="test-send-btn">
-            {testing ? "Gönderiliyor..." : `Test ${testChannel === "email" ? "E-posta" : testChannel === "whatsapp" ? "WhatsApp" : "SMS"} Gönder`}
+            {testing ? "Gönderiliyor..." : `Test ${testChannel === "email" ? "E-posta" : "SMS"} Gönder`}
           </button>
         </div>
         <textarea value={testMsg} onChange={(e) => setTestMsg(e.target.value)}

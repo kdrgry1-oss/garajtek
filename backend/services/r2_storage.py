@@ -9,7 +9,7 @@ Sıra:
   3. Hiçbiri yoksa is_enabled() False → çağıranlar eski DB fallback'ine düşer.
 
 Fonksiyon imzaları (is_enabled / public_url / put_object / get_object / health_check)
-eski R2-yalnız modülle AYNIDIR; çağıranlar (routes/upload.py, size_tables.py,
+eski R2-yalnız modülle AYNIDIR; çağıranlar (routes/upload.py,
 orders.py, instagram.py) değişmeden iki depoyla da çalışır.
 """
 import os

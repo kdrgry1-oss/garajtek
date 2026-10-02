@@ -5,15 +5,11 @@
  * DEĞİŞTİRMEYİN — aksi takdirde mevcut tercihler bozulur.
  */
 import {
-  LayoutDashboard, Package, ShoppingCart, Tags, Image, Phone,
-  Megaphone, FileText, Settings, Palette, Plug, RotateCcw, Store, GitMerge, XCircle, Trash2,
-  Cable, Shield, Users, Ruler, MessageSquare, PenTool,
-  Truck, CreditCard, AlertTriangle, TrendingUp, Link2, BellRing, CheckSquare, Lock, Brain, Mail, Rss,
-  Instagram, GraduationCap,
+  LayoutDashboard, Package, ShoppingCart, Tags, Image, Megaphone, FileText, Settings, Palette, RotateCcw, Store, GitMerge, XCircle, Trash2, Cable, Shield, Users, MessageSquare, PenTool, Truck, CreditCard, AlertTriangle, TrendingUp, Link2, BellRing, Lock, Mail, Rss, GraduationCap,
 } from "lucide-react";
 
 // Default sıralama (kullanıcı tercihi yoksa kullanılır):
-// Siparişler → Katalog → Raporlar → Tasarım → Üyeler → Görevler →
+// Siparişler → Katalog → Raporlar → Tasarım → Üyeler →
 // Pazarlama → SEO → Entegrasyonlar → Sistem → Ayarlar
 export const navigationGroups = [
   {
@@ -43,7 +39,6 @@ export const navigationGroups = [
       { label: "Ürün Özellikleri", path: "/admin/urun-ozellikleri", icon: Tags },
       { label: "Varyantlar", path: "/admin/varyantlar", icon: GitMerge },
       { label: "XML Feed'ler", path: "/admin/xml-feedler", icon: Rss },
-      { label: "Ölçü Tabloları", path: "/admin/olcu-tablolari", icon: Ruler },
       { label: "Stok & Fiyat Alarm", path: "/admin/stok-alarm", icon: BellRing },
       { label: "Toplu Fiyat/Stok (Excel)", path: "/admin/toplu-fiyat-stok", icon: Package },
       { label: "Stok Uyarıları", path: "/admin/stok-uyarilari", icon: BellRing },
@@ -71,7 +66,6 @@ export const navigationGroups = [
       { label: "Menü Yönetimi", path: "/admin/menu-yonetimi", icon: LayoutDashboard },
       { label: "Sayfa Tasarımı", path: "/admin/sayfa-tasarimi", icon: Palette },
       { label: "Footer Tasarımı", path: "/admin/footer-tasarim", icon: Palette },
-      { label: "Instagram Akışı", path: "/admin/instagram", icon: Instagram },
       { label: "Sayfalar (CMS)", path: "/admin/sayfalar", icon: FileText },
     ],
   },
@@ -82,17 +76,10 @@ export const navigationGroups = [
     children: [
       { label: "Üye Listesi", path: "/admin/uyeler", icon: Users },
       { label: "Müşteri Segmentleri (RFM)", path: "/admin/musteri-segmentleri", icon: Users },
-      { label: "Müşteri Soruları", path: "/admin/sorular", icon: MessageSquare },
       { label: "Destek Talepleri", path: "/admin/tickets", icon: MessageSquare },
       { label: "Bloklu Müşteriler", path: "/admin/bloklu-musteriler", icon: Users },
       { label: "Pazarlama İzinleri (E-posta/SMS)", path: "/admin/izinler", icon: Users },
     ],
-  },
-  {
-    key: "gorevler",
-    label: "Görevler",
-    path: "/admin/gorevler",
-    icon: CheckSquare,
   },
   {
     key: "egitim",
@@ -135,7 +122,6 @@ export const navigationGroups = [
       { label: "BirFatura (e-Fatura)", path: "/admin/birfatura", icon: FileText },
       { label: "Reklam Pikselleri & CAPI", path: "/admin/ayarlar/pixel", icon: TrendingUp },
       { label: "SMS & İYS (NetGSM)", path: "/admin/iys", icon: MessageSquare },
-      { label: "WhatsApp & Instagram Mesajları", path: "/admin/sorular", icon: Instagram },
     ],
   },
   {
@@ -148,7 +134,6 @@ export const navigationGroups = [
       { label: "Kullanıcı İşlem Geçmişi", path: "/admin/islem-gecmisi", icon: FileText },
       { label: "Sistem Sağlığı", path: "/admin/sistem-sagligi", icon: Cable },
       { label: "Secrets Vault", path: "/admin/secrets-vault", icon: Lock },
-      { label: "AI Asistan", path: "/admin/ai-asistan", icon: Brain },
     ],
   },
   {

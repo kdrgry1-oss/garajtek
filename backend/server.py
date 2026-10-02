@@ -48,12 +48,6 @@ from routes.vendors import router as vendors_router
 from routes.pages import router as pages_router
 from routes.admin_rbac import router as admin_rbac_router
 from routes.seo import router as seo_router
-from routes.size_tables import router as size_tables_router, public_router as size_tables_public_router
-from routes.decision_board import router as decision_board_router
-from routes.ai_chatbot import router as ai_chatbot_router
-from routes.whatsapp_webhook import router as whatsapp_webhook_router
-from routes.meta_messaging_webhook import router as meta_messaging_webhook_router
-from routes.ai_assistant import router as ai_assistant_router
 from routes.locations import router as locations_router
 from routes.attribution import router as attribution_router
 from routes.members import router as members_router
@@ -81,7 +75,6 @@ from routes.catalog_extras import (
     email_admin_router,
     currency_router,
 )
-from routes.admin_tasks import router as admin_tasks_router
 from routes.business_rules_api import admin_router as business_rules_admin_router, public_router as business_rules_public_router
 from routes.help_center import admin_router as help_center_admin_router, public_router as help_center_public_router
 from routes.referrals import public_router as referrals_public_router, admin_router as referrals_admin_router
@@ -94,7 +87,6 @@ from routes.iys import router as iys_consent_router  # /iys — OTP + ticari ile
 from routes.automation_status import router as automation_status_router
 from routes.footer_template import public_router as footer_public_router, admin_router as footer_admin_router
 from routes.newsletter import public_router as newsletter_public_router, admin_router as newsletter_admin_router
-from routes.instagram import public_router as instagram_public_router, admin_router as instagram_admin_router
 from routes.rooftr_returns import router as rooftr_returns_router
 from routes.bulk_ops import router as bulk_ops_router
 from routes.analytics_extra import router as analytics_extra_router
@@ -109,7 +101,6 @@ from routes.secrets_vault import router as secrets_vault_router
 from routes.system_health import router as system_health_router
 from routes.mail_admin import router as mail_admin_router  # kendi mail sunucusu (deploy/mail)
 from routes.reports_v2 import router as reports_v2_router, costs_router as product_costs_router
-from routes.size_recommender import router as size_rec_router
 from routes.iys_integration import router as iys_router
 
 # Database
@@ -399,15 +390,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"CAPI retry loop start warning: {e}")
 
-    # Tek seferlik onarım: ölçü tablosu görsellerinin kaybolan is_size_table işareti
-    # (bayrakla korunur — yalnız bir kez çalışır; arka planda, startup'ı bloklamaz)
-    try:
-        import asyncio as _asyncio
-        from routes.size_tables import repair_size_table_markers
-        _asyncio.create_task(repair_size_table_markers())
-    except Exception as e:
-        logger.warning(f"Size-table marker repair start warning: {e}")
-
     # Tek seferlik onarım: geçmişte iptal edilmiş siparişlerde yanan kupon hakları
     # geri açılır (hoş geldin kodu iptal sonrası tekrar kullanılamıyordu) — bayrak korumalı.
     try:
@@ -445,8 +427,6 @@ async def lifespan(app: FastAPI):
         _asyncio.create_task(migrate_welcome_coupon_sale_policy())
         # Kupon birleşme varsayılanı: hepsiyle birleşir, engellenenler kuponun içinden seçilir (tek seferlik).
         _asyncio.create_task(migrate_coupon_stacking_default())
-        # Galeri sırası: beden tablosu nesnesi ilk sırada kalan ürünleri düzelt (tek seferlik, bayraklı)
-        _asyncio.create_task(fix_size_table_order_once())
         _asyncio.create_task(refit_installment_returns_once())
         _asyncio.create_task(audit_unpaid_confirmed_card_orders_once())
         _asyncio.create_task(audit_member_group_discount_once())
@@ -738,8 +718,6 @@ api_router.include_router(orders_router)
 api_router.include_router(categories_router)
 api_router.include_router(banners_router)
 api_router.include_router(cms_router)
-from routes.full_look import router as full_look_router
-api_router.include_router(full_look_router)
 api_router.include_router(pages_router)
 # Iyzico endpoint'leri — integrations_router'ın catch-all /{provider} rotasından ÖNCE include edilmeli
 from routes.integrations_iyzico import router as iyzico_router
@@ -770,13 +748,6 @@ api_router.include_router(upload_files_router)
 api_router.include_router(settings_router)
 api_router.include_router(vendors_router, prefix="/vendors")
 api_router.include_router(admin_rbac_router)
-api_router.include_router(size_tables_router)
-api_router.include_router(size_tables_public_router)
-api_router.include_router(decision_board_router)
-api_router.include_router(ai_chatbot_router)
-api_router.include_router(whatsapp_webhook_router)
-api_router.include_router(meta_messaging_webhook_router)
-api_router.include_router(ai_assistant_router)
 api_router.include_router(locations_router)
 api_router.include_router(attribution_router)
 
@@ -812,7 +783,6 @@ for _r in (
     currency_router,
 ):
     api_router.include_router(_r)
-api_router.include_router(admin_tasks_router)
 api_router.include_router(business_rules_admin_router)
 api_router.include_router(business_rules_public_router)
 api_router.include_router(help_center_admin_router)
@@ -841,8 +811,6 @@ api_router.include_router(newsletter_admin_router)
 from routes.email_marketing import admin_router as email_mkt_admin_router, public_router as email_mkt_public_router
 api_router.include_router(email_mkt_admin_router)
 api_router.include_router(email_mkt_public_router)
-api_router.include_router(instagram_public_router)
-api_router.include_router(instagram_admin_router)
 api_router.include_router(rooftr_returns_router)
 # Site iadeleri — toplu gider pusulası (eski /integrations/trendyol/claims/gp-bulk-range yerine)
 from routes.returns import router as returns_router
@@ -864,8 +832,7 @@ api_router.include_router(mail_admin_router)
 # Iteration 42 — Yeni rapor seti (stok değer, hızlı/yavaş satan, iade oranı, kanal kâr)
 api_router.include_router(reports_v2_router)
 api_router.include_router(product_costs_router)
-# Iteration 43 — size recommender + IYS
-api_router.include_router(size_rec_router)
+# IYS
 api_router.include_router(iys_router)
 
 # TOTP MFA (çok faktörlü doğrulama)
@@ -885,27 +852,6 @@ async def root():
     }
 
 # Health check
-async def fix_size_table_order_once() -> None:
-    """Ürün galerisinde beden tablosu (is_size_table) nesnesi normal görsellerin ÖNÜNE geçmişse sona alır.
-    Kartlar images[0]'ı görsel sandığı için ürün resimsiz görünüyordu (ör. Mold Balon Pantolon)."""
-    from routes.deps import db as _db
-    from routes.products import _size_tables_last
-    from datetime import datetime as _dt, timezone as _tz
-    flag_id = "migrations.size_table_order_v1"
-    try:
-        if await _db.settings.find_one({"id": flag_id, "done": True}):
-            return
-        fixed = 0
-        async for p in _db.products.find({"images.0.is_size_table": True}, {"_id": 0, "id": 1, "images": 1}):
-            new = _size_tables_last(p.get("images") or [])
-            if new != (p.get("images") or []):
-                await _db.products.update_one({"id": p["id"]}, {"$set": {"images": new}})
-                fixed += 1
-        await _db.settings.update_one({"id": flag_id}, {"$set": {"id": flag_id, "done": True, "fixed": fixed,
-                                                                 "at": _dt.now(_tz.utc).isoformat()}}, upsert=True)
-        logger.warning(f"[size-table-order] düzeltilen ürün: {fixed}")
-    except Exception as e:
-        logger.error(f"[size-table-order] hata: {e}")
 
 
 async def refit_installment_returns_once() -> None:
@@ -2621,14 +2567,9 @@ async def health(diag: str = "", audit_key: str = "",
             _lbc[_c] = {"ok": bool(_png), "png_bytes": (len(_png) * 3 // 4) if _png else 0}
     except Exception as _e:
         _lbc = {"error": str(_e)[:120]}
-    _st = None
-    try:
-        _st = await db.settings.find_one({"id": "migrations.size_table_order_v1"}, {"_id": 0, "done": 1, "fixed": 1, "at": 1})
-    except Exception:
-        pass
     _inst = None   # süreç-etiketi teşhisi KALDIRILDI: indeks-siz log aggregation'ları DB'yi kilitliyordu
     return {"status": "healthy", "version": _sha or None, "havale_sweep": _hv or None,
-            "scheduler_jobs": _jobs, "size_table_order": _st,
+            "scheduler_jobs": _jobs,
             "instances": _inst,
             "otp_mail_fix": (await db.settings.find_one({"id": "migrations.otp_email_tpl_v2"}, {"_id": 0, "id": 0})),
             "vade_refit": (await db.settings.find_one({"id": "migrations.vade_refit_v1"}, {"_id": 0, "id": 0})),

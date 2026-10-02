@@ -17,7 +17,6 @@ import AdminPageDesign from "./pages/admin/PageDesign";
 import AdminCategoryOrder from "./pages/admin/CategoryOrder";
 import AdminFooterDesign from "./pages/admin/FooterDesign";
 import AdminMenu from "./pages/admin/MenuAdmin";
-import AdminInstagram from "./pages/admin/Instagram";
 import EmailMarketing from "./pages/admin/EmailMarketing";
 import AdminIntegrations from "./pages/admin/Integrations";
 import Payments from "./pages/admin/Payments";
@@ -26,12 +25,10 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import AdminReturns from "./pages/admin/Returns";
 import AdminCancellations from "./pages/admin/Cancellations";
 import DeletedOrders from "./pages/admin/DeletedOrders";
-import AdminQuestions from "./pages/admin/Questions";
 import ProductAttributes from "./pages/admin/ProductAttributes";
 import Members from "./pages/admin/Members";
 import Consents from "./pages/admin/Consents";
 import Attribution from "./pages/admin/Attribution";
-import SizeTablesList from "./pages/admin/SizeTablesList";
 import Coupons from "./pages/admin/Coupons";
 import GiftCards from "./pages/admin/GiftCards";
 import ProductReviews from "./pages/admin/ProductReviews";
@@ -43,7 +40,6 @@ import {
   StockAlerts, HavaleNotifications, Tickets, ShippingPaymentRules,
   ExtraReports,
 } from "./pages/admin/CatalogExtras";
-import AdminTasks from "./pages/admin/AdminTasks";
 import TrainingPanel from "./pages/admin/TrainingPanel";
 import BlockedCustomers from "./pages/admin/BlockedCustomers";
 import PaymentTrace from "./pages/admin/PaymentTrace";
@@ -60,7 +56,6 @@ import SecretsVault from "./pages/admin/SecretsVault";
 import MailServer from "./pages/admin/MailServer";
 import IysAdmin from "./pages/admin/IysAdmin";
 import ReportsExtended from "./pages/admin/ReportsExtended";
-import AIAssistant from "./pages/admin/AIAssistant";
 import ActivityHistory from "./pages/admin/ActivityHistory";
 
 // Bu Routes, App.js'te "/admin/*" altına mount edilir; bu yüzden yollar
@@ -79,11 +74,9 @@ export default function AdminApp() {
         <Route path="kategori-siralama" element={<AdminCategoryOrder />} />
         <Route path="varyantlar" element={<AdminVariants />} />
         <Route path="xml-feedler" element={<XmlFeeds />} />
-        <Route path="sorular" element={<AdminQuestions />} />
         <Route path="sayfa-tasarimi" element={<AdminPageDesign />} />
         <Route path="footer-tasarim" element={<AdminFooterDesign />} />
         <Route path="menu-yonetimi" element={<AdminMenu />} />
-        <Route path="instagram" element={<AdminInstagram />} />
         <Route path="eposta-pazarlama" element={<EmailMarketing />} />
         <Route path="bannerlar" element={<AdminBanners />} />
         <Route path="kampanyalar" element={<AdminCampaigns />} />
@@ -122,14 +115,12 @@ export default function AdminApp() {
         <Route path="secrets-vault" element={<SecretsVault />} />
         <Route path="mail-yonetimi" element={<MailServer />} />
         <Route path="iys" element={<IysAdmin />} />
-        <Route path="ai-asistan" element={<AIAssistant />} />
         <Route path="urun-ozellikleri" element={<ProductAttributes />} />
         <Route path="cariler" element={<Navigate to="/admin/ayarlar?tab=vendors" replace />} />
         <Route path="kullanicilar" element={<Navigate to="/admin/ayarlar?tab=users-roles" replace />} />
         <Route path="uyeler" element={<Members />} />
         <Route path="izinler" element={<Consents />} />
         <Route path="kaynak" element={<Attribution />} />
-        <Route path="olcu-tablolari" element={<SizeTablesList />} />
         <Route path="kuponlar" element={<Coupons />} />
         <Route path="hediye-cekleri" element={<GiftCards />} />
         <Route path="yorumlar" element={<ProductReviews />} />
@@ -153,7 +144,6 @@ export default function AdminApp() {
         <Route path="toplu-mail" element={<Navigate to="/admin/eposta-pazarlama" replace />} />
         <Route path="raporlar/gelismis" element={<Navigate to="/admin/raporlar/satis" replace />} />
         <Route path="raporlar/kar-stok" element={<ReportsExtended />} />
-        <Route path="gorevler" element={<AdminTasks />} />
       </Route>
     </Routes>
   );

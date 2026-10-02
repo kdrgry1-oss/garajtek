@@ -70,7 +70,6 @@ html, body {
 .font-thin { font-weight: 300 !important; }
 .font-extralight { font-weight: 300 !important; }
 /* Menü "Full Look" başlığı: global hafif ağırlık kurallarından muaf, gerçek kalın (mobil dahil) */
-.nav-full-look { font-weight: 700 !important; }
 :where(strong, b):where(:not(.electro *)) { font-weight: 500; }
 :where(button):where(:not(.electro *)) { font-weight: 400; }
 

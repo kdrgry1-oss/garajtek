@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   CreditCard, Truck, MessageSquare, FileText, RefreshCw, Check, X, AlertCircle,
-  Megaphone, Instagram, ExternalLink,
+  Megaphone, ExternalLink,
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -24,7 +24,6 @@ const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("toke
  *   • e-Fatura / e-Arşiv: BirFatura
  *   • Reklam pikselleri + CAPI (Meta / TikTok / Google)
  *   • SMS + İYS (NetGSM)
- *   • WhatsApp / Instagram mesajları
  */
 export default function Integrations() {
   const [iyzicoStatus, setIyzicoStatus] = useState({ configured: false, mode: "sandbox" });
@@ -182,16 +181,6 @@ export default function Integrations() {
           linkLabel: "Bildirim Sağlayıcıları",
           extraLink: "/admin/iys",
           extraLabel: "İYS",
-        },
-        {
-          id: "whatsapp-instagram",
-          name: "WhatsApp & Instagram",
-          description: "WhatsApp/Instagram/Messenger müşteri mesajları ve Instagram akışı.",
-          icon: <Instagram className="w-7 h-7" />,
-          link: "/admin/sorular",
-          linkLabel: "Mesajlar",
-          extraLink: "/admin/instagram",
-          extraLabel: "Instagram Akışı",
         },
       ],
     },

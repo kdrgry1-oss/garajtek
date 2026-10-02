@@ -1,6 +1,5 @@
 import { SITE_NAME } from "../../lib/brand";
 import { useState, useEffect, useMemo } from "react";
-import FullLookEditor from './FullLookEditor';
 import { Plus, Edit, Trash2, GripVertical, Upload, X, Eye, EyeOff, Copy, Undo2, Redo2, Save, Search, Monitor, Smartphone } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -55,7 +54,7 @@ const BLOCK_TYPES = [
   { value: "brands_carousel", label: "Markalar", icon: "🏷️", description: "Marka logoları (200×60); boşsa ürün markaları" },
   { value: "product_columns", label: "Alt Ürün Sütunları", icon: "📋", description: "3 küçük ürün listesi (Öne çıkan / İndirimli / Çok satan)" },
   { value: "half_banners", label: "Yarı Yarıya Banner", icon: "◧", description: "İki görsel yan yana" },
-  { value: "instashop", label: "InstaShop", icon: "📸", description: "Instagram tarzı görseller" },
+  { value: "instashop", label: "Görsel Galeri", icon: "📸", description: "Kare görsel ızgarası (ürün bağlantılı)" },
   { value: "text_block", label: "Yazı Bloğu", icon: "📝", description: "Başlık ve açıklama" },
   { value: "video_banner", label: "Video Banner", icon: "🎬", description: "Video arka planlı banner" },
 ];
@@ -327,17 +326,7 @@ function SortableBlockItem({ block, selected, onSelect, onEdit, onDelete, onTogg
 }
 
 export default function PageDesign() {
-  const initialFullLook = new URLSearchParams(window.location.search).get('tab') === 'full-look';
-  const [tab, setTab] = useState(initialFullLook ? 'full-look' : 'home');
-  const [visited, setVisited] = useState({ home: !initialFullLook, 'full-look': initialFullLook });
-  return <>
-    <div className="flex gap-2 border-b mb-4 pb-3" role="tablist" aria-label="Düzenlenecek sayfa">
-      {[['home', 'Ana Sayfa'], ['full-look', 'Full Look Sayfası Düzenleme']].map(([key, title]) =>
-        <button key={key} type="button" role="tab" aria-selected={tab === key} className={`px-4 py-2 rounded ${tab === key ? 'bg-black text-white' : 'bg-white text-gray-600'}`} onClick={() => { setTab(key); setVisited(v => ({ ...v, [key]: true })); }}>{title}</button>)}
-    </div>
-    <div hidden={tab !== 'home'}>{visited.home && <HomePageDesign />}</div>
-    <div hidden={tab !== 'full-look'}>{visited['full-look'] && <FullLookEditor />}</div>
-  </>;
+  return <HomePageDesign />;
 }
 
 function HomePageDesign() {
@@ -1150,23 +1139,6 @@ function HomePageDesign() {
             
             {needsImages && (
               <div>
-                {formData.type === "instashop" && (
-                  <div className="mb-4 bg-gradient-to-br from-fuchsia-50 to-purple-50 border border-fuchsia-200 rounded-lg p-3.5">
-                    <p className="text-sm font-bold text-fuchsia-800 mb-1">📸 Instagram gönderilerini seçmek + ürün eklemek için</p>
-                    <p className="text-[12px] text-fuchsia-900/80 leading-relaxed mb-2">
-                      Anasayfadaki <b>SHOP THE LOOK</b> bölümü, artık <b>Instagram Akışı</b> sayfasından yönetilir:
-                      oradan gönderileri çekersin (kendi + etiketli), hangileri görünsün seçersin ve her gönderiye
-                      <b> ürün bağlarsın</b> (müşteri tıklayınca sepete ekler). Bağlı feed varsa <b>otomatik</b> anasayfaya gelir.
-                    </p>
-                    <a href="/admin/instagram"
-                      className="inline-flex items-center gap-1.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-semibold px-3 py-2 rounded-lg">
-                      Instagram Akışı sayfasına git →
-                    </a>
-                    <p className="text-[11px] text-fuchsia-900/60 mt-2">
-                      Aşağıdaki görseller yalnızca <b>Instagram bağlı değilken</b> (feed boşsa) yedek olarak gösterilir.
-                    </p>
-                  </div>
-                )}
                 {formData.type === "hero_slider" && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium mb-1">Slider Stili</label>
@@ -1661,7 +1633,7 @@ function HomePageDesign() {
                     type="text"
                     value={formData.settings?.subtitle || ""}
                     onChange={(e) => setFormData({ ...formData, settings: { ...formData.settings, subtitle: e.target.value } })}
-                    placeholder="Alt yazı (ör. Koleksiyonumuzdan senin stilini tamamlayacak parçalar.)"
+                    placeholder="Alt yazı (ör. Atölyenizi tamamlayacak ekipmanlar.)"
                     className="w-full border px-3 py-2 rounded text-sm"
                   />
                   <div className="flex gap-2">

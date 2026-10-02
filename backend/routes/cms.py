@@ -506,7 +506,7 @@ async def seed_default_home_blocks(
         },
         {
             "type": "instashop",
-            "title": "Stilini Yarat",
+            "title": "Atölyemizden",
             "images": [],
             "links": [],
             "sort_order": 5,

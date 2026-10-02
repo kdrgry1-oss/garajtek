@@ -39,7 +39,7 @@ _MAX_SES = 10 * 1024 * 1024
 
 # ── Anahtar + model çözümü ────────────────────────────────────────────────────
 async def _anahtar(ad: str, saglayici: str) -> str:
-    """Önce ortam değişkeni, sonra şifreli kasa, sonra AI sohbet ayarlarındaki anahtar."""
+    """Önce ortam değişkeni, sonra şifreli kasa."""
     v = (os.environ.get(ad) or "").strip()
     if v:
         return v
@@ -48,13 +48,6 @@ async def _anahtar(ad: str, saglayici: str) -> str:
         v = (await get_secret(ad) or "").strip()
         if v:
             return v
-    except Exception:
-        pass
-    try:
-        from .ai_chatbot import get_ai_settings, _api_key_for
-        s = await get_ai_settings()
-        if str(s.get("provider") or "").lower() in saglayici.split("|"):
-            return (_api_key_for(s) or "").strip()
     except Exception:
         pass
     return ""
