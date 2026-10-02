@@ -213,6 +213,29 @@ anahtar girilmedikçe ilgili zamanlanmış işler çalışmaz.
 
 ---
 
+### 6.1 Demo içerik (gerçek ürünler eklenene kadar)
+
+Mağaza boş görünmesin diye örnek ürünler, ürün setleri, ana sayfa slider/banner ve marka
+görselleri yüklenebilir. Tüm kayıtlar `demo` etiketlidir; **Kaldır** yalnız bunları siler.
+
+- **Panelden (önerilen):** Tasarım › Sayfa Tasarımı › sol alttaki **Demo İçerik** kartı →
+  *Demo İçerik Yükle* / *Kaldır* (yalnız süper yönetici). Servis çalışırken güvenle yapılır.
+- **Komut satırından, servis çalışırken (API ile):**
+  ```bash
+  cd /opt/garajtek/backend
+  /opt/garajtek/venv/bin/python seed_demo.py --api http://127.0.0.1:8001 --email YONETICI@alanadi.com          # yükle
+  /opt/garajtek/venv/bin/python seed_demo.py --api http://127.0.0.1:8001 --email YONETICI@alanadi.com --remove # kaldır
+  ```
+  (şifre sorulur; yönetici MFA açıksa panel yolunu kullanın)
+- **Komut satırından, doğrudan veritabanına** (tek-süreç kilidi nedeniyle servis durdurulmalı):
+  ```bash
+  sudo systemctl stop garajtek-api
+  cd /opt/garajtek/backend && sudo -u garajtek bash -c 'set -a; . ./.env; set +a; /opt/garajtek/venv/bin/python seed_demo.py'
+  sudo systemctl start garajtek-api
+  ```
+Görseller uygulamanın medya deposuna (MEDIA_DIR / R2) yüklenir; Sayfa Tasarımı bloklarında
+yalnız **boş** görsel alanları doldurulur, sizin eklediğiniz görsellere dokunulmaz.
+
 ## 7. Güncellemeler
 
 ### 7.1 Otomatik (önerilen)
