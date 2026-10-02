@@ -5,8 +5,7 @@
  *
  * NE İŞE YARAR?
  *   Admin panelinde ürünlerin listelenmesi, filtrelenmesi, oluşturulması,
- *   düzenlenmesi, çoğaltılması, silinmesi ve pazaryerlerine (Trendyol) aktarılması
- *   için kullanılan ana ekran. Ürüne bağlı varyantlar, özellikler (attributes),
+ *   düzenlenmesi, çoğaltılması ve silinmesi için kullanılan ana ekran. Ürüne bağlı varyantlar, özellikler (attributes),
  *   görseller, ölçü tablosu ve SEO alanları da bu ekrandaki modal üzerinden
  *   yönetilir.
  *
@@ -19,12 +18,10 @@
  *   - GET  /api/categories              → Kategori listesi (filtre + form)
  *   - GET  /api/attributes              → Varyant/özellik kütüphanesi
  *   - GET  /api/size-tables/{product_id}→ Ölçü tablosu
- *   - POST /api/trendyol/push-product   → Trendyol'a gönderim
  *
  * BAĞLANTILI DİĞER DOSYALAR:
  *   - SizeTablePanel.jsx  → Ürün modalında "Ölçü Tablosu" sekmesinde gömülü açılır.
- *   - SearchableAttribute (aşağıda) → Zorunlu/opsiyonel Trendyol özelliklerini
- *                                      arayarak seçmeyi sağlayan küçük bileşen.
+ *   - SearchableAttribute → Ürün özelliklerini arayarak seçmeyi sağlayan küçük bileşen.
  *   - components/admin/Pagination.jsx  → Üst (compact) ve alt (full) sayfalama.
  *
  * PERFORMANS NOTU:
@@ -62,7 +59,6 @@ import Pagination from "../../components/admin/Pagination";
 import { priceView } from "../../lib/price";
 import { buildProductPrintHtml } from "../../lib/productPrint";
 import SearchableAttribute from "../../components/admin/product-form/SearchableAttribute";
-import SearchableMapSelect from "../../components/admin/SearchableMapSelect";
 import SeoTab from "../../components/admin/product-form/SeoTab";
 import CombineProductsTab from "../../components/admin/product-form/CombineProductsTab";
 import ProductDetailFields from "../../components/admin/product-form/ProductDetailFields";
@@ -217,12 +213,6 @@ export default function AdminProducts() {
   // Ürün düzenleme modalı açılıp kapanınca liste scroll'u BAŞA dönmesin: açarken konumu sakla,
   // kapanınca (liste yeniden render olduktan sonra) aynı yere geri dön (kullanıcı isteği).
   const scrollYRef = useRef(0);
-  const [barcodePushOpen, setBarcodePushOpen] = useState(false);
-  const [barcodePushText, setBarcodePushText] = useState("");
-  const [barcodePushLoading, setBarcodePushLoading] = useState(false);
-  const [validationBlock, setValidationBlock] = useState(null);
-  const [vbSelections, setVbSelections] = useState({}); // {`${prodId}|${attrId}|${localVal}`: value_id|"__remove__"|""}
-  const [vbSaving, setVbSaving] = useState(false);
   // URL'den ürün ID'si — `/admin/urunler/{productId}` ile gelen direct link
   const { productId: urlProductId } = useParams();
   const navigate = useNavigate();
@@ -284,7 +274,6 @@ export default function AdminProducts() {
   const [dragOverImgIdx, setDragOverImgIdx] = useState(null);
   const [variantsModalOpen, setVariantsModalOpen] = useState(false);
   const [selectedProductForVariants, setSelectedProductForVariants] = useState(null);
-  const [globalTrendyolMarkup, setGlobalTrendyolMarkup] = useState(0);
   const [globalVatRate, setGlobalVatRate] = useState(10);
   const [activeTab, setActiveTab ] = useState("basic");
   const [stockHistory, setStockHistory] = useState([]);
@@ -429,9 +418,6 @@ export default function AdminProducts() {
   });
   const [ticimaxSchema, setTicimaxSchema] = useState([]);
 
-  const [trendyolAttributesList, setTrendyolAttributesList] = useState([]);
-  const [hepsiburadaAttributesList, setHepsiburadaAttributesList] = useState([]);
-  const [trendyolCategories, setTrendyolCategories] = useState([]);
   const [globalAttributes, setGlobalAttributes] = useState([]);
   const [globalSizes, setGlobalSizes] = useState([]);
   const [globalColors, setGlobalColors] = useState([]);
@@ -440,105 +426,7 @@ export default function AdminProducts() {
   // #6: Hızlı varyant — çoklu beden/renk seçimi (kombinasyondan kart üret).
   const [multiSizes, setMultiSizes] = useState([]);
   const [multiColors, setMultiColors] = useState([]);
-  const [fetchingAttributes, setFetchingAttributes] = useState(false);
-  // HB kategori şeması canlı çekilirken true; modal şema gelmeden 9 sabite düşmesin diye guard.
-  const [hbAttrsLoading, setHbAttrsLoading] = useState(false);
-  const [attrSearch, setAttrSearch] = useState({});
 
-  useEffect(() => {
-    if (modalOpen) {
-      const selectedCat = formData.category_name ? categories.find(c => c.name === formData.category_name || c.id === formData.category_name) : null;
-      const targetTrendyolCatId = formData.trendyol_category_id || (selectedCat ? selectedCat.trendyol_category_id : null);
-      
-      if (targetTrendyolCatId) {
-        setFetchingAttributes(true);
-        const token = localStorage.getItem('token');
-        axios.get(`${API}/integrations/trendyol/categories/${targetTrendyolCatId}/attributes?refresh=true`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-          .then(res => setTrendyolAttributesList(res.data.attributes || []))
-          .catch(err => setTrendyolAttributesList([]))
-          .finally(() => setFetchingAttributes(false));
-      } else {
-        setTrendyolAttributesList([]);
-      }
-    }
-  }, [formData.trendyol_category_id, formData.category_name, modalOpen, categories]);
-
-  // Hepsiburada: urun editorunun HB bolumu icin HB kategori ozelliklerini canli cek.
-  // HB kategori id URUNDE durmaz (category_mappings'te durur) — Trendyol gibi kategoriden cozulur.
-  // 1) formData.hepsiburada_category_id varsa onunla; 2) yoksa duzenlenen urunun id'siyle
-  // /products/{id}/category-attributes endpoint'inden esleme uzerinden cek → 'Zorunlu - Bos' kirmizi dolar.
-  useEffect(() => {
-    if (!modalOpen) return;
-    const token = localStorage.getItem('token');
-    const auth = { headers: { Authorization: `Bearer ${token}` } };
-    const hbCatId = formData.hepsiburada_category_id;
-    // Yerel kategori (id + ad) — KAYDEDİLMEMİŞ üründe HB kategorisini buradan çözeriz
-    // (push çekirdeği ile aynı: category_mappings üzerinden). Böylece yeni üründe de
-    // HB'nin tüm kategori özellikleri gelir, 9 sabite düşmez.
-    const selCat = (categories || []).find(c =>
-      c.name === formData.category_name || c.id === formData.category_name || c.id === formData.category_id);
-    const locId = formData.category_id || selCat?.id || "";
-    const locName = formData.category_name || selCat?.name || "";
-    // Once urunun kategori eslemesinden coz (en guvenilir, mapping uzerinden);
-    // bos donerse yerel kategoriden, o da bossa formData.hepsiburada_category_id ile dene.
-    const byProduct = () => formData.id
-      ? axios.get(`${API}/integrations/hepsiburada/products/${formData.id}/category-attributes`, auth).then(r => r.data.attributes || [])
-      : Promise.resolve([]);
-    const byLocalCat = () => (locId || locName)
-      ? axios.get(`${API}/integrations/hepsiburada/category-attributes/by-local`,
-          { ...auth, params: { category_id: locId, category_name: locName } }).then(r => r.data.attributes || [])
-      : Promise.resolve([]);
-    const byCat = () => hbCatId
-      ? axios.get(`${API}/integrations/hepsiburada/categories/${hbCatId}/attributes`, auth).then(r => r.data.attributes || [])
-      : Promise.resolve([]);
-    setHbAttrsLoading(true);
-    byProduct()
-      .then(list => (list && list.length) ? list : byLocalCat())
-      .then(list => (list && list.length) ? list : byCat())
-      .then(list => setHepsiburadaAttributesList(list || []))
-      .catch(() => setHepsiburadaAttributesList([]))
-      .finally(() => setHbAttrsLoading(false));
-  }, [formData.hepsiburada_category_id, formData.id, formData.category_id, formData.category_name, modalOpen, categories]);
-
-  // HB OTOMATİK DOLUM (yaklaşım A): Varsayılan özellikler (genel `attributes` + Teknik Detay)
-  // HB kategori şemasına normalize ad + değer eşlemesiyle yazılır. Sadece BOŞ HB alanları doldurulur;
-  // manuel değer ASLA ezilmez. Temu'daki otomatik dolumun HB karşılığı.
-  useEffect(() => {
-    if (!modalOpen || !(hepsiburadaAttributesList || []).length) return;
-    const _norm = (s) => (s || "").toLocaleLowerCase("tr").replace(/[\s\-_/().]/g, "").trim();
-    const defaults = { ...(formData.attributes || {}) };
-    Object.values(technicalDetails || {}).forEach(t => { if (t?.label && t?.value) defaults[t.label] = t.value; });
-    const defKeys = Object.keys(defaults);
-    const next = { ...(formData.hepsiburada_attributes || {}) };
-    let changed = false;
-    for (const hbAttr of hepsiburadaAttributesList) {
-      const hbName = hbAttr.name;
-      if (!hbName || next[hbName]) continue;                 // dolu → ezme
-      const nb = _norm(hbName);
-      const matchKey = defKeys.find(dn => {
-        const na = _norm(dn);
-        return na && (na === nb || na.includes(nb) || nb.includes(na));
-      });
-      if (!matchKey) continue;
-      const dv = defaults[matchKey];
-      if (dv === undefined || dv === null || dv === "") continue;
-      const vals = (hbAttr.attributeValues || []).map(v => v.name).filter(Boolean);
-      let hbVal = dv;
-      if (vals.length) {
-        const exact = vals.find(v => _norm(v) === _norm(dv));
-        const partial = vals.find(v => _norm(v).includes(_norm(dv)) || _norm(dv).includes(_norm(v)));
-        if (exact) hbVal = exact;
-        else if (partial) hbVal = partial;
-        else if (!hbAttr.allowCustom) continue;              // HB enum'da yok ve serbest değil → atla
-      }
-      next[hbName] = hbVal;
-      changed = true;
-    }
-    if (changed) setFormData(p => ({ ...p, hepsiburada_attributes: next }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hepsiburadaAttributesList, formData.attributes, technicalDetails, modalOpen]);
 
   useEffect(() => {
     if (modalOpen && !editingProduct) {
@@ -583,51 +471,6 @@ export default function AdminProducts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalOpen]);
 
-  // Deep-link: /admin/urunler?aktar=barkod → "Barkod ile Trendyol'a Aktar" pop-up'ını otomatik aç.
-  // (Pazaryeri Hub'ından hızlı erişim için.)
-  useEffect(() => {
-    // İMALATTAN ÜRÜN AÇ: İmalat Takip'teki "Ürün Aç" butonu Yeni Ürün formunu
-    // üretim bilgileriyle (ad, stok kodu, sezon, alış fiyatı, renk×beden=stok) önden dolu açar.
-    if (searchParams.get("newFromMfg") === "1") {
-      const raw = sessionStorage.getItem("mfg_product_prefill");
-      if (raw) {
-        try {
-          const p = JSON.parse(raw);
-          resetForm();
-          setFormData(f => ({
-            ...f,
-            name: p.name || "",
-            stock_code: p.stock_code || "",
-            season: p.season || "",
-            purchase_price: Number(p.purchase_price || 0),
-            manufacturer: p.manufacturer || DEFAULT_PRODUCT_BRAND,
-            mfg_record_id: p.mfg_record_id || "",
-            is_active: false, // satışa açmadan önce kalan bilgiler girilecek
-            // Varyant id ürünler arası BENZERSİZ olmalı (Meta katalog content_id'si). Eski
-            // `var-mfg-${i}-…` her imalat ürününde aynı çıkıyordu → katalogda çakışıyordu.
-            variants: (p.variants || []).map((v, i) => ({
-              id: `var-mfg-${Date.now()}-${i}-${v.size}-${v.color}`.replace(/\s+/g, ""),
-              size: v.size || "", color: v.color || "",
-              stock: Number(v.stock || 0), barcode: "", stock_code: p.stock_code || "",
-            })),
-          }));
-          setModalOpen(true);
-          toast.success("Ürün kartı imalat bilgileriyle dolduruldu — kalan alanları tamamlayıp kaydedin");
-        } catch { /* sessiz */ }
-        sessionStorage.removeItem("mfg_product_prefill");
-      }
-      searchParams.delete("newFromMfg");
-      setSearchParams(searchParams, { replace: true });
-      return;
-    }
-    if (searchParams.get("aktar") === "barkod") {
-      setBarcodePushOpen(true);
-      const next = new URLSearchParams(searchParams);
-      next.delete("aktar");
-      setSearchParams(next, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
 
   // Arama "debounce": kullanıcı yazmayı ~350ms bıraktığında TEK istek atılır.
   // Önceden her tuş vuruşu /products çağırıyordu → yarış durumu (eski yanıt yeni
@@ -640,8 +483,6 @@ export default function AdminProducts() {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-    fetchTrendyolCategories();
-    fetchGlobalTrendyolMarkup();
     fetchGlobalSettings();
   }, [page, pageSize, debouncedSearch, JSON.stringify(appliedFilters), JSON.stringify(sortBy)]);
 
@@ -697,32 +538,6 @@ export default function AdminProducts() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const fetchTrendyolCategories = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/integrations/trendyol/categories`, { headers: { Authorization: `Bearer ${token}` }});
-      if (res.data?.categories) {
-        setTrendyolCategories(res.data.categories);
-      }
-    } catch (err) {
-      console.error("Trendyol categories fetch failed", err);
-    }
-  };
-
-  const fetchGlobalTrendyolMarkup = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/integrations/trendyol/settings`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data && res.data.default_markup !== undefined) {
-        setGlobalTrendyolMarkup(res.data.default_markup);
-      }
-    } catch (err) {
-      console.error("Global markup fetch error:", err);
-    }
-  };
 
   const fetchGlobalSettings = async () => {
     try {
@@ -1023,25 +838,6 @@ export default function AdminProducts() {
    */
   // ── "Toplu İşlemler" menüsü (ürün aramanın altındaki dropdown) handlerleri ──
   // Buton onClick'leri buraya taşındı; menü öğeleri bu fonksiyonları çağırır.
-  const handleOtomatikDoldur = async () => {
-    if (!window.confirm("TÜM ürünlerin Trendyol/HB/Temu özelliklerini otomatik doldur?\n\nMevcut manuel girilen değerler korunur.")) return;
-    const t = toast.loading("Teknik detaylar eşleniyor...");
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(
-        `${API}/integrations/site/teknik-detay/sync?use_cache=true`,
-        null,
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 120000 }
-      );
-      toast.dismiss(t);
-      toast.success(res.data.message || "Eşleme tamamlandı");
-      fetchProducts();
-    } catch (e) {
-      toast.dismiss(t);
-      toast.error(e.response?.data?.detail || "Eşleme başarısız");
-    }
-  };
-
   const handleSilinenOzellikKurtar = async () => {
     const token = localStorage.getItem('token');
     const t = toast.loading("Önizleme hazırlanıyor...");
@@ -1195,7 +991,6 @@ export default function AdminProducts() {
     }
   };
 
-  const handleBarkodPush = () => setBarcodePushOpen(true);
 
   // Toplu İşlemler menüsü: dışarı tıklayınca kapat
   useEffect(() => {
@@ -1331,27 +1126,6 @@ export default function AdminProducts() {
     uploadImageFiles(e.dataTransfer.files);
   };
 
-  /**
-   * handleTrendyolSync — Tek bir ürünü Trendyol'a YENİ ürün olarak gönderir.
-   *   Zorunlu attributes (SearchableAttribute'ın "ZORUNLU" rozetiyle gösterdiği
-   *   alanlar) backend tarafında kontrol edilir; eksikse 400 döner.
-   *   BACKEND: POST /api/integrations/trendyol/products/{id}/sync
-   */
-  const handleTrendyolSync = async (productId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(`${API}/integrations/trendyol/products/${productId}/sync`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data.success) {
-        toast.success(res.data.message || "Trendyol senkronizasyonu başlatıldı");
-        fetchProducts();
-      }
-    } catch (err) {
-      console.error("Trendyol sync error:", err);
-      toast.error(err.response?.data?.detail || "Trendyol aktarımı başarısız");
-    }
-  };
   const removeImage = (index) => {
     const newImages = [...formData.images];
     newImages.splice(index, 1);
@@ -1572,11 +1346,6 @@ export default function AdminProducts() {
           await axios.post(`${API}/products`, payload, { headers });
           toast.success("Ürün oluşturuldu");
         }
-      }
-      // İmalattan açılan üründe kaydı 'ürün açıldı ✓' olarak işaretle (rozet + tekrar açılmasın)
-      if (!editingProduct && formData.mfg_record_id) {
-        axios.put(`${API}/manufacturing/${formData.mfg_record_id}`,
-          { product_created: true }, { headers }).catch(() => {});
       }
       setModalOpen(false);
       resetForm();
@@ -2366,12 +2135,10 @@ export default function AdminProducts() {
               Ürün Toplu İşlemleri
             </div>
             {[
-              { label: "Otomatik Doldur", desc: "Tüm ürünlerin teknik detaylarını eşle", color: "bg-purple-600", on: handleOtomatikDoldur, testid: "ticimax-tekdetay-sync-btn", icon: RefreshCw },
               { label: "Silinen Özellik Kurtar", desc: "Snapshot'tan teknik detayları geri yükle", color: "bg-teal-600", on: handleSilinenOzellikKurtar, testid: "teknik-detay-recover-btn", icon: RefreshCw },
               { label: "Eksik Açıklama Kurtar", desc: "Boş açıklamaları export'tan doldur", color: "bg-cyan-600", on: handleEksikAciklamaKurtar, testid: "aciklama-recover-btn", icon: RefreshCw },
               { label: "Renk + Web Color Doldur", desc: "Ad son kelimesinden renk + web color", color: "bg-fuchsia-600", on: handleRenkWebColorDoldur, testid: "renk-webcolor-autofill-btn", icon: RefreshCw },
               { label: "AI Açıklama Üret", desc: "Boş açıklamalara AI ile üret", color: "bg-violet-600", on: handleAIAciklamaUret, testid: "aciklama-generate-ai-btn", icon: RefreshCw },
-              { label: "Barkod ile Trendyol'a Aktar", desc: "Barkod yazıp seçili ürünleri Trendyol'a gönder", color: "bg-orange-500", on: handleBarkodPush, testid: "trendyol-push-barcodes-btn", icon: Store },
             ].map((it) => {
               const Icon = it.icon;
               return (
@@ -2701,10 +2468,6 @@ export default function AdminProducts() {
                         <button onClick={() => handleDuplicate(product)} className="p-1.5 hover:bg-gray-100 rounded" title="Kopyala">
                           <Copy size={16} />
                         </button>
-                        {/* "Trendyola Aktar" satır butonu KALDIRILDI (kullanıcı isteği).
-                            Tek ürünü Trendyol'a göndermek hâlâ mümkün: ürün düzenleme →
-                            Pazaryeri Entegrasyonu sekmesi. Toplu gönderim için de
-                            "Barkod ile Trendyol'a Aktar" işlemi duruyor. */}
                         <button
                           onClick={() => openBarcodeSizePicker('single', product)}
                           className="p-1.5 hover:bg-purple-50 rounded text-purple-600 transition-colors"
@@ -2779,8 +2542,6 @@ export default function AdminProducts() {
                  <TabsTrigger value="attributes" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Özellikler</TabsTrigger>
                  <TabsTrigger value="sizetable" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Ölçü Tablosu</TabsTrigger>
                  <TabsTrigger value="combine" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Kombin</TabsTrigger>
-                 {/* "Trendyol Ayarları" sekmesi kullanıcı isteğiyle kaldırıldı — Trendyol
-                     eşleştirme/aktarım Pazaryeri Hub ve ürün listesi araçlarından yönetiliyor. */}
                </TabsList>
 
               {/* Basic Info Tab */}
@@ -3203,54 +2964,6 @@ export default function AdminProducts() {
                     </div>
                   </div>
 
-                  {/* Trendyol Fiyatlandırma sağ kolona taşındı — sol Fiyatlandırma kartıyla yan yana */}
-                  <div className="bg-orange-50 p-6 rounded-xl border border-orange-200 shadow-sm h-fit">
-                    <h3 className="font-semibold text-lg text-orange-900 mb-5 flex items-center gap-2">
-                      <span className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-bold">2</span>
-                      Trendyol Fiyatlandırma Ayarları
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="bg-white p-4 rounded-lg border border-orange-100 flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          id="use_default_markup"
-                          checked={formData.use_default_markup}
-                          onChange={(e) => setFormData({ ...formData, use_default_markup: e.target.checked })}
-                          className="mt-1 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        <label htmlFor="use_default_markup" className="cursor-pointer">
-                          <span className="block text-sm font-bold text-orange-900 leading-tight">Global Kâr Oranını Kullan</span>
-                          <span className="block text-xs text-orange-600 mt-0.5">Ayarlar sayfasındaki global oranı (%{globalTrendyolMarkup}) baz alır.</span>
-                        </label>
-                      </div>
-
-                      {!formData.use_default_markup && (
-                        <div className="bg-white p-4 rounded-lg border border-orange-100 animate-in slide-in-from-top-2">
-                          <label className="block text-xs font-bold text-orange-900 uppercase mb-2">Bu Ürüne Özel Trendyol Fark Oranı (%)</label>
-                          <input
-                            type="number"
-                            value={formData.markup_rate || ""}
-                            onChange={(e) => setFormData({ ...formData, markup_rate: parseFloat(e.target.value) || 0 })}
-                            placeholder="Örn: 25"
-                            className="w-full border-orange-200 border-2 px-4 py-3 rounded-xl focus:border-orange-500 outline-none transition-all text-xl font-bold text-orange-700"
-                          />
-                        </div>
-                      )}
-
-                      <div className="bg-white p-6 rounded-lg border border-orange-100 flex flex-col justify-center">
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-4 tracking-widest text-center">Tahmini Trendyol Satış Fiyatı</p>
-                        <div className="text-center">
-                          <span className="text-4xl font-black text-orange-600">
-                            {(((formData.member_price_1 || formData.price) || 0) * (1 + (formData.use_default_markup ? globalTrendyolMarkup : (formData.markup_rate || 0)) / 100)).toFixed(2)}
-                          </span>
-                          <span className="text-xl font-bold text-orange-400 ml-1">TL</span>
-                        </div>
-                        <p className="text-[10px] text-gray-400 text-center mt-4">
-                          * KDV ve kargo masrafları fiyata dahildir. {formData.use_default_markup ? 'Global' : 'Özel'} markup uygulanmıştır.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
                 {/* "Fiyatlandırma / Üye Tipi Fiyatları" akordeonu kullanıcı isteğiyle kaldırıldı */}
               </TabsContent>
@@ -3258,8 +2971,6 @@ export default function AdminProducts() {
               {/* Attributes Tab */}
               <TabsContent value="attributes" className="space-y-6 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 {(() => {
-                  const selectedCat = categories.find(c => c.name === formData.category_name || c.id === formData.category_name);
-                  const attrMappings = selectedCat?.attribute_mappings || [];
                   // Türkçe-duyarsız normalize (İ/ı/ş/ğ/ü/ö/ç) + tam-eşleşme gizleme.
                   const _attrNorm = (s) => (s || "").toLowerCase()
                     .replace(/ı/g, "i").replace(/i̇/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g")
@@ -3299,44 +3010,9 @@ export default function AdminProducts() {
                     });
                   }
 
-                  // Determine required attrs from Trendyol mapping
-                  const getIsRequired = (attr) => {
-                    const mapping = attrMappings.find(m => m.local_attr?.toLowerCase() === attr.name.toLowerCase());
-                    let tyAttr = null;
-                    if (mapping?.trendyol_attr_id) {
-                      tyAttr = trendyolAttributesList.find(ta => (ta.attribute?.id || ta.id) === mapping.trendyol_attr_id);
-                    }
-                    if (!tyAttr) {
-                      tyAttr = trendyolAttributesList.find(ta => {
-                        const taName = (ta.attribute?.name || ta.name || "").toLowerCase().trim();
-                        return taName === (attr.name || "").toLowerCase().trim();
-                      });
-                    }
-                    return !!tyAttr?.required;
-                  };
-
-                  // Auto-sync: when Trendyol attribute changes, if value matches an allowed value
-                  // in that attribute's value library, auto-apply to HB + Temu maps (only if those
-                  // are currently empty for that attr, to respect manual overrides).
-                  // Çift yönlü çapraz doldurma: HERHANGİ bir pazaryerinde özellik seçilince,
-                  // DİĞER pazaryerlerinin AYNI isimli alanı BOŞSA aynı değer otomatik yazılır.
-                  // Manuel her zaman kazanır (dolu alan ASLA ezilmez). Tek yönlü Trendyol→X yerine simetrik.
-                  const MP_ATTR_KEY = { trendyol: "attributes", hepsiburada: "hepsiburada_attributes", temu: "temu_attributes" };
-                  const setMarketplaceAttr = (srcMp, attr, val) => {
-                    const next = { ...formData };
-                    const srcKey = MP_ATTR_KEY[srcMp] || "attributes";
-                    next[srcKey] = { ...(formData[srcKey] || {}), [attr.name]: val };
-                    const valuesLower = (attr.values || []).map(v => (v || "").toLowerCase());
-                    const valOk = !val || !attr.values?.length || valuesLower.includes((val || "").toLowerCase());
-                    if (valOk) {
-                      for (const mp of ["trendyol", "hepsiburada", "temu"]) {
-                        if (mp === srcMp) continue;
-                        const k = MP_ATTR_KEY[mp];
-                        const cur = { ...(next[k] || formData[k] || {}) };
-                        if (!cur[attr.name]) { cur[attr.name] = val; next[k] = cur; }
-                      }
-                    }
-                    setFormData(next);
+                  // Özellik değeri formData.attributes'a yazılır (tek kaynak: mağaza ürün özellikleri).
+                  const setProductAttr = (attr, val) => {
+                    setFormData({ ...formData, attributes: { ...(formData.attributes || {}), [attr.name]: val } });
                   };
 
                   // Renk kardeşlerine özellik kopyala: tekten bölünen renk kartlarının
@@ -3388,90 +3064,8 @@ export default function AdminProducts() {
                   };
 
                   const renderSection = (marketplace, title, accent, logo) => {
-                    const mapKey = marketplace === 'trendyol' ? 'attributes'
-                                 : marketplace === 'hepsiburada' ? 'hepsiburada_attributes'
-                                 : 'temu_attributes';
-                    const valuesMap = formData[mapKey] || {};
-
-                    // HB bolumu HB'nin kendi kategori ozelliklerinden beslenir
-                    // (Beden/Renk/Cinsiyet + HB enum degerleri). Diger pazaryerleri global listeden.
-                    // HB bazı kategorilerde aynı özelliği iki kez döndürür (örn. "Renk" hem
-                    // varyant hem normal attribute) → modalde ÇİFT alan çıkıyordu. Normalize
-                    // ada göre tekilleştir: değerli/zorunlu olanı tut, diğerini at.
-                    const _hbNorm = (s) => (s || "").toLocaleLowerCase("tr").replace(/[\s\-_/().]/g, "").trim();
-                    const _hbMap = new Map();
-                    (hepsiburadaAttributesList || []).forEach(a => {
-                      const nk = _hbNorm(a.name);
-                      if (!nk) return;
-                      const cand = {
-                        id: a.id,
-                        name: a.name,
-                        values: (a.attributeValues || []).map(v => v.name),
-                        required: !!a.required,
-                        allowCustom: !!a.allowCustom,
-                      };
-                      const prev = _hbMap.get(nk);
-                      if (!prev) { _hbMap.set(nk, cand); return; }
-                      const score = (x) => (x.values.length > 0 ? 2 : 0) + (x.required ? 1 : 0);
-                      if (score(cand) > score(prev)) _hbMap.set(nk, cand);
-                    });
-                    const hbSource = [..._hbMap.values()];
-                    // HB şeması boş mu? (kategori eşli değil/seçilmedi VEYA canlı çekim sürüyor).
-                    // Boşsa aşağıda Dolu/Zorunlu/Diğer grupları RENDER EDİLMEZ → "Dolu Özellikler (9)"
-                    // yanıltıcı flicker'ı engellenir; yerine yükleniyor / eşli değil kutusu gösterilir.
-                    const hbSchemaMissing = marketplace === 'hepsiburada' && hbSource.length === 0;
-
-                    // TRENDYOL: kendi kategori özelliklerinin TÜM izin verilen değerlerini
-                    // (attributeValues) global kütüphaneyle BİRLEŞTİR ve global'de olmayan
-                    // Trendyol özelliklerini de ekle → forma eksiksiz Trendyol listesi gelir.
-                    const tyByName = {};
-                    (trendyolAttributesList || []).forEach(a => {
-                      const nm = (a.attribute?.name || a.name || "").trim();
-                      if (!nm) return;
-                      tyByName[nm.toLowerCase()] = {
-                        id: a.attribute?.id || a.id,
-                        name: nm,
-                        values: (a.attributeValues || [])
-                          .map(v => (typeof v === "string" ? v : (v?.name || "")))
-                          .filter(Boolean),
-                      };
-                    });
-                    // KULLANICI KARARI: Trendyol bölümünde 159 özelliklik global kütüphane DEĞİL,
-                    // YALNIZ Trendyol API'sinin bu kategori için döndürdüğü özellikler listelenir.
-                    // (Ürüne zaten girilmiş dolu değerler şemada olmasa da görünür kalır — veri kaybolmaz.)
-                    const tySchemaLoaded = Object.keys(tyByName).length > 0;
-                    const tyOnly = (() => {
-                      if (!tySchemaLoaded) {
-                        // Şema henüz çekilmediyse (kategori eşli değil) yalnız DOLU özellikler gösterilir
-                        return baseList.filter(a => (formData.attributes || {})[a.name]);
-                      }
-                      const out = [];
-                      const seen = new Set();
-                      Object.values(tyByName).forEach(ty => {
-                        // Gizli özellikler (Kimyasal/Materyal Analiz Testi, Ürün Tipi/Detayı,
-                        // Silüet...) TY şemasında olsa da formda LİSTELENMEZ (kullanıcı isteği).
-                        if (_isHiddenAttr(ty.name)) return;
-                        const g = baseList.find(a => (a.name || "").toLowerCase() === ty.name.toLowerCase());
-                        const values = g ? Array.from(new Set([...(g.values || []), ...ty.values])) : ty.values;
-                        out.push({ id: g?.id || `ty-${ty.id}`, name: ty.name, values });
-                        seen.add(ty.name.toLowerCase());
-                      });
-                      // TY şemasında olmayan ama üründe DOLU olan özellikler görünür kalsın
-                      Object.keys(formData.attributes || {}).forEach(nm => {
-                        const low = (nm || "").toLowerCase();
-                        if (!nm || seen.has(low) || _isHiddenAttr(nm)) return;
-                        if (!(formData.attributes || {})[nm]) return;
-                        out.push({ id: `cur-${nm}`, name: nm, values: [] });
-                        seen.add(low);
-                      });
-                      return out.filter(a => (a.name || "").toLowerCase().includes(attributeSearchTerm.toLowerCase()));
-                    })();
-
-                    const sourceList = marketplace === 'hepsiburada'
-                      ? hbSource.filter(a => (a.name || '').toLowerCase().includes(attributeSearchTerm.toLowerCase()))
-                      : marketplace === 'trendyol'
-                      ? tyOnly
-                      : baseList;
+                    const valuesMap = formData.attributes || {};
+                    const sourceList = baseList;
 
                     // 🎯 Değer çözümü: önce pazaryerine-özel harita, yoksa NÖTR formData.attributes,
                     // yoksa sabit varsayılan, yoksa GPSR üretici/ithalatçı sabiti → DOLU görünür.
@@ -3497,9 +3091,7 @@ export default function AdminProducts() {
                         .filter(Boolean)
                     );
                     const processed = sourceListAll.map(attr => {
-                      const isReq = marketplace === 'trendyol' ? getIsRequired(attr)
-                                  : marketplace === 'hepsiburada' ? !!attr.required
-                                  : false;
+                      const isReq = false;
                       const hasVal = !!_effVal(attr.name);
                       return { attr, isRequired: isReq, hasValue: hasVal };
                     })
@@ -3523,7 +3115,7 @@ export default function AdminProducts() {
                     const isSearching = attributeSearchTerm.length > 0;
 
                     const handleChange = (attr, val) => {
-                      setMarketplaceAttr(marketplace, attr, val);
+                      setProductAttr(attr, val);
                     };
 
                     const renderAttr = ({ attr, isRequired }) => (
@@ -3533,7 +3125,7 @@ export default function AdminProducts() {
                         value={_effVal(attr.name)}
                         isRequired={isRequired}
                         channelLabel={logo}
-                        allowCustom={marketplace === 'hepsiburada' ? !!attr.allowCustom : marketplace === 'temu'}
+                        allowCustom={false}
                         onChange={(val) => handleChange(attr, val)}
                       />
                     );
@@ -3555,13 +3147,11 @@ export default function AdminProducts() {
                             <div>
                               <h3 className="font-bold text-xl mb-0" style={{ color: accent.text }}>{title}</h3>
                               <p className="text-xs text-gray-500 leading-relaxed max-w-2xl">
-                                {marketplace === 'trendyol'
-                                  ? "Trendyol için ürün özellikleri. Seçilen değer HB ve Temu'da da otomatik set edilir (boş ise)."
-                                  : `${marketplace === 'hepsiburada' ? 'Hepsiburada' : 'Temu'} için ürün özellikleri. Gerekirse Trendyol'dan bağımsız düzenleyin.`}
+                                Ürün kartında ve filtrelerde kullanılan ürün özellikleri.
                               </p>
                             </div>
                           </div>
-                          {marketplace === 'trendyol' && (
+                          {(
                             <div className="flex items-center gap-3">
                               <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
@@ -3577,21 +3167,7 @@ export default function AdminProducts() {
                           )}
                         </div>
 
-                        {hbSchemaMissing && (
-                          hbAttrsLoading ? (
-                            <div className="py-16 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                              <div className="animate-pulse text-sm font-bold uppercase tracking-widest text-gray-400">Hepsiburada kategori özellikleri yükleniyor…</div>
-                              <p className="text-xs mt-2 text-gray-400">İlk açılışta canlı çekiliyor; birkaç saniye sürebilir.</p>
-                            </div>
-                          ) : (
-                            <div className="py-12 text-center bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200">
-                              <div className="text-sm font-bold text-amber-700">Bu kategori Hepsiburada'ya eşli değil (ya da kategori seçilmedi).</div>
-                              <p className="text-xs mt-2 text-amber-600">Kategori Eşleştirme'den HB'ye eşle → Renk, Beden, Kumaş ve tüm HB özellikleri burada görünür.</p>
-                            </div>
-                          )
-                        )}
-
-                        {filledAttrs.length > 0 && !hbSchemaMissing && (
+                        {filledAttrs.length > 0 && (
                           <div className="mb-6">
                             <div className="flex items-center gap-2 mb-4">
                               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -3603,7 +3179,7 @@ export default function AdminProducts() {
                           </div>
                         )}
 
-                        {requiredEmpty.length > 0 && !hbSchemaMissing && (
+                        {requiredEmpty.length > 0 && (
                           <div className="mb-6">
                             <div className="flex items-center gap-2 mb-4">
                               <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
@@ -3615,7 +3191,7 @@ export default function AdminProducts() {
                           </div>
                         )}
 
-                        {otherEmpty.length > 0 && !hbSchemaMissing && (isSearching || showAllAttributes || marketplace !== 'trendyol') && (
+                        {otherEmpty.length > 0 && (isSearching || showAllAttributes) && (
                           <div className="mb-6">
                             <div className="flex items-center gap-2 mb-4">
                               <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
@@ -3627,7 +3203,7 @@ export default function AdminProducts() {
                           </div>
                         )}
 
-                        {otherEmpty.length > 0 && !isSearching && marketplace === 'trendyol' && (
+                        {otherEmpty.length > 0 && !isSearching && (
                           <div className="text-center pt-4 border-t border-dashed border-gray-200">
                             <button
                               type="button"
@@ -3666,12 +3242,7 @@ export default function AdminProducts() {
                           </button>
                         </div>
                       )}
-                      {/* Teknik Detay paneli KALDIRILDI (kullanıcı isteği): aşağıdaki "Trendyol/HB/Temu
-                          için Özellikler" bölümleriyle mükerrer oluyordu. technicalDetails state'i
-                          ve kaydı arka planda korunur; yalnızca bu mükerrer düzenleme paneli gizlendi. */}
-                      {renderSection('trendyol', 'Trendyol için Özellikler', { border: '#e5e5e5', bg: '#1a1a1a', text: '#1a1a1a' }, 'TRENDYOL')}
-                      {renderSection('hepsiburada', 'Hepsiburada için Özellikler', { border: '#e5e5e5', bg: '#1a1a1a', text: '#1a1a1a' }, 'HEPSIBURADA')}
-                      {renderSection('temu', 'Temu için Özellikler', { border: '#e5e5e5', bg: '#1a1a1a', text: '#1a1a1a' }, 'TEMU')}
+                      {renderSection('site', 'Ürün Özellikleri', { border: '#e5e5e5', bg: '#1a1a1a', text: '#1a1a1a' }, 'ÖZELLİK')}
                     </div>
                   );
                 })()}
@@ -4053,148 +3624,6 @@ export default function AdminProducts() {
                   </div>
                 </TabsContent>
               )}
-
-              {/* Trendyol Tab */}
-              <TabsContent value="trendyol" className="space-y-6 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="bg-white p-8 rounded-xl border-t-4 border-t-orange-500 shadow-sm">
-                  <div className="flex justify-between items-center mb-8">
-                    <div>
-                      <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight flex items-center gap-2">
-                        <Store className="text-orange-500" size={24} />
-                        Trendyol Entegrasyon Ayarları
-                      </h3>
-                      <p className="text-sm text-gray-500">Bu ürünün Trendyol'da nasıl görüneceğini ve eşleşeceğini ayarlayın.</p>
-                    </div>
-                    <div className="flex items-center gap-3 bg-orange-50 px-4 py-2 rounded-full">
-                      <span className="text-xs font-bold text-orange-700 uppercase">Durum:</span>
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-orange-600">
-                        <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                        Yayına Hazır
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Trendyol Kategorisi</label>
-                        <SearchableMapSelect
-                          optionsUrl={`/category-mapping/trendyol/options`}
-                          value={{
-                            id: formData.trendyol_category_id || "",
-                            name: (trendyolCategories.find(c => String(c.id) === String(formData.trendyol_category_id))?.name) || "",
-                          }}
-                          onChange={(v) => setFormData({ ...formData, trendyol_category_id: v.id || "" })}
-                          placeholder="Kategori ara... (örn: şort, kadın elbise)"
-                          treeMode={true}
-                          data-testid="product-trendyol-cat-search"
-                        />
-                      </div>
-
-                      {/* Hepsiburada Category Mapping */}
-                      <div className="space-y-2">
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">
-                          <span className="inline-block w-2 h-2 bg-[#FF6000] rounded-full mr-1.5"></span>
-                          Hepsiburada Kategorisi
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.hepsiburada_category_id || ""}
-                          onChange={(e) => setFormData({ ...formData, hepsiburada_category_id: e.target.value })}
-                          data-testid="hb-category-id"
-                          placeholder="Hepsiburada Category ID (örn: 18021982)"
-                          className="w-full border-gray-200 border-2 px-4 py-3 rounded-xl focus:border-red-500 outline-none transition-all font-bold text-gray-700 bg-gray-50 focus:bg-white"
-                        />
-                        <input
-                          type="text"
-                          value={formData.hepsiburada_category_name || ""}
-                          onChange={(e) => setFormData({ ...formData, hepsiburada_category_name: e.target.value })}
-                          placeholder="HB Kategori Adı (örn: Giyim > Kadın > Kazak)"
-                          className="w-full border-gray-200 border px-4 py-2 rounded-xl focus:border-red-500 outline-none text-xs text-gray-600 bg-gray-50 focus:bg-white"
-                        />
-                        <p className="text-[10px] text-gray-400">HB Merchant panelinden kategori ID'sini alıp yapıştırın.</p>
-                      </div>
-
-                      {/* Temu Category Mapping */}
-                      <div className="space-y-2">
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">
-                          <span className="inline-block w-2 h-2 bg-black rounded-full mr-1.5"></span>
-                          Temu Kategorisi
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.temu_category_id || ""}
-                          onChange={(e) => setFormData({ ...formData, temu_category_id: e.target.value })}
-                          data-testid="temu-category-id"
-                          placeholder="Temu Category ID"
-                          className="w-full border-gray-200 border-2 px-4 py-3 rounded-xl focus:border-gray-900 outline-none transition-all font-bold text-gray-700 bg-gray-50 focus:bg-white"
-                        />
-                        <input
-                          type="text"
-                          value={formData.temu_category_name || ""}
-                          onChange={(e) => setFormData({ ...formData, temu_category_name: e.target.value })}
-                          placeholder="Temu Kategori Adı"
-                          className="w-full border-gray-200 border px-4 py-2 rounded-xl focus:border-gray-900 outline-none text-xs text-gray-600 bg-gray-50 focus:bg-white"
-                        />
-                      </div>
-
-                      <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
-                        <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Kategori Bilgisi</h4>
-                        <div className="text-sm font-bold text-gray-600 italic">
-                          {formData.category_name || "Kategori seçilmemiş"}
-                        </div>
-                        <p className="text-[10px] text-gray-400 font-medium leading-relaxed">
-                          Ürün özellikleri ve Trendyol eşleştirmeleri kategori düzeyinde yönetilmektedir. 
-                          Değişiklik yapmak için Kategori Ayarları sayfasını ziyaret edin.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      <div className="bg-gray-900 rounded-3xl p-8 text-white shadow-2xl shadow-orange-200 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500 rounded-full blur-[80px] opacity-20 group-hover:opacity-40 transition-opacity" />
-                        <div className="relative z-10">
-                          <p className="text-[10px] font-black text-orange-400 uppercase tracking-[4px] mb-6">Satış Özeti</p>
-                          
-                          <div className="space-y-4">
-                            <div className="flex justify-between items-baseline border-b border-gray-800 pb-4">
-                              <span className="text-gray-400 text-xs font-bold uppercase">Mağaza Fiyatı</span>
-                              <span className="text-xl font-bold">{formData.sale_price || formData.price || 0} TL</span>
-                            </div>
-                            <div className="flex justify-between items-baseline border-b border-gray-800 pb-4">
-                              <span className="text-gray-400 text-xs font-bold uppercase">Markup (%{formData.use_default_markup ? globalTrendyolMarkup : formData.markup_rate})</span>
-                              <span className="text-green-400 font-bold">
-                                +{((((formData.member_price_1 || formData.price) || 0) * (formData.use_default_markup ? globalTrendyolMarkup : formData.markup_rate)) / 100).toFixed(2)} TL
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center pt-2">
-                              <span className="text-white text-sm font-black uppercase tracking-widest">Trendyol Fiyatı</span>
-                              <div className="text-right">
-                                <span className="text-3xl font-black text-orange-500">
-                                  {(((formData.member_price_1 || formData.price) || 0) * (1 + (formData.use_default_markup ? globalTrendyolMarkup : formData.markup_rate) / 100)).toFixed(2)}
-                                </span>
-                                <span className="text-orange-300 font-bold ml-1">TL</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div 
-                        className="bg-white p-6 rounded-2xl border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-center group cursor-pointer hover:border-orange-300 transition-all active:scale-95"
-                        onClick={() => editingProduct && handleTrendyolSync(editingProduct.id)}
-                      >
-                        <div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
-                          <Store className="text-orange-500" size={32} />
-                        </div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase mb-1">Şimdi Trendyol'a Aktar</h4>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Ürünü anlık olarak Trendyol kataloğuna gönderin</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {renderDetailFields(["Pazaryeri Entegrasyonu"])}
-              </TabsContent>
 
               {/* Images Tab */}
               <TabsContent value="images" className="space-y-6 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -4591,254 +4020,6 @@ export default function AdminProducts() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Barkod ile Trendyol'a Aktar — pop-up */}
-      <Dialog open={barcodePushOpen} onOpenChange={setBarcodePushOpen}>
-        <DialogContent className="max-w-2xl" data-testid="barcode-push-dialog">
-          <DialogHeader>
-            <DialogTitle>Barkod ile Trendyol'a Aktar</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Aktarmak istediğiniz ürünlerin <b>barkod</b> veya <b>stok kodlarını</b> her satıra bir tane yazın.
-              Boşluk, virgül veya satır sonu ile ayırabilirsiniz.
-            </p>
-            <textarea
-              value={barcodePushText}
-              onChange={(e) => setBarcodePushText(e.target.value)}
-              rows={10}
-              placeholder="8684483528521&#10;FCSS2700005&#10;8684483528522"
-              className="w-full border rounded-lg p-3 text-sm font-mono"
-              data-testid="barcode-push-textarea"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setBarcodePushOpen(false)}
-                className="px-4 py-2 border rounded hover:bg-gray-100"
-              >
-                İptal
-              </button>
-              <button
-                disabled={barcodePushLoading || !barcodePushText.trim()}
-                data-testid="barcode-push-submit-btn"
-                onClick={async () => {
-                  // Split by whitespace/comma/newline
-                  const codes = barcodePushText
-                    .split(/[\s,;\n]+/)
-                    .map(s => s.trim())
-                    .filter(Boolean);
-                  if (!codes.length) return;
-                  setBarcodePushLoading(true);
-                  const token = localStorage.getItem('token');
-                  // 1) ÖNCE DOĞRULA — Trendyol karşılığı olmayan değer/eksik varsa AKTARMA, uyar.
-                  const tv = toast.loading(`${codes.length} ürün doğrulanıyor...`);
-                  try {
-                    const vr = await axios.post(
-                      `${API}/integrations/trendyol/products/validate`,
-                      { barcodes: codes, stock_codes: codes },
-                      { headers: { Authorization: `Bearer ${token}` }, timeout: 120000 }
-                    );
-                    toast.dismiss(tv);
-                    const blocked = (vr.data?.results || []).filter(
-                      (r) => !r.is_valid || (r.unmatched_values || []).length || (r.missing_required_attrs || []).length
-                    );
-                    if (blocked.length) {
-                      setBarcodePushLoading(false);
-                      setValidationBlock(blocked);
-                      return; // AKTARMA — kullanıcı eşleştirmeyi yapsın
-                    }
-                  } catch (e) {
-                    toast.dismiss(tv);
-                    toast.error(e.response?.data?.detail || "Doğrulama başarısız");
-                    setBarcodePushLoading(false);
-                    return;
-                  }
-                  // 2) Doğrulama temiz → aktar
-                  const t = toast.loading(`${codes.length} kod Trendyol'a aktarılıyor...`);
-                  try {
-                    // Hem barkod hem stok_kodu olarak dene — backend ikisini de kontrol eder
-                    const res = await axios.post(
-                      `${API}/integrations/trendyol/products/sync`,
-                      { barcodes: codes, stock_codes: codes },
-                      { headers: { Authorization: `Bearer ${token}` }, timeout: 180000 }
-                    );
-                    toast.dismiss(t);
-                    const data = res.data || {};
-                    toast.success(`${data.successful || data.count || 0} ürün gönderildi${data.failed ? `, ${data.failed} hata` : ''}`);
-                    setBarcodePushOpen(false);
-                    setBarcodePushText("");
-                  } catch (e) {
-                    toast.dismiss(t);
-                    toast.error(e.response?.data?.detail || "Aktarım başarısız");
-                  } finally {
-                    setBarcodePushLoading(false);
-                  }
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
-              >
-                {barcodePushLoading ? <RefreshCw className="animate-spin" size={16} /> : <Store size={16} />}
-                Trendyol'a Gönder
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Aktarım Engellendi — Trendyol karşılığı olmayan değerler */}
-      <Dialog open={!!validationBlock} onOpenChange={(o) => { if (!o) setValidationBlock(null); }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="validation-block-dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-700">
-              <AlertTriangle size={20} /> Aktarım Durduruldu — Eşleştirme Gerekli
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-gray-600 mb-3">
-            Aşağıdaki ürünlerde bazı değerlerin <b>Trendyol karşılığı bulunamadı</b>. Yanlış aktarımı
-            önlemek için bu ürünler <b>gönderilmedi</b>. Lütfen ilgili kategoride değer eşleştirmesini
-            yapın, ardından tekrar aktarın.
-          </p>
-          <div className="space-y-3">
-            {(validationBlock || []).map((r, i) => (
-              <div key={i} className="border border-red-200 bg-red-50/50 rounded-lg p-3" data-testid={`vblock-item-${i}`}>
-                <div className="font-semibold text-sm text-gray-900 mb-1">
-                  {r.name || r.stock_code} <span className="text-gray-400 font-normal">({r.stock_code})</span>
-                </div>
-                {(r.errors || []).filter((e) => !e.includes("karşılığı yok")).map((e, j) => (
-                  <div key={j} className="text-xs text-red-600">• {e}</div>
-                ))}
-                {(r.unmatched_values || []).length > 0 && (
-                  <div className="mt-2">
-                    <div className="text-xs font-medium text-gray-700 mb-1.5">
-                      Değer eşleştirme — <span className="text-gray-500">Trendyol'un kabul ettiği değeri seçin</span>:
-                    </div>
-                    <div className="space-y-2">
-                      {r.unmatched_values.map((u, k) => {
-                        const key = `${r.id}|${u.mp_attr_id}|${u.local_value}`;
-                        const cur = vbSelections[key] !== undefined
-                          ? vbSelections[key]
-                          : (u.suggested_value?.id || "");
-                        const tyVals = u.trendyol_values || [];
-                        return (
-                          <div key={k} className="flex items-center gap-2 flex-wrap" data-testid={`vblock-${r.stock_code}-${u.mp_attr_id}`}>
-                            <span className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs">{u.attr_name}</span>
-                            <span className="text-gray-400 text-xs">:</span>
-                            <span className="font-semibold text-amber-700 text-xs">{u.local_value}</span>
-                            {u.required && <span className="text-[10px] text-red-600 font-bold">(ZORUNLU)</span>}
-                            <span className="text-gray-400 text-xs">→</span>
-                            <select
-                              value={cur}
-                              onChange={(e) => setVbSelections((s) => ({ ...s, [key]: e.target.value }))}
-                              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white max-w-[220px]"
-                              data-testid={`vblock-select-${r.stock_code}-${u.mp_attr_id}`}
-                            >
-                              <option value="">— Trendyol değeri seçin —</option>
-                              {tyVals.map((tv) => (
-                                <option key={tv.id} value={tv.id}>
-                                  {tv.name}{u.suggested_value?.id === tv.id ? "  (önerilen)" : ""}
-                                </option>
-                              ))}
-                              {u.allow_custom && (
-                                <option value={`__custom__${u.local_value}`}>Serbest metin: {u.local_value}</option>
-                              )}
-                              <option value="__remove__">✕ Bu özelliği üründen kaldır</option>
-                            </select>
-                            {tyVals.length === 0 && (
-                              <span className="text-[10px] text-gray-500">Trendyol bu özellik için değer döndürmedi</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {(r.missing_required_attrs || []).length > 0 && (
-                  <div className="text-xs text-red-600 mt-1">
-                    Eksik zorunlu özellik: {r.missing_required_attrs.map((m) => m.name).join(", ")}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-end gap-2 mt-4 pt-3 border-t">
-            <button
-              onClick={() => setValidationBlock(null)}
-              className="px-4 py-2 text-sm text-gray-600 border rounded hover:bg-gray-50"
-              data-testid="vblock-close-btn"
-            >
-              Kapat
-            </button>
-            <button
-              onClick={() => { setValidationBlock(null); navigate("/admin/kategori-eslestir"); }}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 border rounded hover:bg-gray-50"
-              data-testid="vblock-open-mapping-btn"
-            >
-              <Store size={15} /> Eşleştirme Ekranı
-            </button>
-            <button
-              disabled={vbSaving}
-              onClick={async () => {
-                // Seçimleri topla: kategori bazında value-mapping merge + üründen kaldır.
-                const byCat = {};       // category_id -> [{mp_attr_id, local_value, value_id}]
-                const removals = [];    // {product_id, attr_name}
-                let picked = 0;
-                for (const r of (validationBlock || [])) {
-                  for (const u of (r.unmatched_values || [])) {
-                    const key = `${r.id}|${u.mp_attr_id}|${u.local_value}`;
-                    const sel = vbSelections[key] !== undefined ? vbSelections[key] : (u.suggested_value?.id || "");
-                    if (!sel) continue;
-                    picked++;
-                    if (sel === "__remove__") {
-                      removals.push({ product_id: r.id, attr_name: u.attr_name });
-                    } else if (String(sel).startsWith("__custom__")) {
-                      const cat = r.category_id;
-                      (byCat[cat] = byCat[cat] || []).push({
-                        mp_attr_id: u.mp_attr_id, local_value: u.local_value,
-                        value_id: String(sel).replace("__custom__", ""),
-                      });
-                    } else {
-                      const cat = r.category_id;
-                      (byCat[cat] = byCat[cat] || []).push({
-                        mp_attr_id: u.mp_attr_id, local_value: u.local_value, value_id: sel,
-                      });
-                    }
-                  }
-                }
-                if (!picked) { toast.error("Önce en az bir değer için seçim yapın"); return; }
-                const token = localStorage.getItem("token");
-                const auth = { headers: { Authorization: `Bearer ${token}` } };
-                const t = toast.loading("Eşleştirmeler kaydediliyor…");
-                try {
-                  setVbSaving(true);
-                  for (const [cat, mappings] of Object.entries(byCat)) {
-                    if (!cat || cat === "undefined" || cat === "null") continue;
-                    await axios.post(`${API}/integrations/trendyol/value-mappings/merge`,
-                      { category_id: cat, mappings }, auth);
-                  }
-                  for (const rm of removals) {
-                    await axios.post(`${API}/integrations/trendyol/products/${rm.product_id}/remove-attribute`,
-                      { attr_name: rm.attr_name }, auth);
-                  }
-                  toast.dismiss(t);
-                  toast.success("Kaydedildi. Şimdi tekrar 'Trendyol'a Gönder' ile aktarabilirsiniz.");
-                  setVbSelections({});
-                  setValidationBlock(null);
-                } catch (e) {
-                  toast.dismiss(t);
-                  toast.error(e.response?.data?.detail || "Kaydetme başarısız");
-                } finally {
-                  setVbSaving(false);
-                }
-              }}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-black rounded hover:bg-gray-800 disabled:opacity-50"
-              data-testid="vblock-save-btn"
-            >
-              {vbSaving ? <RefreshCw className="animate-spin" size={15} /> : <Store size={15} />}
-              Kaydet
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
 
       {/* Çöp Kutusu */}
       <Dialog open={trashOpen} onOpenChange={setTrashOpen}>

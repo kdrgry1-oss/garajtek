@@ -34,7 +34,6 @@ import axios from "axios";
 import OrderEventsLog from "../../components/admin/OrderEventsLog";
 import OrderCargoActions, { CARRIER_OPTIONS } from "../../components/admin/OrderCargoActions";
 import MultiSelect from "../../components/admin/MultiSelect";
-import OrderMarketplaceInfo from "../../components/admin/OrderMarketplaceInfo";
 import OrderPaymentDetail from "../../components/admin/OrderPaymentDetail";
 import { toast } from "sonner";
 import { sanitizeHtml } from "../../lib/sanitizeHtml";
@@ -153,7 +152,6 @@ export default function AdminOrders({ unpaidView = false }) {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState(null);
-  const [slipUploading, setSlipUploading] = useState(false);
   const [bulkAction, setBulkAction] = useState("");
   const [selectedCargo, setSelectedCargo] = useState("MNG");
   // Varsayılan kargo firması (Kargo Ayarları) → toplu barkod / kargoya ver modalının başlangıç seçimi
@@ -169,8 +167,6 @@ export default function AdminOrders({ unpaidView = false }) {
   const [shipOrderId, setShipOrderId] = useState(null);
   const [trackingNumber, setTrackingNumber] = useState("");
 
-  // Trendyol Invoice Upload State
-  const [invoicingId, setInvoicingId] = useState(null); // fatura kesimi uçuşta olan sipariş (çift tıklama koruması)
 
   // FAZ 1 B3 - Order Note Modal
   const [noteModalOpen, setNoteModalOpen] = useState(false);
@@ -319,44 +315,8 @@ export default function AdminOrders({ unpaidView = false }) {
     }
   };
 
-  /**
-   * handleGenerateInvoice — Seçili sipariş için e-Arşiv fatura oluşturur.
-   *   BACKEND: POST /api/orders/{id}/create-invoice?invoice_type=e-arsiv
-   *   Başarılı olursa `invoice_number` dönerek satırda görünür; fatura
-   *   oluşturulmuş siparişler tabloda opaklık azaltılarak pasifleştirilir.
-   */
-  const handleGenerateInvoice = async (orderId) => {
-    if (invoicingId) return;            // başka bir fatura işlemi sürüyor → çift tıklamayı yut
-    setInvoicingId(orderId);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(`${API}/orders/${orderId}/create-invoice?invoice_type=e-arsiv`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data.success) {
-        toast.success(`Fatura oluşturuldu: ${res.data.invoice_number}`);
-        fetchOrders();
-      } else {
-        toast.error(res.data.message || "Fatura oluşturulamadı");
-      }
-    } catch (err) {
-      // Backend iş-hatalarını 400 + {detail} olarak döndürür (Doğan mesajı burada). Yine de
-      // detail boşsa (ör. ağ/gateway hatası) gerçek durum kodunu/mesajı göster — sessiz
-      // "Fatura oluşturulamadı" teşhisi imkânsız kılıyordu.
-      const _d = err.response?.data?.detail;
-      const _msg = _d
-        ? _d
-        : err.response
-          ? `Fatura oluşturulamadı (HTTP ${err.response.status})`
-          : `Sunucuya ulaşılamadı: ${err.message || 'ağ hatası'}`;
-      toast.error(_msg, { duration: 8000 });
-    } finally {
-      setInvoicingId(null);
-    }
-  };
-
   const handleResetInvoice = async (orderId) => {
-    if (!window.confirm("Bu siparişin fatura kaydı panelden silinecek ve yeniden kesilebilir hale gelecek.\n(Doğan'daki gerçek fatura iptal edilmez.)\n\nDevam edilsin mi?")) return;
+    if (!window.confirm("Bu siparişin fatura kaydı panelden silinecek ve yeniden kesilebilir hale gelecek.\n(Entegratördeki gerçek fatura iptal edilmez.)\n\nDevam edilsin mi?")) return;
     try {
       const token = localStorage.getItem('token');
       const res = await axios.post(`${API}/orders/${orderId}/reset-invoice`, {}, {
@@ -374,22 +334,7 @@ export default function AdminOrders({ unpaidView = false }) {
     }
   };
 
-  // İzi temizle + yeniden dene: başarısız fatura denemesinin izini (hata/kilit) siler ve
-  // hemen yeniden Doğan'a gönderir. Kesilmemiş siparişlerde (invoice_issued=false) "Fatura
-  // Sıfırla" butonu görünmediği için, hata banner'ından tek tıkla temiz-sayfa + yeniden gönderim
-  // sağlar. Not: başarısız denemede gerçek fatura/numara oluşmaz; silinen yalnız iz kaydıdır.
-  const handleClearAndRetryInvoice = async (orderId) => {
-    if (invoicingId) return;
-    try {
-      const token = localStorage.getItem('token');
-      await axios.post(`${API}/orders/${orderId}/reset-invoice`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-    } catch (e) { /* iz yoksa sorun değil — yine de yeniden göndermeyi dene */ }
-    await handleGenerateInvoice(orderId);   // taze gönderim (hata/başarı toast'ı burada gösterilir)
-  };
-
-  // Manuel fatura yükleme (Doğan down / dışarıda kesilen fatura) — PDF/görsel + opsiyonel no
+  // Manuel fatura yükleme (dışarıda kesilen fatura) — PDF/görsel + opsiyonel no
   const [manualInvNo, setManualInvNo] = useState("");
   const [manualInvFile, setManualInvFile] = useState(null);
   const [uploadingInv, setUploadingInv] = useState(false);
@@ -513,52 +458,6 @@ export default function AdminOrders({ unpaidView = false }) {
     catch (err) { toast.error(err.message || "Kargo etiketi açılamadı"); return; }
     // Etiket çekimi backend'de "yazdırıldı" damgası bırakır → listeyi tazele (kamyon sarı→yeşil).
     setTimeout(() => fetchOrders(), 1500);
-  };
-
-  const handleTrendyolPrintLabel = async (cargoTrackingNumber) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/integrations/trendyol/orders/label/${cargoTrackingNumber}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob'
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-      window.open(url, '_blank');
-    } catch (err) {
-      toast.error("Trendyol kargo etiketi alınamadı");
-    }
-  };
-
-
-  // Amazon sevk irsaliyesi (PDF) yükle → adres/isim/telefon otomatik doldur (PII rolü gerekmez).
-  const uploadPackingSlip = async (file) => {
-    if (!file) return;
-    setSlipUploading(true);
-    const t = toast.loading("İrsaliye çözümleniyor...");
-    try {
-      const token = localStorage.getItem('token');
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await axios.post(`${API}/amazon/spapi/orders/parse-packing-slip`, fd, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.data?.success) {
-        toast.success(res.data.message || "Adres dolduruldu", { id: t });
-        await fetchOrders();
-        // Açık detayda anında görünsün diye seçili siparişi güncelle
-        const p = res.data.parsed || {};
-        setSelectedOrder((o) => o ? { ...o, shipping_address: { ...(o.shipping_address || {}),
-          first_name: (p.name || "").split(" ").slice(0, -1).join(" ") || o.shipping_address?.first_name,
-          last_name: (p.name || "").split(" ").slice(-1).join(" ") || o.shipping_address?.last_name,
-          address: p.address, city: p.city, district: p.district, phone: p.phone } } : o);
-      } else {
-        toast.error(res.data?.error || "Çözümlenemedi", { id: t });
-      }
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "İrsaliye yüklenemedi", { id: t });
-    } finally {
-      setSlipUploading(false);
-    }
   };
 
   const handleSendConfirmationSMS = async (orderId) => {
@@ -723,48 +622,6 @@ export default function AdminOrders({ unpaidView = false }) {
       w.close();
       toast.dismiss("bulklbl");
       toast.error(`Etiket yazdırma başarısız: ${e.message || "Belge hazırlanamadı"}`);
-    }
-  };
-
-  /**
-   * handleBulkGenerateInvoice — Seçili siparişlerin HEPSİ için e-Arşiv fatura
-   *   oluşturur. Sıralı çağrı yapar; hata olursa tek tek raporlar.
-   *   BACKEND: POST /api/orders/{id}/create-invoice?invoice_type=e-arsiv
-   */
-  const handleBulkGenerateInvoice = async () => {
-    if (selectedOrders.length === 0) {
-      toast.error("Lütfen sipariş seçiniz");
-      return;
-    }
-    if (!await window.appConfirm(`${selectedOrders.length} sipariş için fatura oluşturulacak (otomatik: VKN'liyse e-Fatura, değilse e-Arşiv). Devam?`)) return;
-    // Toplu barkodla tutarlı: işlem sürerken "oluşturuluyor" bildirimi (aynı id ile sonra başarı/hata ile değişir).
-    const _invTid = toast.loading("Toplu fatura oluşturuluyor...");
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(
-        `${API}/orders/bulk-create-invoice?invoice_type=auto`,
-        selectedOrders,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const ok = res.data?.success_count || 0;
-      const fail = res.data?.error_count || 0;
-      toast.success(`${ok} fatura oluşturuldu${fail > 0 ? `, ${fail} başarısız` : ""}`, { id: _invTid });
-      if (fail > 0 && res.data?.errors?.length) {
-        console.warn("Bulk invoice errors:", res.data.errors);
-        const havaleBlocked = res.data.errors.filter(
-          (e) => (e.error || "").includes("Havale onaylanmadığı")
-        );
-        if (havaleBlocked.length) {
-          toast.error(
-            `${havaleBlocked.length} sipariş havale onaylanmadığı için faturalanamadı. Önce ödemelerini 'Ödendi' işaretleyin.`,
-            { duration: 6000 }
-          );
-        }
-      }
-      setSelectedOrders([]);
-      fetchOrders();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Toplu fatura başarısız", { id: _invTid });
     }
   };
 
@@ -1094,17 +951,6 @@ export default function AdminOrders({ unpaidView = false }) {
             <input type="text" placeholder="Telefon" className="border px-3 py-1.5 rounded text-sm" value={filters.phone} onChange={e => setFilters({...filters, phone: e.target.value})} onKeyDown={onFilterKey} />
             <input type="text" placeholder="E-posta" className="border px-3 py-1.5 rounded text-sm" value={filters.email} onChange={e => setFilters({...filters, email: e.target.value})} onKeyDown={onFilterKey} />
             <input type="text" placeholder="Kupon Kodu" className="border px-3 py-1.5 rounded text-sm" value={filters.coupon_code} onChange={e => setFilters({...filters, coupon_code: e.target.value})} onKeyDown={onFilterKey} />
-            <MultiSelect className="w-44" placeholder="Tüm Platformlar" value={filters.platform} onChange={(v) => setFilters({ ...filters, platform: v })}
-              options={[
-                { value: "web", label: "Web Sitesi" },
-                { value: "trendyol", label: "Trendyol" },
-                { value: "hepsiburada", label: "Hepsiburada" },
-                { value: "amazon", label: "Amazon" },
-                { value: "temu", label: "Temu" },
-                { value: "n11", label: "N11" },
-                { value: "ciceksepeti", label: "Çiçeksepeti" },
-                { value: "pttavm", label: "PttAVM" },
-              ]} />
             <MultiSelect className="w-44" placeholder="Tüm Kaynaklar" title="Geliş kaynağı (reklam/organik/sosyal/influencer)" value={filters.channel} onChange={(v) => setFilters({ ...filters, channel: v })}
               options={[
                 { value: "organic", label: "Organik" },
@@ -1201,16 +1047,6 @@ export default function AdminOrders({ unpaidView = false }) {
             >
               <Printer size={16} />
               Kargo Barkodu Yazdır
-            </button>
-            {/* Yeni: Toplu fatura oluştur + yazdır */}
-            <button
-              onClick={handleBulkGenerateInvoice}
-              className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white text-sm rounded hover:bg-amber-700"
-              data-testid="bulk-generate-invoice-btn"
-              title="Seçili siparişlere e-Arşiv fatura oluştur"
-            >
-              <FileText size={16} />
-              Toplu Fatura Kes
             </button>
             <button
               onClick={handleBulkPrintInvoices}
@@ -1343,7 +1179,6 @@ export default function AdminOrders({ unpaidView = false }) {
                 // İPTAL TALEBİ ALINDI: müşterinin HER iptal talebi (ödenmiş/ödenmemiş) bu duruma düşer;
                 // sipariş kendiliğinden iptal OLMAZ. MOR vurgu; personel (gerekirse iadeyi yapıp) iptale çeker.
                 const isCancelRequested = order.status === 'cancel_requested';
-                const isInvoiceIssued = !!order.invoice_issued;
                 // row-unpaid-* marker sınıfları: hover'da .admin-table tr:hover td kuralı
                 // kırmızı/sarı vurguyu griyle eziyordu; index.css'te bu marker'lar hover'da
                 // rengi KORUR (karışıklık olmasın diye kırmızı şerit hover'da kaybolmaz).
@@ -1585,24 +1420,6 @@ export default function AdminOrders({ unpaidView = false }) {
                         </button>
                         {/* 2. (kaldırıldı) Kargoya Ver → üst bar "Toplu Barkod Oluştur" + sipariş detayından yapılır */}
                         {/* 3. (kaldırıldı) Fatura Yazdır → üst bar "Toplu Fatura Yazdır" kullanılır */}
-                        {/* 4. E-Arşiv Fatura Oluştur - kesilince saydam+pasif (Fatura Sıfırla'ya kadar) */}
-                        {(() => {
-                          const invoiced = isInvoiceIssued || !!order.invoice_number || !!order.invoice?.invoice_number;
-                          const busy = invoicingId === order.id;
-                          const invNo = order.invoice_number || order.invoice?.invoice_number || "";
-                          return (
-                            <button
-                              onClick={() => handleGenerateInvoice(order.id)}
-                              disabled={busy || invoiced}
-                              title={invoiced
-                                ? `Fatura kesildi${invNo ? `: ${invNo}` : ""} — yeniden basmak için Fatura Sıfırla`
-                                : "E-Arşiv Fatura Oluştur"}
-                              className={`tci-btn ${invoiced ? "tci-btn-green-active opacity-50 cursor-not-allowed" : "tci-btn-green"} ${busy ? "opacity-50 cursor-not-allowed" : ""}`}
-                            >
-                              <FileText size={15} />
-                            </button>
-                          );
-                        })()}
                         {/* 5. (kaldırıldı) Kargo Etiketi → sipariş detayından / üst bardan yapılır */}
                         {/* 5b. (kaldırıldı) Kargo Durum Yenile — kargo verisi artık otomatik
                             çekildiği için manuel yenile butonuna gerek kalmadı. */}
@@ -1742,7 +1559,7 @@ export default function AdminOrders({ unpaidView = false }) {
                     <FileText size={15} /> Faturayı Manuel Yükle
                   </div>
                   <p className="text-[11px] text-gray-500 mb-2">
-                    Doğan otomatik kesilemezse (ör. geçici kesinti), dışarıda kestiğiniz faturayı
+                    Fatura dışarıda kesildiyse (ör. entegratör panelinden), faturayı
                     (PDF veya görsel) buraya yükleyin. Sipariş "faturalandı" işaretlenir ve dosya
                     sipariş içinde görünür.
                   </p>
@@ -1774,16 +1591,6 @@ export default function AdminOrders({ unpaidView = false }) {
 
               {/* Action Buttons */}
               <div className="flex gap-2 flex-wrap">
-                {!(selectedOrder.invoice_issued || selectedOrder.invoice_number || selectedOrder.invoice?.invoice_number) && (
-                  <button
-                    onClick={() => handleGenerateInvoice(selectedOrder.id)}
-                    disabled={invoicingId === selectedOrder.id}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FileText size={16} />
-                    {invoicingId === selectedOrder.id ? "Kesiliyor..." : "Fatura Kes"}
-                  </button>
-                )}
                 {(selectedOrder.invoice_issued || selectedOrder.invoice_number || selectedOrder.invoice?.invoice_number) && (
                   <button
                     onClick={() => handleResetInvoice(selectedOrder.id)}
@@ -1808,15 +1615,6 @@ export default function AdminOrders({ unpaidView = false }) {
                     kaldırıldı — istek üzerine. Kargo takip no VARSA etiket + kargo SMS kalır. */}
                 {(selectedOrder.cargo?.tracking_number || selectedOrder.cargo_tracking_number) && (
                   <>
-                    {selectedOrder.platform === 'trendyol' && selectedOrder.cargo_tracking_number ? (
-                      <button
-                        onClick={() => handleTrendyolPrintLabel(selectedOrder.cargo_tracking_number)}
-                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm rounded hover:bg-orange-700"
-                      >
-                        <Tag size={16} />
-                        Trendyol Etiketi Yazdır
-                      </button>
-                    ) : (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handlePrintLabel(selectedOrder.id)}
@@ -1831,7 +1629,6 @@ export default function AdminOrders({ unpaidView = false }) {
                           </span>
                         )}
                       </div>
-                    )}
                     <button
                       onClick={() => handleSendShippingSMS(selectedOrder.id)}
                       className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm rounded hover:bg-orange-700"
@@ -2041,18 +1838,6 @@ export default function AdminOrders({ unpaidView = false }) {
                       </div>
                     );
                   })()}
-                  {/* Amazon: PII rolü olmadan adres için sevk irsaliyesi (PDF) çözümle */}
-                  {!editMode && (selectedOrder.platform === "amazon") && (
-                    <div className="mt-3 pt-3 border-t">
-                      <label className="block text-[11px] text-gray-500 mb-1">
-                        📄 Sevk irsaliyesi (PDF) çözümle — adres/isim/telefon otomatik dolar
-                      </label>
-                      <input type="file" accept=".pdf,application/pdf" disabled={slipUploading}
-                        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; uploadPackingSlip(f); }}
-                        className="text-xs" />
-                      {slipUploading && <span className="text-[11px] text-gray-400 ml-2">çözümleniyor…</span>}
-                    </div>
-                  )}
                 </div>
                 <div className="p-4 border rounded">
                   <h3 className="font-medium mb-3">{editMode ? "Teslimat Adresi" : "Fatura Adresi"}</h3>
@@ -2114,7 +1899,7 @@ export default function AdminOrders({ unpaidView = false }) {
                     <input className="border rounded px-2 py-1 text-sm w-full" placeholder="VKN (10) / TCKN (11)" inputMode="numeric" value={editData.billing_info?.tax_number || ""} onChange={(e) => setBI("tax_number", e.target.value.replace(/\D/g, ""))} />
                     <input className="border rounded px-2 py-1 text-sm w-full" placeholder="Vergi Dairesi" value={editData.billing_info?.tax_office || ""} onChange={(e) => setBI("tax_office", e.target.value)} />
                   </div>
-                  <p className="text-[11px] text-amber-800 mt-1">VKN 10 hane ise kesimde Doğan'a e-Fatura mükellefiyeti sorulur; mükellef değilse e-Arşiv kesilir. (Bu siparişte VKN'yi girip Kaydet → sonra Fatura Kes.)</p>
+                  <p className="text-[11px] text-amber-800 mt-1">VKN 10 hane ise e-Fatura mükellefiyeti sorgulanır; mükellef değilse e-Arşiv kesilir.</p>
                 </div>
               ) : null}
               {/* Fatura bilgileri Müşteri Bilgileri kutusuna taşındı (kullanıcı isteği: 2 kutu yeterli) */}
@@ -2126,17 +1911,6 @@ export default function AdminOrders({ unpaidView = false }) {
                   {selectedOrder.invoice_last_error_at && (
                     <span className="text-xs text-red-500"> ({formatDate(selectedOrder.invoice_last_error_at)})</span>
                   )}
-                  <div className="mt-2">
-                    <button
-                      onClick={() => handleClearAndRetryInvoice(selectedOrder.id)}
-                      disabled={invoicingId === selectedOrder.id}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
-                      title="Başarısız denemenin izini siler ve yeniden Doğan'a gönderir"
-                    >
-                      <FileText size={14} />
-                      {invoicingId === selectedOrder.id ? "Deneniyor..." : "İzi temizle ve yeniden dene"}
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -2365,7 +2139,6 @@ export default function AdminOrders({ unpaidView = false }) {
                 )}
               </div>
 
-              <OrderMarketplaceInfo order={selectedOrder} />
               <OrderPaymentDetail order={selectedOrder} />
               <OrderEventsLog orderId={selectedOrder.id} />
             </div>

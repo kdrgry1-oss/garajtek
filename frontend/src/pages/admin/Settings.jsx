@@ -321,31 +321,6 @@ export default function AdminSettings() {
           </div>
         </div>
 
-        {/* Trendyol Integration Settings */}
-        <div className="bg-orange-50 p-6 rounded-lg shadow-sm border border-orange-100">
-          <h2 className="text-lg font-medium mb-4 text-orange-900 flex items-center gap-2">
-            <span className="w-2 h-6 bg-orange-500 rounded-full inline-block"></span>
-            Trendyol Entegrasyon Ayarları
-          </h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-orange-900">Global Trendyol Kâr Oranı (%)</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={settings.trendyol_markup || 0}
-                  onChange={(e) => setSettings({ ...settings, trendyol_markup: parseFloat(e.target.value) || 0 })}
-                  className="w-full border-orange-200 border px-3 py-2 rounded text-sm focus:outline-none focus:border-orange-500 font-bold text-orange-700"
-                  placeholder="Örn: 20"
-                />
-              </div>
-              <p className="text-xs text-orange-600 mt-2">
-                Trendyol fiyatlamasında "Global oranı kullan" seçilen ürünlerde otomatik eklenecek varsayılan markup (kâr / komisyon) yüzdesi.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Contact */}
         <div className="bg-white p-6 rounded-lg shadow-sm">
           <h2 className="text-lg font-medium mb-4">İletişim Bilgileri</h2>

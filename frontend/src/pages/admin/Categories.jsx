@@ -8,31 +8,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
-import SearchableMapSelect from "../../components/admin/SearchableMapSelect";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
-  const [trendyolCategories, setTrendyolCategories] = useState([]);
-  const [trendyolCatSearch, setTrendyolCatSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [syncingTrendyol, setSyncingTrendyol] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
-  const [trendyolAttributes, setTrendyolAttributes] = useState([]);
-  const [fetchingAttributes, setFetchingAttributes] = useState(false);
   
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
     image_url: "",
     parent_id: "",
-    trendyol_category_id: "",
-    hepsiburada_category_id: "",
-    amazon_category_id: "",
-    attribute_mapping: {},
     is_active: true,
     members_only: false,
     sort_order: 0,
@@ -40,7 +30,6 @@ export default function AdminCategories() {
 
   useEffect(() => {
     fetchCategories();
-    fetchTrendyolCategories();
   }, []);
 
   const fetchCategories = async () => {
@@ -55,56 +44,12 @@ export default function AdminCategories() {
     }
   };
 
-  const fetchTrendyolCategories = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/integrations/trendyol/categories`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data?.categories && res.data.categories.length > 0) {
-        setTrendyolCategories(res.data.categories);
-      } else {
-        // Kategoriler boşsa otomatik senkronize et
-        syncTrendyolCategories();
-      }
-    } catch (err) {
-      console.error("Trendyol categories fetch failed", err);
-    }
-  };
-
-  const syncTrendyolCategories = async () => {
-    setSyncingTrendyol(true);
-    try {
-      const token = localStorage.getItem('token');
-      await axios.post(`${API}/integrations/trendyol/categories/sync`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 60000
-      });
-      // Tekrar çek
-      const res = await axios.get(`${API}/integrations/trendyol/categories`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data?.categories) {
-        setTrendyolCategories(res.data.categories);
-        toast.success(`${res.data.categories.length} Trendyol kategorisi yüklendi`);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Trendyol kategorileri çekilemedi");
-    } finally {
-      setSyncingTrendyol(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const payload = {
         ...formData,
-        parent_id: formData.parent_id || null,
-        trendyol_category_id: formData.trendyol_category_id ? parseInt(formData.trendyol_category_id) : null,
-        hepsiburada_category_id: formData.hepsiburada_category_id ? parseInt(formData.hepsiburada_category_id) : null,
-        amazon_category_id: formData.amazon_category_id ? parseInt(formData.amazon_category_id) : null
+        parent_id: formData.parent_id || null
       };
 
       if (editingCategory) {
@@ -144,55 +89,6 @@ export default function AdminCategories() {
     });
   };
 
-  const fetchTrendyolAttributes = async (trendyolCatId) => {
-    if (!trendyolCatId) { setTrendyolAttributes([]); return; }
-    setFetchingAttributes(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/integrations/trendyol/categories/${trendyolCatId}/attributes`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setTrendyolAttributes(res.data?.attributes || []);
-    } catch (err) {
-      console.error(err);
-      setTrendyolAttributes([]);
-    } finally {
-      setFetchingAttributes(false);
-    }
-  };
-
-  // DENETİM FIX (#22): turuncu buton CANLI Trendyol stok/fiyat push'u tetikliyordu — onaysız
-  // ve çift tıklamaya açıktı. Artık önce onay istenir, işlem sırasında buton devre dışı/spinner olur.
-  const [pushingCat, setPushingCat] = useState(null);
-
-  const doTrendyolCategoryStockPrice = async (categoryId, categoryName) => {
-    setPushingCat(categoryId);
-    try {
-      const token = localStorage.getItem('token');
-      toast.info(`${categoryName} kategorisi için stok/fiyat güncelleniyor...`);
-      const res = await axios.post(`${API}/integrations/trendyol/categories/${categoryId}/update-stock-price`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      toast.success(res.data?.message || "Stok/fiyat güncellendi");
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Stok/fiyat güncelleme başarısız");
-    } finally {
-      setPushingCat(null);
-    }
-  };
-
-  const handleTrendyolCategoryStockPrice = (categoryId, categoryName) => {
-    if (pushingCat) return;
-    toast(`"${categoryName}" kategorisindeki ürünlerin stok/fiyatını CANLI Trendyol'a göndersin mi?`, {
-      action: {
-        label: 'Gönder',
-        onClick: () => doTrendyolCategoryStockPrice(categoryId, categoryName),
-      },
-      cancel: { label: 'İptal', onClick: () => {} },
-      duration: 8000,
-    });
-  };
-
   const openEditModal = (category) => {
     setEditingCategory(category);
     setFormData({
@@ -200,33 +96,18 @@ export default function AdminCategories() {
       slug: category.slug || "",
       image_url: category.image_url || "",
       parent_id: category.parent_id || "",
-      trendyol_category_id: category.trendyol_category_id || "",
-      hepsiburada_category_id: category.hepsiburada_category_id || "",
-      amazon_category_id: category.amazon_category_id || "",
-      attribute_mapping: category.attribute_mapping || {},
       is_active: category.is_active,
       members_only: !!category.members_only,
       sort_order: category.sort_order || 0,
     });
-    // Trendyol kategori adını yansıt (varsa)
-    if (category.trendyol_category_id) {
-      const found = trendyolCategories.find(c => String(c.id) === String(category.trendyol_category_id));
-      setTrendyolCatSearch(found?.name || "");
-      fetchTrendyolAttributes(category.trendyol_category_id);
-    } else {
-      setTrendyolCatSearch("");
-      setTrendyolAttributes([]);
-    }
     setModalOpen(true);
   };
 
   const resetForm = () => {
     setEditingCategory(null);
-    setTrendyolAttributes([]);
-    setTrendyolCatSearch("");
     setFormData({
-      name: "", slug: "", description: "", image_url: "", parent_id: "", trendyol_category_id: "",
-      hepsiburada_category_id: "", amazon_category_id: "", attribute_mapping: {}, is_active: true, members_only: false, sort_order: 0
+      name: "", slug: "", description: "", image_url: "", parent_id: "",
+      is_active: true, members_only: false, sort_order: 0
     });
   };
 
@@ -302,14 +183,6 @@ export default function AdminCategories() {
                 <button onClick={() => openEditModal(node)} className="p-1 hover:bg-gray-100 rounded text-blue-600" title="Düzenle">
                   <Edit size={16} />
                 </button>
-                <button
-                  onClick={() => handleTrendyolCategoryStockPrice(node.id, node.name)}
-                  disabled={pushingCat === node.id}
-                  className="p-1 hover:bg-orange-50 rounded text-orange-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Trendyol Stok/Fiyat Güncelle"
-                >
-                  <RefreshCw size={16} className={pushingCat === node.id ? "animate-spin" : ""} />
-                </button>
                 <button onClick={() => handleDelete(node.id)} className="p-1 hover:bg-gray-100 rounded text-red-500" title="Sil">
                   <Trash2 size={16} />
                 </button>
@@ -327,7 +200,7 @@ export default function AdminCategories() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold">Kategori Yönetimi</h1>
-          <p className="text-gray-500 text-sm mt-1">Hiyerarşik kategori ağacı ve pazaryeri eşleştirmeleri</p>
+          <p className="text-gray-500 text-sm mt-1">Hiyerarşik kategori ağacı</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -359,14 +232,6 @@ export default function AdminCategories() {
           >
             <RefreshCw size={16} />
             Eksik Kategorileri Yükle
-          </button>
-          <button
-            onClick={syncTrendyolCategories}
-            disabled={syncingTrendyol}
-            className="flex items-center gap-2 bg-[#F27A1A] text-white px-4 py-2 rounded hover:bg-[#d96a15] disabled:opacity-50"
-          >
-            <RefreshCw size={18} className={syncingTrendyol ? "animate-spin" : ""} />
-            {syncingTrendyol ? "Çekiliyor..." : `Trendyol Kategorileri (${trendyolCategories.length})`}
           </button>
           <button 
             onClick={() => { resetForm(); setModalOpen(true); }}
@@ -445,85 +310,6 @@ export default function AdminCategories() {
                 type="text"
                 value={formData.slug}
                 onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                className="w-full border px-3 py-2 rounded text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Trendyol Kategori Eşleşmesi</label>
-              <SearchableMapSelect
-                optionsUrl={`/category-mapping/trendyol/options`}
-                value={{ id: formData.trendyol_category_id || "", name: trendyolCatSearch }}
-                onChange={(v) => {
-                  const newCatId = v.id || "";
-                  setFormData({ ...formData, trendyol_category_id: newCatId, attribute_mapping: {} });
-                  setTrendyolCatSearch(v.name || "");
-                  if (newCatId) fetchTrendyolAttributes(newCatId);
-                }}
-                placeholder="Kategori ara... (örn: şort, kadın elbise)"
-                treeMode={true}
-                data-testid="cat-trendyol-search"
-              />
-              {formData.trendyol_category_id && (
-                <p className="text-xs text-green-600 mt-1">Seçili ID: {formData.trendyol_category_id}</p>
-              )}
-
-              {/* Attribute Mapping Section */}
-              {formData.trendyol_category_id && (
-                <div className="mt-4 border-t pt-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <h4 className="text-sm font-semibold text-orange-700">Özellik Eşleştirmesi</h4>
-                    {fetchingAttributes && <span className="text-xs text-gray-500 animate-pulse">Yükleniyor...</span>}
-                  </div>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Bu kategorideki ürünlerin özellik anahtarlarını Trendyol özellik ID'leriyle eşleştirin. Böylece ürünleri Trendyol'a gönderirken otomatik doldurmak için kullanılır.
-                  </p>
-                  {trendyolAttributes.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {trendyolAttributes.map((attr) => (
-                        <div key={attr.attribute?.id} className={`p-3 rounded border ${attr.attribute?.required ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
-                          <label className="block text-xs font-semibold mb-1 text-gray-700">
-                            {attr.attribute?.name}
-                            {attr.attribute?.required ? <span className="text-red-500 ml-1">*</span> : <span className="text-gray-400 ml-1">(opsiyonel)</span>}
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.attribute_mapping[attr.attribute?.id] || ""}
-                            onChange={(e) => setFormData(prev => ({
-                              ...prev,
-                              attribute_mapping: { ...prev.attribute_mapping, [attr.attribute?.id]: e.target.value }
-                            }))}
-                            placeholder={`Ürün özellik anahtarı (örn: Kumaş)`}
-                            className="w-full text-xs border px-2 py-1.5 rounded bg-white"
-                          />
-                          {attr.attributeValues?.length > 0 && (
-                            <p className="text-[10px] text-gray-400 mt-1">Geçerli değerler: {attr.attributeValues.slice(0, 4).map(v => v.name).join(", ")}{attr.attributeValues.length > 4 ? "..." : ""}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : !fetchingAttributes ? (
-                    <p className="text-xs text-gray-500 bg-gray-50 rounded p-3">Bu kategori için özellik bulunamadı.</p>
-                  ) : null}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Hepsiburada Eşleşmesi (ID Ara)</label>
-              <input
-                type="text"
-                value={formData.hepsiburada_category_id || ""}
-                onChange={(e) => setFormData({ ...formData, hepsiburada_category_id: e.target.value })}
-                placeholder="Örn: 12345"
-                className="w-full border px-3 py-2 rounded text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Amazon Eşleşmesi (ID Ara)</label>
-              <input
-                type="text"
-                value={formData.amazon_category_id || ""}
-                onChange={(e) => setFormData({ ...formData, amazon_category_id: e.target.value })}
-                placeholder="Örn: 98765"
                 className="w-full border px-3 py-2 rounded text-sm"
               />
             </div>

@@ -13,7 +13,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import {
   Activity, Clock, CheckCircle2, AlertCircle, Info, RefreshCw,
-  Cpu, Globe, Database, Zap
+  Cpu, Database, Zap
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -106,13 +106,10 @@ export default function AutomationStatus() {
         <>
           {/* Integrations row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5" data-testid="integration-status-cards">
-            <IntegrationCard label="Doğan e-Dönüşüm" ok={data.integrations.dogan_configured} hint="e-Fatura / e-Arşiv" />
             <IntegrationCard label="Resend" ok={data.integrations.resend_configured} hint="E-posta gönderimi (kampanyalar)" />
-            <IntegrationCard label="Trendyol" ok={(data.marketplaces.find((m) => m.key === "trendyol") || {}).orders_enabled}
-              hint={`${(data.marketplaces.find((m) => m.key === "trendyol") || {}).orders_interval_min || "?"} dk'da bir sipariş çek`} />
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-5">
+          <div className="grid lg:grid-cols-2 gap-5">
             {/* Cron jobs */}
             <section className="lg:col-span-1 bg-white border rounded-xl p-4">
               <h2 className="text-sm font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -133,33 +130,6 @@ export default function AutomationStatus() {
                       <span className="font-medium">{formatTime(j.next_run)}</span>
                       <span className="text-gray-400">({relativeFromNow(j.next_run)})</span>
                     </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Marketplaces */}
-            <section className="lg:col-span-1 bg-white border rounded-xl p-4">
-              <h2 className="text-sm font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Globe size={16} /> Pazaryeri Senkron Ayarları
-              </h2>
-              <div className="space-y-2.5">
-                {data.marketplaces.length === 0 && <p className="text-sm text-gray-400">Tanımlı hesap yok</p>}
-                {data.marketplaces.map((m) => (
-                  <div key={m.key} className="border border-gray-100 rounded-lg p-3" data-testid={`mp-${m.key}`}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-bold uppercase">{m.name || m.key}</span>
-                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${m.enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {m.enabled ? "Aktif" : "Pasif"}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-600 space-y-0.5">
-                      <p>📦 Ürün: {m.products_enabled ? `${m.products_interval_min || "?"} dk'da bir` : "kapalı"}</p>
-                      <p>🛒 Sipariş: {m.orders_enabled ? `${m.orders_interval_min || "?"} dk'da bir` : "kapalı"}</p>
-                      {m.last_orders_sync && (
-                        <p className="text-[11px] text-gray-500 pt-1">Son sipariş senkron: {formatTime(m.last_orders_sync)} ({relativeFromNow(m.last_orders_sync)})</p>
-                      )}
-                    </div>
                   </div>
                 ))}
               </div>
@@ -196,7 +166,7 @@ export default function AutomationStatus() {
                 <thead>
                   <tr>
                     <th className="text-left">Zaman</th>
-                    <th className="text-left">Pazaryeri / Sistem</th>
+                    <th className="text-left">Sistem</th>
                     <th className="text-left">İşlem</th>
                     <th className="text-left">Durum</th>
                     <th className="text-left">Mesaj</th>

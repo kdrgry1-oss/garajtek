@@ -1,11 +1,10 @@
 """
 =============================================================================
-provider_settings.py — E-Fatura ve Kargo Entegratör Ayarları
+provider_settings.py — Kargo Entegratör Ayarları
 =============================================================================
 
 AMAÇ:
-  Yöneticinin piyasada bulunan büyük e-fatura entegratörleri ve kargo
-  firmaları arasından istediğini seçip, sadece o entegratörün gerektirdiği
+  Yöneticinin kargo firmaları arasından istediğini seçip, sadece o entegratörün gerektirdiği
   bilgileri girip sisteme entegre edebilmesi için ayar altyapısı.
 
 NASIL ÇALIŞIR?
@@ -13,23 +12,19 @@ NASIL ÇALIŞIR?
     Frontend bu şemayı alıp dinamik form render eder.
   - Kayıt: `providers_config` koleksiyonunda tek bir döküman tutulur:
       {
-        "kind": "einvoice" | "cargo",
-        "active_provider": "dogan-edonusum",
+        "kind": "cargo",
+        "active_provider": "mng",
         "providers": {
-          "dogan-edonusum": {<credentials>},
-          "nilvera": {<credentials>},
+          "mng": {<credentials>},
           ...
         }
       }
-  - Fatura kesme veya kargo etiketi basma rutinleri `active_provider`'ı
+  - Kargo etiketi basma rutinleri `active_provider`'ı
     okuyup o provider'ın config'i ile işlem yapar.
 
 ENDPOINT'LER:
-  - GET  /api/provider-settings/einvoice/schemas  → Tüm e-fatura provider şemaları
-  - GET  /api/provider-settings/einvoice/config   → Kayıtlı tüm config + aktif provider
-  - POST /api/provider-settings/einvoice/config   → Tüm config güncelle
-  - POST /api/provider-settings/einvoice/test     → Seçili provider'ın bağlantı testi
-  - GET  /api/provider-settings/cargo/schemas     → Aynı, kargo firmaları için
+  - GET  /api/provider-settings/cargo/schemas     → Kargo firması şemaları
+  (e-fatura artık BirFatura entegrasyonu üzerinden: routes/integrations_birfatura.py)
   - GET  /api/provider-settings/cargo/config
   - POST /api/provider-settings/cargo/config
   - POST /api/provider-settings/cargo/test
@@ -67,177 +62,6 @@ def _f(key, label, type="text", required=False, placeholder="", help=None, optio
     if help: d["help"] = help
     if options: d["options"] = options
     return d
-
-
-EINVOICE_PROVIDERS = {
-    # TÜRKİYE'NİN EN ÇOK KULLANILAN E-FATURA ENTEGRATÖRLERİ
-    "dogan-edonusum": {
-        "name": "Doğan e-Dönüşüm",
-        "website": "https://www.edonusum.com",
-        "description": "Ticimax başta olmak üzere yaygın kullanılan e-Fatura / e-Arşiv servis sağlayıcı.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True, placeholder="1234567890"),
-            _f("branch", "Şube Adı", required=True, placeholder="DFLT"),
-            _f("earchive_username", "E-Arşiv Kullanıcı Adı", required=True),
-            _f("earchive_password", "E-Arşiv Şifre", type="password", required=True),
-            _f("einvoice_username", "E-Fatura Kullanıcı Adı", required=True),
-            _f("einvoice_password", "E-Fatura Şifre", type="password", required=True),
-            _f("einvoice_post_label", "E-Fatura Posta Etiketi",
-               placeholder="urn:mail:defaultpk@firma.com"),
-            _f("einvoice_unit_label", "E-Fatura Birim Etiketi",
-               placeholder="urn:mail:defaultgb@firma.com"),
-            _f("einvoice_prefix", "E-Fatura Öneki (Prefix)", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki (Prefix)", required=True, placeholder="ABD"),
-            _f("bank_commission_vat", "Banka Komisyonu KDV Oranı", type="number", placeholder="20"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "nilvera": {
-        "name": "Nilvera",
-        "website": "https://nilvera.com",
-        "description": "Bulut tabanlı e-Fatura / e-Arşiv / e-SMM / e-İrsaliye entegratörü.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("api_key", "API Key"),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "uyumsoft": {
-        "name": "Uyumsoft",
-        "website": "https://www.uyumsoft.com.tr",
-        "description": "Kurumsal e-Dönüşüm çözümleri (e-Fatura, e-Arşiv, e-İrsaliye).",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Web Servis Kullanıcı Adı", required=True),
-            _f("password", "Web Servis Şifre", type="password", required=True),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "logo-edonusum": {
-        "name": "Logo e-Dönüşüm",
-        "website": "https://www.logo.com.tr",
-        "description": "Logo Yazılım tarafından sunulan e-Fatura / e-Arşiv entegratörü.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("customer_code", "Müşteri Kodu"),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "mikro": {
-        "name": "Mikro Yazılım",
-        "website": "https://www.mikro.com.tr",
-        "description": "Mikro ERP üzerinden e-Dönüşüm hizmetleri.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("api_url", "API URL"),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "foriba-edm": {
-        "name": "Foriba (EDM)",
-        "website": "https://www.foriba.com",
-        "description": "EDM Bilişim / Foriba — kurumsal e-Fatura entegratörü.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "qnb-efinans": {
-        "name": "QNB Finansbank e-Finans",
-        "website": "https://www.qnbefinans.com",
-        "description": "Finansbank bünyesindeki e-Fatura / e-Arşiv servisi.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("customer_no", "Müşteri Numarası"),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "turkcell-esirket": {
-        "name": "Turkcell e-Şirket",
-        "website": "https://www.turkcell.com.tr/tr/sirketinize-ozel/e-donusum",
-        "description": "Turkcell e-Dönüşüm servisleri.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "izibiz": {
-        "name": "İzibiz",
-        "website": "https://www.izibiz.com.tr",
-        "description": "İzibiz e-Fatura / e-Arşiv entegratörü.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "idea-teknoloji": {
-        "name": "İdea Teknoloji",
-        "website": "https://www.ideateknoloji.com.tr",
-        "description": "İdea Teknoloji e-Dönüşüm servisleri.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "kolaysoft": {
-        "name": "Kolaysoft",
-        "website": "https://www.kolaysoft.com.tr",
-        "description": "Kolaysoft e-Fatura entegrasyonu.",
-        "fields": [
-            _f("vkn_tckn", "VKN / TCKN", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("einvoice_prefix", "E-Fatura Öneki", required=True, placeholder="ABC"),
-            _f("earchive_prefix", "E-Arşiv Öneki", required=True, placeholder="ABD"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-}
 
 
 CARGO_PROVIDERS = {
@@ -437,7 +261,6 @@ CARGO_PROVIDERS = {
 
 
 PROVIDERS_BY_KIND = {
-    "einvoice": EINVOICE_PROVIDERS,
     "cargo": CARGO_PROVIDERS,
 }
 
@@ -518,7 +341,7 @@ def _mask_config_doc(kind: str, doc: dict) -> dict:
 @router.get("/{kind}/schemas")
 async def get_schemas(kind: str, current_user: dict = Depends(require_admin)):
     """
-    Belirtilen tür için (einvoice|cargo) tüm provider şemalarını döner.
+    Belirtilen tür için (cargo) tüm provider şemalarını döner.
     Frontend bu şemayı alıp dinamik form render eder.
     """
     _kind_guard(kind)

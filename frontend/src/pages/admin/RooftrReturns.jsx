@@ -123,8 +123,6 @@ export default function RooftrReturns({ embedded = false, gpStart = "085490", on
   // Liste (filtre/arama sonrası yeniden yüklenince) veya sıralama değişince ilk sayfaya dön.
   useEffect(() => { setCpage(1); }, [rows, sort.key, sort.dir]);
   const [loading, setLoading] = useState(true);
-  const [pulling, setPulling] = useState(false);
-  const [redating, setRedating] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -201,64 +199,6 @@ export default function RooftrReturns({ embedded = false, gpStart = "085490", on
   }, [statusFilter, paymentFilter, debounced, dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
-
-  // Rooftr'dan siparişleri çek (iade olanlar orders'a düşer, sonra listeyi yenile)
-  const pullFromRooftr = async () => {
-    setPulling(true);
-    toast.info("Rooftr'dan siparişler çekiliyor — bu işlem birkaç dakika sürebilir…");
-    try {
-      const res = await axios.post(
-        `${API}/integrations/rooftr/orders/import?days=365&pages=20&limit=100`,
-        {},
-        auth()
-      );
-      if (res.data?.success === false) {
-        // Backend gerçek WS hatasını message + error_detail ile döndürür
-        toast.error(res.data.message || "Rooftr'dan sipariş çekilemedi.");
-      } else {
-        toast.success(res.data.message || "Rooftr siparişleri çekildi");
-      }
-      await load();
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Rooftr'dan çekme başarısız. WS yetki kodu / Sipariş Servisi iznini kontrol edin.");
-    } finally {
-      setPulling(false);
-    }
-  };
-
-  // Tüm siparişlerin TARİHİ'ni Rooftr'daki gerçek SiparisTarihi'ne çek.
-  // Zaman aşımına takılmamak için backend'i parça parça (5 sayfa) döngüyle çağırır.
-  const refreshDates = async () => {
-    if (redating || pulling) return;
-    setRedating(true);
-    let page = 1, totalFixed = 0;
-    try {
-      for (let guard = 0; guard < 60; guard++) {
-        const res = await axios.post(
-          `${API}/admin/rooftr/orders/refresh-dates?page=${page}&per_pages=5`,
-          {},
-          auth()
-        );
-        const d = res.data || {};
-        if (d.success === false) {
-          toast.error(d.message || "Tarih güncelleme başarısız.", { id: "redate" });
-          break;
-        }
-        totalFixed += d.fixed || 0;
-        toast.info(`Tarihler güncelleniyor… ${totalFixed} sipariş düzeltildi`, { id: "redate" });
-        if (!d.has_more) {
-          toast.success(`Tamamlandı — ${totalFixed} siparişin tarihi gerçek tarihine çekildi.`, { id: "redate" });
-          break;
-        }
-        page = d.next_page || page + 5;
-      }
-      await load();
-    } catch (e) {
-      toast.error(e.response?.data?.detail || e.response?.data?.message || "Tarih güncelleme başarısız.", { id: "redate" });
-    } finally {
-      setRedating(false);
-    }
-  };
 
   // İade siparişlerini Excel'e aktar (görseldeki kolon düzeni — backend openpyxl üretir)
   const exportExcel = async () => {

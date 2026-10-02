@@ -12,7 +12,6 @@ export const SETTINGS_TAB_GROUPS = [
     label: "Sipariş & Finans",
     tabs: [
       { key: "order-statuses", label: "Sipariş Durumları" },
-      { key: "einvoice", label: "E-Arşiv / E-Fatura" },
       { key: "currency", label: "Döviz Kurları" },
     ],
   },
@@ -35,7 +34,6 @@ export const SETTINGS_TAB_GROUPS = [
   {
     label: "Görünüm & Panel",
     tabs: [
-      { key: "custom-theme", label: "Özel Tema (CSS/JS)" },
       { key: "menu-layout", label: "Menü Düzeni" },
     ],
   },
@@ -61,9 +59,7 @@ export const SETTINGS_TAB_KEYS = new Set(
 
 export const LEGACY_SETTINGS_TABS = {
   "/admin/ayarlar/isletme-kurallari": "business-rules",
-  "/admin/ayarlar/ozel-tema": "custom-theme",
   "/admin/ayarlar/menu-duzeni": "menu-layout",
-  "/admin/ayarlar/e-fatura": "einvoice",
   "/admin/ayarlar/kargo": "cargo",
   "/admin/ayarlar/gonderici-adresi": "sender-address",
   "/admin/ayarlar/bildirim": "notifications",

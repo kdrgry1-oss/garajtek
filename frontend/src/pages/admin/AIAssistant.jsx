@@ -63,8 +63,8 @@ export default function AIAssistant() {
         </div>
         <div className="flex gap-3">
           <div className="text-right text-xs">
-            <div className="text-gray-400">Bekleyen Trendyol</div>
-            <div className="text-2xl font-light">{stats?.pending_trendyol ?? "—"}</div>
+            <div className="text-gray-400">Bekleyen Mesaj</div>
+            <div className="text-2xl font-light">{stats?.pending_questions ?? "—"}</div>
           </div>
           <div className="text-right text-xs">
             <div className="text-gray-400">KB toplam</div>
@@ -81,7 +81,7 @@ export default function AIAssistant() {
         <Tab id="chat" label="Sohbet ile Eğit" icon={MessageCircle} activeId={tab} onClick={setTab} />
         <Tab id="kb" label="Bilgi Bankası" icon={Database} activeId={tab} onClick={setTab} badge={trainStatus?.kb_total} />
         <Tab id="train" label="Toplu Eğitim" icon={Sparkles} activeId={tab} onClick={setTab} />
-        <Tab id="auto" label="Otomatik Yanıt" icon={Zap} activeId={tab} onClick={setTab} badge={stats?.pending_trendyol} />
+        <Tab id="auto" label="Otomatik Yanıt" icon={Zap} activeId={tab} onClick={setTab} badge={stats?.pending_questions} />
         <Tab id="prodqa" label="Ürüne Özel Yanıt" icon={Tag} activeId={tab} onClick={setTab} />
         <Tab id="key" label="API Anahtarı" icon={Key} activeId={tab} onClick={setTab} />
       </div>
@@ -348,7 +348,7 @@ function KbTab() {
    TRAIN TAB — bulk train from history
    ============================================================ */
 function TrainTab({ status, onUpdate }) {
-  const [cfg, setCfg] = useState({ channel: "trendyol", min_answer_length: 30, skip_existing: true, max_count: 1000 });
+  const [cfg, setCfg] = useState({ channel: "all", min_answer_length: 30, skip_existing: true, max_count: 1000 });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -378,9 +378,10 @@ function TrainTab({ status, onUpdate }) {
             <select data-testid="train-channel" value={cfg.channel}
               onChange={(e) => setCfg({...cfg, channel: e.target.value})}
               className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
-              <option value="trendyol">Trendyol</option>
-              <option value="hepsiburada">Hepsiburada</option>
-              <option value="temu">Temu</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="messenger">Messenger</option>
+              <option value="site">Site</option>
               <option value="all">Tümü</option>
             </select>
           </div>
@@ -447,13 +448,13 @@ function TrainTab({ status, onUpdate }) {
    AUTO TAB — auto answer batch
    ============================================================ */
 function AutoTab({ stats, onUpdate }) {
-  const [cfg, setCfg] = useState({ channel: "trendyol", max_count: 10, min_confidence: 0.85, dry_run: true, send: false });
+  const [cfg, setCfg] = useState({ channel: "site", max_count: 10, min_confidence: 0.85, dry_run: true, send: false });
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
 
   const run = async () => {
     const willSend = !cfg.dry_run && cfg.send;
-    if (willSend && !confirm(`Bu işlem confidence ≥ ${cfg.min_confidence} olan cevapları GERÇEKTEN Trendyol'a gönderecek. Devam?`)) return;
+    if (willSend && !confirm(`Bu işlem confidence ≥ ${cfg.min_confidence} olan cevapları kanal üzerinden gönderecek. Devam?`)) return;
     setLoading(true);
     try {
       const res = await axios.post(`${API}/ai-assistant/auto-answer-batch`, cfg, auth());
@@ -474,7 +475,10 @@ function AutoTab({ stats, onUpdate }) {
             <select data-testid="auto-channel" value={cfg.channel}
               onChange={(e) => setCfg({...cfg, channel: e.target.value})}
               className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
-              <option value="trendyol">Trendyol</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="messenger">Messenger</option>
+              <option value="site">Site</option>
             </select>
           </div>
           <div>
@@ -768,7 +772,7 @@ function ProdQaTab() {
   return (
     <div className="space-y-6">
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
-        Buraya girdiğin kurallar, o ürünle ilgili Trendyol/Hepsiburada sorularında AI'ın <b>en yüksek öncelikle</b> uyacağı yanıtlardır. Genel bilgi + geçmiş soru-cevaplar bunun altında kullanılır.
+        Buraya girdiğin kurallar, o ürünle ilgili müşteri sorularında AI'ın <b>en yüksek öncelikle</b> uyacağı yanıtlardır. Genel bilgi + geçmiş soru-cevaplar bunun altında kullanılır.
       </div>
 
       {/* Ürün seç */}

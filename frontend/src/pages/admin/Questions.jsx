@@ -12,9 +12,6 @@ import {
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const CHANNEL_STYLE = {
-  trendyol:    { border: "#F27A1A", bg: "#F27A1A", label: "Trendyol" },
-  hepsiburada: { border: "#FF6000", bg: "#FF6000", label: "Hepsiburada" },
-  temu:        { border: "#111827", bg: "#111827", label: "Temu" },
   whatsapp:    { border: "#25D366", bg: "#25D366", label: "WhatsApp" },
   instagram:   { border: "#E4405F", bg: "linear-gradient(135deg,#FFDC80,#E4405F,#833AB4)", label: "Instagram" },
   messenger:   { border: "#0084FF", bg: "linear-gradient(135deg,#00C6FF,#0078FF)", label: "Messenger" },
@@ -22,10 +19,10 @@ const CHANNEL_STYLE = {
 };
 
 const ChannelBadge = ({ channel }) => {
-  const s = CHANNEL_STYLE[channel] || CHANNEL_STYLE.trendyol;
+  const s = CHANNEL_STYLE[channel] || CHANNEL_STYLE.site;
   return (
     <span
-      data-testid={`mp-badge-${channel || "trendyol"}`}
+      data-testid={`mp-badge-${channel || "site"}`}
       className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-[11px] font-black uppercase tracking-widest shadow-sm text-white"
       style={{ background: s.bg }}
     >
@@ -78,12 +75,7 @@ export default function AdminQuestions() {
     setSyncing(true);
     try {
       const token = localStorage.getItem("token");
-      const endpoint = ch === "trendyol"
-        ? `${API}/integrations/trendyol/questions/sync`
-        : `${API}/integrations/${ch}/questions/sync`;
-      await axios.get(endpoint, { headers: { Authorization: `Bearer ${token}` } }).catch(async () => {
-        if (ch !== "trendyol") await axios.post(endpoint, {}, { headers: { Authorization: `Bearer ${token}` } });
-      });
+      await axios.post(`${API}/integrations/${ch}/questions/sync`, {}, { headers: { Authorization: `Bearer ${token}` } });
       toast.success(`${CHANNEL_STYLE[ch].label} senkronize edildi`);
       fetchQuestions();
     } catch (err) {
@@ -105,16 +97,11 @@ export default function AdminQuestions() {
     setSendingAnswer(true);
     try {
       const token = localStorage.getItem("token");
-      const ch = selectedQuestion.marketplace || "trendyol";
-      const endpoint = ch === "trendyol"
-        ? `${API}/integrations/trendyol/questions/${selectedQuestion.question_id}/answer`
-        : `${API}/integrations/${ch}/questions/${selectedQuestion.question_id}/answer`;
+      const ch = selectedQuestion.marketplace || "site";
+      const endpoint = `${API}/integrations/${ch}/questions/${selectedQuestion.question_id}/answer`;
       const res = await axios.post(endpoint, { answer: answerText }, { headers: { Authorization: `Bearer ${token}` } });
-      // DENETİM FIX: sabit "gönderildi" yanıltıcıydı — Trendyol dışı kanallarda (HB/Temu/WhatsApp/
-      // Instagram/Site) cevap müşteriye GİTMİYOR olabilir. Backend'in gerçek mesajını göster;
-      // yoksa entegrasyonsuz kanalda "gönderildi" değil "kaydedildi" de.
-      const _msg = res?.data?.message
-        || (ch === "trendyol" ? "Cevap müşteriye gönderildi" : "Cevap kaydedildi (bu kanalda otomatik gönderim yok)");
+      // Backend'in gerçek mesajını göster; yoksa "kaydedildi" de (bu kanallarda otomatik gönderim yok).
+      const _msg = res?.data?.message || "Cevap kaydedildi (bu kanalda otomatik gönderim yok)";
       toast.success(_msg);
       setAnswerOpen(false);
       fetchQuestions();
@@ -129,7 +116,7 @@ export default function AdminQuestions() {
     if (!await window.appConfirm("Bu soruyu silmek istediğinize emin misiniz?")) return;
     try {
       const token = localStorage.getItem("token");
-      const ch = q.marketplace || "trendyol";
+      const ch = q.marketplace || "site";
       await axios.delete(`${API}/integrations/${ch}/questions/${q.question_id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -146,7 +133,7 @@ export default function AdminQuestions() {
     setAiDraft(null);
     try {
       const token = localStorage.getItem("token");
-      const ch = selectedQuestion.marketplace || "trendyol";
+      const ch = selectedQuestion.marketplace || "site";
       const res = await axios.post(`${API}/ai/draft/${ch}/${selectedQuestion.question_id}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -170,7 +157,7 @@ export default function AdminQuestions() {
       await axios.post(`${API}/ai/train-from-question`, {
         question: selectedQuestion.question_text,
         answer: answerText,
-        channel: selectedQuestion.marketplace || "trendyol",
+        channel: selectedQuestion.marketplace || "site",
         question_id: selectedQuestion.question_id,
       }, { headers: { Authorization: `Bearer ${token}` } });
       toast.success("AI bilgi bankasına eklendi – benzer sorularda kullanılacak");
@@ -222,7 +209,7 @@ export default function AdminQuestions() {
             <MessageCircle className="text-blue-600" /> Müşteri Mesajları
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Trendyol · Hepsiburada · Temu · WhatsApp · Instagram · Messenger · Site — tek panelden AI asistan destekli.
+            WhatsApp · Instagram · Messenger · Site — tek panelden AI asistan destekli.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -296,8 +283,8 @@ export default function AdminQuestions() {
           ) : questions.length === 0 ? (
             <div className="p-8 text-center text-gray-500">Mesaj bulunamadı</div>
           ) : questions.map(q => {
-            const ch = q.marketplace || "trendyol";
-            const style = CHANNEL_STYLE[ch] || CHANNEL_STYLE.trendyol;
+            const ch = q.marketplace || "site";
+            const style = CHANNEL_STYLE[ch] || CHANNEL_STYLE.site;
             const timeObj = q.status === "WAITING_FOR_ANSWER" ? getRemainingTime(q.created_date) : null;
             return (
               <div
@@ -372,7 +359,7 @@ export default function AdminQuestions() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               Mesajı Yanıtla
-              {selectedQuestion && <ChannelBadge channel={selectedQuestion.marketplace || "trendyol"} />}
+              {selectedQuestion && <ChannelBadge channel={selectedQuestion.marketplace || "site"} />}
             </DialogTitle>
           </DialogHeader>
 
@@ -429,11 +416,9 @@ export default function AdminQuestions() {
               </div>
 
               {selectedQuestion.status === "WAITING_FOR_ANSWER" && (() => {
-                // DENETİM FIX (#42): yalnız Trendyol'da cevap müşteriye otomatik gider. Diğer
-                // kanallarda (HB/Temu/WhatsApp/Instagram/Messenger/Site) buton "Yerel Kaydet"
-                // olur ve gönderim vaadi verilmez; bir uyarı satırı gösterilir.
-                const _ch = selectedQuestion.marketplace || "trendyol";
-                const _autoSend = _ch === "trendyol";
+                // Bu kanallarda cevap müşteriye otomatik gitmez: buton "Yerel Kaydet" olur ve
+                // gönderim vaadi verilmez; bir uyarı satırı gösterilir.
+                const _autoSend = false;
                 return (
                   <div className="flex flex-col items-end gap-1 pt-2">
                     {!_autoSend && (

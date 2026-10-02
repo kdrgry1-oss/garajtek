@@ -26,13 +26,8 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import AdminReturns from "./pages/admin/Returns";
 import AdminCancellations from "./pages/admin/Cancellations";
 import DeletedOrders from "./pages/admin/DeletedOrders";
-import AttributeImport from "./pages/admin/AttributeImport";
 import AdminQuestions from "./pages/admin/Questions";
-import TrendyolLogs from "./pages/admin/TrendyolLogs";
-import BarcodeIssues from "./pages/admin/BarcodeIssues";
-import TrendyolGhostScanner from "./pages/admin/TrendyolGhostScanner";
 import ProductAttributes from "./pages/admin/ProductAttributes";
-import Manufacturing from "./pages/admin/Manufacturing";
 import Members from "./pages/admin/Members";
 import Consents from "./pages/admin/Consents";
 import Attribution from "./pages/admin/Attribution";
@@ -51,17 +46,10 @@ import {
 import AdminTasks from "./pages/admin/AdminTasks";
 import TrainingPanel from "./pages/admin/TrainingPanel";
 import BlockedCustomers from "./pages/admin/BlockedCustomers";
-import Influencers from "./pages/admin/Influencers";
-import AmazonAdmin from "./pages/admin/AmazonAdmin";
 import PaymentTrace from "./pages/admin/PaymentTrace";
 import ReportsAdvanced from "./pages/admin/ReportsAdvanced";
 import ReportsInsights from "./pages/admin/ReportsInsights";
 import XmlFeeds from "./pages/admin/XmlFeeds";
-import MarketplaceHub from "./pages/admin/MarketplaceHub";
-import IntegrationLogs from "./pages/admin/IntegrationLogs";
-import FailedTransfers from "./pages/admin/FailedTransfers";
-import BrandMapping from "./pages/admin/BrandMapping";
-import CategoryMapping from "./pages/admin/CategoryMapping";
 import BulkPriceStock from "./pages/admin/BulkPriceStock";
 import StockAlerts2 from "./pages/admin/StockAlerts";
 import CustomerSegments from "./pages/admin/CustomerSegments";
@@ -72,10 +60,7 @@ import SecretsVault from "./pages/admin/SecretsVault";
 import MailServer from "./pages/admin/MailServer";
 import IysAdmin from "./pages/admin/IysAdmin";
 import ReportsExtended from "./pages/admin/ReportsExtended";
-import MobileApp from "./pages/admin/MobileApp";
 import AIAssistant from "./pages/admin/AIAssistant";
-import Themes from "./pages/admin/Themes";
-import RooftrExcelUpload from "./pages/admin/RooftrExcelUpload";
 import ActivityHistory from "./pages/admin/ActivityHistory";
 
 // Bu Routes, App.js'te "/admin/*" altına mount edilir; bu yüzden yollar
@@ -94,7 +79,6 @@ export default function AdminApp() {
         <Route path="kategori-siralama" element={<AdminCategoryOrder />} />
         <Route path="varyantlar" element={<AdminVariants />} />
         <Route path="xml-feedler" element={<XmlFeeds />} />
-        <Route path="rooftr-excel" element={<RooftrExcelUpload />} />
         <Route path="sorular" element={<AdminQuestions />} />
         <Route path="sayfa-tasarimi" element={<AdminPageDesign />} />
         <Route path="footer-tasarim" element={<AdminFooterDesign />} />
@@ -102,7 +86,6 @@ export default function AdminApp() {
         <Route path="instagram" element={<AdminInstagram />} />
         <Route path="eposta-pazarlama" element={<EmailMarketing />} />
         <Route path="bannerlar" element={<AdminBanners />} />
-        <Route path="temalar" element={<Themes />} />
         <Route path="kampanyalar" element={<AdminCampaigns />} />
         <Route path="entegrasyonlar" element={<AdminIntegrations />} />
         <Route path="odeme-tipleri" element={<Payments />} />
@@ -114,37 +97,21 @@ export default function AdminApp() {
         <Route path="sayfalar" element={<AdminPages />} />
         <Route path="ayarlar" element={<SettingsWorkspace />} />
         <Route path="ayarlar/isletme-kurallari" element={<Navigate to="/admin/ayarlar?tab=business-rules" replace />} />
-        <Route path="ayarlar/ozel-tema" element={<Navigate to="/admin/ayarlar?tab=custom-theme" replace />} />
         <Route path="egitim" element={<TrainingPanel />} />
         <Route path="ayarlar/menu-duzeni" element={<Navigate to="/admin/ayarlar?tab=menu-layout" replace />} />
-        <Route path="ayarlar/e-fatura" element={<Navigate to="/admin/ayarlar?tab=einvoice" replace />} />
         <Route path="ayarlar/kargo" element={<Navigate to="/admin/ayarlar?tab=cargo" replace />} />
         <Route path="ayarlar/gonderici-adresi" element={<Navigate to="/admin/ayarlar?tab=sender-address" replace />} />
         <Route path="ayarlar/bildirim" element={<Navigate to="/admin/ayarlar?tab=notifications" replace />} />
         <Route path="ayarlar/eposta" element={<Navigate to="/admin/ayarlar?tab=email" replace />} />
         <Route path="ayarlar/bildirim/sablonlar" element={<Navigate to="/admin/ayarlar?tab=notification-templates" replace />} />
         <Route path="bloklu-musteriler" element={<BlockedCustomers />} />
-        {/* İmalat Planı (Tablo) menüden kaldırıldı — eski yer imleri İmalat Takip'e gider */}
-        <Route path="uretim-plani" element={<Navigate to="/admin/imalat" replace />} />
         <Route path="ayarlar/pixel" element={<Navigate to="/admin/ayarlar?tab=pixels" replace />} />
-        <Route path="influencer" element={<Influencers />} />
-        <Route path="amazon" element={<AmazonAdmin />} />
-        <Route path="amazon/sp-api" element={<Navigate to="/admin/amazon?tab=connection" replace />} />
-        <Route path="amazon/aktarim" element={<Navigate to="/admin/amazon?tab=mapping" replace />} />
-        <Route path="amazon/eslestirme" element={<Navigate to="/admin/amazon?tab=mapping" replace />} />
-        <Route path="amazon/dpp" element={<Navigate to="/admin/amazon?tab=compliance" replace />} />
-        <Route path="dpp-uyum" element={<Navigate to="/admin/amazon?tab=compliance" replace />} />
         <Route path="ayarlar/capi-loglar" element={<Navigate to="/admin/ayarlar?tab=capi" replace />} />
         <Route path="odeme-izi" element={<PaymentTrace />} />
         <Route path="raporlar/iade-ve-trend" element={<Navigate to="/admin/raporlar/urun" replace />} />
         <Route path="raporlar/konum-kanal" element={<Navigate to="/admin/raporlar/satis" replace />} />
         <Route path="ayarlar/sosyal-giris" element={<Navigate to="/admin/ayarlar?tab=social-login" replace />} />
         <Route path="ayarlar/siparis-durumlari" element={<Navigate to="/admin/ayarlar?tab=order-statuses" replace />} />
-        <Route path="pazaryerleri" element={<MarketplaceHub />} />
-        <Route path="entegrasyon-loglari" element={<IntegrationLogs />} />
-        <Route path="aktarilamayanlar" element={<FailedTransfers />} />
-        <Route path="marka-eslestir" element={<BrandMapping />} />
-        <Route path="kategori-eslestir" element={<CategoryMapping />} />
         <Route path="toplu-fiyat-stok" element={<BulkPriceStock />} />
         <Route path="stok-uyarilari" element={<StockAlerts2 />} />
         <Route path="musteri-segmentleri" element={<CustomerSegments />} />
@@ -155,21 +122,13 @@ export default function AdminApp() {
         <Route path="secrets-vault" element={<SecretsVault />} />
         <Route path="mail-yonetimi" element={<MailServer />} />
         <Route path="iys" element={<IysAdmin />} />
-        <Route path="mobil-uygulama" element={<MobileApp />} />
         <Route path="ai-asistan" element={<AIAssistant />} />
-        <Route path="trendyol-eslestir" element={<Navigate to="/admin/kategori-eslestir" replace />} />
-        <Route path="trendyol-loglar" element={<TrendyolLogs />} />
-        <Route path="barkod-sorunlari" element={<BarcodeIssues />} />
-        <Route path="trendyol-hayalet" element={<TrendyolGhostScanner />} />
         <Route path="urun-ozellikleri" element={<ProductAttributes />} />
         <Route path="cariler" element={<Navigate to="/admin/ayarlar?tab=vendors" replace />} />
         <Route path="kullanicilar" element={<Navigate to="/admin/ayarlar?tab=users-roles" replace />} />
-        <Route path="imalat" element={<Manufacturing />} />
         <Route path="uyeler" element={<Members />} />
         <Route path="izinler" element={<Consents />} />
         <Route path="kaynak" element={<Attribution />} />
-        <Route path="hepsiburada-eslestir" element={<Navigate to="/admin/kategori-eslestir" replace />} />
-        <Route path="temu-eslestir" element={<Navigate to="/admin/kategori-eslestir" replace />} />
         <Route path="olcu-tablolari" element={<SizeTablesList />} />
         <Route path="kuponlar" element={<Coupons />} />
         <Route path="hediye-cekleri" element={<GiftCards />} />

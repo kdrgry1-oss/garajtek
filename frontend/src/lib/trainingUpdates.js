@@ -6,7 +6,7 @@
  * eksik sistem maddeleri eklenir. Böylece yeni sürüm dokümantasyonu upsert
  * edilirken tenant'a özel içerik kaybolmaz.
  */
-export const TRAINING_CONTENT_VERSION = "2026.09.09.2";
+export const TRAINING_CONTENT_VERSION = "2026.10.02.1";
 
 export const TRAINING_UPDATES = [
   {
@@ -114,8 +114,8 @@ export const TRAINING_UPDATES = [
         where: "Ayarlar menüsü; masaüstünde soldaki grup listesi, dar ekranda Ayar bölümü seçicisi.",
         how: [
           "Genel Ayarlar için /admin/ayarlar adresini aç; diğer bölümlere soldaki listeden geç.",
-          "Eski yer imleri yeni sekmeye otomatik gider: işletme kuralları → business-rules, e-fatura → einvoice, kargo → cargo, gönderici adresi → sender-address.",
-          "Bildirim, e-posta, şablon, özel tema, menü, pixel, CAPI, sosyal giriş ve sipariş durumu eski yolları da karşılık gelen ?tab= adresine yönlenir.",
+          "Eski yer imleri yeni sekmeye otomatik gider: işletme kuralları → business-rules, kargo → cargo, gönderici adresi → sender-address.",
+          "Bildirim, e-posta, şablon, menü, pixel, CAPI, sosyal giriş ve sipariş durumu eski yolları da karşılık gelen ?tab= adresine yönlenir.",
           "Döviz, kullanıcılar ve cariler eski üst seviye yollarından sırasıyla currency, users-roles ve vendors sekmelerine yönlenir.",
         ],
         tips: [
@@ -141,20 +141,6 @@ export const TRAINING_UPDATES = [
           "Dry-run hiçbir ürün/kategori kaydını değiştirmez. Ayrı bulk-apply servisi açık onay ifadesi ister ve yalnız boş meta alanlarını doldurur; panel önizleme sırasında bu servisi çağırmaz.",
           "Canonical alan adı Ayarlar → Genel Ayarlar → Web Sitesi/Mağaza Adresi değerinden gelir.",
         ],
-      },
-      {
-        key: "amazon-single-workspace",
-        title: "Amazon tek ekran",
-        path: "/admin/amazon",
-        what: "Amazon bağlantısı, aktarım/eşleştirme ve DPP uyum kontrollerini üç sekmeli tek çalışma alanında toplar.",
-        where: "Entegrasyonlar → Amazon.",
-        how: [
-          "SP-API & Bağlantı sekmesinde hesap bağlantısını ve entegrasyon durumunu yönet.",
-          "Aktarım & Eşleştirme sekmesinde Amazon TR için kategori/alan eşleştirmelerini incele.",
-          "DPP Uyum sekmesinde ürün güvenliği ve uyum kontrollerini yönet.",
-          "Eski /admin/amazon/sp-api bağlantısı connection; /amazon/aktarim ve /amazon/eslestirme mapping; /amazon/dpp ve /dpp-uyum compliance sekmesine gider.",
-        ],
-        tips: ["Eski yolların yönlenmesi bağlantı veya eşleştirme verisini yeniden oluşturmaz; aynı ekranın ilgili sekmesini açar."],
       },
       {
         key: "email-marketing-workspace",
@@ -187,7 +173,7 @@ export const TRAINING_UPDATES = [
         how: [
           "Brüt Satış Adedi = Net Satış Adedi + İptal Adedi + Onaylanmış İade Adedi.",
           "Brüt Ciro = Net Ciro + İptal Tutarı + Onaylanmış İade Tutarı.",
-          "Trendyol/kapsam iade yüzdesi = Onaylanmış İade Adedi / Brüt Satış Adedi × 100.",
+          "Kapsam iade yüzdesi = Onaylanmış İade Adedi / Brüt Satış Adedi × 100.",
           "Operasyonel iade yüzdesi (iptal hariç) = Onaylanmış İade Adedi / (Net Satış Adedi + Onaylanmış İade Adedi) × 100.",
           "Açık İade, henüz sonuçlanmamış kalem adedi/tutarıdır; Öngörülen Net Ciro = Net Ciro − Açık İade Tutarı.",
           "Haftalık satış hızı seçili dönemin net satış adedinden; stok kapsama haftası = Güncel Stok / Haftalık Satış Hızı formülünden gelir. Hız yoksa kapsama tahmin edilmez.",
@@ -197,23 +183,6 @@ export const TRAINING_UPDATES = [
           "Kısmi iptal/iade tüm sipariş yerine yalnız ilgili kalem adedi ve tutarıyla ayrıştırılır; siparişte kalan ürün net satışta kalır.",
           "Kaynak filtresi seçildiğinde adet/ciro/iptal/iade ve oran paydası yalnız o kanala daralır; güncel stok kanallar arasında ortaktır.",
           "Reddedilen iade gerçekleşmiş iade sayılmaz ve satış ciroda kalır.",
-        ],
-      },
-      {
-        key: "open-return-reconciliation",
-        title: "Açık iade ve Trendyol mutabakatı",
-        path: "/admin/raporlar/urun",
-        what: "Açık ve onaylanmış iadeleri kalem durumuna göre ayırır; Trendyol ile panel sipariş/adet/tutar farklarını salt-okunur karşılaştırır.",
-        where: "Ürün Raporları → Trendyol ile Mutabakat; satış raporunda Açık İade ve Öngörülen Net alanları.",
-        how: [
-          "Tarih aralığını ve gerekiyorsa platform filtresini seç; raporu yenile.",
-          "Trendyol ile Mutabakat'a bas; uzun aralıklar ekran tarafından boşluksuz parçalara ayrılır ve her istek apply=false ile çalışır.",
-          "Sipariş, ürün adedi ve tutar farkının yanında kopya belge, panelde eksik/fazla sipariş, iptal durum farkı ve kısmi iptal özetini incele.",
-          "Açık pazaryeri claim kalemleri Created, WaitingInAction veya InAnalysis durumundadır; Accepted gerçekleşmiş iadeye, Rejected/Unresolved reddedilene ayrılır.",
-        ],
-        tips: [
-          "Paneldeki Mutabakat düğmesi sipariş, ödeme veya stok kaydı değiştirmez.",
-          "Bir fark bulmak düzeltmenin otomatik uygulandığı anlamına gelmez; önce sipariş numarası ve tarih kapsamını doğrulayın.",
         ],
       },
       {

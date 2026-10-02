@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Trash2, Edit2, Search, DownloadCloud, RefreshCw, X, Check } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, RefreshCw, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -28,7 +28,6 @@ export default function ProductAttributes() {
   const [selVals, setSelVals] = useState(new Set());         // toplu DEĞER seçimi
 
   // ── ÖZELLİK AYAR KARTI durumu ──────────────────────────────────────────────
-  const [requiredIn, setRequiredIn] = useState({ grouped: {}, loading: false });
   const [defaultValueDraft, setDefaultValueDraft] = useState('');
   const [savingSetting, setSavingSetting] = useState(false);
   const [categories, setCategories] = useState([]);        // kategori-bazlı zorunlu seçici için
@@ -43,20 +42,10 @@ export default function ProductAttributes() {
       .catch(() => setCategories([]));
   }, []);
 
-  // Seçili özellik değişince: ayar kartı alanlarını doldur + zorunlu-pazaryeri listesini çek.
+  // Seçili özellik değişince: ayar kartı alanlarını doldur.
   useEffect(() => {
-    if (!selectedAttr?.id) {
-      setRequiredIn({ grouped: {}, loading: false });
-      setDefaultValueDraft('');
-      return;
-    }
-    setDefaultValueDraft(selectedAttr.default_value || '');
-    let cancelled = false;
-    setRequiredIn({ grouped: {}, loading: true });
-    axios.get(`${API}/attributes/${selectedAttr.id}/required-in`, { headers: authHeaders() })
-      .then((res) => { if (!cancelled) setRequiredIn({ grouped: res.data.grouped || {}, loading: false }); })
-      .catch(() => { if (!cancelled) setRequiredIn({ grouped: {}, loading: false }); });
-    return () => { cancelled = true; };
+    setDefaultValueDraft(selectedAttr?.id ? (selectedAttr.default_value || '') : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAttr?.id]);
 
   // Ayar kartı KISMİ kaydı: yalnız değişen alan(lar) PUT edilir (name/values korunur).
@@ -110,28 +99,6 @@ export default function ProductAttributes() {
       toast.error('Özellikler yüklenemedi');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const syncFromTrendyol = async () => {
-    // SCOPE: yalnız SEÇİLİ özelliğin Trendyol değerleri çekilir; diğer özellikler kirlenmez.
-    if (!selectedAttr?.name) {
-      toast.error('Önce soldan bir özellik seçin — Trendyol değerleri yalnız o özelliğe eklenir.');
-      return;
-    }
-    try {
-      setSyncing(true);
-      const res = await axios.post(
-        `${API}/attributes/sync-from-trendyol`,
-        { attribute_name: selectedAttr.name },
-        { headers: authHeaders() }
-      );
-      toast.success(res.data.message || 'Senkronizasyon tamamlandı');
-      fetchAttributes();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Senkronizasyon başarısız oldu');
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -299,17 +266,6 @@ export default function ProductAttributes() {
             <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
             Mevcut Ürünlerden Topla
           </button>
-          <button
-            onClick={syncFromTrendyol}
-            disabled={syncing || !selectedAttr?.name}
-            title={selectedAttr?.name
-              ? `Yalnız "${selectedAttr.name}" özelliğine Trendyol değerleri eklenir`
-              : 'Önce soldan bir özellik seçin'}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg shadow-sm text-sm font-medium hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
-          >
-            <DownloadCloud size={16} className={syncing ? 'animate-bounce' : ''} />
-            {selectedAttr?.name ? `Trendyol'dan Aktar (${selectedAttr.name})` : "Trendyol'dan Aktar"}
-          </button>
         </div>
       </div>
 
@@ -441,31 +397,6 @@ export default function ProductAttributes() {
                     <span className="inline-block w-1.5 h-4 bg-orange-500 rounded-full" />
                     "{selectedAttr.name}" Ayar Kartı
                   </h3>
-
-                  {/* 1) Zorunlu olduğu pazaryeri/kategoriler (salt-okunur) */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                      Zorunlu olduğu pazaryeri / kategoriler
-                    </label>
-                    {requiredIn.loading ? (
-                      <div className="text-xs text-gray-400">Yükleniyor...</div>
-                    ) : Object.keys(requiredIn.grouped).length === 0 ? (
-                      <div className="text-xs text-gray-500 bg-gray-100 rounded-lg px-3 py-2">
-                        Hiçbir pazaryerinde zorunlu değil.
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(requiredIn.grouped).map(([mp, cats]) => {
-                          const label = { trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', temu: 'Temu' }[mp] || mp;
-                          return (
-                            <div key={mp} className="text-xs bg-red-50 border border-red-200 text-red-800 rounded-lg px-3 py-1.5">
-                              <span className="font-semibold">{label}:</span> {cats.join(', ')}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
 
                   {/* 2) Tüm sistemde varsayılan değer (input) */}
                   <div className="mb-4">

@@ -8,7 +8,7 @@ import ReportScopeBadge from "../../components/ReportScopeBadge";
 import {
   REPORT_MIN_DATE, clampReportDate, defaultReportRange, filterReportChannels,
   productExportParams, productReportScope, reportGroupBy, reportPresetRange,
-  reportRangeDays, reportRangeError, splitReportRange, trTodayYmd,
+  reportRangeDays, reportRangeError, trTodayYmd,
 } from "../../lib/reportFilters";
 import { createLatestRequestManager, isCanceledRequest } from "../../lib/latestRequest";
 
@@ -636,54 +636,12 @@ export function ProductsReport() {
   const [sizeFilter, setSizeFilter] = useState("");
   const [collFilter, setCollFilter] = useState("");   // Sezon filtresi (İlkbahar/Yaz/Sonbahar/Kış)
   const [velFilter, setVelFilter] = useState("");      // D4 — satış hızı (green/yellow/red)
-  const [recon, setRecon] = useState(null);
-  const [reconLoading, setReconLoading] = useState(false);
   const [expanded, setExpanded] = useState(() => new Set()); // açılır: beden dağılımı
   const [top90Map, setTop90Map] = useState({});              // İvme: 90 günlük haftalık hız haritası
   const [loadError, setLoadError] = useState("");
   const requestManagerRef = useRef(null);
   if (!requestManagerRef.current) requestManagerRef.current = createLatestRequestManager();
   const toggleExpand = (k) => setExpanded(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
-
-  const reconcileTrendyol = async () => {
-    setReconLoading(true);
-    const rFrom = applied?.from || from;
-    const rTo = applied?.to || to;
-    try {
-      // Backend tek istekte uzun aralığı bilinçli olarak sınırlar. 5 Haziran'dan
-      // bugüne mutabakatı 31 günlük, boşluksuz parçalara bölüp salt-okunur sonuçları
-      // birleştir; hiçbir sipariş/statü/stok kaydı değiştirilmez.
-      const parts = [];
-      for (const chunk of splitReportRange(rFrom, rTo, 31)) {
-        const response = await axios.get(`${API}/integrations/trendyol/reconcile`, {
-          headers: authHeaders(), params: {
-            start_date: chunk.from, end_date: chunk.to, apply: false, list_limit: 20,
-          },
-        });
-        parts.push(response.data);
-      }
-      const sum = (pick) => parts.reduce((total, part) => total + Number(pick(part) || 0), 0);
-      const collect = (key) => parts.flatMap((part) => part?.[key]?.items || []).slice(0, 20);
-      const tyAmount = sum((p) => p.trendyol?.amount);
-      const amountDiff = sum((p) => p.diff?.amount);
-      setRecon({
-        range: { start: rFrom, end: rTo },
-        trendyol: { orders: sum((p) => p.trendyol?.orders), units: sum((p) => p.trendyol?.units), amount: tyAmount },
-        panel: { orders: sum((p) => p.panel?.orders), units: sum((p) => p.panel?.units), amount: sum((p) => p.panel?.amount), docs: sum((p) => p.panel?.docs) },
-        diff: { orders: sum((p) => p.diff?.orders), units: sum((p) => p.diff?.units), amount: amountDiff,
-          amount_pct: tyAmount ? 100 * amountDiff / tyAmount : 0 },
-        duplicates: { extra_docs: sum((p) => p.duplicates?.extra_docs), order_numbers: parts.flatMap((p) => p.duplicates?.order_numbers || []).slice(0, 20) },
-        missing_in_panel: { count: sum((p) => p.missing_in_panel?.count), active_count: sum((p) => p.missing_in_panel?.active_count), cancelled_count: sum((p) => p.missing_in_panel?.cancelled_count), items: collect("missing_in_panel") },
-        extra_in_panel: { count: sum((p) => p.extra_in_panel?.count), items: collect("extra_in_panel") },
-        cancel_mismatch: { count: sum((p) => p.cancel_mismatch?.count), items: collect("cancel_mismatch") },
-        partial_cancel: { count: sum((p) => p.partial_cancel?.count), items: collect("partial_cancel") },
-      });
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "Trendyol mutabakatı alınamadı");
-    } finally {
-      setReconLoading(false);
-    }
-  };
 
   const load = async () => {
     const rangeErr = reportRangeError(from, to);
@@ -847,11 +805,6 @@ export function ProductsReport() {
           <h1 className="text-2xl font-bold flex items-center gap-2"><Package /> Ürün Raporları <ReportScopeBadge kind="mixed" /></h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={reconcileTrendyol} disabled={reconLoading}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-semibold hover:bg-orange-700 disabled:opacity-50 shadow-sm"
-            data-testid="trendyol-reconcile">
-            {reconLoading ? "Karşılaştırılıyor…" : "Trendyol ile Mutabakat"}
-          </button>
           <label className="inline-flex items-center gap-1.5 text-sm text-gray-700 select-none cursor-pointer"
             title="Excel'e her ürünün fotoğrafı gömülür (tam görünür, kırpılmaz).">
             <input type="checkbox" className="accent-emerald-600" data-testid="report-export-with-images"
@@ -873,33 +826,6 @@ export function ProductsReport() {
           {loadError}
         </div>
       )}
-
-      {recon && (
-        <div className={`rounded-xl border p-4 ${recon.diff?.orders || recon.diff?.units || Math.abs(recon.diff?.amount || 0) > 0.01 ? "bg-amber-50 border-amber-300" : "bg-emerald-50 border-emerald-300"}`}
-          data-testid="trendyol-reconcile-result">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h3 className="font-semibold">Trendyol ↔ Panel Mutabakatı</h3>
-              <p className="text-xs text-gray-600 mt-1">{recon.range?.start} → {recon.range?.end}</p>
-            </div>
-            <div className="grid grid-cols-3 gap-5 text-sm text-right">
-              <div><div className="text-gray-500">Sipariş farkı</div><b>{recon.diff?.orders ?? 0}</b></div>
-              <div><div className="text-gray-500">Ürün adedi farkı</div><b>{recon.diff?.units ?? 0}</b></div>
-              <div><div className="text-gray-500">Tutar farkı</div><b>{fmtTL(recon.diff?.amount)}</b></div>
-            </div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-3 mt-3 text-sm">
-            <div className="bg-white/70 rounded-lg p-3"><b>Trendyol:</b> {recon.trendyol?.orders || 0} sipariş · {recon.trendyol?.units || 0} adet · {fmtTL(recon.trendyol?.amount)}</div>
-            <div className="bg-white/70 rounded-lg p-3"><b>Panel (tekil):</b> {recon.panel?.orders || 0} sipariş · {recon.panel?.units || 0} adet · {fmtTL(recon.panel?.amount)}</div>
-          </div>
-          <p className="text-xs text-gray-600 mt-3">
-            Ham kopya belge: {recon.duplicates?.extra_docs || 0} · Panelde eksik: {recon.missing_in_panel?.count || 0}
-            {recon.missing_in_panel?.count ? ` (${recon.missing_in_panel.active_count || 0} aktif, ${recon.missing_in_panel.cancelled_count || 0} iptal)` : ""}
-            {' · '}Panelde fazla: {recon.extra_in_panel?.count || 0} · İptal durum farkı: {recon.cancel_mismatch?.count || 0}
-          </p>
-        </div>
-      )}
-
 
       <div className="bg-white rounded-xl border p-5">
         <h3 className="font-semibold mb-3">En Çok Satan 10 Ürün</h3>

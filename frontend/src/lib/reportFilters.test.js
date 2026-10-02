@@ -13,7 +13,7 @@ test("report range starts at the historical reporting boundary", () => {
   expect(reportCoverageDays(new Date(2026, 8, 7))).toBe(95);
 });
 
-test("long Trendyol reconciliation periods are split without gaps", () => {
+test("long report periods are split without gaps", () => {
   expect(splitReportRange("2026-06-05", "2026-09-07", 31)).toEqual([
     { from: "2026-06-05", to: "2026-07-05" },
     { from: "2026-07-06", to: "2026-08-05" },

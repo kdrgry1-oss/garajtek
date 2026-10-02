@@ -16,9 +16,6 @@
  * BAĞLANTILI BACKEND:
  *   - PUT /api/products/{id}     → Form submit edildiğinde tüm variants bir
  *                                   defada güncellenir.
- *   - POST /api/integrations/trendyol/products/{id}/sync-inventory
- *     (sadece Trendyol'da eşi varsa, Products listesindeki "RefreshCw" butonu
- *      ile ayrıca tetiklenir)
  *
  * NOT: Burada değişen stok'lar formData'dadır — Save butonuna basılmadan
  *       veritabanına yazılmaz. Kullanıcıya kaybolma riskini iletmek için

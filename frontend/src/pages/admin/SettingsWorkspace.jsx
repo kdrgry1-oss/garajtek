@@ -3,9 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import AdminSettings from "./Settings";
 import BusinessRules from "./BusinessRules";
-import CustomTheme from "./CustomTheme";
 import MenuSettings from "./MenuSettings";
-import EInvoiceSettings from "./EInvoiceSettings";
 import CargoSettings from "./CargoSettings";
 import SenderAddress from "./SenderAddress";
 import NotificationSettings from "./NotificationSettings";
@@ -28,7 +26,6 @@ const TAB_COMPONENTS = {
   general: AdminSettings,
   "business-rules": BusinessRules,
   "order-statuses": OrderStatusSettings,
-  einvoice: EInvoiceSettings,
   currency: CurrencyRates,
   cargo: CargoSettings,
   "sender-address": SenderAddress,
@@ -36,7 +33,6 @@ const TAB_COMPONENTS = {
   "notification-templates": NotificationTemplates,
   email: EmailSettings,
   "social-login": SocialAuthSettings,
-  "custom-theme": CustomTheme,
   "menu-layout": MenuSettings,
   pixels: MarketingPixels,
   capi: CapiLogs,

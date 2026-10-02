@@ -7,14 +7,14 @@
 import {
   LayoutDashboard, Package, ShoppingCart, Tags, Image, Phone,
   Megaphone, FileText, Settings, Palette, Plug, RotateCcw, Store, GitMerge, XCircle, Trash2,
-  Cable, Shield, Factory, Users, Ruler, MessageSquare, PenTool,
+  Cable, Shield, Users, Ruler, MessageSquare, PenTool,
   Truck, CreditCard, AlertTriangle, TrendingUp, Link2, BellRing, CheckSquare, Lock, Brain, Mail, Rss,
   Instagram, GraduationCap,
 } from "lucide-react";
 
 // Default sıralama (kullanıcı tercihi yoksa kullanılır):
-// Siparişler → Katalog → Raporlar → Üretim → Tasarım → Üyeler → Görevler →
-// Pazarlama → SEO → Entegrasyonlar → Ayarlar
+// Siparişler → Katalog → Raporlar → Tasarım → Üyeler → Görevler →
+// Pazarlama → SEO → Entegrasyonlar → Sistem → Ayarlar
 export const navigationGroups = [
   {
     key: "siparisler",
@@ -61,19 +61,10 @@ export const navigationGroups = [
     ],
   },
   {
-    key: "uretim",
-    label: "Üretim",
-    icon: Factory,
-    children: [
-      { label: "İmalat Takip", path: "/admin/imalat", icon: Factory },
-    ],
-  },
-  {
     key: "tasarim",
     label: "Tasarım",     // ← eski adı "İçerik"
     icon: PenTool,
     children: [
-      { label: "Tema Yönetimi", path: "/admin/temalar", icon: Palette },
       { label: "Bannerlar & Sliderlar", path: "/admin/bannerlar", icon: Image },
       { label: "Popuplar", path: "/admin/popuplar", icon: BellRing },
       { label: "Duyurular", path: "/admin/duyurular", icon: BellRing },
@@ -122,7 +113,6 @@ export const navigationGroups = [
       { label: "Ürün Yorumları", path: "/admin/yorumlar", icon: MessageSquare },
       { label: "Terkedilmiş Sepetler", path: "/admin/terkedilmis-sepet", icon: ShoppingCart },
       { label: "Kaynak & Funnel", path: "/admin/kaynak", icon: TrendingUp },
-      { label: "Influencer / İş Birlikleri", path: "/admin/influencer", icon: TrendingUp },
     ],
   },
   {
@@ -139,22 +129,25 @@ export const navigationGroups = [
     label: "Entegrasyonlar",
     icon: Cable,
     children: [
+      { label: "Tüm Entegrasyonlar", path: "/admin/entegrasyonlar", icon: Cable },
       { label: "Ödeme Tipleri", path: "/admin/odeme-tipleri", icon: CreditCard },
+      { label: "Kargo Firmaları", path: "/admin/ayarlar/kargo", icon: Truck },
       { label: "BirFatura (e-Fatura)", path: "/admin/birfatura", icon: FileText },
-      { label: "Pazaryerleri Hub", path: "/admin/pazaryerleri", icon: Store, superOnly: true },
-      { label: "Amazon", path: "/admin/amazon", icon: Store },
-      { label: "Detaylı Aktarım & Eşleştirme", path: "/admin/entegrasyonlar", icon: Cable },
-      { label: "Entegrasyon Logları", path: "/admin/entegrasyon-loglari", icon: FileText, superOnly: true },
-      { label: "Aktarılamayanlar", path: "/admin/aktarilamayanlar", icon: FileText, superOnly: true },
-      { label: "Marka Eşleştirme", path: "/admin/marka-eslestir", icon: Store, superOnly: true },
-      { label: "Kategori Eşleştirme", path: "/admin/kategori-eslestir", icon: Store, superOnly: true },
+      { label: "Reklam Pikselleri & CAPI", path: "/admin/ayarlar/pixel", icon: TrendingUp },
+      { label: "SMS & İYS (NetGSM)", path: "/admin/iys", icon: MessageSquare },
+      { label: "WhatsApp & Instagram Mesajları", path: "/admin/sorular", icon: Instagram },
+    ],
+  },
+  {
+    key: "sistem",
+    label: "Sistem",
+    icon: Shield,
+    children: [
       { label: "Otomasyon Durumu", path: "/admin/otomasyon", icon: Cable },
       { label: "Güvenlik Paneli", path: "/admin/guvenlik-paneli", icon: Shield },
       { label: "Kullanıcı İşlem Geçmişi", path: "/admin/islem-gecmisi", icon: FileText },
       { label: "Sistem Sağlığı", path: "/admin/sistem-sagligi", icon: Cable },
       { label: "Secrets Vault", path: "/admin/secrets-vault", icon: Lock },
-      { label: "İYS (İzin Yönetim Sistemi)", path: "/admin/iys", icon: Cable },
-      { label: "Mobil Uygulama", path: "/admin/mobil-uygulama", icon: BellRing },
       { label: "AI Asistan", path: "/admin/ai-asistan", icon: Brain },
     ],
   },
@@ -198,9 +191,7 @@ export function resetUserMenuPrefs(userId) {
  */
 // Süper-admin'e özel yollar — arka uç zaten kilitli (require_super_admin);
 // burada menüden de gizlenir ki kimse 403 alan bir sayfaya tıklamasın.
-export const SUPER_ONLY_PATHS = ["/admin/pazaryerleri", "/admin/entegrasyon-loglari",
-                                 "/admin/aktarilamayanlar", "/admin/marka-eslestir",
-                                 "/admin/kategori-eslestir"];
+export const SUPER_ONLY_PATHS = [];
 
 export function isSuperAdmin(perms) {
   return Array.isArray(perms) && perms.includes("*");

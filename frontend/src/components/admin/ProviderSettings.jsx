@@ -4,17 +4,15 @@
  * =============================================================================
  *
  * AMAÇ:
- *   E-Fatura entegratörleri ve kargo firmaları için TEK BİR component ile
- *   provider seçimi + dinamik credential form'u yönetmek. Ticimax'in
- *   e-Arşiv/E-Fatura ayarları sayfasındaki mantıkla aynı:
+ *   Kargo firmaları için provider seçimi + dinamik credential form'u yönetmek:
  *     1) Soldan bir provider seç.
  *     2) Sağda yalnızca o provider'ın ihtiyaç duyduğu alanlar çıkar.
  *     3) Kaydet → bundan sonra "aktif provider" olarak işaretlenir.
  *     4) Opsiyonel: "Bağlantıyı Test Et" butonu.
  *
  * PROPS:
- *   - kind       : "einvoice" | "cargo"
- *   - title      : Sayfa başlığı (ör. "E-Arşiv / E-Fatura Ayarları").
+ *   - kind       : "cargo"
+ *   - title      : Sayfa başlığı (ör. "Kargo Firmaları").
  *   - subtitle   : Sayfa alt açıklaması.
  *
  * BACKEND:
@@ -25,7 +23,6 @@
  *   POST /api/provider-settings/{kind}/test     → bağlantı testi (mock)
  *
  * KULLANAN SAYFALAR:
- *   - EInvoiceSettings.jsx → <ProviderSettings kind="einvoice" .../>
  *   - CargoSettings.jsx    → <ProviderSettings kind="cargo" .../>
  *
  * NEDEN JENERİK?

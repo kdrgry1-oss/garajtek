@@ -208,7 +208,7 @@ Panelde sırasıyla:
 8. **Entegrasyonlar › BirFatura (e-Fatura):** token oluşturun, BirFatura panelinde "Özel Entegrasyon"
    mağazası açıp site adresini + token'ı girin, test edip açın. Ayrıntı: [`docs/BIRFATURA.md`](docs/BIRFATURA.md).
 
-Kullanılmayan entegrasyonlar (Trendyol, Hepsiburada, Amazon, Temu, NetGSM) boş bırakılır;
+Kullanılmayan entegrasyonlar (ör. NetGSM SMS/İYS, WhatsApp, Instagram) boş bırakılır;
 anahtar girilmedikçe ilgili zamanlanmış işler çalışmaz.
 
 ---

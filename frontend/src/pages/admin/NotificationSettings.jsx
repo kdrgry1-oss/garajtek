@@ -42,9 +42,6 @@ export default function NotificationSettings() {
   const [testChannel, setTestChannel] = useState("sms");
   const [testTo, setTestTo] = useState("");
   const [testMsg, setTestMsg] = useState(`${SITE_NAME} test ✓`);
-  const [pushTitle, setPushTitle] = useState("");
-  const [pushBody, setPushBody] = useState("");
-  const [pushSending, setPushSending] = useState(false);
 
   const token = localStorage.getItem("token");
   const auth = { headers: { Authorization: `Bearer ${token}` } };
@@ -95,29 +92,6 @@ export default function NotificationSettings() {
     } catch (e) {
       toast.error("Hata: " + (e?.response?.data?.detail || e.message));
     } finally { setTesting(false); }
-  };
-
-  const handlePushSend = async () => {
-    if (!pushTitle.trim()) { toast.error("Başlık gerekli"); return; }
-    setPushSending(true);
-    try {
-      const r = await axios.post(`${API}/push/send`, { title: pushTitle, body: pushBody }, auth);
-      if (r.data.success) toast.success(`Push gönderildi (${r.data.sent} cihaz)`);
-      else toast.error("Gönderilemedi: " + (r.data.error || ""));
-    } catch (e) {
-      toast.error("Hata: " + (e?.response?.data?.detail || e.message));
-    } finally { setPushSending(false); }
-  };
-
-  const handleTestOrder = async () => {
-    setPushSending(true);
-    try {
-      const r = await axios.post(`${API}/push/test-order`, {}, auth);
-      if (r.data.success) toast.success(`Sahte sipariş bildirimi gönderildi (${r.data.sent} cihaz)`);
-      else toast.error("Gönderilemedi");
-    } catch (e) {
-      toast.error("Hata: " + (e?.response?.data?.detail || e.message));
-    } finally { setPushSending(false); }
   };
 
   return (
@@ -207,7 +181,7 @@ export default function NotificationSettings() {
           <p className="text-[11px] text-gray-500 mt-2">
             AI bir soruyu cevaplayamadığında, müşterinin sorusunu <strong>bu numaraya</strong> WhatsApp'tan iletir.
             O alarm mesajını <strong>yanıtlayıp</strong> (kaydır/reply) cevabı yazdığınızda, cevap otomatik olarak
-            müşteriye gönderilir. (Bu esnada müşteriye mesaj gitmez; sessiz beklenir.) Alarm ulaşmazsa panel push +
+            müşteriye gönderilir. (Bu esnada müşteriye mesaj gitmez; sessiz beklenir.) Alarm ulaşmazsa
             firma e-postası ile de haber verilir. <strong>Not:</strong> işletme hattının kendi numarası olmamalı;
             cevap verecek temsilcinin kişisel WhatsApp numarası olmalı.
           </p>
@@ -323,33 +297,6 @@ export default function NotificationSettings() {
           data-testid="test-msg-input" />
       </section>
 
-      {/* Uygulama Push Bildirimi */}
-      <section className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-        <h3 className="font-semibold mb-1 flex items-center gap-2"><Send size={16} /> Uygulama Push Bildirimi</h3>
-        <p className="text-xs text-gray-500 mb-3">Mobil admin uygulamasına giriş yapmış tüm cihazlara anlık bildirim gönderir.</p>
-        <div className="grid grid-cols-1 gap-3">
-          <input value={pushTitle} onChange={(e) => setPushTitle(e.target.value)}
-            placeholder="Başlık (örn. Duyuru)"
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
-            data-testid="push-title-input" />
-          <textarea value={pushBody} onChange={(e) => setPushBody(e.target.value)} rows={2}
-            placeholder="Mesaj metni"
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
-            data-testid="push-body-input" />
-          <div className="flex flex-wrap gap-3">
-            <button onClick={handlePushSend} disabled={pushSending}
-              className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-60"
-              data-testid="push-send-btn">
-              {pushSending ? "Gönderiliyor..." : "Push Gönder"}
-            </button>
-            <button onClick={handleTestOrder} disabled={pushSending}
-              className="bg-amber-500 text-white px-4 py-2 rounded text-sm disabled:opacity-60"
-              data-testid="push-test-order-btn">
-              🛍️ Sahte Sipariş Bildirimi (Test)
-            </button>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
