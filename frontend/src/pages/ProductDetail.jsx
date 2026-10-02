@@ -588,10 +588,10 @@ export default function ProductDetail() {
   ].filter(Boolean);
   if (otherRows.length) specGroups.push({ key: "diger", group: "Diğer Bilgiler", rows: otherRows.map(([label, value]) => ({ label, value })) });
   const specRows = specGroups.flatMap((g) => g.rows);
-  const enc = encodeURIComponent;
-  const copyLink = async () => {
   const shortList = attrs.slice(0, 5);
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  const enc = encodeURIComponent;
+  const copyLink = async () => {
     try { await navigator.clipboard.writeText(shareUrl); toast.success("Bağlantı kopyalandı"); } catch { toast.error("Kopyalanamadı"); }
   };
   const nativeShare = async () => {

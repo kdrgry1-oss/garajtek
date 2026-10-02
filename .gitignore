@@ -85,3 +85,8 @@ memory/
 agenthub/agents/youtube/db
 frontend/fcc/
 android-sdk/
+
+# Yerel çalışma veritabanı (asla commit edilmez)
+backend/data/*.db
+backend/data/*.db-*
+backend/data/*.lock

@@ -445,6 +445,9 @@ async def lifespan(app: FastAPI):
         # Kupon birleşme varsayılanı: hepsiyle birleşir, engellenenler kuponun içinden seçilir (tek seferlik).
         _asyncio.create_task(migrate_coupon_stacking_default())
         _asyncio.create_task(refit_installment_returns_once())
+        # Eski ek katalog alanı anahtarı → catalog_fields (tek seferlik, bayraklı, veri silmez)
+        from legacy_migrations import migrate_catalog_fields_once as _mig_cf
+        _asyncio.create_task(_mig_cf(db))
         _asyncio.create_task(audit_unpaid_confirmed_card_orders_once())
         _asyncio.create_task(audit_member_group_discount_once())
         _asyncio.create_task(audit_cancel_requested_visibility_once())
@@ -455,29 +458,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Coupon exception seed start warning: {e}")
 
-    # Tek seferlik migrasyon: kapida odemeyi varsayilan olarak KAPAT.
-    # Admin panelinden (Ayarlar > Odeme Yontemleri) tekrar acilabilir; bu blok
-    # _cod_default_off_v1 isaretiyle korundugu icin SADECE BIR KEZ calisir ve
-        # Eski ek katalog alanı anahtarı → catalog_fields (tek seferlik, bayraklı, veri silmez)
-        from legacy_migrations import migrate_catalog_fields_once as _mig_cf
-        _asyncio.create_task(_mig_cf(db))
-    # admin sonradan tekrar acarsa bir daha kapatmaz.
+    # Eski platformdan kalan "kapıda ödemeyi varsayılan KAPAT" migrasyonu kaldırıldı:
+    # garajtek'te kapıda ödeme varsayılan AÇIK (cod_rules.apply_cod_default_once) ve admin
+    # seçimi korunur. Eski bayrak yalnız işaretlenir; ödeme yöntemlerine DOKUNULMAZ.
     try:
-        _cfg = await db.settings.find_one({"id": "main"}, {"_id": 0}) or {}
+        _cfg = await db.settings.find_one({"id": "main"}, {"_id": 0, "_cod_default_off_v1": 1}) or {}
         if not _cfg.get("_cod_default_off_v1"):
-            _pm = dict(_cfg.get("payment_methods") or {})
-            _pm.setdefault("credit_card", True)
-            _pm.setdefault("bank_transfer", True)
-            _pm["cash_on_delivery"] = False
             await db.settings.update_one(
                 {"id": "main"},
-                {"$set": {"payment_methods": _pm, "_cod_default_off_v1": True},
-                 "$setOnInsert": {"id": "main"}},
+                {"$set": {"_cod_default_off_v1": True}, "$setOnInsert": {"id": "main"}},
                 upsert=True,
             )
-            logger.info("[migrate] cash_on_delivery varsayilan KAPALI uygulandi (_cod_default_off_v1)")
     except Exception as e:
-        logger.warning(f"[migrate] cod_default_off atlandi: {e}")
+        logger.warning(f"[migrate] cod_default_off bayrağı atlandı: {e}")
 
     # Tek seferlik: "Google Merchant" XML feed kaydini olustur (XML Feed'ler sayfasinda gorunur).
     # Cikti /api/products/feed/google-merchant.xml — google-merchant-feed.xml ile birebir ayni format.
