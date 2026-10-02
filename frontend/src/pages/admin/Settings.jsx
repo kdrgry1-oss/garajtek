@@ -144,7 +144,7 @@ export default function AdminSettings() {
         <div className="bg-amber-50 p-6 rounded-lg shadow-sm border border-amber-200" data-testid="maintenance-settings">
           <h2 className="text-lg font-medium mb-4 text-amber-900 flex items-center gap-2">
             <span className="w-2 h-6 bg-amber-500 rounded-full inline-block"></span>
-            Bakım Modu (Bakım Modu)
+            Bakım Modu
           </h2>
           <label className="flex items-center gap-3 cursor-pointer mb-4">
             <input
