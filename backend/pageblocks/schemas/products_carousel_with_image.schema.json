@@ -2,12 +2,14 @@
   "key": "products_carousel_with_image",
   "version": 2,
   "title": "Arka Plan Görselli Ürün Karuseli",
-  "description": "",
+  "description": "Tam genişlik görsel/renkli bant; solda büyük şeffaf ürün görseli, sağda başlık + 2'li ürün karuseli (şablon v1.0 homepage-3 products-carousel-with-image; v2.0 home-v3 Television Entertainment)",
   "category": "urun",
   "group": "C",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/homepage-3/products-carousel-with-image.php"
+    "T1/inc/blocks/homepage-3/products-carousel-with-image.php",
+    "T1/assets/sass/blocks/_products-carousel-with-image.scss",
+    "T2/html/home/home-v3.html#Television-Entertainment"
   ],
   "layout": "full_bleed",
   "singleton": false,
@@ -15,7 +17,25 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1.0 – ızgara kartları, 2'li (varsayılan)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2_cards",
+      "label": "v2.0 – yatay beyaz kartlar",
+      "defaults_patch": {
+        "card": "horizontal",
+        "side_image_mobile": false,
+        "carousel": {
+          "gutter": 16,
+          "dots": true
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -23,7 +43,134 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "background_image",
+      "type": "image",
+      "label": "Arka plan görseli",
+      "tab": "İçerik",
+      "recommended": [
+        1919,
+        1026
+      ],
+      "help": "Bandın tamamını kaplar (cover). Boşsa bant rengi (Görünüm › Bölüm › Bant rengi, şablon #f9f9f9) görünür."
+    },
+    {
+      "name": "side_image",
+      "type": "image",
+      "label": "Yan görsel (şeffaf PNG)",
+      "tab": "İçerik",
+      "recommended": [
+        665,
+        616
+      ]
+    },
+    {
+      "name": "side_image_link",
+      "type": "link",
+      "label": "Yan görsel bağlantısı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "image_position",
+      "type": "select",
+      "label": "Yan görsel konumu",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "left",
+          "label": "Solda (şablon)"
+        },
+        {
+          "value": "right",
+          "label": "Sağda"
+        }
+      ]
+    },
+    {
+      "name": "side_image_mobile",
+      "type": "bool",
+      "label": "Mobilde yan görseli göster",
+      "tab": "Görünüm",
+      "width": "half",
+      "help": "v1.0 şablonu mobilde görseli ürünlerin üstünde gösterir; v2.0 gizler."
+    },
+    {
+      "name": "content_width",
+      "type": "select",
+      "label": "İçerik genişliği",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "container",
+          "label": "Kutulu (şablon)"
+        },
+        {
+          "value": "full",
+          "label": "Tam genişlik"
+        }
+      ]
+    },
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık satırı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "source",
+      "type": "product_source",
+      "label": "Ürün kaynağı",
+      "tab": "Ürünler",
+      "allowed_kinds": [
+        "manual",
+        "category",
+        "discounted",
+        "newest",
+        "best_sellers",
+        "featured",
+        "top_rated",
+        "tag",
+        "brand",
+        "recently_viewed"
+      ],
+      "default_limit": 7,
+      "help": "Şablon: bir kategorinin 7 ürünü. Kategori seçilmezse en yeni ürünler gösterilir."
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "grid",
+          "label": "Izgara kartı (şablon)"
+        },
+        {
+          "value": "grid_small",
+          "label": "Küçük ızgara kartı"
+        },
+        {
+          "value": "horizontal",
+          "label": "Yatay kart (v2.0)"
+        }
+      ]
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "hide": [
+        "rows"
+      ],
+      "help": "Şablon: 0 px 1, 992 px 2 ürün, 30 px boşluk, başlıkta oklar, nokta yok."
+    }
+  ],
   "common": [
     "section",
     "visibility",

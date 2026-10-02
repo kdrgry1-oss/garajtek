@@ -2,12 +2,16 @@
   "key": "best_sellers",
   "version": 2,
   "title": "Ürün Kartları Karuseli (Çok Satanlar)",
-  "description": "Başlık + kategori hapları + 2 satırlı yatay kart karuseli (şablon: best-sellers-products-cards-carousel)",
+  "description": "Başlık + “İlk 20” / kategori hapları + sayfa başına 3×2 yatay ürün kartı karuseli (şablon v1.0 best-sellers-products-cards-carousel; v2.0 Bestsellers)",
   "category": "urun",
   "group": "C",
   "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/best-sellers-products-cards-carousel.php"
+    "T1/inc/blocks/homepage/best-sellers-products-cards-carousel.php",
+    "T1/inc/blocks/homepage/best-seller-home-v2.php",
+    "T1/inc/blocks/homepage-3/section-product-cards-carousel.php",
+    "T1/assets/sass/blocks/_product-cards-carousel.scss",
+    "T2/html/home/index.html#Prodcut-cards-carousel"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,7 +19,24 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1 – 3 sütun × 2 satır yatay kart (varsayılan)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2_grid",
+      "label": "v1.0 home-v2 – ızgara kartı, 4 sütun × 1 satır",
+      "defaults_patch": {
+        "card": "grid",
+        "columns": "4",
+        "columns_wide": "6",
+        "rows_per_slide": 1,
+        "mobile_per_slide": 2
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -28,13 +49,15 @@
       "name": "header",
       "type": "section_header",
       "label": "Başlık satırı",
-      "tab": "İçerik"
+      "tab": "İçerik",
+      "help": "Şablon: “Çok Satanlar” başlığı, sağda haplar. İlk hap (İlk 20) ana ürün kaynağını gösterir; kendi kaynağı olan hap sekme gibi davranır."
     },
     {
       "name": "pills_auto_categories",
       "type": "group",
       "label": "Kök kategorilerden otomatik haplar",
       "tab": "İçerik",
+      "help": "Açıkken menüdeki ilk N ana kategori, elle eklenen hapların ardından otomatik eklenir (şablon: 3 kategori).",
       "fields": [
         {
           "name": "enabled",
@@ -48,7 +71,13 @@
           "label": "En fazla",
           "min": 0,
           "max": 8,
-          "width": "half"
+          "unit": "adet",
+          "width": "half",
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          }
         }
       ]
     },
@@ -56,12 +85,24 @@
       "name": "pills_as_tabs",
       "type": "bool",
       "label": "Haplar ürünleri değiştirsin (sekme gibi)",
-      "tab": "İçerik"
+      "tab": "İçerik",
+      "help": "Kapalıyken haplar kategori sayfasına giden bağlantıdır (şablondaki gibi); açıkken tıklanınca karusel o kategorinin ürünlerini gösterir."
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Sekmede ürün yoksa yazı",
+      "tab": "İçerik",
+      "show_if": {
+        "pills_as_tabs": [
+          true
+        ]
+      }
     },
     {
       "name": "source",
       "type": "product_source",
-      "label": "Ürün kaynağı",
+      "label": "Ürün kaynağı (İlk 20)",
       "tab": "Ürünler",
       "allowed_kinds": [
         "manual",
@@ -75,28 +116,59 @@
         "brand",
         "recently_viewed"
       ],
-      "default_limit": 12
+      "default_limit": 12,
+      "help": "Şablon: en çok satanlar. Otomatik kategori hapları da aynı adet ve sıralamayı kullanır."
     },
     {
       "name": "columns",
       "type": "select",
-      "label": "Sütun",
+      "label": "Sütun (768–1479 px)",
       "tab": "Görünüm",
       "width": "third",
       "options": [
         {
           "value": "2",
-          "label": "2"
+          "label": "2 sütun"
         },
         {
           "value": "3",
-          "label": "3"
+          "label": "3 sütun"
         },
         {
           "value": "4",
-          "label": "4"
+          "label": "4 sütun"
         }
       ]
+    },
+    {
+      "name": "columns_wide",
+      "type": "select",
+      "label": "Sütun (≥1480 px)",
+      "tab": "Görünüm",
+      "width": "third",
+      "options": [
+        {
+          "value": "2",
+          "label": "2 sütun"
+        },
+        {
+          "value": "3",
+          "label": "3 sütun"
+        },
+        {
+          "value": "4",
+          "label": "4 sütun"
+        },
+        {
+          "value": "5",
+          "label": "5 sütun"
+        },
+        {
+          "value": "6",
+          "label": "6 sütun"
+        }
+      ],
+      "help": "v2.0 şablonu geniş ekranda 4 sütun gösterir."
     },
     {
       "name": "rows_per_slide",
@@ -105,18 +177,29 @@
       "tab": "Görünüm",
       "width": "third",
       "min": 1,
-      "max": 3
+      "max": 3,
+      "unit": "adet"
+    },
+    {
+      "name": "mobile_per_slide",
+      "type": "number",
+      "label": "Mobilde sayfa başına kart (<768 px)",
+      "tab": "Görünüm",
+      "width": "half",
+      "min": 1,
+      "max": 8,
+      "unit": "adet"
     },
     {
       "name": "card",
       "type": "select",
       "label": "Kart tipi",
       "tab": "Görünüm",
-      "width": "third",
+      "width": "half",
       "options": [
         {
           "value": "horizontal",
-          "label": "Yatay kart"
+          "label": "Yatay kart (şablon)"
         },
         {
           "value": "grid",
@@ -132,13 +215,8 @@
       "hide": [
         "per_view",
         "rows"
-      ]
-    },
-    {
-      "name": "empty_text",
-      "type": "text",
-      "label": "Boş durum yazısı",
-      "tab": "Gelişmiş"
+      ],
+      "help": "Her sayfa = sütun × satır kart. Şablon: altta uzun noktalar, ok yok, otomatik oynatma yok."
     }
   ],
   "common": [

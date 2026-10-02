@@ -2,6 +2,11 @@
   "columns": [
     {
       "title": "Öne Çıkan Ürünler",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      },
       "source": {
         "kind": "featured",
         "product_ids": [],
@@ -20,6 +25,11 @@
     },
     {
       "title": "İndirimdeki Ürünler",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      },
       "source": {
         "kind": "discounted",
         "product_ids": [],
@@ -38,6 +48,11 @@
     },
     {
       "title": "En Çok Beğenilenler",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      },
       "source": {
         "kind": "top_rated",
         "product_ids": [],
@@ -51,7 +66,7 @@
         "exclude_ids": [],
         "fill_with": "none"
       },
-      "show_rating": false,
+      "show_rating": true,
       "show_old_price": true
     }
   ],
@@ -59,17 +74,18 @@
     "enabled": false,
     "image": null,
     "link": {
-      "kind": "url",
+      "kind": "none",
       "url": "",
       "new_tab": false
     }
   },
   "card": "list_small",
+  "min_screen": "lg",
   "_section": {
     "margin_bottom": {
-      "desktop": 50,
-      "tablet": 40,
-      "mobile": 30
+      "desktop": 16,
+      "tablet": 16,
+      "mobile": 16
     }
   }
 }

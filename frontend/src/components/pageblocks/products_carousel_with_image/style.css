@@ -1,0 +1,10 @@
+/* C4 — v1.0 _products-carousel-with-image.scss (.electro kapsamında). Bant rengi/boşluklar BlockFrame'de (_section). */
+.electro .pcwi__bg { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; pointer-events: none; }
+.electro .pcwi > .container, .electro .pcwi > .container-fluid { position: relative; z-index: 1; }
+.electro .pcwi__image img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.electro .pcwi__image .el-ph { max-width: 665px; margin: 0 auto; background-color: rgba(0, 0, 0, .04); }
+.electro .pcwi__header { margin-bottom: 1.357em; }
+.electro .pcwi__carousel { margin-bottom: 2.857em; }
+/* beyaz kart içi, kartlar arası ayırıcı yok */
+.electro .pcwi .product-item::after { content: none; }
+.electro .pcwi .product-item__inner { background-color: #fff; }

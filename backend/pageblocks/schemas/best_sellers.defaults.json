@@ -8,7 +8,7 @@
       {
         "label": "İlk 20",
         "link": {
-          "kind": "url",
+          "kind": "none",
           "url": "",
           "new_tab": false
         },
@@ -19,7 +19,7 @@
     "link": {
       "label": "Tümünü gör",
       "link": {
-        "kind": "url",
+        "kind": "none",
         "url": "",
         "new_tab": false
       }
@@ -31,6 +31,7 @@
     "max": 3
   },
   "pills_as_tabs": true,
+  "empty_text": "Bu kategoride henüz ürün yok.",
   "source": {
     "kind": "best_sellers",
     "product_ids": [],
@@ -45,7 +46,9 @@
     "fill_with": "none"
   },
   "columns": "3",
+  "columns_wide": "4",
   "rows_per_slide": 2,
+  "mobile_per_slide": 3,
   "card": "horizontal",
   "carousel": {
     "per_view": {
@@ -66,7 +69,6 @@
     "drag": true,
     "last_active_divider": false
   },
-  "empty_text": "Bu kategoride ürün bulunamadı.",
   "_section": {
     "margin_bottom": {
       "desktop": 60,

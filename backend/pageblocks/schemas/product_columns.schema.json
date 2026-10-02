@@ -2,12 +2,13 @@
   "key": "product_columns",
   "version": 2,
   "title": "Alt Ürün Sütunları",
-  "description": "Footer üstü 3 sütun küçük ürün listesi (şablon: footer widget'ları)",
+  "description": "Footer üstünde 3 sütun küçük ürün listesi (Öne Çıkan / İndirimdeki / En Çok Beğenilen) + geniş ekranda tanıtım görseli (şablon v1.0 footer widget'ları; v2.0 Footer-top-widget). Bu blok varken footer'ın kendi ürün bandı gizlenir.",
   "category": "urun",
   "group": "C",
   "status": "ready",
   "template_refs": [
-    "T1/inc/footer/footer-widgets.php"
+    "T1/inc/footer/footer-widgets.php",
+    "T2/html/home/index.html#Footer-top-widget"
   ],
   "layout": "container",
   "singleton": false,
@@ -31,12 +32,20 @@
       "tab": "Ürünler",
       "min": 1,
       "max": 4,
+      "item_noun": "Sütun",
       "item_label": "{{title}}",
+      "help": "Şablon: Öne Çıkan Ürünler / İndirimdeki Ürünler / En Çok Beğenilenler, her biri 3 ürün.",
       "item_fields": [
         {
           "name": "title",
           "type": "text",
-          "label": "Başlık"
+          "label": "Başlık",
+          "max_length": 80
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Başlık bağlantısı (isteğe bağlı)"
         },
         {
           "name": "source",
@@ -54,23 +63,30 @@
             "brand",
             "recently_viewed"
           ],
-          "default_limit": 3
+          "default_limit": 3,
+          "max_limit": 8
         },
         {
           "name": "show_rating",
           "type": "bool",
-          "label": "Puanı göster",
-          "width": "half"
+          "label": "Yıldız puanını göster",
+          "width": "half",
+          "help": "Yalnız puanı olan ürünlerde görünür."
         },
         {
           "name": "show_old_price",
           "type": "bool",
-          "label": "Eski fiyatı göster",
+          "label": "Eski (üstü çizili) fiyatı göster",
           "width": "half"
         }
       ],
       "item_default": {
         "title": "Yeni sütun",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        },
         "source": {
           "kind": "featured",
           "product_ids": [],
@@ -86,14 +102,14 @@
         },
         "show_rating": false,
         "show_old_price": true
-      },
-      "item_noun": "Sütun"
+      }
     },
     {
       "name": "promo",
       "type": "group",
-      "label": "Tanıtım görseli (≥1480 px)",
+      "label": "Tanıtım görseli (yalnız ≥1480 px geniş ekranda)",
       "tab": "İçerik",
+      "collapsible": true,
       "fields": [
         {
           "name": "enabled",
@@ -107,12 +123,22 @@
           "recommended": [
             330,
             360
-          ]
+          ],
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          }
         },
         {
           "name": "link",
           "type": "link",
-          "label": "Bağlantı"
+          "label": "Bağlantı",
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          }
         }
       ]
     },
@@ -121,12 +147,31 @@
       "type": "select",
       "label": "Kart tipi",
       "tab": "Görünüm",
+      "width": "half",
       "options": [
         {
           "value": "list_small",
-          "label": "Küçük liste"
+          "label": "Küçük liste (75×75, şablon)"
         }
       ]
+    },
+    {
+      "name": "min_screen",
+      "type": "select",
+      "label": "Görünür olduğu ekranlar",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "lg",
+          "label": "Yalnız ≥992 px (şablon)"
+        },
+        {
+          "value": "all",
+          "label": "Tüm ekranlar"
+        }
+      ],
+      "help": "Şablonda bu bant tablet/mobilde gizlidir."
     }
   ],
   "common": [

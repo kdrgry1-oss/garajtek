@@ -1,0 +1,16 @@
+/* C3 Sekmeli Ürün Karuseli — v1.0 _products-carousel-tabs.scss: sekmeler arası 4em, alt 1px çizgi; etkin sekme kalın. */
+.electro .pct .nav-tab { border-bottom: 1px solid #ddd; }
+.electro .pct .nav-tab .nav-item + .nav-item { margin-left: 4em; }
+.electro .pct .nav-tab .nav-link { font-size: 1.429em; line-height: .9em; padding: 0 0 1em; border-bottom: 0; color: #333e48; }
+@media (max-width: 767.98px) { .electro .pct .nav-tab .nav-item + .nav-item { margin-left: 1.25em; } .electro .pct .nav-tab .nav-link { font-size: 1rem; white-space: nowrap; } }
+.electro .pct .nav-tab .nav-link.active::before { content: " "; border-bottom: 2px solid var(--electro-primary, #fed700); display: block; position: absolute; bottom: -1px; left: 0; width: 100%; }
+.electro .pct-no-underline::after { content: none; }
+/* ızgara görünümü: kırılım başına sütun = karusel “görünen adet” */
+.electro .pct-grid { margin: 0; }
+.electro .pct-grid > .pct-grid__item { flex: 0 0 calc(100% / var(--el-n)); max-width: calc(100% / var(--el-n)); }
+/* sekme değişim efekti */
+.electro .pct-anim { animation-duration: .5s; animation-fill-mode: both; }
+.electro .pct-anim--fadeIn { animation-name: pdFadeIn; }
+.electro .pct-anim--slideInUp { animation-name: pctSlideInUp; }
+@keyframes pctSlideInUp { from { opacity: 0; transform: translate3d(0, 40px, 0); } to { opacity: 1; transform: none; } }
+html.pd-no-anim .electro .pct-anim { animation: none !important; }

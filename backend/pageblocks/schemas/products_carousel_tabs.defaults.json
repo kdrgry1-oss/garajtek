@@ -1,1 +1,114 @@
-{}
+{
+  "header": {
+    "title": "Ürün Sekmeleri",
+    "tag": "sr-only",
+    "align": "left",
+    "right": "none",
+    "pills": [],
+    "link": {
+      "label": "Tümünü gör",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    "underline": true
+  },
+  "tabs": [
+    {
+      "label": "Öne Çıkanlar",
+      "source": {
+        "kind": "featured",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 7,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "label": "İndirimdekiler",
+      "source": {
+        "kind": "discounted",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 7,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    },
+    {
+      "label": "En Çok Beğenilenler",
+      "source": {
+        "kind": "top_rated",
+        "product_ids": [],
+        "category_ids": [],
+        "include_children": true,
+        "tag": "",
+        "brand_ids": [],
+        "limit": 7,
+        "sort": "default",
+        "exclude_out_of_stock": false,
+        "exclude_ids": [],
+        "fill_with": "none"
+      }
+    }
+  ],
+  "default_tab": 0,
+  "empty_text": "Bu sekmede henüz ürün yok.",
+  "display": "carousel",
+  "card": "grid",
+  "tab_effect": "fadeIn",
+  "side_banner": {
+    "enabled": false,
+    "position": "left",
+    "image": null,
+    "link": {
+      "kind": "none",
+      "url": "",
+      "new_tab": false
+    }
+  },
+  "carousel": {
+    "per_view": {
+      "0": 1,
+      "480": 1,
+      "768": 2,
+      "992": 3,
+      "1200": 3,
+      "1480": 3
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": true,
+    "arrows": "none",
+    "drag": true,
+    "last_active_divider": true
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 50,
+      "tablet": 40,
+      "mobile": 30
+    }
+  }
+}

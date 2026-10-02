@@ -2,12 +2,15 @@
   "key": "product_slider",
   "version": 2,
   "title": "Ürün Karuseli",
-  "description": "Başlık + oklu ürün karuseli (şablon: recently-added-products-carousel)",
+  "description": "Başlık (sağda ‹ › okları) + 6'lı küçük ürün kartı karuseli; Yeni Eklenenler, kategori, trend vb. (şablon v1.0 recently-added-products-carousel; v2.0 Recently Viewed)",
   "category": "urun",
   "group": "C",
   "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/recently-added-products-carousel.php"
+    "T1/inc/blocks/homepage/recently-added-products-carousel.php",
+    "T1/inc/blocks/homepage/home-v2-categories-products-carousel.php",
+    "T1/assets/sass/blocks/_products-carousel.scss",
+    "T2/html/home/index.html#Recently-viewed"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,7 +18,62 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1 – Yeni Eklenenler (6'lı, varsayılan)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2_wide",
+      "label": "v2.0 – geniş ekranda 7'li, mobilde 2'li (Recently Viewed düzeni)",
+      "defaults_patch": {
+        "header": {
+          "title": "Öne Çıkan Ürünler"
+        },
+        "source": {
+          "kind": "featured",
+          "limit": 14,
+          "fill_with": "newest"
+        },
+        "carousel": {
+          "per_view": {
+            "0": 2,
+            "480": 2,
+            "768": 3,
+            "992": 4,
+            "1200": 6,
+            "1480": 7
+          }
+        }
+      }
+    },
+    {
+      "value": "category",
+      "label": "Kategori ürünleri (v1.0 home-v2, 4'lü)",
+      "defaults_patch": {
+        "header": {
+          "title": "Kategori Ürünleri"
+        },
+        "source": {
+          "kind": "category",
+          "limit": 12,
+          "fill_with": "newest"
+        },
+        "card": "grid",
+        "carousel": {
+          "per_view": {
+            "0": 1,
+            "480": 2,
+            "768": 2,
+            "992": 3,
+            "1200": 4,
+            "1480": 4
+          }
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -28,7 +86,8 @@
       "name": "header",
       "type": "section_header",
       "label": "Başlık satırı",
-      "tab": "İçerik"
+      "tab": "İçerik",
+      "help": "Şablonda başlığın sağında ‹ › okları vardır (Sağ taraf: Oklar). Karusel sekmesinde Oklar = Başlıkta olmalı."
     },
     {
       "name": "source",
@@ -47,7 +106,8 @@
         "brand",
         "recently_viewed"
       ],
-      "default_limit": 14
+      "default_limit": 14,
+      "help": "Şablon: en yeni ürünler. Kategori, indirimdekiler, çok satanlar, elle seçim vb. seçilebilir."
     },
     {
       "name": "card",
@@ -58,7 +118,7 @@
       "options": [
         {
           "value": "grid_small",
-          "label": "Küçük ızgara kartı (6'lı)"
+          "label": "Küçük ızgara kartı (şablon, 6'lı)"
         },
         {
           "value": "grid",
@@ -75,13 +135,15 @@
       "type": "bool",
       "label": "İndirim rozetini göster",
       "tab": "Görünüm",
-      "width": "half"
+      "width": "half",
+      "help": "Açıkken bu karuseldeki kartlarda “-%25” rozeti görünür; kapalıyken gizlenir (genel kart ayarından bağımsız)."
     },
     {
       "name": "carousel",
       "type": "carousel",
       "label": "Karusel",
-      "tab": "Karusel"
+      "tab": "Karusel",
+      "help": "Şablon: 0 px 1, 480 px 2, 768 px 2, 992 px 3, 1200 px 6 ürün; başlıkta oklar, altta noktalar, görünen son kartın ayırıcısı gizli."
     }
   ],
   "common": [

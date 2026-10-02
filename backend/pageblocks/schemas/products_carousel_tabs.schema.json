@@ -2,12 +2,16 @@
   "key": "products_carousel_tabs",
   "version": 2,
   "title": "Sekmeli Ürün Karuseli",
-  "description": "",
+  "description": "Öne Çıkanlar / İndirimdekiler / En Çok Beğenilenler sekmeleri + ürün karuseli; ortalı (3'lü), sola yaslı (4'lü) veya başlıklı hap sekmeler + yan banner (şablon v1.0 product-carousel-tab, homepage-3/products-carousel-tabs; v2.0 home-v3/v5/v6)",
   "category": "urun",
   "group": "C",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/product-carousel-tab.php"
+    "T1/inc/blocks/homepage/product-carousel-tab.php",
+    "T1/inc/blocks/homepage-3/products-carousel-tabs.php",
+    "T1/assets/sass/blocks/_products-carousel-tabs.scss",
+    "T2/html/home/home-v3.html#Tab-Prodcut-Section",
+    "T2/html/home/home-v6.html#Laptops-Computers"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,7 +19,55 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "centered",
+      "label": "Ortalı sekmeler, 3'lü (v1.0 home-v2)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "left",
+      "label": "Sola yaslı sekmeler, 4'lü (v1.0 home-v3)",
+      "defaults_patch": {
+        "carousel": {
+          "per_view": {
+            "0": 1,
+            "480": 1,
+            "768": 2,
+            "992": 3,
+            "1200": 4,
+            "1480": 4
+          }
+        }
+      }
+    },
+    {
+      "value": "pill_header",
+      "label": "Başlık + hap sekmeler + yan banner (v2.0 home-v5/v6)",
+      "defaults_patch": {
+        "header": {
+          "title": "Atölye Ekipmanları",
+          "tag": "h3",
+          "right": "link"
+        },
+        "side_banner": {
+          "enabled": true
+        },
+        "card": "grid_small",
+        "carousel": {
+          "per_view": {
+            "0": 2,
+            "480": 2,
+            "768": 2,
+            "992": 3,
+            "1200": 4,
+            "1480": 5
+          },
+          "last_active_divider": true
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -23,7 +75,212 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "help": "Ortalı/sola yaslı görünümde başlık şablondaki gibi gizlidir (ekran okuyucu). Hap başlıklı görünümde başlık solda, sekmeler sağda görünür; Sağ taraf = “Tümünü gör” bağlantısı ise sekmelerin yanında bağlantı çıkar."
+    },
+    {
+      "name": "tabs",
+      "type": "repeater",
+      "label": "Sekmeler",
+      "tab": "Ürünler",
+      "min": 1,
+      "max": 8,
+      "item_noun": "Sekme",
+      "item_label": "{{label}}",
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Sekme adı",
+          "max_length": 60
+        },
+        {
+          "name": "source",
+          "type": "product_source",
+          "label": "Ürün kaynağı",
+          "allowed_kinds": [
+            "manual",
+            "category",
+            "discounted",
+            "newest",
+            "best_sellers",
+            "featured",
+            "top_rated",
+            "tag",
+            "brand",
+            "recently_viewed"
+          ],
+          "default_limit": 7
+        }
+      ],
+      "item_default": {
+        "label": "Yeni sekme",
+        "source": {
+          "kind": "featured",
+          "product_ids": [],
+          "category_ids": [],
+          "include_children": true,
+          "tag": "",
+          "brand_ids": [],
+          "limit": 7,
+          "sort": "default",
+          "exclude_out_of_stock": false,
+          "exclude_ids": [],
+          "fill_with": "none"
+        }
+      }
+    },
+    {
+      "name": "default_tab",
+      "type": "number",
+      "label": "Açılışta seçili sekme (0 = ilk)",
+      "tab": "Ürünler",
+      "min": 0,
+      "max": 7,
+      "width": "half"
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Sekmede ürün yoksa yazı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "display",
+      "type": "select",
+      "label": "Gösterim",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "carousel",
+          "label": "Karusel (şablon)"
+        },
+        {
+          "value": "grid",
+          "label": "Izgara (tümü görünür)"
+        }
+      ],
+      "help": "Izgarada sütun sayısı Karusel sekmesindeki “kırılım başına görünen adet” tablosundan gelir."
+    },
+    {
+      "name": "card",
+      "type": "select",
+      "label": "Kart tipi",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "grid",
+          "label": "Izgara kartı (şablon)"
+        },
+        {
+          "value": "grid_small",
+          "label": "Küçük ızgara kartı"
+        },
+        {
+          "value": "horizontal",
+          "label": "Yatay kart"
+        }
+      ]
+    },
+    {
+      "name": "tab_effect",
+      "type": "select",
+      "label": "Sekme değişim efekti",
+      "tab": "Görünüm",
+      "width": "half",
+      "options": [
+        {
+          "value": "none",
+          "label": "Yok"
+        },
+        {
+          "value": "fadeIn",
+          "label": "Belirme (şablon)"
+        },
+        {
+          "value": "slideInUp",
+          "label": "Aşağıdan kayma"
+        }
+      ]
+    },
+    {
+      "name": "side_banner",
+      "type": "group",
+      "label": "Yan banner (v2.0 home-v6)",
+      "tab": "İçerik",
+      "collapsible": true,
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "label": "Göster",
+          "width": "half"
+        },
+        {
+          "name": "position",
+          "type": "select",
+          "label": "Konum",
+          "width": "half",
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          },
+          "options": [
+            {
+              "value": "left",
+              "label": "Solda"
+            },
+            {
+              "value": "right",
+              "label": "Sağda"
+            }
+          ]
+        },
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "recommended": [
+            390,
+            370
+          ],
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          }
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "hide": [
+        "rows"
+      ],
+      "help": "Şablon (ortalı): 0 px 1, 768 px 2, 992 px 3, 1200 px 3 ürün; noktalar açık, ok yok."
+    }
+  ],
   "common": [
     "section",
     "visibility",

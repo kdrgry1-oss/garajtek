@@ -1,0 +1,7 @@
+/* Grup C ürün karuselleri — şablon davranışları (.electro kapsamında). */
+/* v1.0 .owl-item.last-active: görünen son kartın sağ ayırıcısı yok */
+.electro .pc-last-active > .product-item::after,
+.electro .pc-last-active.product-item::after { content: none; }
+/* blok düzeyinde indirim rozeti (genel kart ayarını ezer) */
+.electro .pcs-badge-on .product-item .el-badge--sale { display: inline-block !important; }
+.electro .pcs-badge-off .product-item .el-badge--sale { display: none !important; }
