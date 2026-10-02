@@ -192,7 +192,7 @@ function DevCredit() {
   return (
     <a href="https://roofcommerce.com.tr/" target="_blank" rel="noopener" className="el-devcredit d-inline-flex align-items-center mt-1 font-size-12 text-gray-5" data-testid="dev-credit">
       <span className="mr-1">Designed by</span>
-      <img src="/roofcommerce-logo.svg" alt="roofcommerce" height="16" width="118" loading="lazy"
+      <img src="/roofcommerce-logo.svg" alt="roofcommerce" height="16" width="126" loading="lazy"
         onError={(e) => { if (!e.currentTarget.dataset.fb) { e.currentTarget.dataset.fb = "1"; e.currentTarget.src = "/roofcommerce-logo.png"; } }} />
     </a>
   );
