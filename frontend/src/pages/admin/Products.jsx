@@ -6,7 +6,7 @@
  * NE İŞE YARAR?
  *   Admin panelinde ürünlerin listelenmesi, filtrelenmesi, oluşturulması,
  *   düzenlenmesi, çoğaltılması ve silinmesi için kullanılan ana ekran. Ürüne bağlı varyantlar, özellikler (attributes),
- *   görseller, ölçü tablosu ve SEO alanları da bu ekrandaki modal üzerinden
+ *   görseller, teknik özellikler ve SEO alanları da bu ekrandaki modal üzerinden
  *   yönetilir.
  *
  * BAĞLANTILI BACKEND UÇLARI:
@@ -17,10 +17,10 @@
  *   - POST /api/products/{id}/duplicate → Kopyalama
  *   - GET  /api/categories              → Kategori listesi (filtre + form)
  *   - GET  /api/attributes              → Varyant/özellik kütüphanesi
- *   - GET  /api/size-tables/{product_id}→ Ölçü tablosu
+ *   - GET  /api/products/meta/spec-templates → Teknik özellik alanları + kategori şablonları
  *
  * BAĞLANTILI DİĞER DOSYALAR:
- *   - SizeTablePanel.jsx  → Ürün modalında "Ölçü Tablosu" sekmesinde gömülü açılır.
+ *   - components/admin/product/TechnicalSpecs.jsx → "Teknik Özellikler" sekmesi.
  *   - SearchableAttribute → Ürün özelliklerini arayarak seçmeyi sağlayan küçük bileşen.
  *   - components/admin/Pagination.jsx  → Üst (compact) ve alt (full) sayfalama.
  *
@@ -31,7 +31,7 @@
  */
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useParams, useNavigate } from "react-router-dom";
-import { Plus, Search, Edit, Trash2, Eye, EyeOff, Copy, Upload, Image, X, MoreHorizontal, Layers, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Store, RefreshCw, Check, Globe, Download, FileSpreadsheet, CheckSquare, Square, Printer, Tag, AlertTriangle, History } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Eye, Copy, Upload, Image, X, MoreHorizontal, Layers, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Store, RefreshCw, Check, Globe, Download, FileSpreadsheet, CheckSquare, Square, Printer, Tag, AlertTriangle, History } from "lucide-react";
 import axios from "axios";
 import { openAdminDocument } from "../../lib/adminDocuments";
 import { toast } from "sonner";
@@ -54,17 +54,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
-import SizeTablePanel from "./SizeTablePanel";
 import Pagination from "../../components/admin/Pagination";
 import { priceView } from "../../lib/price";
 import { buildProductPrintHtml } from "../../lib/productPrint";
 import SearchableAttribute from "../../components/admin/product-form/SearchableAttribute";
 import SeoTab from "../../components/admin/product-form/SeoTab";
-import CombineProductsTab from "../../components/admin/product-form/CombineProductsTab";
+import TechnicalSpecs, { VariantLabelsField } from "../../components/admin/product/TechnicalSpecs";
 import ProductDetailFields from "../../components/admin/product-form/ProductDetailFields";
 import ProductFilters from "../../components/admin/ProductFilters";
 import { sanitizeHtml } from "../../lib/sanitizeHtml";
-import { FIT_SIZE_OPTIONS, isStandardSized, sortFitSizes, fitSizesText } from "../../lib/fitSizes";
 import { SITE_NAME } from "../../lib/brand";
 import { useStoreInfo } from "../../lib/storeInfo";
 
@@ -101,7 +99,7 @@ const fixImg = (u) => {
  * - "Bölünmüş": iki yan yana panel (kaynak + canlı).
  * Trendyol'a aktarımda HTML temizleme backend tarafında yapılır.
  */
-function DescriptionEditor({ value, onChange, onGenerate, generating }) {
+function DescriptionEditor({ value, onChange }) {
   const [mode, setMode] = useState("split"); // "source" | "preview" | "split"
   // Önizleme artık DÜZENLENEBİLİR (contentEditable/WYSIWYG). İmleç sıçramasını önlemek için
   // innerHTML'i yalnızca DIŞ değişikliklerde (kaynak textarea düzenlemesi / mod değişimi) yaz;
@@ -141,18 +139,6 @@ function DescriptionEditor({ value, onChange, onGenerate, generating }) {
           {tabBtn("source", "Kaynak")}
           {tabBtn("preview", "Önizleme")}
           {tabBtn("split", "Bölünmüş")}
-          {onGenerate && (
-            <button
-              type="button"
-              onClick={onGenerate}
-              disabled={generating}
-              data-testid="desc-ai-generate"
-              title="Ürün adı, kategori ve özelliklerden yapay zekâ ile açıklama üretir"
-              className="ml-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-md transition-colors bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-            >
-              {generating ? "Üretiliyor…" : "✦ AI ile Oluştur"}
-            </button>
-          )}
         </div>
         <div className="text-[10px] text-gray-500 font-mono">
           HTML: {charsHtml} kr · Metin: {charsPlain} kr
@@ -168,7 +154,7 @@ function DescriptionEditor({ value, onChange, onGenerate, generating }) {
             className={`w-full px-3 py-2.5 outline-none transition-all text-xs font-mono leading-relaxed ${
               mode === "split" ? "border-r border-gray-200" : ""
             }`}
-            placeholder="Ürün açıklaması (HTML destekli). Örn: <p>Pamuklu kumaş…</p>"
+            placeholder="Ürün açıklaması (HTML destekli). Örn: <p>500 lt tanklı, 10 bar çalışma basınçlı…</p>"
           />
         )}
         {(mode === "preview" || mode === "split") && (
@@ -249,21 +235,6 @@ export default function AdminProducts() {
       toast.success("Fiyat güncellendi");
     } catch {
       toast.error("Fiyat güncellenemedi");
-    }
-  };
-  // Sezon satır-içi düzenleme (ürün kartına girmeden). Ürün kartındaki Sezon
-  // alanıyla AYNI değer kümesini kullanır; PUT /products ile kaydeder.
-  const SEASON_OPTIONS = ["İlkbahar/Sonbahar", "Tüm Sezonlar", "Yaz", "Kış"];
-  const [seasonEdit, setSeasonEdit] = useState(null);
-  const saveSeasonEdit = async (id, season) => {
-    try {
-      const token = localStorage.getItem("token");
-      await axios.put(`${API}/products/${id}`, { season }, { headers: { Authorization: `Bearer ${token}` } });
-      setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, season } : p)));
-      setSeasonEdit(null);
-      toast.success("Sezon güncellendi");
-    } catch {
-      toast.error("Sezon güncellenemedi");
     }
   };
   // technicalDetails: XML/Ticimax description'dan parse edilen teknik özellikler.
@@ -380,19 +351,17 @@ export default function AdminProducts() {
   // Tablo sıralaması (3 durumlu: yön -> ters -> varsayılan)
   const [sortBy, setSortBy] = useState(() => _loadProductsView().sortBy || { field: null, dir: null });
 
-  const [aiDescLoading, setAiDescLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "", slug: "", description: "", short_description: "",
     price: 0, sale_price: null, category_name: "", categories: [], brand: DEFAULT_PRODUCT_BRAND,
     images: [], is_active: false, is_featured: false, is_new: false,
-    stock: 0, stock_code: "", season: "", barcode: "", sku: "",
+    stock: 0, stock_code: "", barcode: "", sku: "",
     urun_karti_id: "", urun_id: "",
     // Ticimax fields
     variation_code: "", gtip_code: "", unit: "ADET", keywords: "",
     supplier: "", manufacturer: DEFAULT_PRODUCT_BRAND, max_installment: 9, purchase_price: 0, member_price_1: null,
-    // FAZ 7 — İmalat modülü entegrasyonu için ek alanlar
-    collection: "", color: "",
+    color: "", specs: {}, extra_specs: [], variant_labels: {},
     vat_rate: 10,
     market_price: 0, vat_included: true, currency: "TRY",
     cargo_weight: 0, product_weight: 0, width: 0, depth: 0, height: 0,
@@ -413,7 +382,6 @@ export default function AdminProducts() {
     markup_rate: 0,
     hepsiburada_attributes: {},
     temu_attributes: {},
-    combine_products: [],
     ticimax_fields: {}
   });
   const [ticimaxSchema, setTicimaxSchema] = useState([]);
@@ -426,6 +394,9 @@ export default function AdminProducts() {
   // #6: Hızlı varyant — çoklu beden/renk seçimi (kombinasyondan kart üret).
   const [multiSizes, setMultiSizes] = useState([]);
   const [multiColors, setMultiColors] = useState([]);
+  // Varyant seçenek adları (ürüne özel; vitrin seçim başlığı). Varsayılan: "Seçenek" / "Renk / Tip".
+  const VL1 = (formData.variant_labels && formData.variant_labels.size) || "Seçenek";
+  const VL2 = (formData.variant_labels && formData.variant_labels.color) || "Renk / Tip";
 
 
   useEffect(() => {
@@ -504,19 +475,16 @@ export default function AdminProducts() {
       .catch(() => {});
   }, []);
 
-  // Open size-table editor when deep-linked from /admin/olcu-tablolari
+  // ?edit=<id> ile derin bağlantı: ürün kartını aç
   useEffect(() => {
-    const stId = searchParams.get("sizeTable");
     const editId = searchParams.get("edit");
-    const targetId = stId || editId;
+    const targetId = editId;
     if (!targetId || products.length === 0) return;
     const p = products.find((x) => x.id === targetId);
     if (p) {
       openEditModal(p);
-      if (stId) setActiveTab("sizetable");
       // Clean URL so refresh doesn't reopen endlessly
       const next = new URLSearchParams(searchParams);
-      next.delete("sizeTable");
       next.delete("edit");
       setSearchParams(next, { replace: true });
     }
@@ -611,7 +579,7 @@ export default function AdminProducts() {
   };
   const printFilterText = () => {
     const f = appliedFilters || {};
-    const lbl = { status: "Durum", season: "Sezon", brand: "Marka", supplier: "Tedarikçi", tag: "Etiket",
+    const lbl = { status: "Durum", brand: "Marka", supplier: "Tedarikçi", tag: "Etiket",
       name: "Ad", stock_code: "Stok kodu", barcode: "Barkod", min_stock: "Min stok", max_stock: "Maks stok",
       min_price: "Min fiyat", max_price: "Maks fiyat", date_from: "Eklenme ≥", date_to: "Eklenme ≤",
       has_image: "Görsel", has_variants: "Varyant", discounted: "İndirimli" };
@@ -910,88 +878,6 @@ export default function AdminProducts() {
     }
   };
 
-  const handleRenkWebColorDoldur = async () => {
-    const token = localStorage.getItem('token');
-    const t = toast.loading("Renk/Web Color önizlemesi hazırlanıyor...");
-    try {
-      const pre = await axios.post(
-        `${API}/integrations/site/renk-webcolor/autofill?apply=false`,
-        null, { headers: { Authorization: `Bearer ${token}` }, timeout: 120000 }
-      );
-      toast.dismiss(t);
-      const d = pre.data || {};
-      const ok = window.confirm(
-        "RENK + WEB COLOR DOLDUR — ÖNİZLEME\n\n" +
-        `• Taranan ürün: ${d.taranan_urun}\n` +
-        `• Rengi bulunan: ${d.renk_bulunan_urun}  ·  Bulunamayan: ${d.renk_bulunamayan}\n` +
-        `• Çok renkli (atlanan): ${d.cok_renkli_atlanan}\n` +
-        `• Doldurulacak — Renk: ${d.renk_doldurulacak}  ·  Web Color: ${d.webcolor_doldurulacak}\n` +
-        `• HB: ${d.hb_dolan_toplam}  ·  Temu: ${d.temu_dolan_toplam}\n\n` +
-        "Renk = ürün adının SON kelimesi (renk sözlüğüyle doğrulanır).\n" +
-        "Web Color gönderimde pazaryeri değerine (en yakın) çözülür.\n" +
-        "Çok renkli kart ATLANIR · Beden YAZILMAZ · yalnız BOŞ alanlar.\n\n" +
-        "Uygulansın mı?"
-      );
-      if (!ok) { toast("İptal edildi"); return; }
-      const t2 = toast.loading("Renk + Web Color yazılıyor...");
-      const res = await axios.post(
-        `${API}/integrations/site/renk-webcolor/autofill?apply=true`,
-        null, { headers: { Authorization: `Bearer ${token}` }, timeout: 180000 }
-      );
-      toast.dismiss(t2);
-      toast.success(`${res.data.guncellenen_urun} üründe Renk + Web Color dolduruldu`);
-      fetchProducts();
-    } catch (e) {
-      toast.dismiss(t);
-      toast.error(e.response?.data?.detail || "Renk/Web Color doldurma başarısız");
-    }
-  };
-
-  const handleAIAciklamaUret = async () => {
-    const token = localStorage.getItem('token');
-    const t = toast.loading("Boş açıklamalar sayılıyor...");
-    try {
-      const pre = await axios.post(
-        `${API}/integrations/site/aciklama/generate?apply=false`,
-        null, { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
-      );
-      toast.dismiss(t);
-      const total = pre.data?.bos_aciklamali_urun || 0;
-      if (total === 0) { toast("Boş açıklamalı ürün yok"); return; }
-      const ok = window.confirm(
-        "AI AÇIKLAMA ÜRET — ÖNİZLEME\n\n" +
-        `• Açıklaması boş ürün: ${total}\n\n` +
-        "Ürün Bilgisi AI ile özniteliklerden yazılır.\n" +
-        "Kumaş = Materyal, Kalıp = Kalıp özniteliğinden.\n" +
-        "Beden/Model ölçüleri BOŞ '___' bırakılır (elle doldurursun).\n" +
-        "Yalnız BOŞ açıklamalar doldurulur; mevcutlar KORUNUR.\n\n" +
-        "Üretim batch'ler halinde sürer. Başlatılsın mı?"
-      );
-      if (!ok) { toast("İptal edildi"); return; }
-      let done = 0, remaining = total, guard = 0;
-      const t2 = toast.loading(`AI açıklama üretiliyor... 0/${total}`);
-      while (remaining > 0 && guard < 80) {
-        guard++;
-        const res = await axios.post(
-          `${API}/integrations/site/aciklama/generate?apply=true&limit=10`,
-          null, { headers: { Authorization: `Bearer ${token}` }, timeout: 180000 }
-        );
-        const g = res.data?.uretilen || 0;
-        remaining = res.data?.kalan ?? 0;
-        done += g;
-        toast.loading(`AI açıklama üretiliyor... ${done}/${total}`, { id: t2 });
-        if (g === 0) break;
-      }
-      toast.dismiss(t2);
-      toast.success(`${done} ürüne AI açıklama üretildi` + (remaining > 0 ? ` · kalan ${remaining}` : ''));
-      fetchProducts();
-    } catch (e) {
-      toast.dismiss(t);
-      toast.error(e.response?.data?.detail || "AI açıklama üretimi başarısız");
-    }
-  };
-
-
   // Toplu İşlemler menüsü: dışarı tıklayınca kapat
   useEffect(() => {
     if (!toolsMenuOpen) return;
@@ -1145,40 +1031,17 @@ export default function AdminProducts() {
     if (to < 0 || to >= formData.images.length) return;
     reorderImages(index, to);
   };
-  // Görsel string ya da {url, is_size_table:true} dict olabilir. Ölçü/pazaryeri görseli
-  // işaretlenince müşteriye gizlenir (storefront eler) ama admin galeride durmaya devam eder.
+  // Görsel string ya da {url, ...} dict olabilir (eski içe aktarımlar).
   const imgUrl = (img) => (typeof img === 'object' && img !== null ? (img.url || img.src || img.image || '') : img);
-  const isSizeTableImg = (img) => (typeof img === 'object' && img !== null && !!img.is_size_table);
-  // Ölçü Görseli alanına taşı: işaretle + dizinin SONUNA al (pazaryerine son görsel gider)
-  const markAsSizeImage = (index) => {
-    setFormData(prev => {
-      const arr = [...prev.images];
-      const [it] = arr.splice(index, 1);
-      arr.push({ url: imgUrl(it), is_size_table: true });
-      return { ...prev, images: arr };
-    });
-  };
-  // Galeriye geri taşı: işareti kaldır (sitede tekrar görünür olur)
-  const unmarkSizeImage = (index) => {
-    setFormData(prev => {
-      const arr = [...prev.images];
-      arr[index] = imgUrl(arr[index]);
-      return { ...prev, images: arr };
-    });
-  };
 
   /**
    * handleSubmit — Ürün kaydetme / güncelleme işlemi.
    *
    * AKIŞ:
    *   1) Form'daki attributes objesini backend'in beklediği diziye çevirir.
-   *      Varsayılan olarak "Yaş Grubu: Yetişkin" ve "Menşei: TR" eklenir
-   *      (Trendyol için zorunlu minimumlar).
-   *   2) Oluşturma modunda, varyantlarda birden fazla renk varsa HER RENK
-   *      için AYRI ürün oluşturur → Trendyol aynı renk grubunu tek ürün
-   *      olarak kabul eder; bu ayrım orada zorunludur.
-   *   3) Tek renkte "Web Color" ve "Renk" özellikleri otomatik set edilir.
-   *   4) Edit modunda tüm payload doğrudan PUT edilir.
+   *   2) Teknik özellikler (specs / extra_specs / variant_labels) payload ile gider;
+   *      backend tip/birim doğrular (product_specs.py).
+   *   3) Oluşturmada POST, düzenlemede PUT; tüm varyantlar TEK kartta kalır.
    *
    * BAĞLANTILAR:
    *   - POST/PUT /api/products
@@ -1186,16 +1049,6 @@ export default function AdminProducts() {
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Sezon zorunlu (kullanıcı isteği) — rapor sezon filtresi bu alandan beslenir
-    if (!formData.season) {
-      toast.error("Sezon Bilgisi zorunlu — Temel sekmesinde 'Envanter & Kimlik' altından seçin");
-      return;
-    }
-    // Beden Önerisi (Kalıp) zorunlu (kullanıcı isteği) — ürün sayfası kalıp tavsiyesi buradan beslenir
-    if (!formData.size_advice && !isStandardSized(formData.variants)) {
-      toast.error("Beden Önerisi (Kalıp) zorunlu — Temel sekmesinde Sezon'un altından seçin");
-      return;
-    }
     // Alış ve Satış fiyatı zorunlu (kullanıcı isteği)
     if (!(Number(formData.purchase_price) > 0)) {
       toast.error("Alış Fiyatı zorunlu — Fiyat sekmesinden girin");
@@ -1214,13 +1067,11 @@ export default function AdminProducts() {
       const attrObj = {
         ...(formData.attributes || {}),
       };
-      // #16: "Yaka" formdan kaldırıldı; arka planda lazımsa "Yaka Tipi" değerinden türet.
-      if (attrObj["Yaka Tipi"] && !attrObj["Yaka"]) attrObj["Yaka"] = attrObj["Yaka Tipi"];
       const attributesArray = Object.entries(attrObj)
         .filter(([_, v]) => v !== "" && v !== null && v !== undefined)
         .map(([k, v]) => ({ type: k, name: k, value: v }));
 
-      // Teknik detayları (Kumaş, Kalıp, Model Ölçüleri vb.) attribute array'ine ekle
+      // İçe aktarımdan gelen teknik detayları attribute array'ine ekle
       // — backend'e kayıt için her teknik detayı ayrı {type, name, value} satırı yap
       for (const [slug, item] of Object.entries(technicalDetails || {})) {
         if (item && item.value) {
@@ -1267,77 +1118,7 @@ export default function AdminProducts() {
         }
       }
 
-      // Get unique colors from variants
-      const uniqueColors = [...new Set((payload.variants || []).map(v => v.color).filter(Boolean))];
-      
-      if (uniqueColors.length > 1 && !editingProduct) {
-        // Multi-color: create a separate product per color
-        toast.info(`${uniqueColors.length} farklı renk için ayrı ürünler oluşturuluyor...`);
-
-        // Renk-kardeşi gruplama anahtarı (csv_card_id) TÜM renklerde AYNI → "Diğer Renkler"
-        // swatch'ında bağlı kalır. Ama her renk LİSTEDE kendi BENZERSİZ Ürün Kart ID'sini gösterir:
-        // ilk renk taban kart id'de kalır, sonraki renkler backend'de max+1 ile otomatik artar.
-        const groupCardId = String(payload.urun_karti_id || "").trim();
-        let _firstColor = true;
-        for (const color of uniqueColors) {
-          const colorVariants = payload.variants.filter(v => v.color === color);
-          // Set Web Color and Renk to this color in attributes
-          const colorAttrs = attributesArray
-            .filter(a => a.type !== "Web Color" && a.type !== "Renk")
-            .concat([
-              { type: "Web Color", name: "Web Color", value: color },
-              { type: "Renk", name: "Renk", value: color }
-            ]);
-          
-          const colorPayload = {
-            ...payload,
-            name: `${formData.name} ${color}`,
-            slug: undefined,   // sunucu üretir: {ad}-{ürün kart id}
-            attributes: colorAttrs,
-            variants: colorVariants,
-            csv_card_id: groupCardId || undefined,   // paylaşımlı renk-kardeşi anahtarı
-          };
-          if (_firstColor) {
-            // İlk renk taban Ürün Kart ID'sinde kalır
-            if (groupCardId) {
-              colorPayload.urun_karti_id = groupCardId;
-              colorPayload.ticimax_fields = { ...(colorPayload.ticimax_fields || {}), URUNKARTIID: groupCardId };
-            }
-          } else {
-            // Sonraki renkler BENZERSİZ kart id alsın → urun_karti_id/URUNKARTIID gönderme,
-            // backend sistemdeki max + 1'i otomatik atar (insert'ler sıralı olduğu için artar).
-            delete colorPayload.urun_karti_id;
-            if (colorPayload.ticimax_fields) {
-              colorPayload.ticimax_fields = { ...colorPayload.ticimax_fields };
-              delete colorPayload.ticimax_fields.URUNKARTIID;
-            }
-          }
-          delete colorPayload.newVariant;
-          await axios.post(`${API}/products`, colorPayload, { headers });
-          _firstColor = false;
-        }
-        toast.success(`${uniqueColors.length} ürün oluşturuldu (her renk ayrı kart ID, renkler bağlı)`);
-      } else if (uniqueColors.length === 1 && !editingProduct) {
-        // Single color: auto-set Web Color and Renk
-        const color = uniqueColors[0];
-        const colorAttrs = attributesArray
-          .filter(a => a.type !== "Web Color" && a.type !== "Renk")
-          .concat([
-            { type: "Web Color", name: "Web Color", value: color },
-            { type: "Renk", name: "Renk", value: color }
-          ]);
-        
-        const singlePayload = {
-          ...payload,
-          name: formData.name.includes(color) ? formData.name : `${formData.name} ${color}`,
-          slug: undefined,   // sunucu üretir: {ad}-{ürün kart id}
-          attributes: colorAttrs,
-        };
-        delete singlePayload.newVariant;
-        await axios.post(`${API}/products`, singlePayload, { headers });
-        toast.success("Ürün oluşturuldu");
-      } else {
-        // Edit mode or no variants
+      {
         delete payload.newVariant;
         if (editingProduct) {
           await axios.put(`${API}/products/${editingProduct.id}`, payload, { headers });
@@ -1475,7 +1256,7 @@ export default function AdminProducts() {
     if (!barcodeSizeModal) return;
     const cnt = barcodeSizeModal.counts || {};
     const picked = barcodeSizeModal.sizes.filter(s => barcodeSizeModal.selected[s] && (parseInt(cnt[s], 10) || 0) > 0);
-    if (picked.length === 0) { toast.error("En az bir beden seçip adet giriniz"); return; }
+    if (picked.length === 0) { toast.error("En az bir varyant seçip adet giriniz"); return; }
     const all = picked.length === barcodeSizeModal.sizes.length;
     // hepsi seçiliyse (ya da '*' = tüm barkodlar) beden filtresi gönderme; adetler counts ile gider
     const sizes = (all || picked.includes('*')) ? null : picked;
@@ -1552,8 +1333,7 @@ export default function AdminProducts() {
   /**
    * openEditModal — Seçili ürünü düzenleme modunda modala doldurur.
    *   formData'ya tüm ürün alanlarını + attributes dizisini Object map'e çevirerek
-   *   yerleştirir. Ölçü Tablosu sekmesinde SizeTablePanel bileşeni
-   *   `product.id`'yi kullanarak kendi verisini çeker.
+   *   yerleştirir. Teknik özellikler (specs/extra_specs) TechnicalSpecs sekmesinde düzenlenir.
    */
   const loadStockHistory = async (id) => {
     if (!id) return;
@@ -1615,10 +1395,7 @@ export default function AdminProducts() {
     } else if (Array.isArray(raw)) {
       // Backend savedi: [{ type, name, value }] formatından dict'e geri inşa et
       const dict = {};
-      const techLabels = ["Kumaş", "Kumaş Bilgisi", "Kumaş & İçerik Bilgisi", "Kumaş İçeriği",
-        "Materyal", "İçerik", "Kalıp", "Beden Ölçüleri", "STD Beden Ölçüleri",
-        "Model Ölçüleri", "Yıkama", "Yıkama Talimatı", "Bakım", "Bakım Talimatı",
-        "Astar", "Astar Bilgisi", "Ürün Bilgisi", "Ürün Kodu"];
+      const techLabels = ["Materyal", "İçerik", "Ürün Bilgisi", "Ürün Kodu"];
       for (const a of raw) {
         if (techLabels.some(l => (a.type || a.name || "").toLowerCase().includes(l.toLowerCase().slice(0, 6)))) {
           const slug = (a.type || a.name || "").toLowerCase()
@@ -1641,8 +1418,6 @@ export default function AdminProducts() {
       short_description: product.short_description || "",
       price: product.price || 0,
       sale_price: product.sale_price || null,
-      size_advice: product.size_advice || "",
-      fit_sizes: Array.isArray(product.fit_sizes) ? product.fit_sizes : [],
       category_name: product.category_name || "",
       categories: (() => {
         // Yaprak seçim: önce product.categories, yoksa category_id / category_name eşlemesi.
@@ -1672,7 +1447,6 @@ export default function AdminProducts() {
       is_new: product.is_new ?? false,
       stock: product.stock || 0,
       stock_code: product.stock_code || "",
-      season: product.season || "",
       barcode: product.barcode || "",
       sku: product.sku || "",
       urun_karti_id: product.urun_karti_id || "",
@@ -1686,9 +1460,10 @@ export default function AdminProducts() {
       max_installment: product.max_installment || 9,
       purchase_price: product.purchase_price || 0,
       member_price_1: product.member_price_1 ?? null,
-      // FAZ 7 — İmalat planı için ek alanlar (geri yükleme)
-      collection: product.collection || "",
       color: product.color || "",
+      specs: (product.specs && typeof product.specs === "object") ? product.specs : {},
+      extra_specs: Array.isArray(product.extra_specs) ? product.extra_specs : [],
+      variant_labels: product.variant_labels || {},
       market_price: product.market_price || 0,
       vat_rate: product.vat_rate || 10,
       vat_included: product.vat_included ?? true,
@@ -1715,9 +1490,8 @@ export default function AdminProducts() {
       // dokunmadı" durumunu ayırt eder ve form açıkken gelen sipariş/iade hareketini
       // EZMEZ. Dokunulmuş alan (stock !== _stock0) ise aynen yazılır.
       variants: (product.variants || []).map((v) => ({ ...v, _stock0: Number(v.stock || 0) })),
-      combine_products: product.combine_products || [],
       attributes: (() => {
-        const base = { "Yaş Grubu": "Yetişkin", "Menşei": "TR" };
+        const base = {};
         const a = product.attributes;
         if (!a) return base;
         // Array shape (existing): [{type|name, value}, …]
@@ -1753,12 +1527,11 @@ export default function AdminProducts() {
       name: "", slug: "", description: "", short_description: "",
       price: 0, sale_price: null, category_name: "", categories: [], brand: DEFAULT_PRODUCT_BRAND,
       images: [], is_active: false, is_featured: false, is_new: false,
-      stock: 0, stock_code: "", season: "", barcode: "", sku: "", fit_sizes: [],
+      stock: 0, stock_code: "", barcode: "", sku: "",
       urun_karti_id: "", urun_id: "",
       variation_code: "", gtip_code: "", unit: "ADET", keywords: "",
       supplier: "", manufacturer: DEFAULT_PRODUCT_BRAND, max_installment: 9, purchase_price: 0, member_price_1: null,
-    // FAZ 7 — İmalat modülü entegrasyonu için ek alanlar
-    collection: "", color: "",
+      color: "", specs: {}, extra_specs: [], variant_labels: {},
       market_price: 0, vat_rate: 10, vat_included: true, currency: "TRY",
       cargo_weight: 0, product_weight: 0, width: 0, depth: 0, height: 0,
       min_order_qty: 1, max_order_qty: 999, estimated_delivery: "2-3",
@@ -1769,19 +1542,7 @@ export default function AdminProducts() {
       hepsiburada_attributes: {},
       temu_attributes: {},
       variants: [], newVariant: {},
-      combine_products: [],
-      attributes: {
-        "Yaş Grubu": "Yetişkin",          // #9
-        "Menşei": "TR",
-        "Cinsiyet": "Kadın",               // #7
-        "Koleksiyon": "Casual/Günlük",     // #8
-        "Ortam": "Casual/Günlük",          // #8
-        "Ek Özellik": "Yok",      // #10
-        "Performans": "Cool & Comfort",    // #11
-        "Kutu Durumu": "Kutu Yok",         // #12
-        "Persona": "Fashion Forward",      // sabit
-        "Sürdürülebilirlik Detayı": "Hayır", // sabit (kullanıcı isteği)
-      },
+      attributes: {},
       ticimax_fields: {},
     });
   };
@@ -2008,7 +1769,7 @@ export default function AdminProducts() {
           <button
             onClick={() => handleExport(false)}
             disabled={exporting}
-            title="Her beden ayrı satır"
+            title="Her varyant ayrı satır"
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-all font-medium text-sm shadow-sm disabled:opacity-50"
           >
             {exporting ? <RefreshCw className="animate-spin" size={16} /> : <Download size={16} />}
@@ -2018,17 +1779,17 @@ export default function AdminProducts() {
             onClick={() => handleExport(true)}
             disabled={exporting}
             data-testid="products-export-grouped"
-            title="Aynı ürün + renk tek satır: bedenler birleşik, stok toplam, beden bazlı stok ayrı sütunda"
+            title="Aynı ürün tek satır: varyantlar birleşik, stok toplam, varyant bazlı stok ayrı sütunda"
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-all font-medium text-sm shadow-sm disabled:opacity-50"
           >
             {exporting ? <RefreshCw className="animate-spin" size={16} /> : <Download size={16} />}
-            Excel (Bedenler Tek Satır)
+            Excel (Varyantlar Tek Satır)
           </button>
           <button
             onClick={handlePrintList}
             disabled={printing}
             data-testid="products-print-list-btn"
-            title="Ekrandaki görünümü (görsel, ad, stok kodu, bedenler, fiyat, stok) not sütunuyla A4'e yazdırır. Seçili ürün varsa yalnız onlar, yoksa filtreye uyan tüm ürünler."
+            title="Ekrandaki görünümü (görsel, ad, stok kodu, varyantlar, fiyat, stok) not sütunuyla A4'e yazdırır. Seçili ürün varsa yalnız onlar, yoksa filtreye uyan tüm ürünler."
             className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded hover:bg-black transition-all font-medium text-sm shadow-sm disabled:opacity-50"
           >
             {printing ? <RefreshCw className="animate-spin" size={16} /> : <Printer size={16} />}
@@ -2089,25 +1850,6 @@ export default function AdminProducts() {
             className="w-full pl-10 pr-4 py-2 border rounded focus:ring-1 focus:ring-black outline-none"
           />
         </div>
-        {/* Hızlı Sezon filtresi (en üstten) — anında uygular; gelişmiş panele de yansır. */}
-        <select
-          value={appliedFilters.season || ""}
-          onChange={(e) => {
-            const v = e.target.value;
-            setFilters((f) => ({ ...f, season: v }));
-            setAppliedFilters((a) => ({ ...a, season: v }));
-            setPage(1);
-          }}
-          data-testid="products-quick-season-filter"
-          title="Sezona göre filtrele"
-          className={`px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-black bg-white text-sm ${appliedFilters.season ? "border-black font-semibold" : "text-gray-600"}`}
-        >
-          <option value="">Tüm Sezonlar (filtre yok)</option>
-          <option value="İlkbahar/Sonbahar">İlkbahar/Sonbahar</option>
-          <option value="Tüm Sezonlar">Tüm Sezonlar</option>
-          <option value="Yaz">Yaz</option>
-          <option value="Kış">Kış</option>
-        </select>
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-4 py-2 border rounded transition-colors ${showFilters ? 'bg-black text-white' : 'bg-white hover:bg-gray-50'}`}
@@ -2137,8 +1879,6 @@ export default function AdminProducts() {
             {[
               { label: "Silinen Özellik Kurtar", desc: "Snapshot'tan teknik detayları geri yükle", color: "bg-teal-600", on: handleSilinenOzellikKurtar, testid: "teknik-detay-recover-btn", icon: RefreshCw },
               { label: "Eksik Açıklama Kurtar", desc: "Boş açıklamaları export'tan doldur", color: "bg-cyan-600", on: handleEksikAciklamaKurtar, testid: "aciklama-recover-btn", icon: RefreshCw },
-              { label: "Renk + Web Color Doldur", desc: "Ad son kelimesinden renk + web color", color: "bg-fuchsia-600", on: handleRenkWebColorDoldur, testid: "renk-webcolor-autofill-btn", icon: RefreshCw },
-              { label: "AI Açıklama Üret", desc: "Boş açıklamalara AI ile üret", color: "bg-violet-600", on: handleAIAciklamaUret, testid: "aciklama-generate-ai-btn", icon: RefreshCw },
             ].map((it) => {
               const Icon = it.icon;
               return (
@@ -2254,8 +1994,8 @@ export default function AdminProducts() {
               <th>Görsel</th>
               <SortTH field="name" label="Ürün Adı" />
               <SortTH field="stock_code" label="Stok Kodu" />
-              <th>Bedenler</th>
-              <SortTH field="season" label="Sezon" />
+              <th>Varyantlar</th>
+              <th>Marka</th>
               <SortTH field="price" label="Fiyat" />
               <SortTH field="stock" label="Stok" className="text-center" />
               <SortTH field="is_active" label="Durum" firstDir="desc" />
@@ -2332,7 +2072,7 @@ export default function AdminProducts() {
                         className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800 hover:underline"
                       >
                         <Layers size={14} />
-                        {product.variants.length} Beden
+                        {product.variants.length} Varyant
                       </button>
                     ) : (product.sizes?.length > 0 ? (
                       <span className="inline-flex items-center gap-1 text-xs text-gray-700">
@@ -2344,31 +2084,7 @@ export default function AdminProducts() {
                     ))}
                   </td>
                   <td>
-                    {seasonEdit === product.id ? (
-                      <select
-                        autoFocus
-                        value={product.season || ""}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => saveSeasonEdit(product.id, e.target.value)}
-                        onBlur={() => setSeasonEdit(null)}
-                        className="border border-gray-300 rounded px-2 py-1 text-xs focus:border-black outline-none bg-white"
-                        data-testid={`product-season-edit-${product.id}`}
-                      >
-                        <option value="">— Seçin —</option>
-                        {SEASON_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    ) : (
-                      <button
-                        onClick={() => setSeasonEdit(product.id)}
-                        title="Sezonu düzenle (ürün kartına girmeden)"
-                        className="text-left text-xs hover:bg-orange-50 rounded px-1 -mx-1 cursor-pointer whitespace-nowrap"
-                        data-testid={`product-season-cell-${product.id}`}
-                      >
-                        {product.season
-                          ? <span className="text-gray-700">{product.season}</span>
-                          : <span className="text-red-400 italic">Sezon yok</span>}
-                      </button>
-                    )}
+                    <span className="text-xs text-gray-700 whitespace-nowrap">{product.brand || "-"}</span>
                   </td>
                   <td>
                     {priceEdit?.id === product.id ? (
@@ -2539,9 +2255,8 @@ export default function AdminProducts() {
                  <TabsTrigger value="variants" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Varyantlar</TabsTrigger>
                  {editingProduct && <TabsTrigger value="stock-history" data-testid="stock-history-tab" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Stok Geçmişi</TabsTrigger>}
                  <TabsTrigger value="seo" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">SEO</TabsTrigger>
+                 <TabsTrigger value="specs" data-testid="specs-tab" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Teknik Özellikler</TabsTrigger>
                  <TabsTrigger value="attributes" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Özellikler</TabsTrigger>
-                 <TabsTrigger value="sizetable" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Ölçü Tablosu</TabsTrigger>
-                 <TabsTrigger value="combine" className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm px-6 py-2 text-sm font-medium rounded-lg transition-all">Kombin</TabsTrigger>
                </TabsList>
 
               {/* Basic Info Tab */}
@@ -2564,7 +2279,7 @@ export default function AdminProducts() {
                               });
                             }}
                             className="w-full border-gray-200 border px-3 py-2.5 rounded-lg focus:border-black outline-none transition-all"
-                            placeholder="Örn: V Yaka Saten Elbise"
+                            placeholder="Örn: 500 Lt 10 Bar Pistonlu Kompresör"
                             required
                           />
                         </div>
@@ -2668,37 +2383,6 @@ export default function AdminProducts() {
                         <DescriptionEditor
                           value={formData.description}
                           onChange={(val) => setFormData({ ...formData, description: val })}
-                          generating={aiDescLoading}
-                          onGenerate={async () => {
-                            if (!formData.name?.trim()) { toast.error("Önce ürün adını girin"); return; }
-                            if (formData.description?.trim() && !window.confirm("Mevcut açıklamanın üzerine AI ile üretilen yazılsın mı?")) return;
-                            setAiDescLoading(true);
-                            try {
-                              const attrsList = [];
-                              const A = formData.attributes || {};
-                              Object.entries(A).forEach(([k, v]) => {
-                                const val = typeof v === "string" ? v : (v && v.value) ? v.value : (Array.isArray(v) ? v.join(", ") : "");
-                                if (k && val) attrsList.push({ name: k, value: String(val) });
-                              });
-                              if (formData.color) attrsList.push({ name: "Renk", value: formData.color });
-                              if (formData.collection) attrsList.push({ name: "Koleksiyon", value: formData.collection });
-                              const token = localStorage.getItem("token");
-                              const res = await axios.post(`${API}/products/ai-description`, {
-                                name: formData.name,
-                                category_name: formData.category_name,
-                                brand: formData.brand,
-                                attributes: attrsList,
-                              }, { headers: { Authorization: `Bearer ${token}` } });
-                              if (res.data?.description) {
-                                setFormData((prev) => ({ ...prev, description: res.data.description }));
-                                toast.success("Açıklama AI ile oluşturuldu");
-                              }
-                            } catch (e) {
-                              toast.error(e?.response?.data?.detail || "AI açıklama üretilemedi");
-                            } finally {
-                              setAiDescLoading(false);
-                            }
-                          }}
                         />
                       </div>
                     </div>
@@ -2722,62 +2406,15 @@ export default function AdminProducts() {
                             type="button"
                             onClick={() => {
                               const randomNum = Math.floor(100000 + Math.random() * 900000);
-                              setFormData({ ...formData, stock_code: `FCFW${randomNum}` });
+                              setFormData({ ...formData, stock_code: `GT${randomNum}` });
                             }}
                             className="px-3 py-2 bg-orange-100 text-orange-800 border-none rounded-lg text-[10px] font-black tracking-widest uppercase whitespace-nowrap hover:bg-orange-200 transition-colors"
                           >
-                            Üret (FCFW)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const randomNum = Math.floor(100000 + Math.random() * 900000);
-                              setFormData({ ...formData, stock_code: `FCSS${randomNum}` });
-                            }}
-                            className="px-3 py-2 bg-blue-100 text-blue-800 border-none rounded-lg text-[10px] font-black tracking-widest uppercase whitespace-nowrap hover:bg-blue-200 transition-colors"
-                          >
-                            Üret (FCSS)
+                            Stok Kodu Üret
                           </button>
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Sezon Bilgisi <span className="text-red-500">*</span></label>
-                        <select
-                          value={formData.season || ""}
-                          onChange={(e) => setFormData({ ...formData, season: e.target.value })}
-                          data-testid="product-season-select"
-                          className={`w-full border px-3 py-2 rounded-lg bg-gray-50 focus:bg-white outline-none transition-all text-sm ${formData.season ? "border-gray-200 focus:border-black" : "border-red-300"}`}
-                        >
-                          <option value="">— Sezon seçin (zorunlu) —</option>
-                          <option value="İlkbahar/Sonbahar">İlkbahar/Sonbahar</option>
-                          <option value="Tüm Sezonlar">Tüm Sezonlar</option>
-                          <option value="Yaz">Yaz</option>
-                          <option value="Kış">Kış</option>
-                        </select>
-                        <p className="text-[10px] text-gray-400 mt-1">Ürün raporlarındaki Sezon kolonu ve filtresi bu alandan beslenir.</p>
-                      </div>
-
-                      {/* SKU ve Tedarikçi alanları kullanıcı isteğiyle kaldırıldı */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beden Önerisi (Kalıp) <span className="text-red-500">*</span></label>
-                        <select
-                          value={formData.size_advice || ""}
-                          onChange={(e) => setFormData({ ...formData, size_advice: e.target.value })}
-                          className={`w-full border px-3 py-2 rounded-lg outline-none transition-all text-sm ${formData.size_advice ? "border-gray-200 focus:border-black" : "border-red-300"}`}
-                          title="Ürün sayfasında beden seçiminin yanında öneri yazısı çıkar"
-                        >
-                          <option value="">— Kalıp seçin (zorunlu) —</option>
-                          <option value="dar">Dar / Slim Fit → bir beden büyük öner</option>
-                          <option value="normal">Normal / Regular → kendi bedenini al</option>
-                          <option value="bol">Bol / Oversize → bir beden küçük öner</option>
-                        </select>
-                      </div>
-                      {/* STANDART bedenli ürün: hangi bedenlere uyar (vitrinde "X – Y bedenler arası uyumludur") */}
-                      {isStandardSized(formData.variants) && (
-                        <FitSizesField value={formData.fit_sizes || []}
-                          onChange={(v) => setFormData({ ...formData, fit_sizes: v })} />
-                      )}
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Üretici</label>
                         <input
@@ -2916,7 +2553,6 @@ export default function AdminProducts() {
                           <span className="text-[11px] text-gray-400">satış fiyatından indirim</span>
                         </div>
                       </div>
-                      {/* Beden Önerisi (Kalıp) Temel sekmesine (Sezon'un altına) taşındı */}
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Alış Fiyatı (TL) <span className="text-red-500">*</span></label>
                         <input
@@ -2938,18 +2574,6 @@ export default function AdminProducts() {
                           data-testid="product-member-price-1"
                         />
                         <p className="text-[10px] text-gray-400 mt-1">Üye Tipi 1 fiyatından çekilir. Storefront'ta üye tipi 1 grubuna özel fiyat olarak gösterilir.</p>
-                      </div>
-                      {/* Koleksiyon alanı kullanıcı isteğiyle kaldırıldı (sezon zorunlu alanı Temel'de) */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Renk (Ana)</label>
-                        <input
-                          type="text"
-                          value={formData.color || ""}
-                          onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                          placeholder="ör. Siyah / Ekru / Antrasit"
-                          className="w-full border-gray-200 border px-3 py-2 rounded-lg focus:border-black outline-none transition-all"
-                          data-testid="product-color"
-                        />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1 text-orange-600">KDV ORANI (%)</label>
@@ -3013,22 +2637,6 @@ export default function AdminProducts() {
                   // Özellik değeri formData.attributes'a yazılır (tek kaynak: mağaza ürün özellikleri).
                   const setProductAttr = (attr, val) => {
                     setFormData({ ...formData, attributes: { ...(formData.attributes || {}), [attr.name]: val } });
-                  };
-
-                  // Renk kardeşlerine özellik kopyala: tekten bölünen renk kartlarının
-                  // özelliklerini (Kol Tipi, Yaka Stili, Kumaş... + HB/Temu) birebir eşitler.
-                  // RENK/BEDEN'e dokunmaz. Önce bu kart KAYDEDİLMİŞ olmalı (DB'den kopyalanır).
-                  const copyAttrsToSiblings = async () => {
-                    if (!formData.id) { alert("Önce ürünü kaydet."); return; }
-                    if (!window.confirm("Bu rengin özellikleri (Kol Tipi, Yaka Stili, Kumaş vb. — RENK/BEDEN HARİÇ) aynı modelin diğer renk kartlarına kopyalanacak.\n\nÖnce bu kartı KAYDETTİĞİNDEN emin ol (DB'den kopyalanır). Devam edilsin mi?")) return;
-                    try {
-                      const token = localStorage.getItem('token');
-                      const res = await axios.post(`${API}/products/${formData.id}/copy-attributes-to-siblings`, {}, { headers: { Authorization: `Bearer ${token}` } });
-                      const u = res.data?.updated ?? 0;
-                      alert(u > 0 ? `${u} renk kardeşine kopyalandı. Kartları açıp doğrula.` : (res.data?.detail || "Renk kardeşi bulunamadı."));
-                    } catch (e) {
-                      alert("Kopyalama başarısız: " + (e?.response?.data?.detail || e.message));
-                    }
                   };
 
                   // 🔗 KATALOG SENKRONU: Katalog → Ürün Özellikleri → Ayar Kartı'nda kullanıcı
@@ -3228,34 +2836,15 @@ export default function AdminProducts() {
 
                   return (
                     <div className="space-y-6">
-                      {formData.id && (
-                        <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
-                          <div className="text-xs text-amber-800 leading-relaxed">
-                            <span className="font-bold">Renk kardeşleri:</span> Bu kartın özelliklerini (Kol Tipi, Yaka Stili, Kumaş… — renk/beden hariç) aynı modelin diğer renk kartlarına kopyala. Önce bu kartı kaydet.
-                          </div>
-                          <button
-                            type="button"
-                            onClick={copyAttrsToSiblings}
-                            className="shrink-0 px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors"
-                          >
-                            Renk kardeşlerine kopyala
-                          </button>
-                        </div>
-                      )}
                       {renderSection('site', 'Ürün Özellikleri', { border: '#e5e5e5', bg: '#1a1a1a', text: '#1a1a1a' }, 'ÖZELLİK')}
                     </div>
                   );
                 })()}
               </TabsContent>
 
-              {/* Size Table Tab */}
-              <TabsContent value="sizetable" className="space-y-6 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <SizeTablePanel
-                  productId={editingProduct?.id}
-                  productName={formData.name || editingProduct?.name || ""}
-                  variants={formData.variants}
-                  onToast={(m, t) => (t === 'err' ? toast.error(m) : toast.success(m))}
-                />
+              {/* Teknik Özellikler (ekipman) — ayrı bileşen */}
+              <TabsContent value="specs" className="space-y-6 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <TechnicalSpecs formData={formData} setFormData={setFormData} categories={categories} />
               </TabsContent>
 
               {/* Variants Tab */}
@@ -3270,7 +2859,7 @@ export default function AdminProducts() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                         <input 
                           type="text"
-                          placeholder="Varyant ara (beden/renk/kod)..."
+                          placeholder="Varyant ara (seçenek/kod)..."
                           className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-orange-500 focus:bg-white transition-all w-64"
                           value={variantSearchTerm}
                           onChange={(e) => setVariantSearchTerm(e.target.value)}
@@ -3278,13 +2867,15 @@ export default function AdminProducts() {
                     </div>
                   </div>
 
+                  <VariantLabelsField formData={formData} setFormData={setFormData} />
+
                   {/* Existing Variants Table */}
                   {formData.variants?.length > 0 && (
                     <div className="border rounded-xl overflow-hidden shadow-sm">
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50 border-b">
                           <tr>
-                            <th className="text-left px-4 py-3 font-bold text-gray-600">Beden / Renk</th>
+                            <th className="text-left px-4 py-3 font-bold text-gray-600">Seçenek</th>
                             <th className="text-left px-4 py-3 font-bold text-gray-600">Stok Kodu</th>
                             <th className="text-left px-4 py-3 font-bold text-gray-600">Barkod</th>
                             <th className="text-center px-4 py-3 font-bold text-gray-600">Stok</th>
@@ -3380,7 +2971,7 @@ export default function AdminProducts() {
                     {/* #6: Bedenleri ve renkleri buton buton seç → seçilen kombinasyonlardan kartları tek seferde üret */}
                     <div className="mb-5 bg-white rounded-lg border border-orange-200 p-4">
                       <div className="mb-3">
-                        <span className="block text-xs font-bold text-orange-700 mb-2 uppercase">Bedenler (çoklu seç)</span>
+                        <span className="block text-xs font-bold text-orange-700 mb-2 uppercase">{VL1} (çoklu seç)</span>
                         <div className="flex flex-wrap gap-2">
                           {globalSizes.map(s => {
                             const on = multiSizes.includes(s.value);
@@ -3392,7 +2983,7 @@ export default function AdminProducts() {
                               </button>
                             );
                           })}
-                          {globalSizes.length === 0 && <span className="text-xs text-gray-400 italic">Beden tanımlı değil</span>}
+                          {globalSizes.length === 0 && <span className="text-xs text-gray-400 italic">Tanımlı seçenek yok (Katalog → Varyantlar)</span>}
                         </div>
                       </div>
                       <div className="mb-3">
@@ -3408,12 +2999,12 @@ export default function AdminProducts() {
                               </button>
                             );
                           })}
-                          {globalColors.length === 0 && <span className="text-xs text-gray-400 italic">Renk tanımlı değil</span>}
+                          {globalColors.length === 0 && <span className="text-xs text-gray-400 italic">Tanımlı değer yok</span>}
                         </div>
                       </div>
                       <button type="button"
                         onClick={() => {
-                          if (!multiSizes.length) { toast.error("En az bir beden seçin"); return; }
+                          if (!multiSizes.length) { toast.error(`En az bir ${VL1.toLocaleLowerCase("tr")} seçin`); return; }
                           const colors = multiColors.length ? multiColors : [""];
                           const existing = new Set((formData.variants || []).map(v => `${v.size}|${v.color || ""}`));
                           const adds = [];
@@ -3429,17 +3020,17 @@ export default function AdminProducts() {
                           toast.success(`${adds.length} varyant oluşturuldu`);
                         }}
                         className="w-full bg-orange-600 text-white font-bold py-2.5 rounded-lg hover:bg-orange-700 shadow-md shadow-orange-200 transition-all">
-                        Seçili Kombinasyonları Oluştur ({multiSizes.length || 0} beden × {multiColors.length || 1} renk)
+                        Seçili Kombinasyonları Oluştur ({multiSizes.length || 0} × {multiColors.length || 1})
                       </button>
                       <p className="text-[10px] text-gray-400 mt-2 text-center">Stok ve barkodları oluşan kartlardan düzenleyebilirsin. Tek tek eklemek için aşağıyı kullan.</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
                       <div>
-                        <label className="block text-xs font-bold text-orange-700 mb-1 uppercase">Beden *</label>
+                        <label className="block text-xs font-bold text-orange-700 mb-1 uppercase">{VL1} *</label>
                         <div className="relative size-dropdown-container">
                           <input 
                             type="text" 
-                            placeholder="Beden ara veya seç..." 
+                            placeholder="Ara, seç veya yaz..." 
                             className="w-full border-orange-200 border-2 px-3 py-2 rounded-lg focus:border-orange-500 outline-none text-sm font-bold bg-white"
                             value={sizeSearchTerm || formData.newVariant?.size || ""}
                             onChange={(e) => { setSizeSearchTerm(e.target.value); setSizeSearchOpen(true); }}
@@ -3472,11 +3063,11 @@ export default function AdminProducts() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-orange-700 mb-1 uppercase">Renk</label>
+                        <label className="block text-xs font-bold text-orange-700 mb-1 uppercase">{VL2}</label>
                         <div className="relative color-dropdown-container">
                           <input 
                             type="text" 
-                            placeholder="Renk ara veya seç..." 
+                            placeholder="Ara, seç veya yaz (opsiyonel)..." 
                             className="w-full border-orange-200 border-2 px-3 py-2 rounded-lg focus:border-orange-500 outline-none text-sm font-bold bg-white"
                             value={colorSearchTerm || formData.newVariant?.color || ""}
                             onChange={(e) => { setColorSearchTerm(e.target.value); setColorSearchOpen(true); }}
@@ -3534,22 +3125,17 @@ export default function AdminProducts() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (!formData.newVariant?.size) {
-                              toast.error("Beden seçimi zorunludur");
+                            // Havuzdan seçilmediyse yazılan serbest değer kullanılır (ör. "500 Lt").
+                            const optVal = (formData.newVariant?.size || sizeSearchTerm || "").trim();
+                            if (!optVal) {
+                              toast.error(`${VL1} zorunludur`);
                               return;
                             }
-                            // Renk boş bırakılırsa ürünün rengine, o da yoksa mevcut
-                            // varyantların rengine düş. "Aynı renge ek beden açtık" senaryosunda
-                            // renksiz varyant kaydedilirse Trendyol Renk/Web Color zorunlu
-                            // alanları boş gidiyor ve tüm ürünü reddediyor.
-                            const inheritedColor =
-                              formData.newVariant.color ||
-                              formData.color ||
-                              (formData.variants || []).map((v) => v.color).find((c) => c) ||
-                              "";
+                            const inheritedColor = ((formData.newVariant || {}).color || colorSearchTerm || "").trim();
+                            setSizeSearchTerm(""); setColorSearchTerm("");
                             const newVar = {
                               id: `var-${Date.now()}`,
-                              size: formData.newVariant.size,
+                              size: optVal,
                               stock: formData.newVariant.stock || 0,
                               barcode: formData.newVariant.barcode || "",
                               stock_code: formData.stock_code || "",
@@ -3679,7 +3265,7 @@ export default function AdminProducts() {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                     {formData.images.map((img, idx) => (
-                      isSizeTableImg(img) ? null : (
+                      (
                       <div
                         key={idx}
                         draggable
@@ -3700,14 +3286,6 @@ export default function AdminProducts() {
                             className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <ChevronLeft size={18} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => markAsSizeImage(idx)}
-                            title="Ölçü Görseli alanına taşı (sitede gizlenir, pazaryerine son görsel gider)"
-                            className="w-9 h-9 rounded-full bg-amber-500 text-white flex items-center justify-center hover:bg-amber-600 transition-colors"
-                          >
-                            <EyeOff size={16} />
                           </button>
                           <button
                             type="button"
@@ -3736,54 +3314,6 @@ export default function AdminProducts() {
                     ))}
                   </div>
 
-                  {/* ÖLÇÜ GÖRSELİ — sitede ürün galerisinde GÖRÜNMEZ; pazaryerlerine SON görsel olarak gider.
-                      Ölçü Tablosu'ndan "Görsel Oluştur" buraya otomatik düşer; galeriden sürükleyerek de taşınır. */}
-                  <div
-                    className="mt-8 p-5 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/40"
-                    onDragOver={(e) => { if (draggedImgIdx !== null) e.preventDefault(); }}
-                    onDrop={(e) => { if (draggedImgIdx === null) return; e.preventDefault(); markAsSizeImage(draggedImgIdx); setDraggedImgIdx(null); setDragOverImgIdx(null); }}
-                    data-testid="size-image-zone"
-                  >
-                    <h3 className="font-bold text-amber-700 uppercase tracking-widest text-sm">📏 Ölçü Görseli</h3>
-                    <p className="text-xs text-amber-700/70 mt-1 mb-4">
-                      Sitede ürün görselleri arasında görünmez; pazaryerlerine (Trendyol / Hepsiburada) <b>son görsel</b> olarak gönderilir.
-                      Ölçü Tablosu sekmesinden "Görsel Oluştur" deyince buraya otomatik eklenir — galeriden istediğiniz görseli buraya sürükleyebilirsiniz.
-                    </p>
-                    {formData.images.filter(isSizeTableImg).length === 0 ? (
-                      <div className="text-xs text-amber-500/80 italic py-8 text-center border border-dashed border-amber-200 rounded-xl">
-                        Henüz ölçü görseli yok — galeriden bir görseli buraya sürükleyin ya da Ölçü Tablosu sekmesinden oluşturun.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                        {formData.images.map((img, idx) => (
-                          !isSizeTableImg(img) ? null : (
-                          <div key={idx} className="relative group aspect-[2/3] rounded-2xl overflow-hidden border-4 border-amber-400 shadow-md">
-                            <img src={fixImg(imgUrl(img))} className="w-full h-full object-cover" alt="" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => unmarkSizeImage(idx)}
-                                title="Galeriye geri taşı (sitede tekrar görünür olur)"
-                                className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-100"
-                              >
-                                <ChevronLeft size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeImage(idx)}
-                                title="Sil"
-                                className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                            <div className="absolute top-2 left-2 px-2 py-1 bg-amber-500 text-white text-[10px] font-black uppercase tracking-tighter rounded-full">Ölçü</div>
-                          </div>
-                          )
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 </div>
               </TabsContent>
 
@@ -3791,15 +3321,6 @@ export default function AdminProducts() {
               <TabsContent value="seo" className="space-y-6 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <SeoTab formData={formData} setFormData={setFormData} />
                 {renderDetailFields(["SEO & Adwords"])}
-              </TabsContent>
-
-              {/* Combine Products Tab — Kombin Ürün Atama */}
-              <TabsContent value="combine" className="space-y-4 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <CombineProductsTab
-                  productId={editingProduct?.id}
-                  combineIds={formData.combine_products || []}
-                  onChange={(ids) => setFormData({ ...formData, combine_products: ids })}
-                />
               </TabsContent>
 
               {/* Stock Tab — hızlı stok güncelleme; tam CRUD için "Varyantlar" sekmesi */}
@@ -3814,7 +3335,7 @@ export default function AdminProducts() {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="flex flex-row items-center justify-between border-b pb-4 mb-4">
             <DialogTitle>
-              Beden Varyantları - {selectedProductForVariants?.name}
+              Varyantlar - {selectedProductForVariants?.name}
             </DialogTitle>
             <button
               onClick={handleSaveVariants}
@@ -3833,7 +3354,7 @@ export default function AdminProducts() {
                   <p className="text-xl font-black text-gray-900">{selectedProductForVariants.variants?.[0]?.color || selectedProductForVariants.color || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Toplam Beden</p>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Toplam Varyant</p>
                   <p className="text-xl font-black text-gray-900">{selectedProductForVariants.variants?.length || 0}</p>
                 </div>
                 <div>
@@ -3850,7 +3371,7 @@ export default function AdminProducts() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-left px-4 py-3 font-bold text-gray-600">Ürün ID</th>
-                    <th className="text-left px-4 py-3 font-bold text-gray-600">Beden / Renk</th>
+                    <th className="text-left px-4 py-3 font-bold text-gray-600">Seçenek</th>
                     <th className="text-left px-4 py-3 font-bold text-gray-600">Stok Kodu</th>
                     <th className="text-left px-4 py-3 font-bold text-gray-600">Barkod</th>
                     <th className="text-center px-4 py-3 font-bold text-gray-600 w-24">Stok</th>
@@ -3930,7 +3451,7 @@ export default function AdminProducts() {
               </div>
 
               {(!selectedProductForVariants.variants || selectedProductForVariants.variants.length === 0) && (
-                <p className="text-center text-gray-500 py-8">Bu ürünün beden varyantı bulunmuyor</p>
+                <p className="text-center text-gray-500 py-8">Bu ürünün varyantı bulunmuyor</p>
               )}
             </div>
           )}
@@ -4076,17 +3597,17 @@ export default function AdminProducts() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Barkod Yazdırma: Beden Seçimi ─────────────────────────────── */}
+      {/* ── Barkod Yazdırma: Varyant Seçimi ─────────────────────────────── */}
       {barcodeSizeModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
              onClick={() => setBarcodeSizeModal(null)}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5"
                onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold text-gray-800 mb-1">Barkod Yazdır — Beden Seçimi</h3>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">Barkod Yazdır — Varyant Seçimi</h3>
             <p className="text-xs text-gray-500 mb-3">
               {barcodeSizeModal.mode === 'bulk'
-                ? `${selectedProducts.length} üründe bulunan bedenler. İşaretli bedenler, yanındaki adet kadar basılır.`
-                : 'İşaretli bedenler, yanındaki adet kadar basılır.'}
+                ? `${selectedProducts.length} üründe bulunan varyantlar. İşaretli varyantlar, yanındaki adet kadar basılır.`
+                : 'İşaretli varyantlar, yanındaki adet kadar basılır.'}
             </p>
             <div className="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 mb-1">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -4099,7 +3620,7 @@ export default function AdminProducts() {
                   }}
                   className="rounded border-gray-300"
                 />
-                <span className="text-sm font-medium text-gray-800">Tüm Bedenler</span>
+                <span className="text-sm font-medium text-gray-800">Tüm Varyantlar</span>
               </label>
               {/* Hepsine aynı adet — tek hamlede doldur */}
               <label className="flex items-center gap-1 text-xs text-gray-600">
@@ -4134,7 +3655,7 @@ export default function AdminProducts() {
                       const v = e.target.value;
                       setBarcodeSizeModal(m => ({ ...m, counts: { ...(m.counts || {}), [s]: v === '' ? '' : Math.max(0, parseInt(v, 10) || 0) } }));
                     }}
-                    title={s === '*' ? 'Her barkoddan kaç etiket' : `${s} bedeninden kaç etiket`}
+                    title={s === '*' ? 'Her barkoddan kaç etiket' : `${s} seçeneğinden kaç etiket`}
                     className="w-16 border border-gray-300 rounded px-1.5 py-0.5 text-sm text-right disabled:opacity-40"
                   />
                 </div>
@@ -4154,170 +3675,6 @@ export default function AdminProducts() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/**
- * TeknikDetayPanel — Ticimax XML "description" alanından parse edilmiş
- * teknik detayları gösterir (Kumaş, Kalıp, Beden Ölçüleri, Model Ölçüleri,
- * Yıkama, Bakım, Astar, Ürün Bilgisi, vs.). Her satır editable; admin
- * elle de yeni alan ekleyebilir.
- *
- * Props:
- *   details: { slug: {label, value} } dict
- *   onChange: (updated dict) => void
- */
-function TeknikDetayPanel({ details = {}, onChange }) {
-  const [newLabel, setNewLabel] = React.useState("");
-  const [newValue, setNewValue] = React.useState("");
-  // Önceden bilinen sıralama — yoksa alfabetik
-  const ORDER = ["urun_bilgisi", "kumas", "icerik", "materyal", "kalip",
-    "beden_olculeri", "model_olculeri", "astar", "renk", "yikama", "bakim", "urun_kodu"];
-  const entries = Object.entries(details).sort((a, b) => {
-    const ai = ORDER.indexOf(a[0]); const bi = ORDER.indexOf(b[0]);
-    if (ai === -1 && bi === -1) return a[0].localeCompare(b[0]);
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  });
-  const update = (slug, patch) => onChange({ ...details, [slug]: { ...details[slug], ...patch } });
-  const remove = (slug) => {
-    const next = { ...details };
-    delete next[slug];
-    onChange(next);
-  };
-  const addNew = () => {
-    if (!newLabel.trim() || !newValue.trim()) return;
-    const slug = newLabel.toLowerCase().trim()
-      .replace(/[^a-z0-9çğıöşü]+/g, "_").replace(/^_|_$/g, "");
-    if (!slug) return;
-    onChange({ ...details, [slug]: { label: newLabel.trim(), value: newValue.trim() } });
-    setNewLabel("");
-    setNewValue("");
-  };
-  const isEmpty = entries.length === 0;
-  return (
-    <div className="rounded-lg border-l-4 border-emerald-600 bg-emerald-50/30 p-5" data-testid="teknik-detay-panel">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-base font-bold text-emerald-800">Teknik Detay</h3>
-          <p className="text-xs text-emerald-700/70 mt-0.5">
-            Ürün açıklamasından otomatik parse edilen özellikler. Düzenleyebilir veya yeni alan ekleyebilirsiniz.
-          </p>
-        </div>
-        <span className="text-xs font-semibold text-emerald-700 bg-emerald-200/60 px-2 py-1 rounded">
-          {entries.length} alan
-        </span>
-      </div>
-
-      {isEmpty ? (
-        <div className="text-sm text-emerald-700/70 italic py-3">
-          Bu ürün için açıklamadan herhangi bir teknik detay bulunamadı. Aşağıdan elle ekleyebilirsiniz.
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {entries.map(([slug, item]) => (
-            <div key={slug} className="grid grid-cols-12 gap-2 items-start">
-              <input
-                value={item.label || slug}
-                onChange={(e) => update(slug, { label: e.target.value })}
-                placeholder="Etiket"
-                className="col-span-3 px-3 py-2 border border-emerald-200 rounded text-xs font-semibold bg-white text-zinc-800"
-                data-testid={`tek-label-${slug}`}
-              />
-              <textarea
-                value={item.value || ""}
-                onChange={(e) => update(slug, { value: e.target.value })}
-                placeholder="Değer"
-                rows={Math.min(4, Math.max(1, Math.ceil((item.value || "").length / 80)))}
-                className="col-span-8 px-3 py-2 border border-emerald-200 rounded text-sm bg-white text-zinc-700 leading-snug"
-                data-testid={`tek-value-${slug}`}
-              />
-              <button
-                type="button"
-                onClick={() => remove(slug)}
-                className="col-span-1 text-rose-600 hover:bg-rose-50 rounded px-2 py-2 text-sm font-bold"
-                title="Sil"
-                data-testid={`tek-remove-${slug}`}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="border-t border-emerald-200/60 mt-4 pt-3 grid grid-cols-12 gap-2 items-start">
-        <input
-          value={newLabel}
-          onChange={(e) => setNewLabel(e.target.value)}
-          placeholder="Yeni etiket (örn: Boy)"
-          className="col-span-3 px-3 py-2 border border-emerald-200 rounded text-xs font-semibold bg-white"
-          data-testid="tek-new-label"
-        />
-        <input
-          value={newValue}
-          onChange={(e) => setNewValue(e.target.value)}
-          placeholder="Değer (örn: Diz altı)"
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addNew(); } }}
-          className="col-span-8 px-3 py-2 border border-emerald-200 rounded text-sm bg-white"
-          data-testid="tek-new-value"
-        />
-        <button
-          type="button"
-          onClick={addNew}
-          disabled={!newLabel.trim() || !newValue.trim()}
-          className="col-span-1 bg-emerald-600 text-white rounded px-2 py-2 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-40"
-          data-testid="tek-new-add"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
-
-
-// Standart bedenli ürün — uyumlu bedenler seçimi. Hazır bedenler tek tık aç/kapa; listede
-// olmayan beden "Diğer" kutusuna yazılıp Ekle ile eklenir. Önizleme vitrindeki metnin aynısı.
-function FitSizesField({ value, onChange }) {
-  const [custom, setCustom] = useState("");
-  const sel = sortFitSizes(value);
-  const toggle = (sz) => onChange(sel.includes(sz) ? sel.filter((x) => x !== sz) : sortFitSizes([...sel, sz]));
-  const addCustom = () => {
-    const t = custom.trim().toLocaleUpperCase("tr");
-    if (!t) return;
-    onChange(sortFitSizes([...sel, t]));
-    setCustom("");
-  };
-  const extras = sel.filter((x) => !FIT_SIZE_OPTIONS.includes(x));
-  return (
-    <div data-testid="fit-sizes-field">
-      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Uyduğu Bedenler (Standart Beden)</label>
-      <div className="flex flex-wrap items-center gap-2">
-        {[...FIT_SIZE_OPTIONS, ...extras].map((sz) => {
-          const on = sel.includes(sz);
-          return (
-            <button key={sz} type="button" onClick={() => toggle(sz)} data-testid={`fit-size-${sz}`}
-              className={`inline-flex items-center justify-center h-9 min-w-[44px] px-3 rounded-lg border text-sm font-semibold transition
-                ${on ? "bg-black text-white border-black" : "bg-white text-gray-700 border-gray-300 hover:border-black"}`}>
-              {sz}
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-2 mt-2">
-        <input type="text" value={custom} onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
-          placeholder="Diğer beden (ör. 36, 38)" maxLength={12}
-          className="h-9 flex-1 border-gray-200 border px-3 rounded-lg text-sm focus:border-black outline-none" />
-        <button type="button" onClick={addCustom}
-          className="h-9 px-4 rounded-lg border border-gray-300 text-sm font-semibold hover:border-black">Ekle</button>
-      </div>
-      <p className="text-[10px] text-gray-500 mt-1">
-        {sel.length ? <>Vitrinde: <b>{fitSizesText(sel)}</b></> : "Seçim yoksa vitrinde yalnız \"Standart Beden\" yazar."}
-      </p>
     </div>
   );
 }

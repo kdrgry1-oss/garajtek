@@ -567,110 +567,6 @@ def _fuzzy_tr_regex(s: str) -> str:
     parts = [cls.get(ch, re.escape(ch)) for ch in chars]
     return '.{0,1}'.join(parts)   # .{0,2}→.{0,1}: subsequence sıkılaştı → alakasız "abuk sabuk" eşleşme azalır
 
-@router.post("/ai-description")
-async def ai_generate_description(payload: dict, current_user: dict = Depends(require_admin)):
-    """Ürün için yapay zekâ ile Türkçe HTML açıklama üretir.
-
-    AI anahtarı ve sağlayıcı, mevcut AI ayarlarından (Admin → Sorular → AI ayarları,
-    `ai_chatbot.custom_api_key`) alınır — ürün açıklama üretici de aynı anahtarı
-    kullanır, ayrı token gerekmez. Ürün formundan ad/kategori/marka/özellikler
-    gönderilir; dönen HTML doğrudan açıklama alanına yazılır.
-    """
-    from .ai_chatbot import get_ai_settings, _api_key_for, llm_chat
-    settings = await get_ai_settings()
-    api_key = _api_key_for(settings)
-    if not api_key:
-        raise HTTPException(400, "AI anahtarı tanımlı değil. Admin → AI Asistan → 'API Anahtarı' bölümünden anahtarınızı girin.")
-
-    name = (payload.get("name") or "").strip()
-    if not name:
-        raise HTTPException(400, "Ürün adı gerekli (açıklama üretmek için).")
-    category = (payload.get("category_name") or "").strip()
-    brand = (payload.get("brand") or "").strip()
-    attrs = payload.get("attributes") or []
-
-    attr_lines = []
-    for a in attrs:
-        if isinstance(a, dict):
-            n = (a.get("name") or "").strip()
-            v = (a.get("value") or "").strip()
-            if n and v:
-                attr_lines.append(f"- {n}: {v}")
-    attr_txt = "\n".join(attr_lines[:25])
-
-    # ── SABİT ŞABLON — çıktı bu HTML iskeletini BİREBİR korur; yalnız içerik ürüne göre değişir.
-    TEMPLATE = (
-        '<p><span style="font-size: 11px;">Kayık yaka. Panço detaylı üst. Yüksek bel etek. Oversize kalıp. Midi boy. Lastikli bel. Cepsiz.</span></p>\n'
-        '<p><span style="font-size: 11px;">Kumaş &amp; İçerik Bilgisi</span></p>\n'
-        '<p><span style="font-size:11px;">\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Kumaş içeriği: %80 Viskon %20 Polyester<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Dokuma kumaştan üretilmiştir<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Viskon içerikli yapısı sayesinde yumuşak ve akışkan kullanım sunar<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Panço detaylı tasarımı ile modern ve şık görünüm sağlar<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Oversize kalıbı sayesinde rahat kullanım sunar<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Astarsız yapıya sahiptir\n'
-        '</span></p>\n'
-        '<p>&nbsp;</p>\n'
-        '<p><span style="font-size:11px;">\n'
-        'Yıkama ve Bakım Talimatı<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;30°C’de benzer renklerle yıkanmalıdır<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Hassas program tercih edilmelidir<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Ağartıcı kullanılmamalıdır<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Kurutma makinesinde kurutulması önerilmez<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Düşük ısıda tersinden ütüleyiniz<br />\n'
-        '&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;Uzun ömürlü kullanım için askıda muhafaza ediniz\n'
-        '</span></p>\n'
-        '<p>&nbsp;</p>\n'
-        '<span style="font-size:11px;"> </span>'
-    )
-
-    sys = (
-        "Sen bir e-ticaret mağazası için ürün açıklaması üreten bir asistansın. "
-        "Sana SABİT bir HTML ŞABLONU verilecek. Çıktın bu şablonun HTML yapısını, etiketlerini, "
-        "inline style'larını (font-size:11px), &nbsp; girintilerini, <br /> satır sonlarını ve ÜÇ "
-        "bölümünü (1) kısa özellikler paragrafı, (2) 'Kumaş &amp; İçerik Bilgisi', (3) 'Yıkama ve "
-        "Bakım Talimatı' — BİREBİR korumalıdır. SADECE içeriği bu ürüne göre değiştir. "
-        "Kural: 'Yıkama ve Bakım Talimatı' bölümünü ve son satırdaki <span> boşluğunu AYNEN bırak. "
-        "İlk paragraftaki kısa özellikleri (yaka, kalıp, boy, bel, kol, cep, kapama vb.) ürüne göre, "
-        "nokta ile ayrılmış kısa cümleler hâlinde yaz. 'Kumaş içeriği:' maddesini verilen ürün "
-        "özelliklerinden al; verilmemişse materyal UYDURMA, o maddeyi genel/uygun bir ifadeyle geç. "
-        "Kumaş & İçerik maddeleri 4-6 adet olabilir; bullet biçimi (&nbsp;&nbsp; &nbsp;•&nbsp;&nbsp; &nbsp;) "
-        "ve <br /> düzeni aynı kalmalı, SON maddede <br /> olmamalı. "
-        "SADECE HTML döndür: kod bloğu (```), başlık, açıklama veya ekstra metin EKLEME."
-    )
-
-    user = f"Ürün adı: {name}\n"
-    if category:
-        user += f"Kategori: {category}\n"
-    if brand:
-        user += f"Marka: {brand}\n"
-    if attr_txt:
-        user += f"Ürün özellikleri:\n{attr_txt}\n"
-    user += (
-        "\nAŞAĞIDAKİ ŞABLONU BİREBİR KULLAN; format/stil/etiketleri ASLA bozma, yalnız içeriği "
-        "bu ürüne göre değiştir:\n\n" + TEMPLATE
-    )
-
-    try:
-        html_out = await llm_chat(
-            api_key=api_key,
-            provider=settings.get("provider", "anthropic"),
-            model=settings.get("model") or "claude-sonnet-4-6",
-            system_message=sys,
-            user_text=user,
-            max_tokens=1100,
-        )
-    except Exception as e:
-        raise HTTPException(502, f"AI açıklama üretimi başarısız: {e}")
-
-    html_out = (html_out or "").strip()
-    if html_out.startswith("```"):
-        html_out = re.sub(r"^```[a-zA-Z]*\n?", "", html_out)
-        html_out = re.sub(r"\n?```$", "", html_out).strip()
-    if not html_out:
-        raise HTTPException(502, "AI boş yanıt döndürdü, tekrar deneyin.")
-    return {"description": html_out}
-
 
 _MEMBERS_ONLY_CACHE = {"ids": set(), "ts": 0.0}
 
@@ -1312,6 +1208,13 @@ async def get_products(
         attr_key=attr_key, attr_value=attr_value, pub_date_from=pub_date_from,
         pub_date_to=pub_date_to, sizes=sizes, colors=colors,
     )
+    # Teknik özellik süzgeçleri (?spec_<anahtar>=a,b) — kategori filtre paneli
+    _spec_params = {k: v for k, v in request.query_params.items() if k.startswith("spec_")}
+    if _spec_params:
+        from product_specs import get_config as _spec_cfg, spec_query as _spec_query
+        _sc = _spec_query(_spec_params, await _spec_cfg(db))
+        if _sc:
+            query = {"$and": [query, *_sc]}
     if campaign:
         # SALE menüsü kampanya sayfası: yalnız YAYINDAKİ kampanyanın kapsamı (motor/rozet kuralı).
         from .sale_menu import campaign_live, campaign_scope_query
@@ -1569,6 +1472,64 @@ async def get_next_card_id(current_user: dict = Depends(require_admin)):
     cid = await generate_urun_karti_id()
     return {"card_id": cid}
 
+@router.get("/meta/spec-templates")
+async def get_spec_templates():
+    """Teknik özellik alan tanımları + kategori şablonları (PUBLIC — vitrin etiketleri/filtreleri
+    ve admin ürün formu kullanır)."""
+    from product_specs import get_config as _spec_cfg
+    return await _spec_cfg(db)
+
+
+@router.put("/meta/spec-templates")
+async def save_spec_templates(payload: dict, current_user: dict = Depends(require_admin)):
+    """Şablonları günceller (admin). {"config": {...}} veya {"reset": true} (varsayılana dön)."""
+    from product_specs import SETTINGS_ID, validate_config, default_config
+    if (payload or {}).get("reset"):
+        await db.settings.delete_one({"id": SETTINGS_ID})
+        return {"success": True, "config": default_config()}
+    cfg = (payload or {}).get("config")
+    try:
+        validate_config(cfg)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await db.settings.update_one(
+        {"id": SETTINGS_ID},
+        {"$set": {"id": SETTINGS_ID, "config": cfg,
+                  "updated_at": datetime.now(timezone.utc).isoformat(),
+                  "updated_by": current_user.get("email") or current_user.get("id")}},
+        upsert=True)
+    return {"success": True, "config": cfg}
+
+
+@router.get("/meta/spec-facets")
+async def get_spec_facets(request: Request, category: Optional[str] = None):
+    """Kategori filtre paneli için teknik özellik değerleri ve adetleri (PUBLIC).
+    Yalnız 'filter' işaretli alanlar; değeri olan ürün yoksa alan dönmez."""
+    from product_specs import get_config as _spec_cfg, filterable_fields, format_value
+    cfg = await _spec_cfg(db)
+    fields = filterable_fields(cfg)
+    q, _ = await _build_products_query(request, category=category)
+    proj = {"_id": 0, **{f"specs.{f['key']}": 1 for f in fields}}
+    counts = {f["key"]: {} for f in fields}
+    async for p in db.products.find(q, proj).limit(3000):
+        sp = p.get("specs") or {}
+        for f in fields:
+            v = sp.get(f["key"])
+            for x in (v if isinstance(v, list) else [v]):
+                if x in (None, ""):
+                    continue
+                counts[f["key"]][x] = counts[f["key"]].get(x, 0) + 1
+    out = []
+    for f in fields:
+        c = counts[f["key"]]
+        if not c:
+            continue
+        vals = sorted(c.items(), key=lambda kv: (0, float(kv[0])) if isinstance(kv[0], (int, float)) else (1, str(kv[0])))
+        out.append({"key": f["key"], "label": f["label"], "unit": f.get("unit") or "",
+                    "values": [{"value": v, "label": format_value(f, v), "count": n} for v, n in vals]})
+    return {"facets": out}
+
+
 @router.get("/meta/filter-options")
 async def get_filter_options(current_user: dict = Depends(require_admin)):
     """Gelişmiş filtre panelinin dropdown'larını besleyen dinamik veri.
@@ -1689,6 +1650,13 @@ async def get_product(product_id: str, request: Request):
         pass
     if not _is_admin:
         product = _strip_internal_fields(product)
+    # Vitrin "Teknik Özellikler" tablosu (gruplu, birimli) — bkz. product_specs.py
+    try:
+        from product_specs import get_config as _spec_cfg, spec_table as _spec_table
+        product["spec_table"] = _spec_table(product, await _spec_cfg(db))
+    except Exception as _e:
+        logger.warning(f"[specs] tablo üretilemedi: {_e}")
+        product["spec_table"] = []
     return product
 
 
@@ -2391,19 +2359,24 @@ async def get_color_siblings(product_id: str, request: Request):
 _PROMO_ROOT_NAMES = {
     "indirim", "indirimler", "koleksiyon", "koleksiyonlar", "en yeniler", "yeniler",
     "yeni gelenler", "yeni", "outlet", "firsat", "firsatlar", "kampanya", "kampanyalar",
+    "indirimli urunler", "yeni urunler", "urun setleri",
     "cok satanlar", "one cikanlar", "one cikan", "populer", "sepette indirim", "tum urunler",
 }
 # Ürün ADINDAN tip çıkarımı — (normalize anahtar, kanonik tip kategori adı). Sıra: SPESİFİK önce.
+# Garaj / oto servis ekipmanı tipleri (kategori ağacındaki adlarla eşleşir).
 _TYPE_KEYWORDS = [
-    ("sortolon", "Şortolon"), ("sweatshirt", "Sweatshirt"), ("trenckot", "Trençkot"),
-    ("trench", "Trençkot"), ("tisort", "Tişört"), ("t-shirt", "Tişört"), ("tshirt", "Tişört"),
-    ("bermuda", "Şort"), ("kapri", "Şort"), ("sort", "Şort"), ("etek", "Etek"),
-    ("elbise", "Elbise"), ("gomlek", "Gömlek"), ("ceket", "Ceket"), ("pantolon", "Pantolon"),
-    ("jean", "Pantolon"), ("kot", "Pantolon"), ("tayt", "Tayt"), ("bluz", "Bluz"),
-    ("kazak", "Kazak"), ("hirka", "Hırka"), ("yelek", "Yelek"), ("tunik", "Tunik"),
-    ("sweat", "Sweatshirt"), ("mont", "Mont"), ("kaban", "Kaban"), ("body", "Body"),
-    ("takim", "Takım"), ("pelerin", "Pelerin"), ("fular", "Fular"), ("atki", "Atkı"),
-    ("canta", "Çanta"), ("bodi", "Body"),
+    ("lastik sokme", "Lastik Sökme Takma Makineleri"), ("balans", "Lastik Balans Makineleri"),
+    ("lastik sisirme", "Lastik Şişirme Cihazları"), ("kompresor", "Kompresörler"),
+    ("motosiklet lift", "Motosiklet Liftleri"), ("makasli", "Makaslı Liftler"), ("lift", "Liftler"),
+    ("motor vinc", "Motor Vinçleri"), ("vinc", "Motor Vinçleri"), ("sanziman kriko", "Şanzıman Krikoları"),
+    ("kriko", "Yer Krikoları"), ("pres", "Hidrolik Presler"), ("takim arabasi", "Takım Arabaları"),
+    ("tezgah", "Takım Tezgahları"), ("lokma", "Lokma Setleri"), ("tork", "Tork Anahtarları"),
+    ("somun sokme", "Havalı Somun Sökme Makineleri"), ("havali", "Havalı Aletler"),
+    ("akulu", "Akülü Vidalama Makineleri"), ("kaynak", "Kaynak Makineleri"),
+    ("plazma", "Plazma Kesme Makineleri"), ("ariza tespit", "Arıza Tespit Cihazları"),
+    ("obd", "Arıza Tespit Cihazları"), ("aku", "Akü Test ve Takviye Cihazları"),
+    ("yag", "Yağlama Ekipmanları"), ("gres", "Gres Pompaları"), ("pense", "Penseler"),
+    ("tornavida", "Tornavidalar"), ("anahtar", "Anahtarlar"),
 ]
 
 
@@ -2518,10 +2491,13 @@ async def get_similar_products(product_id: str, request: Request, limit: int = 4
         _mo_ids = await _members_only_cat_ids()
         if _mo_ids:
             base_q["$and"] = members_only_exclusion(_mo_ids)
+    # Stokta olmayanlar önerilmez (stok alanı yoksa/None ise varyant stoğuna bakılır).
+    base_q.setdefault("$and", []).append(
+        {"$or": [{"stock": {"$gt": 0}}, {"variants.stock": {"$gt": 0}}]})
     if basis_cat_id:
         cur = db.products.find(
             {**base_q, "$or": [{"category_ids": basis_cat_id}, {"category_id": basis_cat_id}]},
-            _PROJ).limit(limit * 3)
+            _PROJ).limit(limit * 6)
         async for s in cur:
             results.append(s)
     elif basis and basis.get("type") == "name->regex":
@@ -2531,6 +2507,20 @@ async def get_similar_products(product_id: str, request: Request, limit: int = 4
             {**base_q, "name": {"$regex": rx, "$options": "i"}}, _PROJ).limit(limit * 3)
         async for s in cur:
             results.append(s)
+
+    # Yakın fiyat önce: kaynak ürünün etkin fiyatına en yakın olanlar başta.
+    _src = await db.products.find_one({"id": p["id"]}, {"_id": 0, "price": 1, "sale_price": 1}) or {}
+
+    def _eff(x):
+        try:
+            sp = float(x.get("sale_price") or 0)
+            pr = float(x.get("price") or 0)
+            return sp if 0 < sp < pr else pr
+        except Exception:
+            return 0.0
+    _ref = _eff(_src)
+    if _ref > 0:
+        results.sort(key=lambda x: abs(_eff(x) - _ref))
 
     # Dedup + kırp. (Kaynak yoksa BOŞ döner — rastgele doldurma YOK.)
     seen = set()
@@ -2689,7 +2679,6 @@ def _variants_for_color(variants, color):
     return [v for v in (variants or []) if (v.get("color") or "").strip().lower() == cl]
 
 
-
 def _size_tables_last(images):
     """Galeri sırası: normal görseller önce, is_size_table işaretli beden tablosu nesneleri EN SONA.
     Beden tablosu ilk sıraya düşünce ürün kartları (images[0]) nesneyi görsel sanıp boş kalıyordu."""
@@ -2700,16 +2689,38 @@ def _size_tables_last(images):
     return normal + tables
 
 
-def _clean_fit_sizes(v) -> list:
-    """Standart bedenli ürünün uyduğu bedenler: kısa metin listesi, tekrar yok, en fazla 12."""
-    if not isinstance(v, list):
-        return []
-    out = []
-    for x in v:
-        t = str(x or "").strip().upper()[:12]
-        if t and t not in out:
-            out.append(t)
-    return out[:12]
+
+
+
+_SPEC_PASSTHRU_NUM = ("width", "depth", "height", "product_weight", "cargo_weight")
+
+
+async def _apply_spec_fields(target: dict, src: dict) -> None:
+    """Teknik özellik alanlarını (specs / extra_specs / variant_labels) doğrulayıp target'a yazar.
+    Yalnız src'de GELEN anahtarlar işlenir (kısmi güncellemede diğerleri korunur). Paket boyutu /
+    brüt ağırlık / desi için mevcut kargo alanları (width/depth/height/product_weight/cargo_weight)
+    sayıya çevrilir. Geçersiz değerde 400."""
+    from product_specs import (get_config as _spec_cfg, clean_specs, clean_extra_specs,
+                               clean_variant_labels)
+    try:
+        if "specs" in src:
+            target["specs"] = clean_specs(src.get("specs"), await _spec_cfg(db))
+        if "extra_specs" in src:
+            target["extra_specs"] = clean_extra_specs(src.get("extra_specs"))
+        if "variant_labels" in src:
+            target["variant_labels"] = clean_variant_labels(src.get("variant_labels"))
+        for k in _SPEC_PASSTHRU_NUM:
+            if k in src:
+                v = src.get(k)
+                if v in (None, ""):
+                    target[k] = None
+                else:
+                    n = float(str(v).replace(",", "."))
+                    if n < 0 or n > 100000:
+                        raise ValueError(f"{k}: 0–100000 arası olmalı")
+                    target[k] = n
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Teknik özellik hatası — {e}")
 
 
 @router.post("")
@@ -2812,8 +2823,6 @@ async def create_product(
         "supplier": product_data.get("supplier", ""),
         "manufacturer": product_data.get("manufacturer", _default_brand),
         "season": (product_data.get("season") or "").strip(),  # İlkbahar/Yaz/Sonbahar/Kış — rapor sezon filtresi buradan beslenir
-        # Standart (tek) bedenli üründe "hangi bedenlere uyar" (panelden seçilir; vitrin: "X – Y bedenler arası uyumludur")
-        "fit_sizes": _clean_fit_sizes(product_data.get("fit_sizes")),
         # FAZ 7 — İmalat modülü için ek alanlar
         "collection": product_data.get("collection", ""),   # ör. "2026 İlkbahar/Yaz"
         "purchase_price": float(product_data.get("purchase_price", 0) or 0),  # Alış fiyatı
@@ -2838,126 +2847,29 @@ async def create_product(
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
-    # FARKLI RENK = AYRI ÜRÜN kuralı:
-    # Varyantlarda birden fazla renk varsa her renk AYRI ürün olarak açılır.
-    # Hepsi aynı csv_card_id + urun_karti_id'yi paylaşır → storefront "Diğer Renkler"
-    # swatch'ında renk kardeşi olarak bağlanır. Bedenler her renk altında varyant kalır.
+    await _apply_spec_fields(product, product_data)
+    # Ekipman kataloğu: renkler AYRI ürüne bölünmez — tüm varyantlar tek kartta kalır.
     _all_variants = product.get("variants") or []
     _colors = _distinct_variant_colors(_all_variants)
-    # Renk-kardeşi gruplama anahtarı HER ZAMAN yazılır (manuel ürünler de bağlansın)
+    # Kardeş gruplama anahtarı (eski veriyle uyum için) her zaman yazılır
     product["csv_card_id"] = group_card_id
-
-    if len(_colors) <= 1:
-        if _colors and not product.get("color"):
-            product["color"] = _colors[0]
-        await db.products.insert_one(product)
-        await record_stock_audit(
-            db, product_id=product["id"], product_name=product.get("name", ""),
-            before={}, after=product, source="admin_create", current_user=current_user,
-            request=request, action="product_created",
-        )
-        await record_admin_audit(
-            db, action="product.create", entity_type="product", entity_id=product["id"],
-            before={}, after=product, current_user=current_user, request=request,
-            source="products",
-        )
-        logger.info(f"Product created: {product['id']}")
-        return {"id": product["id"], "message": "Ürün oluşturuldu"}
-
-    # Çok renkli → her renk ayrı ürün (ilk renk ana üründe, diğerleri yeni id)
-    _base_name = product.get("name") or ""
-    _created_ids = []
-    for _idx, _col in enumerate(_colors):
-        _doc = {k: v for k, v in product.items()}
-        _doc["id"] = product["id"] if _idx == 0 else await generate_short_id("products")
-        # Her renk AYRI (benzersiz) Urun Kart ID alir: ilk renk taban id'de kalir,
-        # sonraki renkler sistemdeki max + 1 ile otomatik artar. Insert'ler sirali
-        # (await) oldugu icin generate_urun_karti_id her seferinde bir oncekini gorur.
-        _color_card = urun_karti_id if _idx == 0 else await generate_urun_karti_id()
-        _doc["urun_karti_id"] = _color_card
-        _doc["ticimax_fields"] = {**(_doc.get("ticimax_fields") or {}), "URUNKARTIID": _color_card}
-        _doc["csv_card_id"] = group_card_id   # renk kardesligi PAYLASIMLI → "Diger Renkler" bagli kalir
-        _doc["color"] = _col
-        _doc["variants"] = _variants_for_color(_all_variants, _col)
-        _doc["slug"] = slug_with_card_id(f"{_base_name} {_col}", _color_card)
-        _now = datetime.now(timezone.utc).isoformat()
-        _doc["created_at"] = _doc.get("created_at") or _now
-        _doc["updated_at"] = _now
-        await db.products.insert_one(_doc)
-        await record_stock_audit(
-            db, product_id=_doc["id"], product_name=_doc.get("name", ""),
-            before={}, after=_doc, source="admin_create", current_user=current_user,
-            request=request, action="product_created",
-        )
-        await record_admin_audit(
-            db, action="product.create", entity_type="product", entity_id=_doc["id"],
-            before={}, after=_doc, current_user=current_user, request=request,
-            source="products",
-        )
-        _created_ids.append(_doc["id"])
-    logger.info(f"Product created with color split: {_created_ids} (card {urun_karti_id})")
-    return {
-        "id": _created_ids[0],
-        "split": True,
-        "color_count": len(_colors),
-        "product_ids": _created_ids,
-        "message": f"{len(_colors)} renk ayrı ürün olarak oluşturuldu",
-    }
+    if len(_colors) == 1 and not product.get("color"):
+        product["color"] = _colors[0]
+    await db.products.insert_one(product)
+    await record_stock_audit(
+        db, product_id=product["id"], product_name=product.get("name", ""),
+        before={}, after=product, source="admin_create", current_user=current_user,
+        request=request, action="product_created",
+    )
+    await record_admin_audit(
+        db, action="product.create", entity_type="product", entity_id=product["id"],
+        before={}, after=product, current_user=current_user, request=request,
+        source="products",
+    )
+    logger.info(f"Product created: {product['id']}")
+    return {"id": product["id"], "message": "Ürün oluşturuldu"}
 
 
-@router.post("/{product_id}/split-by-color", dependencies=[Depends(require_admin)])
-async def split_product_by_color(product_id: str):
-    """Mevcut bir ürünün farklı RENK varyantlarını AYRI ürünlere böler.
-    İlk renk ana üründe kalır; diğer renkler yeni ürün olur. Hepsi aynı
-    csv_card_id + urun_karti_id'yi paylaşır → "Diğer Renkler" swatch'ında bağlı kalır.
-    Bedenler her renk ürününün altında varyant olarak kalır.
-    """
-    p = await db.products.find_one({"id": product_id})
-    if not p:
-        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
-    variants = p.get("variants") or []
-    colors = _distinct_variant_colors(variants)
-    if len(colors) <= 1:
-        return {
-            "success": False,
-            "color_count": len(colors),
-            "message": "Bu üründe birden fazla renk yok; ayırma gerekmedi.",
-        }
-    card = str(p.get("csv_card_id") or p.get("urun_karti_id") or p.get("id"))
-    base_name = p.get("name") or ""
-    now = datetime.now(timezone.utc).isoformat()
-    created_ids = [product_id]
-    # İlk renk → ana üründe kalır
-    first = colors[0]
-    await db.products.update_one({"id": product_id}, {"$set": {
-        "variants": _variants_for_color(variants, first),
-        "color": first,
-        "csv_card_id": card,
-        "urun_karti_id": p.get("urun_karti_id") or card,
-        "slug": slug_with_card_id(f"{base_name} {first}", card),
-        "updated_at": now,
-    }})
-    # Diğer renkler → yeni ürün
-    for col in colors[1:]:
-        nid = await generate_short_id("products")
-        clone = {k: v for k, v in p.items() if k not in ("_id", "id", "slug")}
-        clone["id"] = nid
-        clone["csv_card_id"] = card
-        clone["urun_karti_id"] = p.get("urun_karti_id") or card
-        clone["color"] = col
-        clone["variants"] = _variants_for_color(variants, col)
-        clone["slug"] = slug_with_card_id(f"{base_name} {col}", card)
-        clone["created_at"] = now
-        clone["updated_at"] = now
-        await db.products.insert_one(clone)
-        created_ids.append(nid)
-    logger.info(f"Product split by color: {product_id} -> {created_ids} (card {card})")
-    return {
-        "success": True,
-        "color_count": len(colors),
-        "product_ids": created_ids,
-        "message": f"{len(colors)} renk ayrı ürüne bölündü.",
-    }
 
 @router.post("/{product_id}/duplicate", dependencies=[Depends(require_admin)])
 async def duplicate_product(product_id: str):
@@ -3316,8 +3228,7 @@ async def update_product(
         # Parent stok her zaman Σvaryant (korunan değerlerle yeniden hesapla).
         product_data["stock"] = sum(int(v.get("stock", 0) or 0) for v in product_data["variants"])
 
-    if "fit_sizes" in product_data:
-        product_data["fit_sizes"] = _clean_fit_sizes(product_data.get("fit_sizes"))
+    await _apply_spec_fields(product_data, product_data)
     await db.products.update_one({"id": product_id}, {"$set": product_data})
 
     if _pre is not None:
@@ -3617,264 +3528,12 @@ async def save_attributes_bulk(payload: dict, current_user: dict = Depends(requi
     return {"success": True, "updated": updated}
 
 
-@router.get("/{product_id}/combine-products")
-async def get_combine_products(product_id: str, request: Request):
-    """Bu ürünle birlikte gösterilecek kombin ürünlerin LİSTESİNİ döner.
-    Public endpoint — sepet/ürün detay sayfası kullanır."""
-    product = await db.products.find_one(
-        {"id": product_id},
-        {"_id": 0, "combine_products": 1, "category_id": 1, "categories": 1}
-    )
-    if not product:
-        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
-
-    combine_ids = product.get("combine_products") or []
-    items = []
-    if combine_ids:
-        async for p in db.products.find(
-            {"id": {"$in": combine_ids}, "is_active": {"$ne": False}},
-            {"_id": 0, "id": 1, "name": 1, "slug": 1, "price": 1, "sale_price": 1,
-             "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1}
-        ):
-            items.append(p)
-        await _attach_campaign_badges(items)
-    # ÜYELERE ÖZEL: misafir, üyelere özel ürünün kombinini ve üyelere özel kombin ürününü göremez.
-    if not request_is_member(request):
-        if await product_id_is_members_only(product_id):
-            raise HTTPException(status_code=404, detail="Ürün bulunamadı")
-        items = await strip_members_only(request, items)
-    return {"items": items, "source": "combine"}
-
-
-@router.put("/{product_id}/combine-products")
-async def update_combine_products(
-    product_id: str,
-    payload: dict,
-    current_user: dict = Depends(require_admin)
-):
-    """Bu ürün için kombin ürün ID listesini günceller (admin)."""
-    combine_ids = payload.get("combine_products") or []
-    if not isinstance(combine_ids, list):
-        raise HTTPException(status_code=400, detail="combine_products bir liste olmalıdır")
-    # Self-reference temizliği
-    combine_ids = [str(cid) for cid in combine_ids if str(cid) != product_id]
-    # Azami kombin ürün sayısı — admin panelinden (İşletme Kuralları) yönetilir; varsayılan 12.
-    try:
-        import business_rules as _BR
-        _maxc = int(await _BR.get_rule(db, "product.max_combine", 12) or 12)
-    except Exception:
-        _maxc = 12
-    combine_ids = combine_ids[:_maxc]
-
-    # Var olan ürün ID'lerini doğrula — fake/stale id'leri filtrele
-    if combine_ids:
-        existing = await db.products.distinct("id", {"id": {"$in": combine_ids}})
-        existing_set = set(existing)
-        combine_ids = [cid for cid in combine_ids if cid in existing_set]
-
-    result = await db.products.update_one(
-        {"id": product_id},
-        {"$set": {
-            "combine_products": combine_ids,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
-    return {"success": True, "count": len(combine_ids)}
-
-
-@router.post("/{product_id}/auto-combine")
-async def auto_assign_combine_products(
-    product_id: str,
-    payload: dict = None,
-    current_user: dict = Depends(require_admin),
-):
-    """Geçmiş siparişlerdeki co-occurrence verisinden bu ürünle en sık birlikte
-    satılan top-N ürünü otomatik kombin olarak atar."""
-    payload = payload or {}
-    max_n = min(int(payload.get("max", 8)), 12)
-    dry_run = bool(payload.get("dry_run", False))
-    replace = bool(payload.get("replace", True))
-
-    base = await db.products.find_one({"id": product_id}, {"_id": 0, "combine_products": 1})
-    if not base:
-        raise HTTPException(status_code=404, detail="Ürün bulunamadı")
-
-    co_count = {}
-    async for order in db.orders.find(
-        {"items.product_id": product_id}, {"_id": 0, "items.product_id": 1}
-    ).limit(2000):
-        ids_in_order = {it.get("product_id") for it in (order.get("items") or []) if it.get("product_id")}
-        if product_id not in ids_in_order:
-            continue
-        for pid in ids_in_order:
-            if pid and pid != product_id:
-                co_count[pid] = co_count.get(pid, 0) + 1
-
-    sorted_ids = sorted(co_count.items(), key=lambda kv: kv[1], reverse=True)
-    if not sorted_ids:
-        return {"success": False, "message": "Bu ürün için yeterli sipariş geçmişi yok", "candidates": []}
-
-    candidate_ids = [pid for pid, _ in sorted_ids[:max_n * 3]]
-    existing_ids = set(await db.products.distinct(
-        "id", {"id": {"$in": candidate_ids}, "is_active": {"$ne": False}}
-    ))
-
-    candidates = []
-    for pid, cnt in sorted_ids:
-        if len(candidates) >= max_n:
-            break
-        if pid not in existing_ids:
-            continue
-        prod = await db.products.find_one(
-            {"id": pid}, {"_id": 0, "id": 1, "name": 1, "price": 1, "images": 1, "image": 1}
-        )
-        if prod:
-            candidates.append({**prod, "_co_count": cnt})
-
-    selected_ids = [c["id"] for c in candidates]
-    if dry_run:
-        return {"success": True, "candidates": candidates, "would_assign": selected_ids, "dry_run": True}
-
-    new_ids = selected_ids if replace else list(dict.fromkeys((base.get("combine_products") or []) + selected_ids))[:12]
-    await db.products.update_one(
-        {"id": product_id},
-        {"$set": {
-            "combine_products": new_ids,
-            "combine_auto_generated_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }}
-    )
-    return {
-        "success": True, "assigned": new_ids, "candidates": candidates,
-        "count": len(new_ids),
-        "message": f"{len(new_ids)} kombin ürün atandı (geçmiş siparişlerden)",
-    }
-
-
-@router.post("/auto-combine-all")
-async def auto_assign_combine_all(
-    payload: dict = None,
-    current_user: dict = Depends(require_admin),
-):
-    """Tüm aktif ürünler için tek tıkla otomatik kombin atama (admin)."""
-    payload = payload or {}
-    max_n = min(int(payload.get("max", 8)), 12)
-    only_empty = bool(payload.get("only_empty", True))
-
-    query = {"is_active": {"$ne": False}}
-    if only_empty:
-        query["$or"] = [
-            {"combine_products": {"$exists": False}},
-            {"combine_products": {"$size": 0}},
-        ]
-
-    processed = 0
-    assigned_total = 0
-    skipped_no_data = 0
-
-    cursor = db.products.find(query, {"_id": 0, "id": 1})
-    async for p in cursor:
-        pid = p["id"]
-        co_count = {}
-        async for order in db.orders.find(
-            {"items.product_id": pid}, {"_id": 0, "items.product_id": 1}
-        ).limit(500):
-            ids_in_order = {it.get("product_id") for it in (order.get("items") or []) if it.get("product_id")}
-            for cid in ids_in_order:
-                if cid and cid != pid:
-                    co_count[cid] = co_count.get(cid, 0) + 1
-        sorted_ids = sorted(co_count.items(), key=lambda kv: kv[1], reverse=True)
-        if not sorted_ids:
-            skipped_no_data += 1
-            processed += 1
-            continue
-        candidate_ids = [cid for cid, _ in sorted_ids[:max_n * 2]]
-        existing_ids = set(await db.products.distinct(
-            "id", {"id": {"$in": candidate_ids}, "is_active": {"$ne": False}}
-        ))
-        selected = [cid for cid, _ in sorted_ids if cid in existing_ids][:max_n]
-        if selected:
-            await db.products.update_one(
-                {"id": pid},
-                {"$set": {
-                    "combine_products": selected,
-                    "combine_auto_generated_at": datetime.now(timezone.utc).isoformat(),
-                }}
-            )
-            assigned_total += 1
-        processed += 1
-
-    return {
-        "success": True, "processed": processed,
-        "products_with_combine_assigned": assigned_total,
-        "skipped_no_order_history": skipped_no_data,
-        "message": f"{assigned_total}/{processed} ürüne kombin atandı",
-    }
-
-
-@router.post("/combine/clear-auto")
-async def clear_auto_combine_products(
-    payload: dict = None,
-    current_user: dict = Depends(require_admin),
-):
-    """TEK SEFERLİK: Sistemin OTOMATİK atadığı kombin ('Görünümü Tamamla') ürünlerini temizler.
-    Otomatik atamalar `combine_auto_generated_at` damgası taşır; MANUEL atamalar taşımaz →
-    yalnız otomatik olanlar silinir, elle eklenenler KORUNUR.
-
-    payload: {dry_run: bool (varsayılan True), mode: 'auto'|'all'}
-      - dry_run=True  → hiçbir şey silmez, sadece kaç ürünün etkileneceğini sayar
-      - mode='auto'   → yalnız otomatik damgalı ürünler (varsayılan, güvenli)
-      - mode='all'    → combine_products dolu TÜM ürünler (damga aranmaz)
-    """
-    payload = payload or {}
-    dry_run = payload.get("dry_run", True)
-    mode = (payload.get("mode") or "auto").lower()
-
-    auto_q = {"combine_auto_generated_at": {"$exists": True}}
-    all_q = {"combine_products": {"$exists": True, "$ne": []}}
-    manual_q = {"combine_products": {"$exists": True, "$ne": []},
-                "combine_auto_generated_at": {"$exists": False}}
-
-    auto_cnt = await db.products.count_documents(auto_q)
-    all_cnt = await db.products.count_documents(all_q)
-    manual_cnt = await db.products.count_documents(manual_q)
-
-    target_q = all_q if mode == "all" else auto_q
-
-    if dry_run:
-        return {
-            "dry_run": True, "mode": mode,
-            "auto_assigned_count": auto_cnt,
-            "with_any_combine_count": all_cnt,
-            "manual_only_count": manual_cnt,
-            "would_clear": (all_cnt if mode == "all" else auto_cnt),
-            "message": f"KURU ÇALIŞMA — mode={mode}: {(all_cnt if mode=='all' else auto_cnt)} ürün "
-                       f"temizlenecek (otomatik={auto_cnt}, elle={manual_cnt}). "
-                       f"Silmek için dry_run:false gönderin.",
-        }
-
-    res = await db.products.update_many(
-        target_q,
-        {"$set": {"combine_products": [],
-                  "updated_at": datetime.now(timezone.utc).isoformat()},
-         "$unset": {"combine_auto_generated_at": ""}},
-    )
-    return {
-        "success": True, "dry_run": False, "mode": mode,
-        "cleared": res.modified_count,
-        "message": f"{res.modified_count} üründe otomatik kombin ('Görünümü Tamamla') temizlendi. "
-                   f"Artık manuel ekleyebilirsiniz.",
-    }
-
-
 @router.post("/cart-suggestions")
 async def get_cart_suggestions(payload: dict, request: Request):
     """Sepetteki ürünlere göre öneriler döner (public).
-    
+
     Öncelik:
-      1) Sepetteki ürünlerin combine_products listesi (cross-sell, manuel atama)
+      1) Sepetteki ürünlerle AYNI kategorideki stokta olan benzer ürünler
       2) Sale/indirim kategorisindeki aktif ürünler (fallback)
     """
     cart_product_ids = payload.get("product_ids") or []
@@ -3883,27 +3542,25 @@ async def get_cart_suggestions(payload: dict, request: Request):
     suggestions = []
     seen = set(cart_product_ids)
 
-    # 1) Sepetteki her ürünün combine_products'ını topla
+    # 1) Benzer ürünler: sepetteki ürünlerin kategorilerinden, stokta olanlar
     if cart_product_ids:
-        cart_products = []
-        async for p in db.products.find(
+        cat_ids = []
+        async for cp in db.products.find(
             {"id": {"$in": cart_product_ids}},
-            {"_id": 0, "combine_products": 1}
+            {"_id": 0, "category_id": 1}
         ):
-            cart_products.append(p)
-        combine_ids = []
-        for cp in cart_products:
-            for cid in (cp.get("combine_products") or []):
-                if cid not in seen:
-                    combine_ids.append(cid)
-                    seen.add(cid)
-        if combine_ids:
+            if cp.get("category_id") and cp["category_id"] not in cat_ids:
+                cat_ids.append(cp["category_id"])
+        if cat_ids:
             async for p in db.products.find(
-                {"id": {"$in": combine_ids[:limit]}, "is_active": {"$ne": False}},
+                {"category_id": {"$in": cat_ids}, "is_active": {"$ne": False},
+                 "is_deleted": {"$ne": True}, "id": {"$nin": list(seen)},
+                 "stock": {"$gt": 0}},
                 {"_id": 0, "id": 1, "name": 1, "slug": 1, "price": 1, "sale_price": 1,
                  "images": 1, "image": 1, "stock": 1, "category_id": 1, "category_ids": 1}
-            ):
-                suggestions.append({**p, "_source": "combine"})
+            ).limit(limit):
+                suggestions.append({**p, "_source": "similar"})
+                seen.add(p["id"])
 
     # 2) Yetersizse → indirimli aktif ürünlerle doldur
     # Y15: discount_price/is_on_sale/sale_active alanları HİÇBİR YERE yazılmıyor. Gerçek indirim
@@ -4238,13 +3895,10 @@ _PID_REFS = [
     ("product_costs", "scalar", "product_id"),
     ("product_stock_flags", "scalar", "product_id"),
     ("product_image_backups", "scalar", "product_id"),
-    ("size_tables", "scalar", "product_id"),
-    ("whatsapp_active_product", "scalar", "product_id"),
     ("bin_stock", "scalar", "product_id"),
     ("coupons", "arr_scalar", "products"),
     ("coupons", "arr_scalar", "excluded_products"),
     ("referrals", "arr_scalar", "products"),
-    ("instagram_posts", "arr_obj", "products.id"),
     ("products", "arr_scalar", "combo_product_ids"),
     ("products", "arr_scalar", "similar_product_ids"),
 ]
@@ -5299,7 +4953,6 @@ async def _selective_import(file: UploadFile, sel_cols: list, sel_cats: set,
     stats["duration_sec"] = round(_time.monotonic() - _t0, 1)
     stats["mode"] = "selective"
     return {"success": True, "stats": stats}
-
 
 
 @router.post("/attributes/import-technical-xlsx")

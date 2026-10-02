@@ -9,8 +9,6 @@ import ProductCard from "../components/ProductCard";
 import { optimizeImg } from "../lib/img";
 import { slugify } from "../lib/slug";
 import { priceView } from "../lib/price";
-import { resolveColor } from "../lib/colorMap";
-import { isRecommendedSize, recommendLetterSize } from "../lib/sizeRecommend";
 import { applyRuntimeSeo, setProductSeo } from "../lib/seo";
 import { useCart } from "../context/CartContext";
 import { useFavorites } from "../context/FavoritesContext";
@@ -25,7 +23,6 @@ import useCategoryTree, { categoryPath } from "../components/electro/useCategory
 import { toggleCompare } from "../components/electro/compare";
 import { fmtPrice } from "../components/electro/format";
 import NotFound from "./NotFound";
-import { isStandardSized, fitSizesText } from "../lib/fitSizes";
 import { SITE_NAME } from "../lib/brand";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -172,7 +169,6 @@ export default function ProductDetail() {
         holidays: new Set(d["official_holidays"] || []),
         exclude: d["shipping.exclude_official_holidays"] !== false,
         // Vitrin görünüm anahtarları (İşletme Kuralları → varsayılan açık)
-        showSizeGuide: d["product.size_guide_enabled"] !== false,
         showCompleteLook: d["product.complete_the_look_enabled"] !== false,
         showCountdown: d["product.shipping_countdown_enabled"] !== false,
         showSocialShare: d["product.social_share_enabled"] !== false,
@@ -193,14 +189,8 @@ export default function ProductDetail() {
       .catch(() => { /* sessiz — fallback metin gösterilir */ });
     return () => { alive = false; };
   }, []);
-  // Üyenin boy/kilosuna göre önerilen beden (harf) — beden butonunda rozet gösterilir.
-  const recLetter = user ? recommendLetterSize(user.height_cm, user.weight_kg) : null;
   const [product, setProduct] = useState(null);
   const [similarProducts, setSimilarProducts] = useState([]);
-  // Benzer ürünlerde ilk açılışta gösterilen adet; "Daha Fazla" ile 8'er artar.
-  const SIM_STEP = 8;
-  const [simShown, setSimShown] = useState(SIM_STEP);
-  const [comboProducts, setComboProducts] = useState([]);
   const [recentItems, setRecentItems] = useState([]); // son gezilenler (önceki sayfalardan)
   // Son gezilen kartların fiyat/kampanyası CANLI tazelenir: localStorage'daki eski
   // anlık görüntüler kampanyayı bilmediğinden indirimli (kırmızı) fiyat görünmüyordu.
@@ -259,7 +249,6 @@ export default function ProductDetail() {
     const id = setInterval(() => setShipTick((t) => t + 1), 30000);
     return () => clearInterval(id);
   }, []);
-  const [showSizeChart, setShowSizeChart] = useState(false);
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [mobileImageIdx, setMobileImageIdx] = useState(0);
   const [expandedSections, setExpandedSections] = useState({
@@ -269,8 +258,6 @@ export default function ProductDetail() {
   });
   // Sepete eklendi mikro-etkileşimi: buton kısa süre "Eklendi ✓" gösterir
   const [justAdded, setJustAdded] = useState(false);
-  // Size Table (HTML) - fetched via public endpoint. Hooks must live at top level.
-  const [sizeTableData, setSizeTableData] = useState(null);
   // "Gelince Haber Ver" — stokta olmayan beden için e-posta toplama
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyEmail, setNotifyEmail] = useState("");
@@ -341,15 +328,6 @@ export default function ProductDetail() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // Fetch HTML size table whenever product loads
-  useEffect(() => {
-    const pid = product?.id;
-    if (!pid) return;
-    axios.get(`${API}/size-tables-public/${pid}`)
-      .then(res => { if (res.data?.exists) setSizeTableData(res.data); })
-      .catch(() => { /* no table */ });
-  }, [product?.id]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -422,25 +400,13 @@ export default function ProductDetail() {
         // kategoriyi seçer; yoksa ürün adından tip çıkarır; hiçbiri tutmazsa BOŞ döner
         // (İNDİRİM/KOLEKSİYONLAR gibi promo birincil-kategori kaynaklı alakasız öneri düzeltmesi).
         try {
-          // 24 (backend üst sınırı) çekilir, ilk 8'i gösterilir; gerisi "Daha Fazla" ile
-          // açılır — her tıklamada yeni istek atılmaz.
-          const simRes = await axios.get(`${API}/products/${res.data.id}/similar?limit=24`);
+          // Aynı kategori, stokta, fiyatı yakın en çok 12 ürün → "Benzer Ürünler" karuseli.
+          const simRes = await axios.get(`${API}/products/${res.data.id}/similar?limit=12`);
           setSimilarProducts((simRes.data?.similar || []).filter(p => p.id !== res.data.id));
-          setSimShown(SIM_STEP);   // başka ürüne geçilince baştan 8
         } catch {
           // benzer ürün getirilemezse sessizce geç
         }
 
-        // Fetch combo products ("Stilini tamamla")
-        try {
-          const comboRes = await axios.get(`${API}/products/${res.data.id}/combine-products`);
-          const comboItems = comboRes.data?.items || [];
-          // YALNIZ admin'in atadığı kombin gösterilir; otomatik öneri fallback'i KALDIRILDI
-          // (kullanıcı isteği: kombin silinince alan boşalsın, kategori-bazlı ürünler dolmasın).
-          setComboProducts(comboItems);
-        } catch {
-          setComboProducts([]);
-        }
       } catch (err) {
         if (cancel || axios.isCancel?.(err) || err.name === "CanceledError") return;
         // ÜYELERE ÖZEL: misafir üyelere özel ürüne (ya da /:slug ile üyelere özel kategoriye)
@@ -468,7 +434,7 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (product.variants?.length > 0 && !selectedVariant) {
-      toast.error("Lütfen beden seçiniz");
+      toast.error(`Lütfen ${(product.variant_labels?.size || "seçenek").toLocaleLowerCase("tr")} seçiniz`);
       return;
     }
 
@@ -481,7 +447,7 @@ export default function ProductDetail() {
     // Check stock for selected variant (string/null/negatif stoğa karşı sağlam)
     const _selStock = Number(selectedVariant?.stock);
     if (selectedVariant && (!Number.isFinite(_selStock) || _selStock < quantity)) {
-      toast.error(_selStock > 0 ? `Yetersiz stok! Mevcut stok: ${_selStock}` : "Bu beden tükendi");
+      toast.error(_selStock > 0 ? `Yetersiz stok! Mevcut stok: ${_selStock}` : "Bu seçenek tükendi");
       return;
     }
     
@@ -588,12 +554,6 @@ export default function ProductDetail() {
 
   const allImages = product.images || [];
   const uniqueImages = allImages.length > 1 && allImages[0] === allImages[1] ? allImages.slice(1) : allImages;
-  const sizeTableImg = (() => {
-    for (const img of allImages) {
-      if (typeof img === "object" && img !== null && img.is_size_table && img.url) return img.url;
-    }
-    return null;
-  })();
   const displayImages = uniqueImages
     .filter((img) => !(typeof img === "object" && img !== null && img.is_size_table))
     .map((img) => (typeof img === "object" && img !== null ? (img.url || img.src || img.image || "") : img))
@@ -614,17 +574,19 @@ export default function ProductDetail() {
     : product.attributes && typeof product.attributes === "object"
       ? Object.entries(product.attributes).map(([name, v]) => ({ name, value: typeof v === "object" ? v?.value : v })).filter((a) => String(a.value ?? "").trim())
       : [];
-  const specRows = [
-    product.brand && ["Marka", product.brand],
+  // Teknik Özellikler: backend'in gruplu tablosu (product.spec_table — marka, model, kapasite,
+  // güç, boyut/paket/desi, ek özellikler) + stok kodu / teslim süresi / ürün özellikleri.
+  const specGroups = Array.isArray(product.spec_table) ? product.spec_table.filter((g) => g && g.rows && g.rows.length) : [];
+  const otherRows = [
+    !specGroups.length && product.brand && ["Marka", product.brand],
     product.stock_code && ["Stok Kodu", product.stock_code],
-    product.barcode && ["Barkod", product.barcode],
-    product.product_weight && ["Ağırlık", `${product.product_weight} kg`],
-    (product.width || product.depth || product.height) && ["Boyutlar (G×D×Y)", [product.width, product.depth, product.height].map((x) => x || "—").join(" × ") + " cm"],
-    product.estimated_delivery && ["Tahmini Teslim", product.estimated_delivery],
+    product.estimated_delivery && ["Tahmini Teslim", `${product.estimated_delivery} iş günü`],
     ...attrs.map((a) => [a.name, String(a.value)]),
   ].filter(Boolean);
   const shortList = attrs.slice(0, 5);
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  if (otherRows.length) specGroups.push({ key: "diger", group: "Diğer Bilgiler", rows: otherRows.map(([label, value]) => ({ label, value })) });
+  const specRows = specGroups.flatMap((g) => g.rows);
   const enc = encodeURIComponent;
   const copyLink = async () => {
     try { await navigator.clipboard.writeText(shareUrl); toast.success("Bağlantı kopyalandı"); } catch { toast.error("Kopyalanamadı"); }
@@ -636,14 +598,12 @@ export default function ProductDetail() {
     } catch { /* iptal */ }
   };
   const tabs = [
-    comboProducts.length > 0 && shipCfg?.showCompleteLook !== false && ["accessories", "Birlikte Alınanlar"],
     ["description", "Açıklama"],
-    specRows.length > 0 && ["specification", "Özellikler"],
+    specRows.length > 0 && ["specification", "Teknik Özellikler"],
     ["shipping", "Kargo & İade"],
     ["reviews", `Değerlendirmeler${reviewTotal > 0 ? ` (${reviewTotal})` : ""}`],
   ].filter(Boolean);
   const activeTab = tabs.some((t) => t[0] === pdpTab) ? pdpTab : (tabs.find((t) => t[0] === "description") || tabs[0])[0];
-  const comboTotal = comboProducts.reduce((s, p) => s + priceView(p).display, displayPrice);
   const stars = (val, size = "") => [1, 2, 3, 4, 5].map((i) => (
     <small key={i} className={`${i <= Math.round(val || 0) ? "fas fa-star" : "far fa-star text-muted"} ${size}`} />
   ));
@@ -774,41 +734,28 @@ export default function ProductDetail() {
                     {_pv.campaignLabel && <div className="font-size-13 text-green">{_pv.campaignLabel}</div>}
                   </div>
 
-                  <ColorSiblings productId={product.id} currentColor={
-                    product.color
-                    || product.variants?.find?.((v) => v.color)?.color
-                    || (Array.isArray(product.attributes) ? product.attributes.find((a) => /color|renk/i.test(a?.name || ""))?.value : "")
-                  } />
 
                   {hasVariants && (
                     <div className="border-top border-bottom py-3 mb-4" data-testid="pdp-variants">
                       <div className="d-flex align-items-center flex-wrap">
                         <h6 className="font-size-14 mb-0 mr-3">
-                          {isStandardSized(product.variants) ? (fitSizesText(product.fit_sizes) || "Seçenek") : "Seçenek"}
+                          {product.variant_labels?.size || "Seçenek"}
                           {selectedVariant && <span className="font-weight-normal text-gray-90">: {selectedVariant.size}</span>}
                         </h6>
                         <div className="d-flex flex-wrap">
                           {sizes.map((variant, index) => {
                             const isSelected = selectedSize === variant.size;
                             const isOOS = Number(variant.stock) <= 0;
-                            const isRec = recLetter && isRecommendedSize(variant.size, user?.height_cm, user?.weight_kg);
                             return (
                               <button key={index} type="button" onClick={() => handleSizeSelect(variant)} data-testid={`size-btn-${variant.size}`}
-                                title={isOOS ? "Tükendi" : isRec ? "Boy/kilonuza göre öneriliyor" : undefined}
-                                className={`btn btn-sm border rounded-pill mr-2 mb-1 px-3 el-variant-btn${isSelected ? " active" : ""}${isOOS ? " oos" : ""}${isRec && !isSelected ? " border-success" : ""}`}>
+                                title={isOOS ? "Tükendi" : undefined}
+                                className={`btn btn-sm border rounded-pill mr-2 mb-1 px-3 el-variant-btn${isSelected ? " active" : ""}${isOOS ? " oos" : ""}`}>
                                 {variant.size}
                               </button>
                             );
                           })}
                         </div>
-                        {(sizeTableData || sizeTableImg) && (shipCfg?.showSizeGuide !== false) && (
-                          <button type="button" onClick={() => setShowSizeChart(true)} className="btn btn-link p-0 font-size-13 ml-auto text-blue" data-testid="show-size-table-btn">Ölçü Tablosu</button>
-                        )}
                       </div>
-                      {(() => {
-                        const match = recLetter && sizes.find((v) => isRecommendedSize(v.size, user?.height_cm, user?.weight_kg));
-                        return match ? <p className="mt-2 mb-0 font-size-13 text-green" data-testid="size-recommendation"><b>{match.size}</b> sizin için öneriliyor.</p> : null;
-                      })()}
                     </div>
                   )}
 
@@ -896,42 +843,6 @@ export default function ProductDetail() {
             </div>
             <div className="borders-radius-17 border p-4 mt-4 mt-md-0 px-lg-10 py-lg-9">
               <div className="tab-content">
-                {activeTab === "accessories" && (
-                  <div className="tab-pane fade active show" role="tabpanel" data-testid="product-combo-section">
-                    <div className="row no-gutters">
-                      <div className="col mb-6 mb-md-0">
-                        <ul className="row list-unstyled products-group no-gutters border-bottom border-md-bottom-0">
-                          <li className="col-4 col-md-4 col-xl-2gdot5 product-item remove-divider-sm-down border-0">
-                            <div className="product-item__outer h-100"><div className="remove-prodcut-hover product-item__inner px-xl-4 p-3"><div className="product-item__body pb-xl-2">
-                              <h5 className="mb-1 product-item__title d-none d-md-block"><span className="text-blue font-weight-bold">{product.name}</span></h5>
-                              <div className="mb-2 text-center"><span className="el-img-box"><img className="img-fluid" src={optimizeImg(displayImages[0], 300)} alt={product.name} loading="lazy" /></span></div>
-                            </div></div></div>
-                          </li>
-                          {comboProducts.slice(0, 4).map((p) => (
-                            <ProductCard key={p.id} product={p} as="li" className="col-4 col-md-4 col-xl-2gdot5 remove-divider-sm-down" innerClassName="remove-prodcut-hover add-accessories product-item__inner px-xl-4 p-3" />
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="col-md-auto">
-                        <div className="mr-xl-15">
-                          <div className="mb-3">
-                            <div className="text-red font-size-26 text-lh-1dot2">{fmtPrice(comboTotal)}</div>
-                            <div className="text-gray-6">{comboProducts.slice(0, 4).length + 1} ürün için</div>
-                          </div>
-                          <button type="button" className="btn btn-sm btn-block btn-primary-dark btn-wide transition-3d-hover" onClick={() => {
-                            handleAddToCart();
-                            comboProducts.slice(0, 4).forEach((p) => {
-                              const vs = (p.variants || []).filter((v) => v && v.id && Number(v.stock) > 0);
-                              if ((p.variants || []).length > 1) return; // seçim gerektiren ürünler ürün sayfasından eklenir
-                              if (!vs.length && (Number(p.stock) || 0) <= 0) return;
-                              addItem(p, vs[0] || null, 1);
-                            });
-                          }}>Tümünü Sepete Ekle</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
                 {activeTab === "description" && (
                   <div className="tab-pane fade active show el-prose" role="tabpanel" data-testid="pdp-description"
                     dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) || "<p>Ürün açıklaması bulunmamaktadır.</p>" }} />
@@ -939,16 +850,20 @@ export default function ProductDetail() {
                 {activeTab === "specification" && (
                   <div className="tab-pane fade active show" role="tabpanel" data-testid="pdp-specification">
                     <div className="mx-md-5 pt-1">
-                      <h3 className="font-size-18 mb-4">Teknik Özellikler</h3>
-                      <div className="table-responsive mb-4">
-                        <table className="table table-hover">
-                          <tbody>
-                            {specRows.map(([k, v], i) => (
-                              <tr key={k + i}><th className={`px-4 px-xl-5${i === 0 ? " border-top-0" : ""}`}>{k}</th><td className={i === 0 ? "border-top-0" : ""}>{v}</td></tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      {specGroups.map((g) => (
+                        <div key={g.key || g.group} className="mb-4" data-testid={`pdp-spec-group-${g.key || "x"}`}>
+                          <h3 className="font-size-18 mb-3">{g.group}</h3>
+                          <div className="table-responsive">
+                            <table className="table table-hover el-spec-table mb-0">
+                              <tbody>
+                                {g.rows.map((r, i) => (
+                                  <tr key={r.label + i}><th className={`px-4 px-xl-5 font-weight-normal text-gray-90 w-50${i === 0 ? " border-top-0" : ""}`} scope="row">{r.label}</th><td className={`font-weight-bold${i === 0 ? " border-top-0" : ""}`}>{r.value}</td></tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1050,23 +965,18 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {similarProducts.length > 0 && (
+          {similarProducts.length > 0 && shipCfg?.showCompleteLook !== false && (
             <div className="mb-6" data-testid="similar-grid">
-              <div className="d-flex justify-content-between align-items-center border-bottom border-color-1 flex-lg-nowrap flex-wrap mb-3">
-                <h3 className="section-title mb-0 pb-2 font-size-22">Benzer Ürünler</h3>
-              </div>
-              <ul className="row list-unstyled products-group no-gutters">
-                {similarProducts.slice(0, simShown).map((p, i) => (
-                  <ProductCard key={p.id} product={p} as="li" className="col-6 col-md-3 col-xl-2gdot4 col-wd-2" listName="similar" index={i} wishlistLabel="Favori" />
+              <div className="border-bottom border-color-1 mb-2"><h3 className="section-title mb-0 pb-2 font-size-22">Benzer Ürünler</h3></div>
+              <Carousel perView={{ base: 2, md: 3, lg: 4, xl: 5, wd: 6 }} className="position-static overflow-hidden u-slick-overflow-visble pb-7 pt-2 px-1"
+                ariaLabel="Benzer Ürünler"
+                dotsClassName="text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-3 mt-md-0">
+                {similarProducts.slice(0, 12).map((p, i) => (
+                  <div className="js-slide products-group" key={p.id} data-testid={`similar-${p.id}`}>
+                    <ProductCard product={p} listName="similar" index={i} innerClassName="product-item__inner px-wd-4 p-2 p-md-3" wishlistLabel="Favori" />
+                  </div>
                 ))}
-              </ul>
-              {similarProducts.length > simShown && (
-                <div className="text-center mt-4">
-                  <button type="button" onClick={() => setSimShown((n) => n + SIM_STEP)} data-testid="similar-load-more" className="btn btn-soft-secondary px-6 rounded-pill">
-                    Daha Fazla Göster ({similarProducts.length - simShown})
-                  </button>
-                </div>
-              )}
+              </Carousel>
             </div>
           )}
 
@@ -1085,108 +995,8 @@ export default function ProductDetail() {
           )}
         </div>
 
-        {/* Ölçü tablosu modalı */}
-        {showSizeChart && (sizeTableData || sizeTableImg) && (
-          <>
-            <div className="el-backdrop" onClick={() => setShowSizeChart(false)} aria-hidden="true" />
-            <div className="position-fixed bg-white rounded shadow-lg el-anim-up" role="dialog" aria-modal="true" aria-label="Ölçü tablosu"
-              style={{ zIndex: 1003, left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(760px, 94vw)", maxHeight: "90vh", overflow: "auto" }}>
-              <div className="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
-                <h3 className="font-size-18 mb-0">Ölçü Tablosu</h3>
-                <button type="button" className="close" onClick={() => setShowSizeChart(false)} aria-label="Kapat"><i className="ec ec-close-remove" /></button>
-              </div>
-              {!sizeTableData && sizeTableImg && (
-                <div className="p-4 text-center" data-testid="size-table-image"><img src={optimizeImg(sizeTableImg, 1000)} alt="Ölçü Tablosu" className="img-fluid" /></div>
-              )}
-              {sizeTableData && (
-                <div className="p-4" data-testid="size-table-html">
-                  {sizeTableData.product_size && <p className="font-size-13"><strong>Ürün Ölçüsü:</strong> {sizeTableData.product_size}</p>}
-                  <div className="table-responsive">
-                    <table className="table table-bordered table-sm font-size-13">
-                      <thead><tr><th>Ölçüler</th>{sizeTableData.sizes.map((s) => <th key={s} className="text-center">{s}</th>)}</tr></thead>
-                      <tbody>
-                        {sizeTableData.columns.map((c) => (
-                          <tr key={c}><td>{c}</td>{sizeTableData.sizes.map((s) => <td key={s} className="text-center">{sizeTableData.values?.[s]?.[c] || "—"}</td>)}</tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="font-size-12 text-gray-90 mb-0">Tüm ölçüler cm cinsindendir; ± 1-2 cm tolerans taşıyabilir.</p>
-                </div>
-              )}
-            </div>
-          </>
-        )}
       </main>
       <Footer />
-    </div>
-  );
-}
-
-/**
- * ColorSiblings — Aynı modelin (csv_card_id paylaşan) farklı renk ürünlerini
- * miniatür kare swatch'lerle gösterir. Hover ile ürün adı tooltip, click ile
- * o renk varyantının ürün sayfasına yönlendirir.
- */
-// Türkçe renk adı → HEX. Ürün kartında/PDP'de renk kutuları GERÇEK renk gösterir (görsel değil).
-const TR_COLOR_HEX = {
-  siyah: "#111111", beyaz: "#ffffff", "kırmızı": "#d11f1f", kirmizi: "#d11f1f",
-  mavi: "#2454c7", lacivert: "#1a2a5e", "yeşil": "#2e8b45", yesil: "#2e8b45",
-  "sarı": "#f2c500", sari: "#f2c500", turuncu: "#ee7c1b", mor: "#7d3cb5",
-  pembe: "#e86ea3", gri: "#9a9a9a", kahverengi: "#6b4226", bej: "#d8c3a5",
-  ekru: "#e8e2d0", krem: "#efe7d3", bordo: "#6e1423", haki: "#6b6b3a",
-  turkuaz: "#1ab6b6", "gümüş": "#c0c0c0", gumus: "#c0c0c0", "altın": "#c9a227", altin: "#c9a227",
-  "füme": "#5a5a5a", fume: "#5a5a5a", antrasit: "#383838", vizon: "#9b7e6b",
-  taba: "#a9662e", hardal: "#c9a227", indigo: "#33427a", somon: "#f2a68c",
-  "fuşya": "#c81f76", fusya: "#c81f76", lila: "#c8a2d6", mint: "#a8e0c0",
-  petrol: "#1f5f6e", camel: "#c19a6b", ten: "#e6c8a8", nude: "#e3c2a8",
-  "yavruağzı": "#f2b8a2", yavruagzi: "#f2b8a2", "gül kurusu": "#b76e79", gulkurusu: "#b76e79",
-  mürdüm: "#5a2a4d", murdum: "#5a2a4d", "açık mavi": "#8fb8e0", "koyu mavi": "#1a2a5e",
-};
-function colorHexTR(name) {
-  if (!name) return null;
-  // DENETİM FIX: önce paylaşılan zengin harita (lib/colorMap.resolveColor) — kelime-bazlı
-  // eşleşme yapar ("Acı Kahve" → "kahve" → #7c4a2d). Eskiden yerel TR_COLOR_HEX'te "kahve"
-  // anahtarı yoktu (yalnız "kahverengi") → "acı kahve" eşleşmeyip #e5e5e5 (açık gri≈beyaz)
-  // gösteriyordu. resolveColor null dönerse eski yerel haritaya güvenli fallback.
-  const r = resolveColor(name);
-  if (r && r.type === "solid") return r.value;
-  const n = String(name).toLocaleLowerCase("tr").trim();
-  if (TR_COLOR_HEX[n]) return TR_COLOR_HEX[n];
-  for (const key of Object.keys(TR_COLOR_HEX)) if (n.includes(key)) return TR_COLOR_HEX[key];
-  return null;
-}
-// Tek bir renk kutusu (yuvarlak). Beyaz/açık tonlarda görünürlük için ince kenarlık.
-function ColorDot({ color, selected }) {
-  const hex = colorHexTR(color) || "#e5e5e5";
-  return (
-    <span className="d-inline-block rounded-circle" title={color || ""}
-      style={{ width: 28, height: 28, backgroundColor: hex, boxShadow: selected ? "0 0 0 2px #fff, 0 0 0 4px #333e48" : "0 0 0 1px #ddd" }} />
-  );
-}
-
-function ColorSiblings({ productId, currentColor }) {
-  const [siblings, setSiblings] = useState([]);
-  useEffect(() => {
-    if (!productId) return undefined;
-    let cancel = false;
-    axios.get(`${API}/products/${productId}/color-siblings`)
-      .then((r) => { if (!cancel) setSiblings(r.data?.siblings || []); })
-      .catch(() => { if (!cancel) setSiblings([]); });
-    return () => { cancel = true; };
-  }, [productId]);
-  if (!siblings.length) return null;
-  return (
-    <div className="border-top py-3" data-testid="color-siblings">
-      <div className="d-flex align-items-center flex-wrap">
-        <h6 className="font-size-14 mb-0 mr-3">Renk: <span className="font-weight-normal text-gray-90">{currentColor || "—"}</span></h6>
-        <ColorDot color={currentColor} selected />
-        {siblings.map((s) => (
-          <Link key={s.id} to={`/${s.slug || s.id}`} title={`${s.color || s.name || ""}`} data-testid={`color-sibling-${s.id}`} className="d-inline-flex ml-2">
-            <ColorDot color={s.color || s.name} />
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

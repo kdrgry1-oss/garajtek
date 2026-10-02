@@ -134,12 +134,6 @@ RULE_CATALOG = [
              "sayılır → müşteri iade başlatabilir (admin yine onaylar). 0 = kapalı."},
 
     # ---- Ürün & Vitrin ----
-    {"group": "Ürün & Vitrin", "key": "product.max_combine", "label": "Azami 'Stilini Tamamla' ürün sayısı",
-     "type": "number", "default": 12, "unit": "adet", "options": [4, 6, 8, 12, 16],
-     "help": "Bir ürüne elle atanabilecek maksimum kombin ('Stilini Tamamla') ürün sayısı."},
-    {"group": "Ürün & Vitrin", "key": "product.fit_recommendation_enabled", "label": "Kalıba göre beden önerisi göster",
-     "type": "toggle", "default": True, "options": [True, False],
-     "help": "Ürün kalıbına göre 'bir beden büyük/küçük alın' önerisini ürün kartında gösterir."},
 
     # ---- Bildirim & Oturum ----
     {"group": "Ödeme & İndirim", "key": "payment.card_velocity_max_fails", "label": "Kart-testi: azami başarısız ödeme (IP)",
@@ -153,12 +147,9 @@ RULE_CATALOG = [
      "help": "Panelde bu süre işlem yapılmazsa otomatik çıkış yapılır ve filtreler sıfırlanır. 0 = kapalı."},
 
     # ---- Vitrin & Ürün Sayfası (storefront görünüm anahtarları — canlı bağlı) ----
-    {"group": "Vitrin & Ürün Sayfası", "key": "product.size_guide_enabled", "label": "Ürün sayfasında beden tablosu göster",
+    {"group": "Vitrin & Ürün Sayfası", "key": "product.complete_the_look_enabled", "label": "'Benzer Ürünler' bölümünü göster",
      "type": "toggle", "default": True, "options": [True, False],
-     "help": "Kapalıyken ürün sayfasındaki 'Beden Tablosu' butonu ve ölçü tablosu gizlenir."},
-    {"group": "Vitrin & Ürün Sayfası", "key": "product.complete_the_look_enabled", "label": "'Stilini Tamamla' önerilerini göster",
-     "type": "toggle", "default": True, "options": [True, False],
-     "help": "Ürün sayfasındaki kombin ('Stilini Tamamla') öneri bölümünü açar/kapatır."},
+     "help": "Ürün sayfasındaki 'Benzer Ürünler' (aynı kategori, stokta) bölümünü açar/kapatır."},
     {"group": "Vitrin & Ürün Sayfası", "key": "product.shipping_countdown_enabled", "label": "Kargo geri sayımını göster",
      "type": "toggle", "default": True, "options": [True, False],
      "help": "Ürün sayfasında 'bu saate kadar sipariş ver, yarın kargoda' geri sayımını açar/kapatır."},
@@ -170,7 +161,7 @@ RULE_CATALOG = [
      "help": "Ürün sayfasında WhatsApp/X/Facebook paylaşım ve bağlantı kopyalama butonlarını gösterir."},
     {"group": "Vitrin & Ürün Sayfası", "key": "product.low_stock_badge_enabled", "label": "'Son X ürün!' stok aciliyet rozeti",
      "type": "toggle", "default": True, "options": [True, False],
-     "help": "Seçili bedenin stoğu eşiğin altına düşünce ürün sayfasında 'Son X ürün!' uyarısı gösterir."},
+     "help": "Seçili seçeneğin stoğu eşiğin altına düşünce ürün sayfasında 'Son X ürün!' uyarısı gösterir."},
     {"group": "Vitrin & Ürün Sayfası", "key": "product.low_stock_badge_threshold", "label": "Stok aciliyet rozeti eşiği",
      "type": "number", "default": 5, "unit": "adet", "options": [3, 5, 8, 10],
      "help": "Seçili beden stoğu bu değere veya altına düşünce 'Son X ürün!' rozeti çıkar."},

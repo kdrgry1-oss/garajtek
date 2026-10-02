@@ -20,6 +20,7 @@ import { sortLikeSize } from "../utils/sizeSort";
 import { resolveColor, MULTI_GRADIENT } from "../lib/colorMap";
 import { optimizeImg, firstImage } from "../lib/img";
 import { fmtPrice, priceOf, productHref } from "../components/electro/format";
+import SpecFacets, { specQueryString, specFilterCount } from "../components/catalog/SpecFacets";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const VIRTUAL = { "en-yeniler": "Yeni Ürünler", sale: "İndirimdeki Ürünler", "tum-urunler": "Tüm Ürünler", tumu: "Tüm Ürünler", all: "Tüm Ürünler" };
@@ -120,6 +121,7 @@ export default function Category() {
   const sizesParam = searchParams.get("sizes") || "";
   const colorsParam = searchParams.get("colors") || "";
   const brandParam = searchParams.get("brand") || "";
+  const specQ = specQueryString(searchParams);   // teknik özellik süzgeçleri (?spec_*)
   const limit = PER_PAGE.includes(Number(searchParams.get("limit"))) ? Number(searchParams.get("limit")) : 20;
 
   // facet'ler (kategori başına önbellek)
@@ -144,6 +146,7 @@ export default function Category() {
         if (sizesParam) url += `&sizes=${encodeURIComponent(sizesParam)}`;
         if (colorsParam) url += `&colors=${encodeURIComponent(colorsParam)}`;
         if (brandParam) url += `&brand=${encodeURIComponent(brandParam)}`;
+        url += specQ;
         const res = await axios.get(url, { signal: controller.signal });
         const fetched = res.data?.products || [];
         setProducts(fetched);
@@ -158,7 +161,7 @@ export default function Category() {
       }
     })();
     return () => controller.abort();
-  }, [slug, sort, order, minPrice, maxPrice, sizesParam, colorsParam, brandParam, page, limit]);
+  }, [slug, sort, order, minPrice, maxPrice, sizesParam, colorsParam, brandParam, specQ, page, limit]);
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "auto" }); }, [page]);
 
@@ -226,8 +229,9 @@ export default function Category() {
     let n = 0;
     if (minPrice || maxPrice) n += 1;
     [sizesParam, colorsParam, brandParam].forEach((s) => { if (s) n += s.split(",").filter(Boolean).length; });
+    n += specFilterCount(searchParams);
     return n;
-  }, [minPrice, maxPrice, sizesParam, colorsParam, brandParam]);
+  }, [minPrice, maxPrice, sizesParam, colorsParam, brandParam, searchParams]);
 
   const list = dedupeColorGroups(products);
   const from = total ? (page - 1) * limit + 1 : 0;
@@ -283,6 +287,7 @@ export default function Category() {
           {activeCount > 0 && <button type="button" className="btn btn-link p-0 pb-2 font-size-13 text-gray-90" onClick={clearAll}>Temizle ({activeCount})</button>}
         </div>
         <FacetGroup title="Markalar" items={facets.brands} selected={brandParam.split(",").filter(Boolean)} onToggle={(v) => toggleList("brand", v)} idPrefix="brand" />
+        <SpecFacets slug={slug} searchParams={searchParams} onToggle={toggleList} />
         <FacetGroup title="Seçenek / Ölçü" items={facets.sizes} selected={sizesParam.split(",").filter(Boolean)} onToggle={(v) => toggleList("sizes", v)} idPrefix="size" />
         <FacetGroup title="Renk" items={facets.colors} selected={colorsParam.split(",").filter(Boolean)} onToggle={(v) => toggleList("colors", v)} idPrefix="color" swatchOf={swatchOf} />
         {facets.max > facets.min && (

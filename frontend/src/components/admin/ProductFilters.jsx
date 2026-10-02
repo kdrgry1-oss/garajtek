@@ -105,7 +105,7 @@ function DateRange({ label, kFrom, kTo, filters, update }) {
   );
 }
 
-// Beden filtresi — kayıtlı bedenlerden çoklu seçim (seçilenlerden HERHANGİ biri olan ürünler).
+// Varyant seçeneği filtresi — kayıtlı seçeneklerden çoklu seçim (seçilenlerden HERHANGİ biri olan ürünler).
 // Değer virgüllü metin olarak tutulur ("S,M") → backend `sizes` parametresi.
 function SizeChips({ value, update, options }) {
   const sel = String(value || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -115,9 +115,9 @@ function SizeChips({ value, update, options }) {
   };
   return (
     <div>
-      <label className={labelCls}>Beden</label>
+      <label className={labelCls}>Varyant Seçeneği</label>
       <div className="flex flex-wrap gap-1.5" data-testid="pf-sizes">
-        {options.length === 0 && <span className="text-xs text-gray-400">Beden tanımlı değil</span>}
+        {options.length === 0 && <span className="text-xs text-gray-400">Seçenek tanımlı değil</span>}
         {options.map((sz) => {
           const on = sel.includes(sz);
           return (
@@ -188,14 +188,6 @@ export const ProductFilters = ({ filters, update, onApply, onClear, categories =
             />
           </div>
           <Text label="Breadcrumb Kategori" k="breadcrumb" value={filters.breadcrumb} update={update} />
-          {/* Sezon filtresi — yalnız MEVCUT sezonlar (ürün kartındaki zorunlu Sezon alanıyla aynı liste). */}
-          <Sel label="Sezon" k="season" value={filters.season} update={update} options={[
-            { v: "", l: "Tümü" },
-            { v: "İlkbahar/Sonbahar", l: "İlkbahar/Sonbahar" },
-            { v: "Tüm Sezonlar", l: "Tüm Sezonlar" },
-            { v: "Yaz", l: "Yaz" },
-            { v: "Kış", l: "Kış" },
-          ]} />
           <SizeChips value={filters.sizes} update={update} options={sizeOptions} />
           <Text label="Marka" k="brand" value={filters.brand} update={update} />
           <div>

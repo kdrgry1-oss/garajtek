@@ -120,7 +120,7 @@ export default function Cart() {
     .filter((p) => p && Number(p.discount) > 0 && p.type !== "percent")
     .map((p) => p.title || p.code).filter(Boolean);
 
-  // Kombin / sale öneriler
+  // Benzer ürün / indirim önerileri
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [deals, setDeals] = useState([]);
@@ -304,7 +304,7 @@ export default function Cart() {
             </div>
           </div>
 
-          {!suggestionsLoading && carousel("Bunları da Beğenebilirsiniz", suggestions, "cart-suggestions-block")}
+          {!suggestionsLoading && carousel("Benzer Ürünler", suggestions, "cart-suggestions-block")}
           {carousel("Kasa Önü Fırsatları", deals, "checkout-deals-block", <Link to="/sale" className="font-size-14 text-gray-90 pb-2">Tümünü Gör</Link>)}
         </div>
       </main>
