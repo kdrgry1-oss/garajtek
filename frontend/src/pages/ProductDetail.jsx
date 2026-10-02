@@ -673,6 +673,9 @@ export default function ProductDetail() {
                     </Link>
                   )}
                 </div>
+                {product.image_credit && (
+                  <div className="el-pdp-credit" data-testid="pdp-image-credit">{product.image_credit}</div>
+                )}
                 {displayImages.length > 1 && (
                   <div className="row mx-gutters-1" data-testid="pdp-thumb-strip">
                     {displayImages.slice(0, 10).map((img, index) => (

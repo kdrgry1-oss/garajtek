@@ -258,7 +258,8 @@ async def _feed_site_shop_prods():
         _co = {}
     site = (_co.get("site_url") or main.get("site_url") or "").rstrip("/")
     shop = _co.get("store_name") or main.get("site_name") or "Mağaza"
-    _q = {"is_active": True, "is_deleted": {"$ne": True}}
+    # noindex ürünler (URL'den Ürün Aktar demo ürünleri vb.) hiçbir ürün feed'ine girmez
+    _q = {"is_active": True, "is_deleted": {"$ne": True}, "noindex": {"$ne": True}}
     # ÜYELERE ÖZEL: feed'ler ANONİM (üye kavramı yok) → members_only ürünleri HER ZAMAN hariç.
     _mo_ids = await _members_only_cat_ids()
     if _mo_ids:

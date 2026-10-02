@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 DEMO_TAG = "garajtek_demo_v2"
 ALL_TAGS = ["garajtek_demo_v1", DEMO_TAG]  # kaldırma/yükseltme: eski sürümler dahil
+IMPORT_TAG = "url_import_v1"  # URL'den Ürün Aktar (url_import/) — Kaldır'da birlikte silinir
 IMG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "demo", "img")
 
 
@@ -272,11 +273,15 @@ async def demo_status(db) -> dict:
         "available_sets": len(SETS),
         "version": DEMO_TAG,
         "outdated": await db.products.count_documents({"seed_source": {"$in": [t for t in ALL_TAGS if t != DEMO_TAG]}}) > 0,
+        # URL'den Ürün Aktar ile gelen geçici demo ürünler (Kaldır bunları da siler)
+        "imported_products": await db.products.count_documents({"seed_source": IMPORT_TAG}),
     }
 
 
-async def remove_demo(db) -> dict:
-    """YALNIZ demo etiketli kayıtları siler."""
+async def remove_demo(db, *, include_imports: bool = False) -> dict:
+    """YALNIZ demo etiketli kayıtları siler. include_imports=True (panel "Kaldır") URL'den Ürün Aktar
+    ile gelen url_import_v1 ürünlerini ve indirilen görsellerini de siler; yeniden yükleme
+    (load_demo) içe aktarılanlara dokunmaz."""
     from routes.upload import delete_stored_file
 
     q = {"seed_source": {"$in": ALL_TAGS}}
@@ -292,8 +297,15 @@ async def remove_demo(db) -> dict:
         await delete_stored_file(rec)
     pr = await db.products.delete_many({**q, "demo": True})
     br = await db.banners.delete_many({**q, "demo": True})
-    return {"removed_products": pr.deleted_count, "removed_banners": br.deleted_count, "removed_files": len(files),
-            "blocks_cleaned": blocks_cleaned}
+    out = {"removed_products": pr.deleted_count, "removed_banners": br.deleted_count, "removed_files": len(files),
+           "blocks_cleaned": blocks_cleaned}
+    if include_imports:
+        from url_import.job import remove_imports
+        imp = await remove_imports(db, delete_stored_file)
+        out["removed_imported_products"] = imp["removed_products"]
+        out["removed_products"] += imp["removed_products"]
+        out["removed_files"] += imp["removed_files"]
+    return out
 
 
 def _is_demo(url, urls):

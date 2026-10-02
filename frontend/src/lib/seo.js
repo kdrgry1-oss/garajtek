@@ -148,6 +148,8 @@ export function setProductSeo(product, brand = "") {
     canonical: `/urun/${slug}`,
     ogImage,
     ogType: "product",
+    // URL'den Ürün Aktar demo ürünleri (noindex) arama motorlarına kapalı
+    robots: product.noindex ? "noindex,nofollow" : "index, follow, max-image-preview:large",
   });
 }
 

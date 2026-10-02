@@ -26,6 +26,7 @@ PERMISSION_TREE = [
             {"key": "products.delete", "label": "Sil"},
             {"key": "products.import_xlsx", "label": "Excel İçe Aktar"},
             {"key": "products.import_technical", "label": "Teknik Özellik Yükle"},
+            {"key": "products.url_import", "label": "URL'den Ürün Aktar (demo)"},
             {"key": "products.attributes", "label": "Özellik Kütüphanesi"},
             {"key": "products.categories", "label": "Kategori Yönet"},
         ],

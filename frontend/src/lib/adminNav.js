@@ -42,6 +42,7 @@ export const navigationGroups = [
       { label: "XML Feed'ler", path: "/admin/xml-feedler", icon: Rss },
       { label: "Stok & Fiyat Alarm", path: "/admin/stok-alarm", icon: BellRing },
       { label: "Toplu Fiyat/Stok (Excel)", path: "/admin/toplu-fiyat-stok", icon: Package },
+      { label: "URL'den Ürün Aktar", path: "/admin/urlden-urun-aktar", icon: Link2 },
       { label: "Stok Uyarıları", path: "/admin/stok-uyarilari", icon: BellRing },
     ],
   },

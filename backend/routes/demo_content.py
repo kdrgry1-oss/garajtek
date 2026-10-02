@@ -40,7 +40,7 @@ async def demo_content_load(request: Request, current_user: dict = Depends(requi
 @router.delete("")
 async def demo_content_remove(request: Request, current_user: dict = Depends(require_super_admin)):
     from demo_content import remove_demo
-    res = await remove_demo(db)
+    res = await remove_demo(db, include_imports=True)
     logger.info(f"demo content removed: {res}")
     await record_admin_audit(db, action="demo_content.remove", entity_type="demo_content", entity_id=_tag(),
                              before={}, after=res, current_user=current_user, request=request, source="settings.demo")

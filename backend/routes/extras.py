@@ -636,7 +636,8 @@ async def seo_page_meta(path: str = Query("/", max_length=512)):
                  "meta_description": 1, "meta_title": 1, "images": 1, "image": 1, "price": 1,
                  "sale_price": 1, "brand": 1, "barcode": 1, "stock_code": 1, "variants": 1,
                  "category_name": 1, "category_slug": 1, "stock": 1, "is_active": 1, "is_deleted": 1,
-                 "members_only": 1, "category_id": 1, "category_ids": 1, "categories": 1}).to_list(10)
+                 "members_only": 1, "category_id": 1, "category_ids": 1, "categories": 1,
+                 "noindex": 1}).to_list(10)
             prod = (next((c for c in cands if c.get("is_active") is not False and not c.get("is_deleted")), None)
                     or None)
         from .products import _members_only_cat_ids, product_is_members_only

@@ -755,6 +755,8 @@ api_router.include_router(attributes_router)
 api_router.include_router(upload_router)
 from routes.demo_content import router as demo_content_router  # demo içerik yükle/kaldır (süper yönetici)
 api_router.include_router(demo_content_router)
+from routes.url_import import router as url_import_router  # URL'den Ürün Aktar (geçici demo ürünler)
+api_router.include_router(url_import_router)
 from routes.product_sets import router as product_sets_router  # Ürün Setleri + kapıda ödeme vitrin uçları
 api_router.include_router(product_sets_router)
 from routes.site_menus import router as site_menus_router  # vitrin menü grupları (Menü Yönetimi)

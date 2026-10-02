@@ -173,6 +173,8 @@ async function productSeo(slug, canonical) {
     type: "product",
     price,
     currency: "TRY",
+    // URL'den Ürün Aktar demo ürünleri (noindex) arama motorlarına kapalı
+    robots: p.noindex ? "noindex,nofollow" : "",
     jsonLd: [productLd, breadcrumb(crumbs)],
   };
 }
@@ -238,6 +240,7 @@ function transform(res, seo) {
     .on('meta[name="twitter:title"]', content(seo.title))
     .on('meta[name="twitter:description"]', content(seo.description))
     .on('meta[name="twitter:image"]', content(seo.image))
+    .on('meta[name="robots"]', content(seo.robots))
     .on("head", {
       element(el) {
         if (seo.type === "product" && seo.price != null) {

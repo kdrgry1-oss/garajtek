@@ -119,7 +119,8 @@ def resolve_product(product: dict, config: dict, *, override: dict | None = None
         "og_url": canonical, "og_image": og_image, "og_type": "product",
         "og_site_name": config["brand"].get("store_name") or "",
         "og_locale": seo.get("locale") or "",
-        "robots": seo.get("default_robots") or "index,follow",
+        # noindex ürün (ör. URL'den Ürün Aktar demo ürünü) arama motorlarına kapalı
+        "robots": "noindex,nofollow" if product.get("noindex") else (seo.get("default_robots") or "index,follow"),
         "sources": {"title": title_source, "description": desc_source,
                     "og_image": "entity" if images else ("global" if og_image else "missing")},
     }

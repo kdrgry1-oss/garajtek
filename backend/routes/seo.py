@@ -73,7 +73,8 @@ async def sitemap_xml():
                 urls.append(_url_block(f"{storefront}/sayfa/{slug}", today, "monthly", "0.4"))
 
         # Ürünler (yalnızca aktif; üyelere-özel kategori ürünleri HARİÇ) — lastmod = updated_at
-        _prod_q = {"is_active": {"$ne": False}}
+        # noindex ürünler (ör. URL'den Ürün Aktar demo ürünleri) sitemap'e girmez
+        _prod_q = {"is_active": {"$ne": False}, "noindex": {"$ne": True}}
         if _mo_list:
             _prod_q["$and"] = members_only_exclusion(_mo_list)
         async for prod in db.products.find(

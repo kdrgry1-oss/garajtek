@@ -18,7 +18,7 @@ export default function DemoContentCard({ onChanged }) {
   const run = async (method) => {
     const msg = method === "post"
       ? `Demo içerik yüklensin mi? (${st?.available_products || 25} örnek ürün, ${st?.available_sets || 3} ürün seti, slider ve banner görselleri; önceki demo seti kaldırılıp yenilenir)`
-      : "Demo içerik kaldırılsın mı? Yalnız demo ürünler, demo bannerlar ve demo görseller silinir.";
+      : `Demo içerik kaldırılsın mı? Yalnız demo ürünler, demo bannerlar ve demo görseller silinir${st?.imported_products ? ` (URL'den aktarılan ${st.imported_products} ürün ve görselleri dahil)` : ""}.`;
     const ok = window.appConfirm ? await window.appConfirm(msg) : window.confirm(msg);
     if (!ok) return;
     setBusy(true);
@@ -36,13 +36,13 @@ export default function DemoContentCard({ onChanged }) {
       <h3 className="text-xs font-semibold text-amber-900">Demo İçerik</h3>
       <p className="mt-1 text-[11px] leading-snug text-amber-900/80">
         Gerçek ürünler eklenene kadar mağazayı dolu göstermek için örnek ürünler ve görseller.
-        {st ? <> Şu an: <b>{st.products}</b> demo ürün, <b>{st.sets || 0}</b> set, <b>{st.banners}</b> banner.</> : null}
+        {st ? <> Şu an: <b>{st.products}</b> demo ürün, <b>{st.sets || 0}</b> set, <b>{st.banners}</b> banner{st.imported_products ? <>, <b>{st.imported_products}</b> URL'den aktarılan ürün</> : null}.</> : null}
         {st?.outdated ? <b className="block text-amber-900"> Eski demo sürümü yüklü — “Yeniden Yükle” ile güncelleyin.</b> : null}
       </p>
       <div className="mt-2 flex gap-1.5">
         <button type="button" disabled={busy} onClick={() => run("post")} data-testid="demo-load-btn"
           className="flex-1 rounded bg-gray-900 px-2 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">{busy ? "Çalışıyor…" : st?.products ? "Yeniden Yükle" : "Demo İçerik Yükle"}</button>
-        {st?.products > 0 && (
+        {(st?.products > 0 || st?.imported_products > 0) && (
           <button type="button" disabled={busy} onClick={() => run("delete")} data-testid="demo-remove-btn"
             className="flex-1 rounded border border-red-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-red-700 disabled:opacity-50">Kaldır</button>
         )}

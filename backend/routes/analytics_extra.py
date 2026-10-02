@@ -191,6 +191,8 @@ async def google_merchant_feed():
     # Yayında olan ürünler: `is_active=True` veya `status=active` veya filtre yok.
     q = {"$or": [{"is_active": True}, {"status": "active"}, {"is_active": {"$exists": False}, "status": {"$exists": False}}]}
     async for p in db.products.find(q, {"_id": 0}).limit(5000):
+        if p.get("noindex"):  # demo/içe aktarılan (noindex) ürünler feed'e girmez
+            continue
         pid = p.get("id", "")
         name = p.get("name", "")
         desc = p.get("description") or name

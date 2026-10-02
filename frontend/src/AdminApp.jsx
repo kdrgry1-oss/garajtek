@@ -46,6 +46,7 @@ import PaymentTrace from "./pages/admin/PaymentTrace";
 import ReportsAdvanced from "./pages/admin/ReportsAdvanced";
 import ReportsInsights from "./pages/admin/ReportsInsights";
 import XmlFeeds from "./pages/admin/XmlFeeds";
+import UrlImport from "./pages/admin/UrlImport";
 import BulkPriceStock from "./pages/admin/BulkPriceStock";
 import StockAlerts2 from "./pages/admin/StockAlerts";
 import CustomerSegments from "./pages/admin/CustomerSegments";
@@ -75,6 +76,7 @@ export default function AdminApp() {
         <Route path="kategori-siralama" element={<AdminCategoryOrder />} />
         <Route path="varyantlar" element={<AdminVariants />} />
         <Route path="xml-feedler" element={<XmlFeeds />} />
+        <Route path="urlden-urun-aktar" element={<UrlImport />} />
         <Route path="sayfa-tasarimi" element={<AdminPageDesign />} />
         {/* Footer artık Sayfa Tasarımı › Genel Alanlar'da (SPEC §4.7) */}
         <Route path="footer-tasarim" element={<Navigate to="/admin/sayfa-tasarimi?alan=site_footer_links" replace />} />
