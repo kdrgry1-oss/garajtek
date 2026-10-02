@@ -920,8 +920,8 @@ async def _build_products_query(
     if search:
         import re as _re
         esc = _search_tr_regex(search)  # Türkçe duyarsız (İ/ı/ş/ç/ğ/ö/ü dahil)
-        # NOT: 'description' arama alanlarından ÇIKARILDI — ürün açıklamaları stil/kombin metni
-        # içerir ("bu ceketi eteğinizle kombinleyin" gibi) ve "etek" araması alakasız ceket/bluz
+        # NOT: 'description' arama alanlarından ÇIKARILDI — uzun açıklama metinleri başka ürün
+        # adlarını da içerebildiği için arama alakasız ürünleri
         # getiriyordu. Arama artık isim/anahtar kelime/kod/kategori/özellik/renk üzerinden yürür.
         query["$or"] = [
             {"name": {"$regex": esc, "$options": "i"}},
@@ -1505,14 +1505,13 @@ async def save_spec_templates(payload: dict, current_user: dict = Depends(requir
 async def get_spec_facets(request: Request, category: Optional[str] = None):
     """Kategori filtre paneli için teknik özellik değerleri ve adetleri (PUBLIC).
     Yalnız 'filter' işaretli alanlar; değeri olan ürün yoksa alan dönmez."""
-    from product_specs import get_config as _spec_cfg, filterable_fields, format_value
+    from product_specs import get_config as _spec_cfg, filterable_fields, format_value, normalize_specs
     cfg = await _spec_cfg(db)
     fields = filterable_fields(cfg)
     q, _ = await _build_products_query(request, category=category)
-    proj = {"_id": 0, **{f"specs.{f['key']}": 1 for f in fields}}
     counts = {f["key"]: {} for f in fields}
-    async for p in db.products.find(q, proj).limit(3000):
-        sp = p.get("specs") or {}
+    async for p in db.products.find(q, {"_id": 0, "specs": 1}).limit(3000):
+        sp, _ = normalize_specs(p.get("specs") or {}, cfg)
         for f in fields:
             v = sp.get(f["key"])
             for x in (v if isinstance(v, list) else [v]):
@@ -1652,8 +1651,18 @@ async def get_product(product_id: str, request: Request):
         product = _strip_internal_fields(product)
     # Vitrin "Teknik Özellikler" tablosu (gruplu, birimli) — bkz. product_specs.py
     try:
-        from product_specs import get_config as _spec_cfg, spec_table as _spec_table
-        product["spec_table"] = _spec_table(product, await _spec_cfg(db))
+        from product_specs import (get_config as _spec_cfg, spec_table as _spec_table,
+                                   normalize_specs as _norm_specs)
+        _cfg = await _spec_cfg(db)
+        product["spec_table"] = _spec_table(product, _cfg)
+        # Eski/alternatif anahtarlı (ör. demo paketi) specs kanonik alanlara çevrilmiş hâliyle
+        # döner → admin formu doğru alanları doldurur, kaydedince kanonik yazılır.
+        if isinstance(product.get("specs"), dict) and product["specs"]:
+            _ns, _nx = _norm_specs(product["specs"], _cfg)
+            product["specs"] = _ns
+            if _nx:
+                _have = {(r.get("name") or "") for r in (product.get("extra_specs") or []) if isinstance(r, dict)}
+                product["extra_specs"] = list(product.get("extra_specs") or []) + [r for r in _nx if r["name"] not in _have]
     except Exception as _e:
         logger.warning(f"[specs] tablo üretilemedi: {_e}")
         product["spec_table"] = []
@@ -2105,7 +2114,7 @@ def _apply_campaign_badge(p: dict, camps: list) -> dict:
 
 async def _attach_campaign_badges(prods: list) -> list:
     """Bir ürün listesine SEPET otomatik kampanya rozetini (campaign_discount_percent +
-    campaign_label) ekler — vitrin, arama, kombin, öneri, kasa-önü HER YERDE aynı indirim
+    campaign_label) ekler — vitrin, arama, benzer ürünler, öneri, kasa-önü HER YERDE aynı indirim
     görünsün diye TEK kaynak. Kapsam (kategori/ürün) doğru eşleşsin diye category_ids gerekir;
     çağıran uçlar projeksiyona category_ids/category_id eklemeli."""
     if not prods:
@@ -2160,7 +2169,7 @@ async def cart_pricing(payload: dict):
 
 async def _sort_variants_by_pool(variants: list) -> list:
     """Ürün varyantlarını `variant_options` (type=size) sort_order'ına göre sıralar.
-    Havuzda olmayan bedenler (kombinasyonlar/numeric) orijinal sırada en sona eklenir
+    Havuzda olmayan seçenekler (birleşik/numeric) orijinal sırada en sona eklenir
     (stable sort). Renk sıralaması beden eşitliğinde korunur."""
     if not variants:
         return variants
@@ -2846,9 +2855,9 @@ async def create_product(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
-    
     await _apply_spec_fields(product, product_data)
     # Ekipman kataloğu: renkler AYRI ürüne bölünmez — tüm varyantlar tek kartta kalır.
+    
     _all_variants = product.get("variants") or []
     _colors = _distinct_variant_colors(_all_variants)
     # Kardeş gruplama anahtarı (eski veriyle uyum için) her zaman yazılır
@@ -4594,7 +4603,7 @@ async def export_products_excel(
 def _norm_season_cell(val) -> str:
     """Excel'deki Sezon hücresini 4 kanonik değere indirger:
     İlkbahar/Sonbahar · Tüm Sezonlar · Yaz · Kış.
-    Türkçe İ/ı büyük-küçük tuzağına takılmamak için aksan/kombine işaretler soyulur.
+    Türkçe İ/ı büyük-küçük tuzağına takılmamak için aksan/birleşik işaretler soyulur.
     Boş/tanınmayan değer '' döner — mevcut sezon SİLİNMEZ, satır atlanır."""
     import unicodedata
     s = str(val or "").strip()

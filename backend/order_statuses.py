@@ -341,7 +341,7 @@ async def get_status_config(db):
     # Şablon tohumlama VERSİYON bazlı: yeni event/email şablonu eklediğimizde
     # SEED_VERSION'ı artırırız; mevcut (canlı) DB'lerde de eksik şablonlar
     # idempotent olarak tamamlanır. ensure_status_templates var olanı bozmaz,
-    # sadece eksik (event,channel) kombinasyonlarını ekler.
+    # sadece eksik (event,channel) çiftlerini ekler.
     if not saved or saved.get("templates_seed_version") != SEED_VERSION:
         await ensure_status_templates(db)
         await db.settings.update_one(

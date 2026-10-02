@@ -272,7 +272,7 @@ async def apply_upload(request: Request, file: UploadFile = File(...),
 async def stock_alerts(threshold: int = 3,
                         current_user: dict = Depends(require_admin)):
     """
-    Stok seviyesi threshold'un altındaki ürün-varyant kombinasyonlarını döner.
+    Stok seviyesi threshold'un altındaki ürün-varyant satırlarını döner.
     Varyantsız ürünlerde kök product.stock (varsa) ile kontrol edilir.
     """
     alerts = []

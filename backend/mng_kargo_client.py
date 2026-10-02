@@ -324,7 +324,7 @@ def list_shipments_by_date(*, username: str, password: str, start, end, dates=No
         cust_candidates = [x for x in (customer_codes or []) if x] or [username]
         if not cust_slot:
             cust_candidates = [""]
-        # Rapor tipi / alt firma bayrağı bilinmiyor → boş sonuçta kombinasyonlar sırayla denenir
+        # Rapor tipi / alt firma bayrağı bilinmiyor → boş sonuçta olası seçenekler sırayla denenir
         alt_slot = next((n for n in names if "altfirma" in n.lower()), "")
         if rapor_slot and "raporno" in rapor_slot.lower():
             # MusteriOzelRapor: rapor no keşfi (1 = şube listesi çıktı; gönderi listesi hangisi?)

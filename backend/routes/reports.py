@@ -205,7 +205,7 @@ def _collection_from_code(*codes) -> str:
 def _season_from_attrs(attrs) -> str:
     """Ürünün 'Sezon' özniteliğini 4 kanonik değere normalize eder:
     İlkbahar/Sonbahar · Tüm Sezonlar · Yaz · Kış. Veri yoksa BOŞ döner (varsayım
-    yapılmaz). Kombine etiketlerde (SPRING-SUMMER, FALL-WINTER) geç sezon esas alınır;
+    yapılmaz). Birleşik etiketlerde (SPRING-SUMMER, FALL-WINTER) geç sezon esas alınır;
     ara sezonlar (ilkbahar/sonbahar) tek 'İlkbahar/Sonbahar' grubunda toplanır."""
     val = ""
     for a in (attrs or []):

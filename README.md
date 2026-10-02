@@ -26,7 +26,7 @@ veya isteğe bağlı Cloudflare R2'de durur. Her gece 03:30'da yedek alınır (i
 
 ## Başlıca modüller
 
-- **Vitrin:** kategori/ürün, arama, favoriler, sepet, paylaşılan sepet, kombin, üyelere özel kategoriler, SALE menüsü (kampanya sayfaları), çok dilli SEO ve yapılandırılmış veri.
+- **Vitrin:** kategori/ürün, arama, favoriler, sepet, paylaşılan sepet, benzer ürünler, üyelere özel kategoriler, SALE menüsü (kampanya sayfaları), çok dilli SEO ve yapılandırılmış veri.
 - **Ödeme:** iyzico 3D Secure (kendi kart formu), havale/EFT (dekont bildirimi), kapıda ödeme (opsiyonel), hediye çeki, puan.
 - **Kampanya motoru:** yüzde/tutar indirim, X al Y öde, kupon, ilk sipariş, ödeme yöntemine göre indirim, istiflenebilirlik kuralları.
 - **Sipariş & operasyon:** sipariş durumu yaşam döngüsü, iade/iptal, stok hareket defteri, otomatik iptal + mutabakat, ödeme mutabakatı.

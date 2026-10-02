@@ -27,7 +27,7 @@ export function sizeRank(name) {
   const idx = SIZE_ORDER.indexOf(n);
   if (idx >= 0) return [0, idx];
 
-  // 2) Kombine beden (ayraç KORUNARAK ham isimden): S/M, XS/S, M-L, 36/38, 36-38
+  // 2) Birleşik seçenek (ayraç KORUNARAK ham isimden): S/M, M-L, 36/38, 36-38
   const cm = raw.match(/^([a-z0-9]+)\s*[/\-]\s*([a-z0-9]+)$/);
   if (cm) {
     const a = cm[1], b = cm[2];

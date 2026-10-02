@@ -865,7 +865,7 @@ async def _stock_alert_recipients(db) -> list:
 
 
 async def _send_daily_stock_alert(threshold: int = None):
-    """Her gün, stoğu `threshold` veya altına düşmüş ürün-varyant kombinasyonlarını
+    """Her gün, stoğu `threshold` veya altına düşmüş ürün-varyant satırlarını
     bulup admin kullanıcılara (is_admin=True) özet e-posta gönderir. Eşik verilmezse
     İşletme Kuralları'ndan okunur (stock.low_stock_alert_threshold, varsayılan 3).
 
@@ -928,7 +928,7 @@ async def _send_daily_stock_alert(threshold: int = None):
         subject = f"Stok Uyarısı: {len(alerts)} ürün-varyant eşik altında (≤{threshold})"
         html = (
             f"<h2>Düşük Stok Uyarısı</h2>"
-            f"<p>{len(alerts)} ürün-varyant kombinasyonu {threshold} veya altında stoğa sahip.</p>"
+            f"<p>{len(alerts)} ürün-varyant {threshold} veya altında stoğa sahip.</p>"
             f"<table border='1' cellpadding='6' style='border-collapse:collapse'>"
             f"<tr><th>Ürün</th><th>Varyant</th><th>Stok Kodu</th><th>Stok</th></tr>{rows}</table>"
             f"<p style='font-size:12px;color:#888;margin-top:24px'>Bu e-posta otomatik gönderilmiştir.</p>"

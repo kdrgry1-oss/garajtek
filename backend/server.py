@@ -573,7 +573,7 @@ if not _origins_list:
     _origins_list = ["http://localhost:3000"]
 # Güvenlik: wildcard origin ("*") ile allow_credentials=True BİRLİKTE kullanılamaz — Starlette
 # çağıranın Origin'ini yansıtıp kimlik-bilgili (cookie/Authorization) çapraz-origin isteğe izin
-# verirdi. Wildcard varsa credentials KAPATILIR (spec gereği zaten geçersiz kombinasyon).
+# verirdi. Wildcard varsa credentials KAPATILIR (spec gereği zaten geçersiz bir eşleşme).
 _allow_credentials = _origins_list != ["*"]
 if not _allow_credentials:
     logger.warning("CORS_ORIGINS=* ile credentials devre dışı bırakıldı. Üretimde açık bir "

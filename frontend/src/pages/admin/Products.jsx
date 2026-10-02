@@ -391,7 +391,7 @@ export default function AdminProducts() {
   const [globalColors, setGlobalColors] = useState([]);
   // #3: Satış fiyatı → Üye Tipi 1 otomatik aktarım; üye fiyatı manuel değişince bağımsız olur.
   const [memberPriceManual, setMemberPriceManual] = useState(false);
-  // #6: Hızlı varyant — çoklu beden/renk seçimi (kombinasyondan kart üret).
+  // #6: Hızlı varyant — çoklu seçenek seçimi (seçilen değerlerden varyant üret).
   const [multiSizes, setMultiSizes] = useState([]);
   const [multiColors, setMultiColors] = useState([]);
   // Varyant seçenek adları (ürüne özel; vitrin seçim başlığı). Varsayılan: "Seçenek" / "Renk / Tip".
@@ -2968,7 +2968,7 @@ export default function AdminProducts() {
                   {/* Add New Variant Section */}
                   <div className="bg-orange-50 rounded-xl p-6 border border-orange-100">
                     <h4 className="text-sm font-bold text-orange-900 mb-4 uppercase tracking-wider">Hızlı Varyant Ekle</h4>
-                    {/* #6: Bedenleri ve renkleri buton buton seç → seçilen kombinasyonlardan kartları tek seferde üret */}
+                    {/* #6: Seçenekleri buton buton seç → seçilen değerlerden varyantları tek seferde üret */}
                     <div className="mb-5 bg-white rounded-lg border border-orange-200 p-4">
                       <div className="mb-3">
                         <span className="block text-xs font-bold text-orange-700 mb-2 uppercase">{VL1} (çoklu seç)</span>
@@ -3014,13 +3014,13 @@ export default function AdminProducts() {
                             existing.add(key);
                             adds.push({ id: `var-${Date.now()}-${sz}-${cl}`.replace(/\s+/g, ''), size: sz, color: cl, stock: 0, barcode: "", stock_code: formData.stock_code || "" });
                           }));
-                          if (!adds.length) { toast.error("Seçili kombinasyonlar zaten ekli"); return; }
+                          if (!adds.length) { toast.error("Seçili varyantlar zaten ekli"); return; }
                           setFormData(prev => ({ ...prev, variants: [...(prev.variants || []), ...adds] }));
                           setMultiSizes([]); setMultiColors([]);
                           toast.success(`${adds.length} varyant oluşturuldu`);
                         }}
                         className="w-full bg-orange-600 text-white font-bold py-2.5 rounded-lg hover:bg-orange-700 shadow-md shadow-orange-200 transition-all">
-                        Seçili Kombinasyonları Oluştur ({multiSizes.length || 0} × {multiColors.length || 1})
+                        Seçili Varyantları Oluştur ({multiSizes.length || 0} × {multiColors.length || 1})
                       </button>
                       <p className="text-[10px] text-gray-400 mt-2 text-center">Stok ve barkodları oluşan kartlardan düzenleyebilirsin. Tek tek eklemek için aşağıyı kullan.</p>
                     </div>

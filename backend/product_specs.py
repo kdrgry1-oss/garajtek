@@ -177,6 +177,68 @@ def _clean_value(f: Dict[str, Any], v: Any) -> Any:
     return None
 
 
+# Eski / alternatif anahtarlar (ör. demo içerik paketi, içe aktarımlar) → kanonik alan.
+# (kanonik_anahtar, çarpan) — çarpan yalnız sayısal dönüşümde (ton → kg) kullanılır.
+SPEC_ALIASES: Dict[str, tuple] = {
+    "kapasite_ton": ("lifting_capacity_kg", 1000), "kapasite_kg": ("lifting_capacity_kg", 1),
+    "kaldirma_yuksekligi_mm": ("lift_height_mm", 1), "min_yukseklik_mm": ("min_height_mm", 1),
+    "motor_gucu_kw": ("motor_power_kw", 1), "motor_gucu_hp": ("motor_power_hp", 1),
+    "garanti_ay": ("warranty_months", 1), "mense": ("origin_country", None),
+    "voltaj": ("voltage", None), "faz": ("phase", None), "frekans_hz": ("frequency_hz", 1),
+    "calisma_basinci_bar": ("working_pressure_bar", 1), "tank_hacmi_lt": ("tank_volume_l", 1),
+    "hava_debisi_lt_dk": ("air_flow_lpm", 1), "lokma_girisi": ("drive_size", None),
+    "tork_nm": ("torque_nm", 1), "devir_rpm": ("rpm", 1), "jant_araligi_inc": ("rim_diameter_in", None),
+    "parca_sayisi": ("piece_count", 1), "cekmece_sayisi": ("drawer_count", 1),
+    "guc_kaynagi": ("power_source", None), "malzeme": ("material", None), "model": ("model", None),
+    "aku_voltaji_v": ("battery_voltage_v", 1), "aku_kapasitesi_ah": ("battery_capacity_ah", 1),
+    "gurultu_db": ("noise_db", 1), "net_agirlik_kg": ("net_weight_kg", 1),
+}
+_ALIAS_LABELS = {"guc_w": ("Güç", "W"), "marka": None}
+
+
+def normalize_specs(raw: Any, cfg: Dict[str, Any]) -> tuple:
+    """Alternatif anahtarları kanonik alanlara çevirir. Dönüş: (specs, ek_satırlar).
+    Kanonik alana sığmayan değerler (ör. tork "40-210", güç kaynağı serbest metni)
+    kaybolmaz: ek satır olarak döner."""
+    if not isinstance(raw, dict):
+        return {}, []
+    fm = field_map(cfg)
+    out: Dict[str, Any] = {}
+    extras: List[Dict[str, str]] = []
+    for k, v in raw.items():
+        if v in (None, "", [], {}):
+            continue
+        if k in fm:
+            out.setdefault(k, v)
+            continue
+        if k in _ALIAS_LABELS:
+            lab = _ALIAS_LABELS[k]
+            if lab:
+                extras.append({"name": lab[0], "value": f"{v} {lab[1]}".strip()})
+            continue
+        al = SPEC_ALIASES.get(k)
+        if not al:
+            continue
+        ck, mult = al
+        f = fm.get(ck)
+        if not f or ck in out:
+            continue
+        val = v
+        try:
+            if f.get("type") in ("number", "int") and mult:
+                n = _num(v)
+                val = None if n is None else n * mult
+            elif f.get("type") == "multiselect" and isinstance(v, str):
+                val = [x.strip() for x in re.split(r"[+,;]| ve ", v) if x.strip()]
+            cv = _clean_value(f, val)
+        except (ValueError, TypeError):
+            extras.append({"name": f.get("label") or ck, "value": str(v)})
+            continue
+        if cv not in (None, "", [], {}):
+            out[ck] = cv
+    return out, extras
+
+
 def clean_specs(raw: Any, cfg: Dict[str, Any]) -> Dict[str, Any]:
     """Gelen specs nesnesini tanımlara göre doğrular. Bilinmeyen anahtarlar atılır, boş değerler
     kaydedilmez. Geçersiz değerde ValueError('Etiket: neden')."""
@@ -185,8 +247,12 @@ def clean_specs(raw: Any, cfg: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("Teknik özellikler bir nesne olmalı")
     fm = field_map(cfg)
+    known = {k: v for k, v in raw.items() if k in fm}
+    alias_vals, _ = normalize_specs({k: v for k, v in raw.items() if k not in fm}, cfg)
+    for k, v in alias_vals.items():
+        known.setdefault(k, v)
     out: Dict[str, Any] = {}
-    for k, v in raw.items():
+    for k, v in known.items():
         f = fm.get(k)
         if not f:
             continue
@@ -270,8 +336,7 @@ def _f(v) -> float:
 
 def spec_table(product: Dict[str, Any], cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Vitrin 'Teknik Özellikler' tablosu: [{group, label, rows: [{label, value}]}]."""
-    fm = field_map(cfg)
-    specs = product.get("specs") if isinstance(product.get("specs"), dict) else {}
+    specs, alias_extras = normalize_specs(product.get("specs") or {}, cfg)
     by_group: Dict[str, List[Dict[str, str]]] = {}
 
     def add(gkey: str, label: str, value: str):
@@ -296,7 +361,7 @@ def spec_table(product: Dict[str, Any], cfg: Dict[str, Any]) -> List[Dict[str, A
     desi = (w * d * h / 3000.0) if (w and d and h) else _f(product.get("cargo_weight"))
     if desi:
         add("boyut", "Desi", _fmt_num(round(desi, 2)))
-    for r in product.get("extra_specs") or []:
+    for r in list(product.get("extra_specs") or []) + alias_extras:
         if isinstance(r, dict) and r.get("name") and r.get("value"):
             add("ek", str(r["name"]), str(r["value"]))
     labels = {g["key"]: g["label"] for g in cfg.get("groups") or []}
@@ -341,7 +406,15 @@ def spec_query(params: Dict[str, str], cfg: Dict[str, Any]) -> List[Dict[str, An
                 if n is not None:
                     nums.append(int(n) if n == int(n) else n)
             if nums:
-                conds.append({f"specs.{k}": {"$in": nums}})
+                ors = [{f"specs.{k}": {"$in": nums}}]
+                for ak, (ck, mult) in SPEC_ALIASES.items():
+                    if ck == k and mult:
+                        av = [n / mult for n in nums]
+                        av = [int(x) if x == int(x) else x for x in av]
+                        ors.append({f"specs.{ak}": {"$in": av}})
+                conds.append({"$or": ors} if len(ors) > 1 else ors[0])
         else:
-            conds.append({f"specs.{k}": {"$in": vals}})
+            ors = [{f"specs.{k}": {"$in": vals}}]
+            ors += [{f"specs.{ak}": {"$in": vals}} for ak, (ck, _m) in SPEC_ALIASES.items() if ck == k]
+            conds.append({"$or": ors} if len(ors) > 1 else ors[0])
     return conds
