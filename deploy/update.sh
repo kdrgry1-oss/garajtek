@@ -55,8 +55,23 @@ if [ "$PULL" = 1 ] && [ -d "$APP/.git" ]; then
     || die "git pull başarısız (yerel değişiklik veya erişim sorunu). Özel depo ise GitHub Actions ile dağıtın (KURULUM.md §7)."
 elif [ "$PULL" = 1 ]; then
   log "git deposu değil — kod olduğu gibi kullanılıyor (--no-pull)"
+elif [ -d "$APP/.git" ] && [ -s "$APP/REVISION" ]; then
+  # GitHub Actions kodu rsync ile gönderdi (--no-pull): sunucudaki git kopyasını aynı commit'e
+  # hizala ki sürüm doğru görünsün ve sonraki elle `garajtek-update` (git pull) takılmasın.
+  # Depo erişilemezse (özel depo) sessizce geçilir; dosyalar zaten rsync ile güncel.
+  REV=$(tr -dc '0-9a-f' < "$APP/REVISION")
+  chown -R "$APP_USER:$APP_USER" "$APP/.git"
+  BR=$(as_app git -C "$APP" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  if [ -n "$REV" ] && as_app git -C "$APP" fetch -q origin ${BR:+"$BR"} 2>/dev/null \
+     && as_app git -C "$APP" cat-file -e "$REV^{commit}" 2>/dev/null; then
+    as_app git -C "$APP" reset -q --hard "$REV" && log "git kopyası $REV ile hizalandı"
+  fi
 fi
-SHA=$(as_app git -C "$APP" rev-parse HEAD 2>/dev/null || cat "$APP/REVISION" 2>/dev/null || echo "")
+if [ "$PULL" = 0 ] && [ -s "$APP/REVISION" ]; then
+  SHA=$(tr -dc '0-9a-f' < "$APP/REVISION")
+else
+  SHA=$(as_app git -C "$APP" rev-parse HEAD 2>/dev/null || cat "$APP/REVISION" 2>/dev/null || echo "")
+fi
 
 # ---- 2) Sahiplik / izinler --------------------------------------------------------
 log "izinler"
