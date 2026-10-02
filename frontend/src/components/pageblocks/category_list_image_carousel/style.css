@@ -1,0 +1,5 @@
+/* category_list_image_carousel — şablon v2.0 home-v9. Ayarlar: --pd-clic-box (gri kutu), --pd-clic-line (çerçeve), --pd-clic-r (köşe). */
+.electro .pd-clic__slide { border-color: var(--pd-clic-line, #eaeaea) !important; border-radius: var(--pd-clic-r, 10px) !important; }
+.electro .pd-clic__box { background-color: var(--pd-clic-box, #f9f9f9); }
+.electro .pd-clic__slide .el-ph { width: 100%; }
+.electro .pd-clic__header { border-bottom-color: #ddd; }

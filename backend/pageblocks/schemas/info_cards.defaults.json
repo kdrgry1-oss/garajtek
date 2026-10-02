@@ -1,1 +1,44 @@
-{}
+{
+  "items": [
+    {
+      "image": null,
+      "title": "Ne yapıyoruz?",
+      "text": "Profesyonel atölyeler için lift, kompresör, lastik ve el aleti ekipmanlarını kurulum, eğitim ve satış sonrası destekle sunuyoruz.",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    {
+      "image": null,
+      "title": "Vizyonumuz",
+      "text": "Türkiye'nin her atölyesine doğru ekipmanı, doğru fiyatla ve hızlı teslimatla ulaştırmak.",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    {
+      "image": null,
+      "title": "Hikâyemiz",
+      "text": "Küçük bir servis atölyesinde başlayan yolculuğumuz bugün binlerce işletmeye ekipman tedarikiyle sürüyor.",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    }
+  ],
+  "columns": "3",
+  "align": "center",
+  "text_max_width": 334,
+  "_section": {
+    "margin_bottom": {
+      "desktop": 40,
+      "tablet": 40,
+      "mobile": 40
+    }
+  }
+}

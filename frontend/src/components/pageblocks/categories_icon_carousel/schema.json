@@ -2,20 +2,52 @@
   "key": "categories_icon_carousel",
   "version": 2,
   "title": "İkonlu Kategori Karuseli",
-  "description": "",
+  "description": "Kategori ikonları şeridi: ana renk bantlı (home-v8) veya üstü yuvarlak kutulu (home-v6) karusel",
   "category": "kategori",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v6.html"
+    "T2/html/home/home-v8.html#Categories Carousel",
+    "T2/html/home/home-v6.html#Categories Carousel"
   ],
-  "layout": "container",
+  "layout": "full_bleed",
   "singleton": false,
   "allowed_pages": [
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v8",
+      "label": "v2.0 home-v8 – Ana renk bantlı şerit",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v6",
+      "label": "v2.0 home-v6 – Üstü yuvarlak ikon kutuları",
+      "defaults_patch": {
+        "icon_size": 40,
+        "icon_color": "#878787",
+        "carousel": {
+          "per_view": {
+            "0": 2,
+            "554": 3,
+            "768": 5,
+            "992": 6,
+            "1200": 8,
+            "1600": 10
+          }
+        },
+        "_section": {
+          "margin_bottom": {
+            "desktop": 32,
+            "tablet": 32,
+            "mobile": 32
+          }
+        }
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -23,7 +55,127 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Kategoriler",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "icon",
+          "type": "icon",
+          "label": "İkon",
+          "tab": "İçerik",
+          "set": "electro",
+          "allow_upload": true
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Ad",
+          "tab": "İçerik",
+          "max_length": 60
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "search",
+            "page",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "icon": {
+          "icon": "fas fa-tools"
+        },
+        "label": "",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "max": 16,
+      "item_label": "{{label}}",
+      "item_noun": "Kategori"
+    },
+    {
+      "name": "band_color",
+      "type": "color",
+      "label": "Bant rengi (boşsa tema ana rengi)",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "v8"
+        ]
+      }
+    },
+    {
+      "name": "bubble_color",
+      "type": "color",
+      "label": "İkon kutusu rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "v6"
+        ]
+      }
+    },
+    {
+      "name": "icon_color",
+      "type": "color",
+      "label": "İkon rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "icon_size",
+      "type": "number",
+      "label": "İkon boyutu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 14,
+      "max": 80,
+      "width": "half"
+    },
+    {
+      "name": "item_width",
+      "type": "number",
+      "label": "Öğe genişliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 80,
+      "max": 200,
+      "width": "half"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "help": "Şablon (home-v8): 1200 px üstü 10, 992 px üstü 6, 768 px üstü 5, 554 px üstü 3, mobilde 2 (home-v6: 1200 px üstü 8, 1600 px üstü 10); yanlarda yuvarlak oklar (yalnız masaüstü), mobilde noktalar."
+    }
+  ],
   "common": [
     "section",
     "visibility",

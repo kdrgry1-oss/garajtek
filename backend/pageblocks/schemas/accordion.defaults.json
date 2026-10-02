@@ -1,1 +1,35 @@
-{}
+{
+  "title": "Size nasıl yardımcı olabiliriz?",
+  "items": [
+    {
+      "question": "7/24 Destek",
+      "answer": "Kurulum ve kullanım sorularınız için hafta içi 09:00–18:00 arası telefonla, diğer saatlerde WhatsApp ve e-posta ile ulaşabilirsiniz."
+    },
+    {
+      "question": "Orijinal ve garantili ürün",
+      "answer": "Sattığımız tüm ekipmanlar yetkili distribütörlerden gelir; üretici garantisi ve faturası ile teslim edilir."
+    },
+    {
+      "question": "Hızlı teslimat",
+      "answer": "Stoktaki ürünler aynı gün kargoya verilir; büyük ekipmanlar anlaşmalı nakliye ile atölyenize kadar getirilir."
+    },
+    {
+      "question": "Kurulum ve eğitim",
+      "answer": "Lift, balans ve lastik sökme makinelerinde yerinde kurulum ve kullanım eğitimi hizmeti sunuyoruz."
+    },
+    {
+      "question": "Binlerce memnun atölye",
+      "answer": "Türkiye genelinde servis, lastikçi ve oto bakım işletmelerine ekipman tedarik ediyoruz."
+    }
+  ],
+  "open_index": 1,
+  "multiple": false,
+  "width": "full",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 56,
+      "tablet": 56,
+      "mobile": 56
+    }
+  }
+}

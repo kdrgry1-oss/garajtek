@@ -2,11 +2,14 @@
   "key": "sidebar_features",
   "version": 2,
   "title": "Kenar Çubuğu Avantajlar",
-  "description": "",
+  "description": "Kenar çubuğunda alt alta avantaj listesi (Özellikler şeridinin dikey hali; şablon home-v2 Feature List)",
   "category": "kenar",
   "group": "D",
-  "status": "stub",
-  "template_refs": [],
+  "status": "ready",
+  "template_refs": [
+    "T2/html/home/home-v2.html#Feature List",
+    "T1/HTML/home-v2.html#electro_features_block_widget"
+  ],
   "layout": "sidebar",
   "singleton": false,
   "allowed_pages": [
@@ -21,7 +24,109 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Avantajlar",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "icon",
+          "type": "icon",
+          "label": "İkon",
+          "tab": "İçerik",
+          "set": "electro",
+          "allow_upload": true
+        },
+        {
+          "name": "strong_text",
+          "type": "text",
+          "label": "Kalın metin",
+          "tab": "İçerik",
+          "max_length": 60
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "label": "Açıklama",
+          "tab": "İçerik",
+          "max_length": 80
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "icon": {
+          "icon": "ec ec-tag"
+        },
+        "strong_text": "",
+        "text": "",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "max": 6,
+      "item_label": "{{strong_text}}",
+      "item_noun": "Avantaj"
+    },
+    {
+      "name": "border",
+      "type": "bool",
+      "label": "Çerçeve (yuvarlak köşeli)",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "icon_color",
+      "type": "color",
+      "label": "İkon rengi (boşsa tema ana rengi)",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "background",
+      "type": "color",
+      "label": "Arka plan",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "icon_size",
+      "type": "number",
+      "label": "İkon boyutu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 16,
+      "max": 80,
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

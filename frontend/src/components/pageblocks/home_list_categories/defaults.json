@@ -1,1 +1,35 @@
-{}
+{
+  "header": {
+    "title": "Bu Ayın Popüler Kategorileri",
+    "tag": "h2",
+    "align": "left",
+    "right": "none",
+    "pills": [],
+    "link": {
+      "label": "",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    "underline": true
+  },
+  "source": "auto",
+  "auto_max": 6,
+  "categories": [],
+  "sub_limit": 4,
+  "see_all_text": "Tümünü gör",
+  "show_see_all": true,
+  "show_images": true,
+  "columns": "3",
+  "image_width": 150,
+  "dividers": true,
+  "_section": {
+    "margin_bottom": {
+      "desktop": 50,
+      "tablet": 40,
+      "mobile": 30
+    }
+  }
+}

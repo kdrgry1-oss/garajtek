@@ -1,0 +1,7 @@
+/* categories_brands_card — şablon v2.0 home-v11. Ayarlar: --pd-cbc-r (köşe), --pd-cbc-link (bağlantı rengi). */
+.electro .pd-cbc { border-radius: var(--pd-cbc-r, 20px); overflow: hidden; position: relative; z-index: 3; }
+.electro .pd-cbc__box .el-ph { width: 100%; }
+.electro .pd-cbc__arrow { color: #465f76 !important; z-index: 2; }
+.electro .pd-cbc__arrow:hover { text-decoration: none; }
+.electro .pd-cbc__link { color: var(--pd-cbc-link, #0077d0) !important; }
+.electro .pd-cbc__word { display: inline-block; line-height: 2.1875rem; font-size: 14px; }

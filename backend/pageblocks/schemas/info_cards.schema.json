@@ -2,17 +2,17 @@
   "key": "info_cards",
   "version": 2,
   "title": "Bilgi Kartları",
-  "description": "",
+  "description": "Görsel + başlık + metin kartları, 3'lü (şablon v2.0 about.html)",
   "category": "icerik",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/HTML/about.html"
+    "T2/html/home/about.html#card",
+    "T1/HTML/about.html#about-features"
   ],
   "layout": "container",
   "singleton": false,
   "allowed_pages": [
-    "home",
     "*"
   ],
   "variants": [],
@@ -23,7 +23,116 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Kartlar",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "tab": "İçerik",
+          "recommended": [
+            500,
+            300
+          ]
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık",
+          "tab": "İçerik",
+          "max_length": 80
+        },
+        {
+          "name": "text",
+          "type": "textarea",
+          "label": "Metin",
+          "tab": "İçerik",
+          "max_length": 600
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı (opsiyonel)",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "title": "",
+        "text": "",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "max": 6,
+      "item_label": "{{title}}",
+      "item_noun": "Kart"
+    },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Sütun",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "3",
+          "label": "3 sütun (şablon)"
+        },
+        {
+          "value": "2",
+          "label": "2 sütun"
+        },
+        {
+          "value": "4",
+          "label": "4 sütun"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "align",
+      "type": "select",
+      "label": "Hizalama",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "center",
+          "label": "Ortada (şablon)"
+        },
+        {
+          "value": "left",
+          "label": "Solda"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "text_max_width",
+      "type": "number",
+      "label": "Metin genişliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 150,
+      "max": 800,
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

@@ -1,1 +1,76 @@
-{}
+{
+  "items": [
+    {
+      "icon": {
+        "icon": "ec ec-transport"
+      },
+      "strong_text": "Ücretsiz Kargo",
+      "text": "2.500 TL üzeri",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    {
+      "icon": {
+        "icon": "ec ec-customers"
+      },
+      "strong_text": "%99 Olumlu",
+      "text": "Müşteri yorumu",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    {
+      "icon": {
+        "icon": "ec ec-returning"
+      },
+      "strong_text": "14 gün",
+      "text": "kolay iade",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    {
+      "icon": {
+        "icon": "ec ec-payment"
+      },
+      "strong_text": "Güvenli Ödeme",
+      "text": "3D Secure",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    {
+      "icon": {
+        "icon": "ec ec-tag"
+      },
+      "strong_text": "Orijinal",
+      "text": "Markalar",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    }
+  ],
+  "border": true,
+  "icon_color": "",
+  "text_color": "#333e48",
+  "background": "",
+  "icon_size": 46,
+  "_section": {
+    "margin_bottom": {
+      "desktop": 56,
+      "tablet": 56,
+      "mobile": 56
+    }
+  }
+}

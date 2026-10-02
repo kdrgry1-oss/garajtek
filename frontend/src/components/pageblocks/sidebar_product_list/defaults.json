@@ -1,1 +1,26 @@
-{}
+{
+  "title": "Son Eklenenler",
+  "source": {
+    "kind": "newest",
+    "product_ids": [],
+    "category_ids": [],
+    "include_children": true,
+    "tag": "",
+    "brand_ids": [],
+    "limit": 5,
+    "sort": "default",
+    "exclude_out_of_stock": true,
+    "exclude_ids": [],
+    "fill_with": "none"
+  },
+  "per_page": 0,
+  "show_old_price": true,
+  "empty_text": "",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 24,
+      "tablet": 24,
+      "mobile": 24
+    }
+  }
+}

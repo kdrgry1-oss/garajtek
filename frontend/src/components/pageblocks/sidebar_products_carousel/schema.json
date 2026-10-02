@@ -2,11 +2,14 @@
   "key": "sidebar_products_carousel",
   "version": 2,
   "title": "Kenar Çubuğu Ürün Karuseli",
-  "description": "",
+  "description": "Kenar çubuğunda tek ürünlük karusel, başlıkta oklar (şablon home-v2 “Featured Products”)",
   "category": "kenar",
   "group": "D",
-  "status": "stub",
-  "template_refs": [],
+  "status": "ready",
+  "template_refs": [
+    "T2/html/home/home-v2.html#Featured Products",
+    "T1/HTML/home-v2.html#widget_electro_products_carousel_widget"
+  ],
   "layout": "sidebar",
   "singleton": false,
   "allowed_pages": [
@@ -21,7 +24,56 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "max_length": 80
+    },
+    {
+      "name": "source",
+      "type": "product_source",
+      "label": "Ürün kaynağı",
+      "tab": "Ürünler",
+      "default_limit": 4,
+      "max_limit": 20
+    },
+    {
+      "name": "show_category",
+      "type": "bool",
+      "label": "Kategori adını göster",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "show_old_price",
+      "type": "bool",
+      "label": "Eski fiyatı göster",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Ürün yoksa yazı",
+      "tab": "Gelişmiş",
+      "max_length": 120,
+      "help": "Boşsa ürün yokken widget gizlenir."
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "hide": [
+        "per_view",
+        "rows"
+      ],
+      "help": "Kenar çubuğunda her sayfada 1 ürün. Şablon: başlıkta oklar, nokta yok."
+    }
+  ],
   "common": [
     "section",
     "visibility",

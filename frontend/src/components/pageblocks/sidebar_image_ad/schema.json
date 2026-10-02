@@ -2,12 +2,13 @@
   "key": "sidebar_image_ad",
   "version": 2,
   "title": "Kenar Çubuğu Reklam Görseli",
-  "description": "",
+  "description": "Kenar çubuğunda 270×428 dikey reklam görseli (şablon home-v2 kenar çubuğu)",
   "category": "kenar",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/home-v2-sidebar.php"
+    "T2/html/home/home-v2.html#Image Banner",
+    "T1/HTML/home-v2.html#sidebar widget_text"
   ],
   "layout": "sidebar",
   "singleton": false,
@@ -23,7 +24,41 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "image",
+      "type": "image",
+      "label": "Görsel",
+      "tab": "İçerik",
+      "recommended": [
+        270,
+        428
+      ],
+      "allow_mobile": false
+    },
+    {
+      "name": "link",
+      "type": "link",
+      "label": "Bağlantı",
+      "tab": "İçerik",
+      "kinds": [
+        "category",
+        "product",
+        "page",
+        "brand",
+        "search",
+        "url",
+        "none"
+      ]
+    },
+    {
+      "name": "alt",
+      "type": "text",
+      "label": "Alternatif metin",
+      "tab": "İçerik",
+      "max_length": 120
+    }
+  ],
   "common": [
     "section",
     "visibility",

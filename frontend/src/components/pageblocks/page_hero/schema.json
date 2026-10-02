@@ -2,17 +2,17 @@
   "key": "page_hero",
   "version": 2,
   "title": "Sayfa Başlığı (Hero)",
-  "description": "",
+  "description": "Arka plan görselli ortalı sayfa başlığı ve açıklama (şablon v2.0 about.html)",
   "category": "icerik",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/HTML/about.html"
+    "T2/html/home/about.html#bg-img-hero",
+    "T1/HTML/about.html#header-with-cover-image"
   ],
   "layout": "full_bleed",
   "singleton": false,
   "allowed_pages": [
-    "home",
     "*"
   ],
   "variants": [],
@@ -23,7 +23,108 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "background",
+      "type": "image",
+      "label": "Arka plan görseli",
+      "tab": "İçerik",
+      "recommended": [
+        1920,
+        600
+      ],
+      "allow_mobile": true
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "max_length": 120
+    },
+    {
+      "name": "text",
+      "type": "textarea",
+      "label": "Açıklama",
+      "tab": "İçerik",
+      "max_length": 600
+    },
+    {
+      "name": "min_height",
+      "type": "number",
+      "label": "En az yükseklik",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 120,
+      "max": 900,
+      "responsive": true
+    },
+    {
+      "name": "max_width",
+      "type": "number",
+      "label": "Metin genişliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 300,
+      "max": 1200,
+      "width": "half"
+    },
+    {
+      "name": "align",
+      "type": "select",
+      "label": "Hizalama",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "center",
+          "label": "Ortada (şablon)"
+        },
+        {
+          "value": "left",
+          "label": "Solda"
+        },
+        {
+          "value": "right",
+          "label": "Sağda"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "background_color",
+      "type": "color",
+      "label": "Görsel yokken arka plan",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "title_color",
+      "type": "color",
+      "label": "Başlık rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Açıklama rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "title_size",
+      "type": "number",
+      "label": "Başlık boyutu",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 18,
+      "max": 72,
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

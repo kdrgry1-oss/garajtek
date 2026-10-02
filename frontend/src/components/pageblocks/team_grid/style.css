@@ -1,0 +1,4 @@
+/* team_grid — şablon v2.0 about.html ekip bandı. */
+.electro .pd-team__role { color: var(--pd-team-role, #989898); }
+.electro .pd-team__ph { max-width: 300px; margin-left: auto; margin-right: auto; }
+.electro .pd-team .rounded-circle.el-ph { overflow: hidden; }

@@ -1,17 +1,23 @@
 {
+  "title": "Markalar",
   "source": "catalog",
+  "catalog_limit": 20,
   "brands": [],
   "show_name_overlay": true,
   "grayscale": true,
+  "logo_opacity": 50,
   "logo_max_height": 50,
+  "item_height": 50,
+  "border_color": "#dadada",
+  "arrow_color": "#d6d6d6",
   "show_on_all_pages": false,
   "carousel": {
     "per_view": {
-      "0": 2,
-      "480": 3,
-      "768": 4,
-      "992": 5,
-      "1200": 6
+      "0": 1,
+      "480": 1,
+      "768": 2,
+      "992": 3,
+      "1200": 5
     },
     "slides_to_scroll": 1,
     "rows": 1,
@@ -31,8 +37,8 @@
   "_section": {
     "margin_bottom": {
       "desktop": 85,
-      "tablet": 50,
-      "mobile": 40
+      "tablet": 85,
+      "mobile": 85
     }
   }
 }

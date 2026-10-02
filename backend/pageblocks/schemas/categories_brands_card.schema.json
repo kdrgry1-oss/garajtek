@@ -1,13 +1,13 @@
 {
   "key": "categories_brands_card",
   "version": 2,
-  "title": "Markalar + Kategori Kutuları",
-  "description": "",
+  "title": "Markalar + Kategori Kutuları Kartı",
+  "description": "Üstte marka logoları satırı, altta görsel başlıklı kategori kutuları; slider'ın üzerine biner (şablon v2.0 home-v11)",
   "category": "kategori",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v11.html"
+    "T2/html/home/home-v11.html#Categories list and Brand"
   ],
   "layout": "container",
   "singleton": false,
@@ -23,7 +23,271 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "brands_label",
+      "type": "text",
+      "label": "Markalar etiketi",
+      "tab": "İçerik",
+      "max_length": 40
+    },
+    {
+      "name": "brands_source",
+      "type": "select",
+      "label": "Logolar",
+      "tab": "İçerik",
+      "options": [
+        {
+          "value": "catalog",
+          "label": "Katalogdaki markalar"
+        },
+        {
+          "value": "manual",
+          "label": "Elle eklenen logolar"
+        },
+        {
+          "value": "none",
+          "label": "Marka satırını gizle"
+        }
+      ]
+    },
+    {
+      "name": "brands_limit",
+      "type": "number",
+      "label": "En fazla logo",
+      "tab": "İçerik",
+      "unit": "adet",
+      "min": 1,
+      "max": 12,
+      "width": "half",
+      "show_if": {
+        "brands_source": [
+          "catalog"
+        ]
+      }
+    },
+    {
+      "name": "brands",
+      "type": "repeater",
+      "label": "Logolar",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "logo",
+          "type": "image",
+          "label": "Logo",
+          "tab": "İçerik",
+          "recommended": [
+            200,
+            60
+          ]
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "label": "Marka adı",
+          "tab": "İçerik",
+          "max_length": 80
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "tab": "İçerik",
+          "kinds": [
+            "brand",
+            "search",
+            "category",
+            "page",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "logo": null,
+        "name": "",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "max": 12,
+      "item_label": "{{name}}",
+      "item_noun": "Logo",
+      "show_if": {
+        "brands_source": [
+          "manual"
+        ]
+      }
+    },
+    {
+      "name": "more_brands",
+      "type": "group",
+      "label": "“Tüm markalar” bağlantısı",
+      "tab": "İçerik",
+      "fields": [
+        {
+          "name": "text",
+          "type": "text",
+          "label": "Metin",
+          "tab": "İçerik",
+          "max_length": 40
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "boxes",
+      "type": "repeater",
+      "label": "Kategori kutuları",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "header_image",
+          "type": "image",
+          "label": "Başlık görseli",
+          "tab": "İçerik",
+          "recommended": [
+            350,
+            92
+          ]
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık",
+          "tab": "İçerik",
+          "max_length": 80
+        },
+        {
+          "name": "category",
+          "type": "category_picker",
+          "label": "Kategori (bağlantılar boşsa alt kategorileri listelenir)",
+          "tab": "İçerik",
+          "multiple": false
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Ok düğmesi bağlantısı",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        },
+        {
+          "name": "links",
+          "type": "repeater",
+          "label": "Bağlantılar",
+          "tab": "İçerik",
+          "item_fields": [
+            {
+              "name": "label",
+              "type": "text",
+              "label": "Metin",
+              "tab": "İçerik",
+              "max_length": 80
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı",
+              "tab": "İçerik",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            }
+          ],
+          "item_default": {
+            "label": "",
+            "link": {
+              "kind": "none",
+              "url": "",
+              "new_tab": false
+            }
+          },
+          "max": 6,
+          "item_label": "{{label}}",
+          "item_noun": "Bağlantı"
+        }
+      ],
+      "item_default": {
+        "header_image": null,
+        "title": "",
+        "category": "",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        },
+        "links": []
+      },
+      "max": 8,
+      "item_label": "{{title}}",
+      "item_noun": "Kutu"
+    },
+    {
+      "name": "show_more_link",
+      "type": "bool",
+      "label": "Listenin sonuna “…” bağlantısı ekle",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "overlap_hero",
+      "type": "bool",
+      "label": "Üstteki slider'ın üzerine bindir",
+      "tab": "Görünüm",
+      "width": "half",
+      "help": "Masaüstünde kart yukarı kayar (şablon: -10 boşluk)."
+    },
+    {
+      "name": "radius",
+      "type": "number",
+      "label": "Köşe yuvarlaklığı",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 40,
+      "width": "half"
+    },
+    {
+      "name": "link_color",
+      "type": "color",
+      "label": "Bağlantı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

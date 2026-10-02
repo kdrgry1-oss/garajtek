@@ -1,1 +1,76 @@
-{}
+{
+  "title": "Blogdan",
+  "posts": [
+    {
+      "image": null,
+      "category": "Atölye Rehberi",
+      "title": "Lift seçerken dikkat edilmesi gereken 5 nokta",
+      "meta": "3 yorum",
+      "link": {
+        "kind": "url",
+        "url": "/blog",
+        "new_tab": false
+      }
+    },
+    {
+      "image": null,
+      "category": "Bakım",
+      "title": "Kompresör bakımı: yıllık kontrol listesi",
+      "meta": "2 yorum",
+      "link": {
+        "kind": "url",
+        "url": "/blog",
+        "new_tab": false
+      }
+    },
+    {
+      "image": null,
+      "category": "Lastik",
+      "title": "Balans ayarı neden önemlidir?",
+      "meta": "5 yorum",
+      "link": {
+        "kind": "url",
+        "url": "/blog",
+        "new_tab": false
+      }
+    },
+    {
+      "image": null,
+      "category": "Haberler",
+      "title": "Yeni sezon ekipmanları mağazada",
+      "meta": "1 yorum",
+      "link": {
+        "kind": "url",
+        "url": "/blog",
+        "new_tab": false
+      }
+    }
+  ],
+  "limit": 4,
+  "carousel": {
+    "per_view": {
+      "0": 1
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": false,
+    "arrows": "header",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 56,
+      "tablet": 56,
+      "mobile": 56
+    }
+  }
+}

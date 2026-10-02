@@ -2,11 +2,14 @@
   "key": "sidebar_product_list",
   "version": 2,
   "title": "Kenar Çubuğu Ürün Listesi",
-  "description": "",
+  "description": "Kenar çubuğunda küçük görselli ürün listesi; istenirse sayfalı karusel (şablon home-v2 “Latest Products”)",
   "category": "kenar",
   "group": "D",
-  "status": "stub",
-  "template_refs": [],
+  "status": "ready",
+  "template_refs": [
+    "T2/html/home/home-v2.html#Latest Products",
+    "T1/HTML/home-v2.html#widget_products"
+  ],
   "layout": "sidebar",
   "singleton": false,
   "allowed_pages": [
@@ -21,7 +24,49 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "max_length": 80
+    },
+    {
+      "name": "source",
+      "type": "product_source",
+      "label": "Ürün kaynağı",
+      "tab": "Ürünler",
+      "default_limit": 5,
+      "max_limit": 20
+    },
+    {
+      "name": "per_page",
+      "type": "number",
+      "label": "Sayfa başına ürün (0 = karusel yok)",
+      "tab": "Görünüm",
+      "unit": "adet",
+      "min": 0,
+      "max": 10,
+      "width": "half",
+      "help": "Şablonda ürünler sayfalara bölünür, başlıktaki oklarla gezilir."
+    },
+    {
+      "name": "show_old_price",
+      "type": "bool",
+      "label": "Eski fiyatı göster",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "empty_text",
+      "type": "text",
+      "label": "Ürün yoksa yazı",
+      "tab": "Gelişmiş",
+      "max_length": 120,
+      "help": "Boşsa ürün yokken widget gizlenir."
+    }
+  ],
   "common": [
     "section",
     "visibility",

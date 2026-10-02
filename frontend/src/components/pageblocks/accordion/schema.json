@@ -2,17 +2,17 @@
   "key": "accordion",
   "version": 2,
   "title": "Sıkça Sorulanlar (Akordeon)",
-  "description": "",
+  "description": "Başlık + açılır kapanır soru/cevap kartları (şablon v2.0 about.html “What can we do for you?”)",
   "category": "icerik",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/HTML/about.html"
+    "T2/html/home/about.html#basicsAccordion1",
+    "T1/HTML/about.html#accordion"
   ],
   "layout": "container",
   "singleton": false,
   "allowed_pages": [
-    "home",
     "*"
   ],
   "variants": [],
@@ -23,7 +23,88 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "max_length": 120
+    },
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Sorular",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "question",
+          "type": "text",
+          "label": "Soru",
+          "tab": "İçerik",
+          "max_length": 200
+        },
+        {
+          "name": "answer",
+          "type": "rich_text",
+          "label": "Cevap",
+          "tab": "İçerik",
+          "marks": [
+            "strong",
+            "em",
+            "br",
+            "link"
+          ],
+          "max_length": 2000
+        }
+      ],
+      "item_default": {
+        "question": "",
+        "answer": ""
+      },
+      "max": 20,
+      "item_label": "{{question}}",
+      "item_noun": "Soru"
+    },
+    {
+      "name": "open_index",
+      "type": "number",
+      "label": "Başta açık soru (0 = hiçbiri)",
+      "tab": "Görünüm",
+      "unit": "adet",
+      "min": 0,
+      "max": 20,
+      "width": "half"
+    },
+    {
+      "name": "multiple",
+      "type": "bool",
+      "label": "Birden çok soru aynı anda açık kalabilir",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "width",
+      "type": "select",
+      "label": "Genişlik",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "full",
+          "label": "Tam"
+        },
+        {
+          "value": "narrow",
+          "label": "Dar (5/12, şablon)"
+        },
+        {
+          "value": "wide",
+          "label": "Geniş (8/12)"
+        }
+      ],
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

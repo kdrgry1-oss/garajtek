@@ -1,1 +1,16 @@
-{}
+{
+  "image": null,
+  "link": {
+    "kind": "url",
+    "url": "/tum-urunler",
+    "new_tab": false
+  },
+  "alt": "Kampanya",
+  "_section": {
+    "margin_bottom": {
+      "desktop": 56,
+      "tablet": 56,
+      "mobile": 56
+    }
+  }
+}

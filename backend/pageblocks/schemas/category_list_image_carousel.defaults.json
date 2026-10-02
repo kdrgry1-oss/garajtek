@@ -1,1 +1,443 @@
-{}
+{
+  "header": {
+    "title": "Lift ve Kaldırma Sistemleri",
+    "tag": "h2",
+    "align": "left",
+    "right": "arrows",
+    "pills": [],
+    "link": {
+      "label": "",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    "underline": true
+  },
+  "slides": [
+    {
+      "groups": [
+        {
+          "title": "Araç Liftleri",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Ara%C3%A7%20Liftleri",
+            "new_tab": false,
+            "label": "Araç Liftleri"
+          },
+          "links": [
+            {
+              "label": "İki Sütunlu Liftler",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=%C4%B0ki%20S%C3%BCtunlu%20Liftler",
+                "new_tab": false,
+                "label": "İki Sütunlu Liftler"
+              }
+            },
+            {
+              "label": "Makaslı Liftler",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Makasl%C4%B1%20Liftler",
+                "new_tab": false,
+                "label": "Makaslı Liftler"
+              }
+            },
+            {
+              "label": "Dört Sütunlu Liftler",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=D%C3%B6rt%20S%C3%BCtunlu%20Liftler",
+                "new_tab": false,
+                "label": "Dört Sütunlu Liftler"
+              }
+            },
+            {
+              "label": "Motosiklet Liftleri",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Motosiklet%20Liftleri",
+                "new_tab": false,
+                "label": "Motosiklet Liftleri"
+              }
+            },
+            {
+              "label": "Kamyon Liftleri",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Kamyon%20Liftleri",
+                "new_tab": false,
+                "label": "Kamyon Liftleri"
+              }
+            },
+            {
+              "label": "Hareketli Liftler",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Hareketli%20Liftler",
+                "new_tab": false,
+                "label": "Hareketli Liftler"
+              }
+            },
+            {
+              "label": "Lift Aksesuarları",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Lift%20Aksesuarlar%C4%B1",
+                "new_tab": false,
+                "label": "Lift Aksesuarları"
+              }
+            }
+          ]
+        },
+        {
+          "title": "Kaldırma Ekipmanları",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Kald%C4%B1rma%20Ekipmanlar%C4%B1",
+            "new_tab": false,
+            "label": "Kaldırma Ekipmanları"
+          },
+          "links": [
+            {
+              "label": "Timsah Krikolar",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Timsah%20Krikolar",
+                "new_tab": false,
+                "label": "Timsah Krikolar"
+              }
+            },
+            {
+              "label": "Şanzıman Krikoları",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=%C5%9Eanz%C4%B1man%20Krikolar%C4%B1",
+                "new_tab": false,
+                "label": "Şanzıman Krikoları"
+              }
+            },
+            {
+              "label": "Araç Sehpaları",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Ara%C3%A7%20Sehpalar%C4%B1",
+                "new_tab": false,
+                "label": "Araç Sehpaları"
+              }
+            },
+            {
+              "label": "Motor Vinçleri",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Motor%20Vin%C3%A7leri",
+                "new_tab": false,
+                "label": "Motor Vinçleri"
+              }
+            }
+          ]
+        }
+      ],
+      "links": [
+        {
+          "label": "Yeni Gelenler",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Yeni%20Gelenler",
+            "new_tab": false,
+            "label": "Yeni Gelenler"
+          }
+        },
+        {
+          "label": "Çok Satanlar",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=%C3%87ok%20Satanlar",
+            "new_tab": false,
+            "label": "Çok Satanlar"
+          }
+        },
+        {
+          "label": "Kampanyalı Liftler",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Kampanyal%C4%B1%20Liftler",
+            "new_tab": false,
+            "label": "Kampanyalı Liftler"
+          }
+        },
+        {
+          "label": "Kurulum Hizmeti",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Kurulum%20Hizmeti",
+            "new_tab": false,
+            "label": "Kurulum Hizmeti"
+          }
+        },
+        {
+          "label": "Yedek Parça",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Yedek%20Par%C3%A7a",
+            "new_tab": false,
+            "label": "Yedek Parça"
+          }
+        },
+        {
+          "label": "Bakım Kitleri",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Bak%C4%B1m%20Kitleri",
+            "new_tab": false,
+            "label": "Bakım Kitleri"
+          }
+        },
+        {
+          "label": "Tüm Markalar",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=T%C3%BCm%20Markalar",
+            "new_tab": false,
+            "label": "Tüm Markalar"
+          }
+        }
+      ],
+      "image": null,
+      "link": {
+        "kind": "url",
+        "url": "/tum-urunler",
+        "new_tab": false
+      },
+      "alt": "Lift ve Kaldırma Sistemleri"
+    },
+    {
+      "groups": [
+        {
+          "title": "Kompresörler",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Kompres%C3%B6rler",
+            "new_tab": false,
+            "label": "Kompresörler"
+          },
+          "links": [
+            {
+              "label": "Pistonlu Kompresörler",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Pistonlu%20Kompres%C3%B6rler",
+                "new_tab": false,
+                "label": "Pistonlu Kompresörler"
+              }
+            },
+            {
+              "label": "Vidalı Kompresörler",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Vidal%C4%B1%20Kompres%C3%B6rler",
+                "new_tab": false,
+                "label": "Vidalı Kompresörler"
+              }
+            },
+            {
+              "label": "Sessiz Kompresörler",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Sessiz%20Kompres%C3%B6rler",
+                "new_tab": false,
+                "label": "Sessiz Kompresörler"
+              }
+            },
+            {
+              "label": "Hava Tankları",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Hava%20Tanklar%C4%B1",
+                "new_tab": false,
+                "label": "Hava Tankları"
+              }
+            },
+            {
+              "label": "Hava Kurutucular",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Hava%20Kurutucular",
+                "new_tab": false,
+                "label": "Hava Kurutucular"
+              }
+            },
+            {
+              "label": "Filtreler",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Filtreler",
+                "new_tab": false,
+                "label": "Filtreler"
+              }
+            },
+            {
+              "label": "Hortum Makaraları",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Hortum%20Makaralar%C4%B1",
+                "new_tab": false,
+                "label": "Hortum Makaraları"
+              }
+            }
+          ]
+        },
+        {
+          "title": "Havalı El Aletleri",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Haval%C4%B1%20El%20Aletleri",
+            "new_tab": false,
+            "label": "Havalı El Aletleri"
+          },
+          "links": [
+            {
+              "label": "Bijon Tabancaları",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Bijon%20Tabancalar%C4%B1",
+                "new_tab": false,
+                "label": "Bijon Tabancaları"
+              }
+            },
+            {
+              "label": "Cırcırlar",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=C%C4%B1rc%C4%B1rlar",
+                "new_tab": false,
+                "label": "Cırcırlar"
+              }
+            },
+            {
+              "label": "Taşlama Makineleri",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Ta%C5%9Flama%20Makineleri",
+                "new_tab": false,
+                "label": "Taşlama Makineleri"
+              }
+            },
+            {
+              "label": "Boya Tabancaları",
+              "link": {
+                "kind": "search",
+                "url": "/arama?q=Boya%20Tabancalar%C4%B1",
+                "new_tab": false,
+                "label": "Boya Tabancaları"
+              }
+            }
+          ]
+        }
+      ],
+      "links": [
+        {
+          "label": "Yeni Gelenler",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Yeni%20Gelenler",
+            "new_tab": false,
+            "label": "Yeni Gelenler"
+          }
+        },
+        {
+          "label": "Çok Satanlar",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=%C3%87ok%20Satanlar",
+            "new_tab": false,
+            "label": "Çok Satanlar"
+          }
+        },
+        {
+          "label": "Kampanyalı Ürünler",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Kampanyal%C4%B1%20%C3%9Cr%C3%BCnler",
+            "new_tab": false,
+            "label": "Kampanyalı Ürünler"
+          }
+        },
+        {
+          "label": "Hava Hortumları",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Hava%20Hortumlar%C4%B1",
+            "new_tab": false,
+            "label": "Hava Hortumları"
+          }
+        },
+        {
+          "label": "Rakorlar",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Rakorlar",
+            "new_tab": false,
+            "label": "Rakorlar"
+          }
+        },
+        {
+          "label": "Yağlayıcılar",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=Ya%C4%9Flay%C4%B1c%C4%B1lar",
+            "new_tab": false,
+            "label": "Yağlayıcılar"
+          }
+        },
+        {
+          "label": "Tüm Markalar",
+          "link": {
+            "kind": "search",
+            "url": "/arama?q=T%C3%BCm%20Markalar",
+            "new_tab": false,
+            "label": "Tüm Markalar"
+          }
+        }
+      ],
+      "image": null,
+      "link": {
+        "kind": "url",
+        "url": "/tum-urunler",
+        "new_tab": false
+      },
+      "alt": "Kompresör ve Havalı Aletler"
+    }
+  ],
+  "box_background": "#f9f9f9",
+  "border_color": "#eaeaea",
+  "radius": 10,
+  "carousel": {
+    "per_view": {
+      "0": 1
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": false,
+    "arrows": "header",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 36,
+      "tablet": 36,
+      "mobile": 36
+    }
+  }
+}

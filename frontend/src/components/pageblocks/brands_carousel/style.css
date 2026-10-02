@@ -1,0 +1,36 @@
+/* brands_carousel — şablon v1 _brands-carousel.scss (+ v2.0 Brand Carousel). Ayarlar: --pd-brands-h/-mh/-op/-line/-arrow. */
+.electro .pd-brands { position: relative; }
+/* v1: .owl-brands */
+.electro .pd-brands__owl { border-top: 1px solid var(--pd-brands-line, #dadada); border-bottom: 1px solid var(--pd-brands-line, #dadada); padding: 1.286em 0; }
+.electro .pd-brands__owl .el-carousel__viewport { padding: 0 1px; }
+.electro .pd-brands__item { text-align: center; height: var(--pd-brands-h, 50px); position: relative; }
+.electro .pd-brands__link { display: block; height: 100%; color: inherit; }
+.electro .pd-brands__link:hover { text-decoration: none; color: inherit; }
+.electro .pd-brands__fig { display: block; margin: 0; position: absolute; top: 50%; left: 0; transform: translateY(-50%); width: 100%; text-align: center; }
+.electro .pd-brands__fig picture { display: block; }
+.electro .pd-brands__img, .electro .pd-brands__fig img { display: block; opacity: var(--pd-brands-op, .5); max-height: var(--pd-brands-mh, 50px); max-width: 100%; width: auto; height: auto; margin: 0 auto; transition: opacity .2s, filter .2s; }
+.electro .pd-brands__fig:hover img { opacity: 1; }
+.electro .pd-brands--gray .pd-brands__fig img { filter: grayscale(1); }
+.electro .pd-brands--gray .pd-brands__fig:hover img { filter: none; }
+.electro .pd-brands__word { display: inline-block; font-size: 1.286em; font-weight: 700; letter-spacing: .02em; color: #333e48; opacity: var(--pd-brands-op, .5); line-height: var(--pd-brands-h, 50px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 0 8px; transition: opacity .2s; }
+.electro .pd-brands__link:hover .pd-brands__word { opacity: 1; }
+/* ad katmanı: şablonda figcaption.text-overlay gizli; burada üzerine gelince logonun ortasında belirir */
+.electro .pd-brands__name { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 2; opacity: 0; pointer-events: none; transition: opacity .2s; text-align: center; }
+.electro .pd-brands__name h4 { display: inline-block; margin: 0; font-size: 11px; line-height: 16px; font-weight: 600; color: #333e48; background: rgba(255, 255, 255, .92); padding: 0 6px; border-radius: 8px; white-space: nowrap; }
+.electro .pd-brands--names .pd-brands__fig:hover .pd-brands__name { opacity: 1; }
+/* oklar: .owl-nav [class*=owl-] — 14 px #d6d6d6, şeridin iki ucunda, logo satırının ortasında */
+.electro .pd-brands__owl .slick-arrow.pd-brands__nav { position: absolute; top: calc(1.286em + var(--pd-brands-h, 50px) - 30px); padding: 0; font-size: 14px; line-height: 14px; color: var(--pd-brands-arrow, #d6d6d6); z-index: 3; }
+.electro .pd-brands__owl .slick-arrow.pd-brands__nav:hover { color: #869791; }
+.electro .pd-brands__owl .pd-brands__prev { left: 0; }
+.electro .pd-brands__owl .pd-brands__next { right: 0; }
+.electro .pd-brands__owl--empty { display: flex; gap: 30px; }
+.electro .pd-brands__owl--empty .pd-brands__item { flex: 1 1 0; height: auto; }
+.electro .pd-brands__ph { max-width: 200px; margin: 0 auto; }
+/* v2 */
+.electro .pd-brands--v2 .pd-brands__band { border-color: var(--pd-brands-line, #ddd) !important; }
+.electro .pd-brands--v2 .link-hover__brand { opacity: var(--pd-brands-op, .5); position: relative; text-align: center; }
+.electro .pd-brands--v2:not(.pd-brands--gray) .link-hover__brand { filter: none; }
+.electro .pd-brands--v2 .link-hover__brand:hover { opacity: 1; }
+.electro .pd-brands--v2 .link-hover__brand img { max-height: var(--pd-brands-mh, 50px); display: block; }
+.electro .pd-brands--v2 .pd-brands__name { font-size: 11px; line-height: 16px; font-weight: 600; color: #333e48; background: rgba(255, 255, 255, .92); }
+.electro .pd-brands--v2.pd-brands--names .link-hover__brand:hover .pd-brands__name { opacity: 1; }

@@ -1,1 +1,23 @@
-{}
+{
+  "background": null,
+  "title": "Hakkımızda",
+  "text": "Garaj ve oto servis ekipmanlarında 20 yılı aşkın tecrübeyle atölyenizin en güvenilir çözüm ortağıyız.",
+  "min_height": {
+    "desktop": 564,
+    "tablet": 564,
+    "mobile": 564
+  },
+  "max_width": 620,
+  "align": "center",
+  "background_color": "#f5f5f5",
+  "title_color": "#333e48",
+  "text_color": "#434343",
+  "title_size": 40,
+  "_section": {
+    "margin_bottom": {
+      "desktop": 104,
+      "tablet": 104,
+      "mobile": 104
+    }
+  }
+}

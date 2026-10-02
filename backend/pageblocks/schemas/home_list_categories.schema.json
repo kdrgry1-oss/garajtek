@@ -2,12 +2,14 @@
   "key": "home_list_categories",
   "version": 2,
   "title": "Bu Ayın Popüler Kategorileri",
-  "description": "",
+  "description": "Görselli kategori listesi: alt kategoriler ve “Tümünü gör” bağlantısı (şablon: homepage-3 home-list-categories)",
   "category": "kategori",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/inc/blocks/homepage/homepage-3/home-list-categories.php"
+    "T1/HTML/home-v3.html#home-list-categories",
+    "T1/assets/sass/blocks/_home-list-categories.scss",
+    "T2/html/home/home-v3.html#Top Categories this Month"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,7 +17,21 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1 – Görsel solda, alt kategoriler sağda (şablon home-v3)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2",
+      "label": "v2.0 – Büyük görsel + altı çizili bağlantılar (home-v3)",
+      "defaults_patch": {
+        "sub_limit": 6,
+        "columns": "3"
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -23,7 +39,282 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık satırı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "source",
+      "type": "select",
+      "label": "Kategoriler",
+      "tab": "İçerik",
+      "options": [
+        {
+          "value": "auto",
+          "label": "Ana kategorilerden otomatik"
+        },
+        {
+          "value": "manual",
+          "label": "Elle seçilen kategoriler"
+        }
+      ],
+      "help": "Otomatik: menüdeki ilk N ana kategori, görselleri ve alt kategorileriyle. Elle: aşağıda her kartı ayrı düzenleyin."
+    },
+    {
+      "name": "auto_max",
+      "type": "number",
+      "label": "Kategori sayısı",
+      "tab": "İçerik",
+      "unit": "adet",
+      "min": 1,
+      "max": 12,
+      "show_if": {
+        "source": [
+          "auto"
+        ]
+      },
+      "width": "half"
+    },
+    {
+      "name": "categories",
+      "type": "repeater",
+      "label": "Kategori kartları",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "category",
+          "type": "category_picker",
+          "label": "Kategori",
+          "tab": "İçerik",
+          "multiple": false,
+          "help": "Ad, görsel, bağlantı ve alt kategoriler bu kategoriden gelir; aşağıdaki alanlarla değiştirilebilir."
+        },
+        {
+          "name": "name_override",
+          "type": "text",
+          "label": "Görünen ad (boşsa kategori adı)",
+          "tab": "İçerik",
+          "max_length": 80
+        },
+        {
+          "name": "image_override",
+          "type": "image",
+          "label": "Görsel (boşsa kategori görseli)",
+          "tab": "İçerik",
+          "recommended": [
+            250,
+            232
+          ],
+          "help": "150 px genişlikte gösterilir."
+        },
+        {
+          "name": "link_override",
+          "type": "link",
+          "label": "Bağlantı (boşsa kategori sayfası)",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        },
+        {
+          "name": "sub_mode",
+          "type": "select",
+          "label": "Alt bağlantılar",
+          "tab": "İçerik",
+          "options": [
+            {
+              "value": "auto",
+              "label": "Alt kategorilerden otomatik"
+            },
+            {
+              "value": "manual",
+              "label": "Elle yaz"
+            }
+          ],
+          "width": "half"
+        },
+        {
+          "name": "sub_limit",
+          "type": "number",
+          "label": "Alt kategori sayısı",
+          "tab": "İçerik",
+          "unit": "adet",
+          "min": 0,
+          "max": 12,
+          "width": "half",
+          "show_if": {
+            "sub_mode": [
+              "auto"
+            ]
+          }
+        },
+        {
+          "name": "sub_links",
+          "type": "repeater",
+          "label": "Alt bağlantılar",
+          "tab": "İçerik",
+          "item_fields": [
+            {
+              "name": "label",
+              "type": "text",
+              "label": "Metin",
+              "tab": "İçerik",
+              "max_length": 80
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı",
+              "tab": "İçerik",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            }
+          ],
+          "item_default": {
+            "label": "",
+            "link": {
+              "kind": "none",
+              "url": "",
+              "new_tab": false
+            }
+          },
+          "max": 12,
+          "item_label": "{{label}}",
+          "item_noun": "Bağlantı",
+          "show_if": {
+            "sub_mode": [
+              "manual"
+            ]
+          }
+        },
+        {
+          "name": "see_all_text",
+          "type": "text",
+          "label": "“Tümünü gör” metni (boşsa genel metin)",
+          "tab": "İçerik",
+          "max_length": 40
+        }
+      ],
+      "item_default": {
+        "category": "",
+        "name_override": "",
+        "image_override": null,
+        "link_override": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        },
+        "sub_mode": "auto",
+        "sub_limit": 4,
+        "sub_links": [],
+        "see_all_text": ""
+      },
+      "max": 12,
+      "item_label": "{{name_override}}",
+      "item_noun": "Kategori kartı",
+      "show_if": {
+        "source": [
+          "manual"
+        ]
+      }
+    },
+    {
+      "name": "sub_limit",
+      "type": "number",
+      "label": "Alt kategori sayısı (otomatik kartlar)",
+      "tab": "İçerik",
+      "unit": "adet",
+      "min": 0,
+      "max": 12,
+      "width": "half",
+      "show_if": {
+        "source": [
+          "auto"
+        ]
+      }
+    },
+    {
+      "name": "see_all_text",
+      "type": "text",
+      "label": "“Tümünü gör” metni",
+      "tab": "İçerik",
+      "max_length": 40,
+      "width": "half"
+    },
+    {
+      "name": "show_see_all",
+      "type": "bool",
+      "label": "“Tümünü gör” bağlantısını göster",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "show_images",
+      "type": "bool",
+      "label": "Kategori görsellerini göster",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Sütun (992 px üstü)",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "3",
+          "label": "3 sütun (şablon)"
+        },
+        {
+          "value": "4",
+          "label": "4 sütun"
+        },
+        {
+          "value": "2",
+          "label": "2 sütun"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "image_width",
+      "type": "number",
+      "label": "Görsel genişliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 60,
+      "max": 250,
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "v1"
+        ]
+      }
+    },
+    {
+      "name": "dividers",
+      "type": "bool",
+      "label": "Sütunlar arası dikey çizgi",
+      "tab": "Görünüm",
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

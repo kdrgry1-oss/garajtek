@@ -1,1 +1,45 @@
-{}
+{
+  "title": "Öne Çıkan Ürünler",
+  "source": {
+    "kind": "featured",
+    "product_ids": [],
+    "category_ids": [],
+    "include_children": true,
+    "tag": "",
+    "brand_ids": [],
+    "limit": 4,
+    "sort": "default",
+    "exclude_out_of_stock": true,
+    "exclude_ids": [],
+    "fill_with": "newest"
+  },
+  "show_category": true,
+  "show_old_price": true,
+  "empty_text": "",
+  "carousel": {
+    "per_view": {
+      "0": 1
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": false,
+    "arrows": "header",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 56,
+      "tablet": 56,
+      "mobile": 56
+    }
+  }
+}

@@ -1,0 +1,22 @@
+/* sidebar_product_list / sidebar_products_carousel — şablon v2.0 home-v2 kenar çubuğu. */
+.electro .pd-spl__header { border-bottom-color: #ddd; }
+.electro .pd-spl .product-item__title { font-size: .875rem; margin-bottom: 0; }
+.electro .pd-spl .product-media-left img { aspect-ratio: 150 / 140; object-fit: contain; }
+.electro .pd-spl__skel { height: 86px; margin: 12px 1rem 0; background: linear-gradient(90deg, #f5f5f5 25%, #ececec 37%, #f5f5f5 63%); background-size: 400% 100%; animation: pdSplSkel 1.4s ease infinite; }
+@keyframes pdSplSkel { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .electro .pd-spl__skel { animation: none; } }
+.electro .pd-sbh__arrows { display: flex; gap: 2px; padding-bottom: .75rem; }
+.electro .pd-sbh__arrows button { background: none; border: 0; padding: 0 4px; font-size: 17px; line-height: 1; color: #333e48; cursor: pointer; }
+.electro .pd-sbh__arrows button:disabled { opacity: .5; cursor: not-allowed; }
+/* Kenar çubuğu blokları "left_sidebar" sayfa düzeninde .pd-sidebar sütununa yerleşir. Tam genişlik düzende (kenar çubuğu
+   yokken) eklenirse kutulu alanın solunda, şablondaki widget genişliğinde (en fazla 300 px) gösterilir — sayfa düzeni bozulmaz. */
+.electro .pd-block--sidebar_image_ad, .electro .pd-block--sidebar_product_list, .electro .pd-block--sidebar_products_carousel,
+.electro .pd-block--sidebar_features, .electro .pd-block--sidebar_blog_carousel { width: 100%; max-width: 1200px; margin-left: auto; margin-right: auto; padding-left: 15px; padding-right: 15px; }
+.electro .pd-block--sidebar_image_ad > aside, .electro .pd-block--sidebar_product_list > aside, .electro .pd-block--sidebar_products_carousel > aside,
+.electro .pd-block--sidebar_features > aside, .electro .pd-block--sidebar_blog_carousel > aside { max-width: 300px; }
+@media (min-width: 1480px) {
+  .electro .pd-block--sidebar_image_ad, .electro .pd-block--sidebar_product_list, .electro .pd-block--sidebar_products_carousel,
+  .electro .pd-block--sidebar_features, .electro .pd-block--sidebar_blog_carousel { max-width: 1430px; }
+}
+.electro .pd-sidebar > .pd-block { max-width: none; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
+.electro .pd-sidebar > .pd-block > aside { max-width: none; }

@@ -2,17 +2,17 @@
   "key": "text_columns",
   "version": 2,
   "title": "Metin Sütunları",
-  "description": "",
+  "description": "Başlık + paragraf sütunları, 2'li ızgara (şablon v2.0 about.html)",
   "category": "icerik",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/HTML/about.html"
+    "T2/html/home/about.html#col-lg-7",
+    "T1/HTML/about.html#text-boxes"
   ],
   "layout": "container",
   "singleton": false,
   "allowed_pages": [
-    "home",
     "*"
   ],
   "variants": [],
@@ -23,7 +23,101 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "items",
+      "type": "repeater",
+      "label": "Sütunlar",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık",
+          "tab": "İçerik",
+          "max_length": 120
+        },
+        {
+          "name": "text",
+          "type": "rich_text",
+          "label": "Metin",
+          "tab": "İçerik",
+          "marks": [
+            "strong",
+            "em",
+            "br",
+            "link"
+          ],
+          "max_length": 2000
+        }
+      ],
+      "item_default": {
+        "title": "",
+        "text": ""
+      },
+      "max": 8,
+      "item_label": "{{title}}",
+      "item_noun": "Sütun"
+    },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Sütun (992 px üstü)",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "2",
+          "label": "2 (şablon)"
+        },
+        {
+          "value": "3",
+          "label": "3"
+        },
+        {
+          "value": "4",
+          "label": "4"
+        },
+        {
+          "value": "1",
+          "label": "1"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "width",
+      "type": "select",
+      "label": "Genişlik",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "full",
+          "label": "Tam"
+        },
+        {
+          "value": "wide",
+          "label": "7/12 (şablon, yanına akordeon)"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "title_color",
+      "type": "color",
+      "label": "Başlık rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "text_color",
+      "type": "color",
+      "label": "Metin rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

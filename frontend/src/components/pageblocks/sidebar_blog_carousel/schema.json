@@ -2,11 +2,14 @@
   "key": "sidebar_blog_carousel",
   "version": 2,
   "title": "Kenar Çubuğu Blog Karuseli",
-  "description": "",
+  "description": "Kenar çubuğunda yazı karuseli (şablon home-v2 “From the Blog”). Mağazada blog modülü olmadığı için galeride gizlidir; yazılar elle girilir.",
   "category": "kenar",
   "group": "D",
   "status": "stub",
-  "template_refs": [],
+  "template_refs": [
+    "T2/html/home/home-v2.html#From the Blog",
+    "T1/HTML/home-v2.html#electro_posts_carousel_widget"
+  ],
   "layout": "sidebar",
   "singleton": false,
   "allowed_pages": [
@@ -21,7 +24,104 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "max_length": 80
+    },
+    {
+      "name": "posts",
+      "type": "repeater",
+      "label": "Yazılar",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "tab": "İçerik",
+          "recommended": [
+            270,
+            180
+          ]
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "label": "Kategori",
+          "tab": "İçerik",
+          "max_length": 60
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "label": "Başlık",
+          "tab": "İçerik",
+          "max_length": 120
+        },
+        {
+          "name": "meta",
+          "type": "text",
+          "label": "Alt bilgi (tarih / yorum)",
+          "tab": "İçerik",
+          "max_length": 60
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "category": "",
+        "title": "",
+        "meta": "",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "max": 8,
+      "item_label": "{{title}}",
+      "item_noun": "Yazı"
+    },
+    {
+      "name": "limit",
+      "type": "number",
+      "label": "En fazla yazı",
+      "tab": "İçerik",
+      "unit": "adet",
+      "min": 1,
+      "max": 8,
+      "width": "half"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "hide": [
+        "per_view",
+        "rows"
+      ],
+      "help": "Kenar çubuğunda her sayfada 1 yazı; başlıkta oklar."
+    }
+  ],
   "common": [
     "section",
     "visibility",

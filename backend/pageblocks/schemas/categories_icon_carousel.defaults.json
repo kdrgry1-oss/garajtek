@@ -1,1 +1,184 @@
-{}
+{
+  "items": [
+    {
+      "icon": {
+        "icon": "fas fa-car"
+      },
+      "label": "Araç Liftleri",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Lift",
+        "new_tab": false,
+        "label": "Lift"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-wind"
+      },
+      "label": "Kompresörler",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Kompres%C3%B6r",
+        "new_tab": false,
+        "label": "Kompresör"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-cog"
+      },
+      "label": "Lastik Sökme",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Lastik%20s%C3%B6kme",
+        "new_tab": false,
+        "label": "Lastik sökme"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-balance-scale"
+      },
+      "label": "Balans",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Balans",
+        "new_tab": false,
+        "label": "Balans"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-weight-hanging"
+      },
+      "label": "Krikolar",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Kriko",
+        "new_tab": false,
+        "label": "Kriko"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-wrench"
+      },
+      "label": "El Aletleri",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=El%20aleti",
+        "new_tab": false,
+        "label": "El aleti"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-oil-can"
+      },
+      "label": "Yağ Ekipmanları",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Ya%C4%9F",
+        "new_tab": false,
+        "label": "Yağ"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-car-battery"
+      },
+      "label": "Akü Test",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Ak%C3%BC",
+        "new_tab": false,
+        "label": "Akü"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-tachometer-alt"
+      },
+      "label": "Arıza Tespit",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Ar%C4%B1za%20tespit",
+        "new_tab": false,
+        "label": "Arıza tespit"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-toolbox"
+      },
+      "label": "Takım Dolapları",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Tak%C4%B1m",
+        "new_tab": false,
+        "label": "Takım"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-tools"
+      },
+      "label": "Servis Ekipmanı",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Servis",
+        "new_tab": false,
+        "label": "Servis"
+      }
+    },
+    {
+      "icon": {
+        "icon": "fas fa-spray-can"
+      },
+      "label": "Boya ve Bakım",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Boya",
+        "new_tab": false,
+        "label": "Boya"
+      }
+    }
+  ],
+  "band_color": "",
+  "bubble_color": "#f9f9f9",
+  "icon_color": "#333e48",
+  "text_color": "#333e48",
+  "icon_size": 30,
+  "item_width": 122,
+  "carousel": {
+    "per_view": {
+      "0": 2,
+      "554": 3,
+      "768": 5,
+      "992": 6,
+      "1200": 10
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": "mobile",
+    "arrows": "side",
+    "drag": true,
+    "last_active_divider": false
+  },
+  "_section": {
+    "margin_bottom": {
+      "desktop": 24,
+      "tablet": 24,
+      "mobile": 24
+    }
+  }
+}

@@ -1,1 +1,169 @@
-{}
+{
+  "header": {
+    "title": "Bu Haftanın Popüler Kategorileri",
+    "tag": "h2",
+    "align": "left",
+    "right": "none",
+    "pills": [],
+    "link": {
+      "label": "",
+      "link": {
+        "kind": "none",
+        "url": "",
+        "new_tab": false
+      }
+    },
+    "underline": true
+  },
+  "tiles": [
+    {
+      "image": null,
+      "label": "Araç Liftleri",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Lift",
+        "new_tab": false,
+        "label": "Lift"
+      }
+    },
+    {
+      "image": null,
+      "label": "Kompresörler",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Kompres%C3%B6r",
+        "new_tab": false,
+        "label": "Kompresör"
+      }
+    },
+    {
+      "image": null,
+      "label": "Lastik Sökme Makineleri",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Lastik%20s%C3%B6kme",
+        "new_tab": false,
+        "label": "Lastik sökme"
+      }
+    },
+    {
+      "image": null,
+      "label": "Balans Makineleri",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Balans",
+        "new_tab": false,
+        "label": "Balans"
+      }
+    },
+    {
+      "image": null,
+      "label": "Kriko ve Sehpalar",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Kriko",
+        "new_tab": false,
+        "label": "Kriko"
+      }
+    },
+    {
+      "image": null,
+      "label": "Havalı El Aletleri",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Haval%C4%B1",
+        "new_tab": false,
+        "label": "Havalı"
+      }
+    },
+    {
+      "image": null,
+      "label": "Yağ Değişim Ekipmanları",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Ya%C4%9F",
+        "new_tab": false,
+        "label": "Yağ"
+      }
+    },
+    {
+      "image": null,
+      "label": "Akü ve Şarj Cihazları",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Ak%C3%BC",
+        "new_tab": false,
+        "label": "Akü"
+      }
+    },
+    {
+      "image": null,
+      "label": "Arıza Tespit Cihazları",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Ar%C4%B1za%20tespit",
+        "new_tab": false,
+        "label": "Arıza tespit"
+      }
+    },
+    {
+      "image": null,
+      "label": "Atölye Mobilyaları",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=At%C3%B6lye",
+        "new_tab": false,
+        "label": "Atölye"
+      }
+    }
+  ],
+  "lead_banner": {
+    "enabled": false,
+    "image": null,
+    "label": "Araç Liftleri",
+    "link": {
+      "kind": "search",
+      "url": "/arama?q=Lift",
+      "new_tab": false,
+      "label": "Lift"
+    }
+  },
+  "columns": {
+    "desktop": 5,
+    "tablet": 3,
+    "mobile": 1
+  },
+  "mobile_scroll": true,
+  "rotation": 15,
+  "image_size": 100,
+  "min_height": 0,
+  "tile_background": "#ffffff",
+  "label_color": "#333e48",
+  "label_size": "",
+  "shadow_on_hover": true,
+  "_section": {
+    "background": "#f9f9f9",
+    "padding": {
+      "desktop": {
+        "top": 40,
+        "bottom": 40,
+        "unit": "px"
+      },
+      "tablet": {
+        "top": 40,
+        "bottom": 40,
+        "unit": "px"
+      },
+      "mobile": {
+        "top": 40,
+        "bottom": 40,
+        "unit": "px"
+      }
+    },
+    "margin_bottom": {
+      "desktop": 40,
+      "tablet": 40,
+      "mobile": 40
+    }
+  }
+}

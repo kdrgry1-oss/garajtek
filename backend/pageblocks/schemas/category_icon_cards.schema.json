@@ -1,13 +1,15 @@
 {
   "key": "category_icon_cards",
   "version": 2,
-  "title": "Kategori Kartları",
-  "description": "",
+  "title": "Kategori Kartları (döndürülmüş görsel)",
+  "description": "15° döndürülmüş kategori görseli + ad, üzerine gelince gölge (şablon v2.0 home-v4/v5/v8)",
   "category": "kategori",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v4.html"
+    "T2/html/home/home-v4.html#Top Categories this Week",
+    "T2/html/home/home-v5.html#Categories Card",
+    "T2/html/home/home-v8.html#Banner"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,7 +17,50 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v4",
+      "label": "v2.0 home-v4 – Gri bantta beyaz kartlar (5'li)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v5",
+      "label": "v2.0 home-v5 – Büyük gri kartlar (3'lü)",
+      "defaults_patch": {
+        "header": {
+          "title": ""
+        },
+        "columns": {
+          "desktop": 3,
+          "tablet": 2,
+          "mobile": 1
+        },
+        "image_size": 148,
+        "tile_background": "#f5f5f5",
+        "label_size": ""
+      }
+    },
+    {
+      "value": "v8",
+      "label": "v2.0 home-v8 – Solda büyük banner + gri kartlar",
+      "defaults_patch": {
+        "header": {
+          "title": ""
+        },
+        "columns": {
+          "desktop": 3,
+          "tablet": 3,
+          "mobile": 1
+        },
+        "lead_banner": {
+          "enabled": true
+        },
+        "tile_background": "#f5f5f5",
+        "min_height": 120,
+        "label_size": "14"
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -23,7 +68,236 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık satırı",
+      "tab": "İçerik",
+      "help": "Başlık boşsa başlık satırı gizlenir."
+    },
+    {
+      "name": "tiles",
+      "type": "repeater",
+      "label": "Kartlar",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Görsel",
+          "tab": "İçerik",
+          "recommended": [
+            300,
+            300
+          ],
+          "help": "Şeffaf PNG önerilir; karta 15° döndürülmüş yerleşir."
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Ad",
+          "tab": "İçerik",
+          "max_length": 80
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "image": null,
+        "label": "",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "max": 12,
+      "item_label": "{{label}}",
+      "item_noun": "Kart"
+    },
+    {
+      "name": "lead_banner",
+      "type": "group",
+      "label": "Öndeki büyük banner (v2.0 home-v8)",
+      "tab": "İçerik",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "label": "Göster",
+          "tab": "İçerik"
+        },
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Arka plan görseli",
+          "tab": "İçerik",
+          "recommended": [
+            543,
+            272
+          ],
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          }
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Yazı",
+          "tab": "İçerik",
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          },
+          "max_length": 80
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ],
+          "show_if": {
+            "enabled": [
+              true
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "columns",
+      "type": "number",
+      "label": "Satırdaki kart sayısı",
+      "tab": "Görünüm",
+      "unit": "adet",
+      "min": 1,
+      "max": 6,
+      "responsive": true,
+      "help": "Masaüstü / tablet / mobil. Mobilde kartlar yana kaydırılabilir şerit olur (aşağıdaki ayar)."
+    },
+    {
+      "name": "mobile_scroll",
+      "type": "bool",
+      "label": "Mobilde yana kaydırılabilir şerit",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "rotation",
+      "type": "number",
+      "label": "Görsel dönüş açısı (derece)",
+      "tab": "Görünüm",
+      "min": -45,
+      "max": 45,
+      "width": "half"
+    },
+    {
+      "name": "image_size",
+      "type": "number",
+      "label": "Görsel genişliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 40,
+      "max": 200,
+      "width": "half"
+    },
+    {
+      "name": "min_height",
+      "type": "number",
+      "label": "Kart en az yüksekliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 300,
+      "width": "half"
+    },
+    {
+      "name": "tile_background",
+      "type": "color",
+      "label": "Kart rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "label_color",
+      "type": "color",
+      "label": "Yazı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "label_size",
+      "type": "select",
+      "label": "Yazı boyutu",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "",
+          "label": "Şablondaki gibi (başlık boyutu)"
+        },
+        {
+          "value": "13",
+          "label": "13 px"
+        },
+        {
+          "value": "14",
+          "label": "14 px"
+        },
+        {
+          "value": "16",
+          "label": "16 px"
+        },
+        {
+          "value": "18",
+          "label": "18 px"
+        },
+        {
+          "value": "20",
+          "label": "20 px"
+        },
+        {
+          "value": "24",
+          "label": "24 px"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "shadow_on_hover",
+      "type": "bool",
+      "label": "Üzerine gelince gölge",
+      "tab": "Görünüm",
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

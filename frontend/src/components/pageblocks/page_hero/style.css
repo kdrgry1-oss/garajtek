@@ -1,0 +1,13 @@
+/* page_hero — şablon v2.0 about.html bg-img-hero. Ayarlar: --pd-ph-h-d/-t/-m (en az yükseklik), --pd-ph-w (metin genişliği), --pd-ph-tsz. */
+.electro .pd-ph { overflow: hidden; }
+.electro .pd-ph__bg, .electro .pd-ph > picture { position: absolute; inset: 0; width: 100%; height: 100%; }
+.electro .pd-ph > picture img, .electro .pd-ph__bg { width: 100%; height: 100%; object-fit: cover; }
+.electro .pd-ph__inner { min-height: var(--pd-ph-h-d, 564px); max-width: var(--pd-ph-w, 620px); }
+.electro .pd-ph__inner--center { margin: 0 auto; text-align: center; }
+.electro .pd-ph__inner--left { margin-right: auto; text-align: left; align-items: flex-start !important; }
+.electro .pd-ph__inner--right { margin-left: auto; text-align: right; align-items: flex-end !important; }
+.electro .pd-ph__title { font-size: var(--pd-ph-tsz, 40px); }
+.electro .pd-ph__text { color: #434343; white-space: pre-line; }
+@media (max-width: 1199.98px) { .electro .pd-ph__inner { min-height: var(--pd-ph-h-t, 420px); } }
+@media (max-width: 991.98px) { .electro .pd-ph__inner { max-width: none; } }
+@media (max-width: 767.98px) { .electro .pd-ph__inner { min-height: var(--pd-ph-h-m, 300px); } }

@@ -1,1 +1,104 @@
-{}
+{
+  "title": "Popüler Aramalar",
+  "tags": [
+    {
+      "label": "Lift",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Lift",
+        "new_tab": false,
+        "label": "Lift"
+      }
+    },
+    {
+      "label": "Kompresör",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Kompres%C3%B6r",
+        "new_tab": false,
+        "label": "Kompresör"
+      }
+    },
+    {
+      "label": "Lastik sökme",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Lastik%20s%C3%B6kme",
+        "new_tab": false,
+        "label": "Lastik sökme"
+      }
+    },
+    {
+      "label": "Balans",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Balans",
+        "new_tab": false,
+        "label": "Balans"
+      }
+    },
+    {
+      "label": "Kriko",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Kriko",
+        "new_tab": false,
+        "label": "Kriko"
+      }
+    },
+    {
+      "label": "Hava tabancası",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Hava%20tabancas%C4%B1",
+        "new_tab": false,
+        "label": "Hava tabancası"
+      }
+    },
+    {
+      "label": "Yağ boşaltma",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Ya%C4%9F%20bo%C5%9Faltma",
+        "new_tab": false,
+        "label": "Yağ boşaltma"
+      }
+    },
+    {
+      "label": "Takım arabası",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Tak%C4%B1m%20arabas%C4%B1",
+        "new_tab": false,
+        "label": "Takım arabası"
+      }
+    },
+    {
+      "label": "Akü test",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Ak%C3%BC%20test",
+        "new_tab": false,
+        "label": "Akü test"
+      }
+    },
+    {
+      "label": "Far ayar",
+      "link": {
+        "kind": "search",
+        "url": "/arama?q=Far%20ayar",
+        "new_tab": false,
+        "label": "Far ayar"
+      }
+    }
+  ],
+  "style": "soft",
+  "rounded_pill": false,
+  "_section": {
+    "margin_bottom": {
+      "desktop": 40,
+      "tablet": 40,
+      "mobile": 40
+    }
+  }
+}

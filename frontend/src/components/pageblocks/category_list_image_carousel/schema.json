@@ -2,12 +2,12 @@
   "key": "category_list_image_carousel",
   "version": 2,
   "title": "Kategori Listesi + Büyük Görsel Karuseli",
-  "description": "",
+  "description": "Solda gri kutuda kategori grupları, ortada bağlantı listesi, sağda 840×370 görsel; başlıkta oklarla gezilir (şablon v2.0 home-v9)",
   "category": "kategori",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v9.html"
+    "T2/html/home/home-v9.html#List-Image Section"
   ],
   "layout": "container",
   "singleton": false,
@@ -23,7 +23,231 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "header",
+      "type": "section_header",
+      "label": "Başlık satırı",
+      "tab": "İçerik"
+    },
+    {
+      "name": "slides",
+      "type": "repeater",
+      "label": "Slaytlar",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "groups",
+          "type": "repeater",
+          "label": "Kategori grupları (gri kutu)",
+          "tab": "İçerik",
+          "item_fields": [
+            {
+              "name": "title",
+              "type": "text",
+              "label": "Grup başlığı",
+              "tab": "İçerik",
+              "max_length": 80
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Grup bağlantısı",
+              "tab": "İçerik",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            },
+            {
+              "name": "links",
+              "type": "repeater",
+              "label": "Bağlantılar",
+              "tab": "İçerik",
+              "item_fields": [
+                {
+                  "name": "label",
+                  "type": "text",
+                  "label": "Metin",
+                  "tab": "İçerik",
+                  "max_length": 80
+                },
+                {
+                  "name": "link",
+                  "type": "link",
+                  "label": "Bağlantı",
+                  "tab": "İçerik",
+                  "kinds": [
+                    "category",
+                    "product",
+                    "page",
+                    "brand",
+                    "search",
+                    "url",
+                    "none"
+                  ]
+                }
+              ],
+              "item_default": {
+                "label": "",
+                "link": {
+                  "kind": "none",
+                  "url": "",
+                  "new_tab": false
+                }
+              },
+              "max": 7,
+              "item_label": "{{label}}",
+              "item_noun": "Bağlantı"
+            }
+          ],
+          "item_default": {
+            "title": "",
+            "link": {
+              "kind": "none",
+              "url": "",
+              "new_tab": false
+            },
+            "links": []
+          },
+          "max": 2,
+          "item_label": "{{title}}",
+          "item_noun": "Grup"
+        },
+        {
+          "name": "links",
+          "type": "repeater",
+          "label": "Orta liste bağlantıları",
+          "tab": "İçerik",
+          "item_fields": [
+            {
+              "name": "label",
+              "type": "text",
+              "label": "Metin",
+              "tab": "İçerik",
+              "max_length": 80
+            },
+            {
+              "name": "link",
+              "type": "link",
+              "label": "Bağlantı",
+              "tab": "İçerik",
+              "kinds": [
+                "category",
+                "product",
+                "page",
+                "brand",
+                "search",
+                "url",
+                "none"
+              ]
+            }
+          ],
+          "item_default": {
+            "label": "",
+            "link": {
+              "kind": "none",
+              "url": "",
+              "new_tab": false
+            }
+          },
+          "max": 7,
+          "item_label": "{{label}}",
+          "item_noun": "Bağlantı"
+        },
+        {
+          "name": "image",
+          "type": "image",
+          "label": "Büyük görsel",
+          "tab": "İçerik",
+          "recommended": [
+            840,
+            370
+          ],
+          "help": "Yalnız 1200 px üstünde görünür."
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Görsel bağlantısı",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        },
+        {
+          "name": "alt",
+          "type": "text",
+          "label": "Görsel alternatif metni",
+          "tab": "İçerik",
+          "max_length": 120
+        }
+      ],
+      "item_default": {
+        "groups": [],
+        "links": [],
+        "image": null,
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        },
+        "alt": ""
+      },
+      "max": 5,
+      "item_label": "{{alt}}",
+      "item_noun": "Slayt",
+      "min": 1
+    },
+    {
+      "name": "box_background",
+      "type": "color",
+      "label": "Gri kutu rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "border_color",
+      "type": "color",
+      "label": "Çerçeve rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "radius",
+      "type": "number",
+      "label": "Köşe yuvarlaklığı",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 0,
+      "max": 40,
+      "width": "half"
+    },
+    {
+      "name": "carousel",
+      "type": "carousel",
+      "label": "Karusel",
+      "tab": "Karusel",
+      "hide": [
+        "per_view",
+        "rows"
+      ],
+      "help": "Her slayt tek sayfadır. Şablon: başlıkta sağda oklar, nokta yok."
+    }
+  ],
   "common": [
     "section",
     "visibility",

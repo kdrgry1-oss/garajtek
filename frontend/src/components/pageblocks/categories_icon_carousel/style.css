@@ -1,0 +1,15 @@
+/* categories_icon_carousel — şablon v2.0 home-v8 (ana renk bant) / home-v6 (yuvarlak üstlü kutular).
+   Ayarlar: --pd-cicar-isz (ikon), -ic (ikon rengi), -tc (yazı), -w (öğe genişliği), -band, -bubble. */
+.electro .pd-cicar--v8 { background-color: var(--pd-cicar-band, var(--electro-primary, #fed700)) !important; }
+/* şablonda karusel position-static: oklar .container'a göre konumlanır (left -1rem / right -1.25rem) */
+.electro .pd-cicar .pd-cicar__car.pd-carousel { position: static !important; }
+.electro .pd-cicar__item { width: var(--pd-cicar-w, 122px); color: inherit; }
+.electro .pd-cicar__item:hover { text-decoration: none; }
+.electro .pd-cicar__icon { color: var(--pd-cicar-ic, #333e48); }
+.electro .pd-cicar__i { font-size: var(--pd-cicar-isz, 30px); }
+.electro .pd-cicar__img { display: inline-block; max-width: 100%; }
+.electro .pd-cicar__label { color: var(--pd-cicar-tc, #333e48); }
+.electro .pd-cicar--v6 .pd-cicar__bubble { width: var(--pd-cicar-w, 122px); background-color: var(--pd-cicar-bubble, #f9f9f9); color: var(--pd-cicar-ic, #878787); }
+.electro .pd-cicar--v6 .bg-on-hover:hover .pd-cicar__bubble { background-color: var(--electro-primary, #fed700); color: #000; }
+.electro .pd-cicar--v6 .pd-cicar__label-wrap { width: var(--pd-cicar-w, 122px); }
+.electro .pd-cicar .slick-arrow.rounded-circle { background: transparent; line-height: 1; }

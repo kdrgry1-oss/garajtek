@@ -2,17 +2,17 @@
   "key": "team_grid",
   "version": 2,
   "title": "Ekip Izgarası",
-  "description": "",
+  "description": "Yuvarlak fotoğraflı ekip üyeleri, gri bantta 6'lı (şablon v2.0 about.html)",
   "category": "icerik",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T1/HTML/about.html"
+    "T2/html/home/about.html#bg-gray-1 py-12",
+    "T1/HTML/about.html#team-member-wrapper"
   ],
   "layout": "container",
   "singleton": false,
   "allowed_pages": [
-    "home",
     "*"
   ],
   "variants": [],
@@ -23,7 +23,116 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık (opsiyonel)",
+      "tab": "İçerik",
+      "max_length": 80
+    },
+    {
+      "name": "members",
+      "type": "repeater",
+      "label": "Ekip üyeleri",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "photo",
+          "type": "image",
+          "label": "Fotoğraf",
+          "tab": "İçerik",
+          "recommended": [
+            300,
+            300
+          ],
+          "help": "Daire içinde gösterilir."
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "label": "Ad",
+          "tab": "İçerik",
+          "max_length": 80
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "label": "Görevi",
+          "tab": "İçerik",
+          "max_length": 80
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı (opsiyonel)",
+          "tab": "İçerik",
+          "kinds": [
+            "category",
+            "product",
+            "page",
+            "brand",
+            "search",
+            "url",
+            "none"
+          ]
+        }
+      ],
+      "item_default": {
+        "photo": null,
+        "name": "",
+        "role": "",
+        "link": {
+          "kind": "none",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "max": 12,
+      "item_label": "{{name}}",
+      "item_noun": "Üye"
+    },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Masaüstü sütun",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "6",
+          "label": "6 (şablon)"
+        },
+        {
+          "value": "5",
+          "label": "5"
+        },
+        {
+          "value": "4",
+          "label": "4"
+        },
+        {
+          "value": "3",
+          "label": "3"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "round",
+      "type": "bool",
+      "label": "Yuvarlak fotoğraf",
+      "tab": "Görünüm",
+      "width": "half"
+    },
+    {
+      "name": "role_color",
+      "type": "color",
+      "label": "Görev yazısı rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

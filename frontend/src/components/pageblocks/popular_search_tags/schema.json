@@ -2,12 +2,12 @@
   "key": "popular_search_tags",
   "version": 2,
   "title": "Popüler Aramalar",
-  "description": "",
+  "description": "Başlık + arama etiketleri (gri yuvarlak düğmeler) (şablon v2.0 home-v8 Popular Search)",
   "category": "icerik",
   "group": "D",
-  "status": "stub",
+  "status": "ready",
   "template_refs": [
-    "T2/html/home/home-v8.html"
+    "T2/html/home/home-v8.html#Popular Search"
   ],
   "layout": "container",
   "singleton": false,
@@ -23,7 +23,86 @@
     "Karusel",
     "Gelişmiş"
   ],
-  "fields": [],
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "label": "Başlık",
+      "tab": "İçerik",
+      "max_length": 80,
+      "help": "Boş bırakılırsa başlık satırı gizlenir."
+    },
+    {
+      "name": "tags",
+      "type": "repeater",
+      "label": "Etiketler",
+      "tab": "İçerik",
+      "item_fields": [
+        {
+          "name": "label",
+          "type": "text",
+          "label": "Metin",
+          "tab": "İçerik",
+          "max_length": 60
+        },
+        {
+          "name": "link",
+          "type": "link",
+          "label": "Bağlantı",
+          "tab": "İçerik",
+          "kinds": [
+            "search",
+            "category",
+            "product",
+            "page",
+            "brand",
+            "url",
+            "none"
+          ],
+          "help": "Boşsa etiket metniyle arama yapar."
+        }
+      ],
+      "item_default": {
+        "label": "",
+        "link": {
+          "kind": "search",
+          "url": "",
+          "new_tab": false
+        }
+      },
+      "max": 30,
+      "item_label": "{{label}}",
+      "item_noun": "Etiket"
+    },
+    {
+      "name": "style",
+      "type": "select",
+      "label": "Etiket görünümü",
+      "tab": "Görünüm",
+      "options": [
+        {
+          "value": "soft",
+          "label": "Gri dolgulu (şablon)"
+        },
+        {
+          "value": "outline",
+          "label": "Çerçeveli"
+        },
+        {
+          "value": "primary",
+          "label": "Ana renk"
+        }
+      ],
+      "width": "half"
+    },
+    {
+      "name": "rounded_pill",
+      "type": "bool",
+      "label": "Tam yuvarlak köşe",
+      "tab": "Görünüm",
+      "width": "half"
+    }
+  ],
   "common": [
     "section",
     "visibility",

@@ -2,12 +2,14 @@
   "key": "brands_carousel",
   "version": 2,
   "title": "Marka Logoları Karuseli",
-  "description": "Marka logoları karuseli (şablon: brands-carousel)",
+  "description": "Marka logoları şeridi: gri tonlu, üzerine gelince renkli; dış oklar (şablon: brands-carousel / v2.0 Brand Carousel)",
   "category": "marka",
   "group": "D",
   "status": "ready",
   "template_refs": [
-    "T1/inc/footer/brands-carousel.php"
+    "T1/inc/footer/brands-carousel.php",
+    "T1/assets/sass/blocks/_brands-carousel.scss",
+    "T2/html/home/index.html#Brand Carousel"
   ],
   "layout": "container",
   "singleton": false,
@@ -15,7 +17,28 @@
     "home",
     "*"
   ],
-  "variants": [],
+  "variants": [
+    {
+      "value": "v1",
+      "label": "v1 – Şablon ana sayfa (çizgili şerit, üstte oklar)",
+      "defaults_patch": {}
+    },
+    {
+      "value": "v2",
+      "label": "v2.0 – Çerçeveli şerit, yanlarda oklar",
+      "defaults_patch": {
+        "carousel": {
+          "per_view": {
+            "0": 1,
+            "768": 2,
+            "992": 5
+          },
+          "arrows": "side"
+        },
+        "border_color": "#dddddd"
+      }
+    }
+  ],
   "tabs": [
     "İçerik",
     "Ürünler",
@@ -25,56 +48,80 @@
   ],
   "fields": [
     {
+      "name": "title",
+      "type": "text",
+      "label": "Bölüm adı (ekran okuyucular için)",
+      "tab": "İçerik",
+      "help": "Şablonda görünmez (sr-only) başlıktır; erişilebilirlik ve arama motorları için.",
+      "max_length": 80
+    },
+    {
       "name": "source",
       "type": "select",
-      "label": "Kaynak",
+      "label": "Logolar nereden gelsin?",
       "tab": "İçerik",
       "options": [
         {
           "value": "catalog",
-          "label": "Katalogdaki markalar"
+          "label": "Katalogdaki markalar (logosu olanlar)"
         },
         {
           "value": "manual",
           "label": "Elle eklenen logolar"
         }
-      ]
+      ],
+      "help": "Katalog: Katalog › Markalar'da logosu yüklü markalar otomatik dizilir. Elle: aşağıdaki listeden."
+    },
+    {
+      "name": "catalog_limit",
+      "type": "number",
+      "label": "En fazla marka",
+      "tab": "İçerik",
+      "unit": "adet",
+      "min": 1,
+      "max": 30,
+      "show_if": {
+        "source": [
+          "catalog"
+        ]
+      },
+      "width": "half"
     },
     {
       "name": "brands",
       "type": "repeater",
       "label": "Logolar",
       "tab": "İçerik",
-      "max": 30,
-      "item_label": "{{name}}",
-      "show_if": {
-        "source": [
-          "manual"
-        ]
-      },
       "item_fields": [
         {
           "name": "logo",
           "type": "image",
           "label": "Logo",
+          "tab": "İçerik",
           "recommended": [
             200,
             60
-          ]
+          ],
+          "help": "Şeffaf PNG önerilir; şerit içinde en fazla 50 px yükseklikte gösterilir."
         },
         {
           "name": "name",
           "type": "text",
-          "label": "Marka adı"
+          "label": "Marka adı",
+          "tab": "İçerik",
+          "help": "Logonun alt metni ve üzerine gelince görünen ad; logo yoksa yazı olarak gösterilir.",
+          "max_length": 80
         },
         {
           "name": "link",
           "type": "link",
           "label": "Bağlantı",
+          "tab": "İçerik",
           "kinds": [
             "brand",
             "search",
             "category",
+            "page",
             "url",
             "none"
           ]
@@ -84,17 +131,24 @@
         "logo": null,
         "name": "",
         "link": {
-          "kind": "url",
+          "kind": "none",
           "url": "",
           "new_tab": false
         }
       },
-      "item_noun": "Logo"
+      "max": 30,
+      "item_label": "{{name}}",
+      "item_noun": "Logo",
+      "show_if": {
+        "source": [
+          "manual"
+        ]
+      }
     },
     {
       "name": "show_name_overlay",
       "type": "bool",
-      "label": "Üzerine gelince adı göster",
+      "label": "Üzerine gelince marka adını göster",
       "tab": "Görünüm",
       "width": "half"
     },
@@ -106,25 +160,75 @@
       "width": "half"
     },
     {
+      "name": "logo_opacity",
+      "type": "number",
+      "label": "Logo saydamlığı (normal)",
+      "tab": "Görünüm",
+      "unit": "%",
+      "min": 10,
+      "max": 100,
+      "width": "half",
+      "help": "Şablon: %50; üzerine gelince %100."
+    },
+    {
       "name": "logo_max_height",
       "type": "number",
       "label": "Logo en fazla yüksekliği",
       "tab": "Görünüm",
       "unit": "px",
       "min": 20,
-      "max": 120
+      "max": 120,
+      "width": "half"
+    },
+    {
+      "name": "item_height",
+      "type": "number",
+      "label": "Logo satırı yüksekliği",
+      "tab": "Görünüm",
+      "unit": "px",
+      "min": 30,
+      "max": 200,
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "v1"
+        ]
+      }
+    },
+    {
+      "name": "border_color",
+      "type": "color",
+      "label": "Üst/alt çizgi rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half"
+    },
+    {
+      "name": "arrow_color",
+      "type": "color",
+      "label": "Ok rengi",
+      "tab": "Görünüm",
+      "palette": "theme",
+      "width": "half",
+      "show_if": {
+        "_variant": [
+          "v1"
+        ]
+      }
     },
     {
       "name": "show_on_all_pages",
       "type": "bool",
       "label": "Tüm sayfalarda footer üstünde göster",
-      "tab": "Gelişmiş"
+      "tab": "Gelişmiş",
+      "help": "Şablonda marka şeridi her sayfanın altında yer alır. Diğer sayfalarda gösterim vitrin altyapısına bağlanınca bu ayar etkinleşir; şimdilik yalnız bu sayfada görünür."
     },
     {
       "name": "carousel",
       "type": "carousel",
       "label": "Karusel",
-      "tab": "Karusel"
+      "tab": "Karusel",
+      "help": "Şablon: 1200 px üstü 5, 992 px üstü 3, 768 px üstü 2, mobilde 1 logo; dışta oklar, nokta yok, sonda başa döner."
     }
   ],
   "common": [
