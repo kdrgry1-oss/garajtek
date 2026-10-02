@@ -199,7 +199,7 @@
       "min": 1,
       "max": 6,
       "responsive": true,
-      "help": "Masaüstü / tablet / mobil. Mobilde kartlar yana kaydırılabilir şerit olur (aşağıdaki ayar)."
+      "help": "Masaüstü (≥1200 px) / tablet (768–1199 px) / mobil. 992–1199 px arasında şablondaki gibi masaüstünden bir eksik (tabletten az olmamak üzere) gösterilir. Mobilde kartlar yana kaydırılabilir şerit olur (aşağıdaki ayar)."
     },
     {
       "name": "mobile_scroll",

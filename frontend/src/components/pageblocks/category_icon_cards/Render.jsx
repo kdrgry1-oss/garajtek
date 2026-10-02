@@ -22,6 +22,8 @@ export default function Render({ settings, ctx }) {
   const cols = st.columns && typeof st.columns === "object" ? st.columns : { desktop: n(st.columns, 5), tablet: 3, mobile: 1 };
   const vars = {
     "--pd-cic-d": n(cols.desktop, 5), "--pd-cic-t": n(cols.tablet, 3), "--pd-cic-m": n(cols.mobile, 1),
+    // 992–1199 px: şablondaki col-lg-* ara kırılımı (v4: 4, v5: 2, v8: 3) = masaüstünden bir eksik, tabletten az değil
+    "--pd-cic-l": Math.max(n(cols.tablet, 3), n(cols.desktop, 5) - 1),
     "--pd-cic-rot": `${Number(st.rotation) || 0}deg`, "--pd-cic-img": `${n(st.image_size, 100)}px`,
     "--pd-cic-bg": st.tile_background || "#fff", "--pd-cic-color": st.label_color || "#333e48",
     "--pd-cic-minh": `${Number(st.min_height) || 0}px`,

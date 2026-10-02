@@ -1,6 +1,7 @@
-/* category_icon_cards — şablon v2.0 home-v4 / v5 / v8 kategori kartları. Sütunlar: --pd-cic-d (≥1200), -t (768–1199), -m (<768). */
+/* category_icon_cards — şablon v2.0 home-v4 / v5 / v8 kategori kartları. Sütunlar: --pd-cic-d (≥1200), -l (992–1199, d-1 ≥ t), -t (768–991), -m (<768). */
 .electro .pd-cic__col { position: relative; width: 100%; padding-left: 15px; padding-right: 15px; flex: 0 0 calc(100% / var(--pd-cic-m, 1)); max-width: calc(100% / var(--pd-cic-m, 1)); }
 @media (min-width: 768px) { .electro .pd-cic__col { flex-basis: calc(100% / var(--pd-cic-t, 3)); max-width: calc(100% / var(--pd-cic-t, 3)); } }
+@media (min-width: 992px) { .electro .pd-cic__col { flex-basis: calc(100% / var(--pd-cic-l, 4)); max-width: calc(100% / var(--pd-cic-l, 4)); } }
 @media (min-width: 1200px) { .electro .pd-cic__col { flex-basis: calc(100% / var(--pd-cic-d, 5)); max-width: calc(100% / var(--pd-cic-d, 5)); } }
 @media (max-width: 767.98px) { .electro .pd-cic__row--scroll .pd-cic__col { flex-shrink: 0; } }
 .electro .pd-cic__tile { background-color: var(--pd-cic-bg, #fff); min-height: var(--pd-cic-minh, 0); }

@@ -23,6 +23,21 @@ test("çerçevesiz, ikon rengi", async () => {
   r.unmount();
 });
 
+test("yazı rengi kalın metne ve açıklamaya uygulanır (şablon sınıfları ezilir)", async () => {
+  const r = await renderBlock("sidebar_features", { text_color: "#00aa00" });
+  const strong = r.container.querySelector('[data-pd-field="items.0.strong_text"]');
+  const txt = r.container.querySelector('[data-pd-field="items.0.text"]');
+  expect(strong.style.color).toBe("rgb(0, 170, 0)");
+  expect(strong.className).not.toContain("text-dark");
+  expect(txt.style.color).toBe("rgb(0, 170, 0)");
+  expect(txt.className).not.toContain("text-secondary");
+  r.unmount();
+  const d = await renderBlock("sidebar_features", {});
+  expect(d.container.querySelector('[data-pd-field="items.0.strong_text"]').className).toContain("text-dark");
+  expect(d.container.querySelector('[data-pd-field="items.0.text"]').className).toContain("text-secondary");
+  d.unmount();
+});
+
 test("left_sidebar sayfa düzeninde kenar çubuğu sütununa, diğer bloklar ana sütuna yerleşir", async () => {
   const { act } = require("react");
   const { createRoot } = require("react-dom/client");

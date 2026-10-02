@@ -103,10 +103,11 @@
     {
       "name": "text_color",
       "type": "color",
-      "label": "Yazı rengi",
+      "label": "Yazı rengi (boşsa şablon renkleri)",
       "tab": "Görünüm",
       "palette": "theme",
-      "width": "half"
+      "width": "half",
+      "help": "Kalın metne ve açıklamaya birlikte uygulanır. Boş bırakılırsa şablondaki gibi kalın metin koyu, açıklama gri olur."
     },
     {
       "name": "background",

@@ -25,3 +25,11 @@ test("renk ayarları + boş durum", async () => {
   expect(r.container.textContent).toBe("");
   r.unmount();
 });
+
+test("karusel okları “İki yanda” iken başlıkta ikinci ok takımı çıkmaz", async () => {
+  const car = { ...require("./defaults.json").carousel, arrows: "side" };
+  const r = await renderBlock("category_list_image_carousel", { carousel: car });
+  expect(r.container.querySelector("[data-testid=header-arrows]")).toBeNull();
+  expect(r.container.querySelector('[data-pd-field="header.title"]')).not.toBeNull();
+  r.unmount();
+});

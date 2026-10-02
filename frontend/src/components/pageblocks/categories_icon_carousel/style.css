@@ -13,3 +13,5 @@
 .electro .pd-cicar--v6 .bg-on-hover:hover .pd-cicar__bubble { background-color: var(--electro-primary, #fed700); color: #000; }
 .electro .pd-cicar--v6 .pd-cicar__label-wrap { width: var(--pd-cicar-w, 122px); }
 .electro .pd-cicar .slick-arrow.rounded-circle { background: transparent; line-height: 1; }
+/* şablon: noktalar xl altında (d-xl-none) görünür; çerçevenin “Yalnız mobil” kuralı (<768) bu blokta 768–1199 px'i de kapsar */
+@media (min-width: 768px) and (max-width: 1199.98px) { .electro .pd-cicar .pd-cicar__dots-lg.pd-dots-mobile { display: flex !important; } }

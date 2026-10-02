@@ -8,6 +8,7 @@ test("varsayılan v4: başlık + 10 döndürülmüş kart, 5/3/1 sütun, gri ban
   const root = container.querySelector("[data-testid=category-icon-cards]");
   expect(container.querySelectorAll(".pd-cic__col").length).toBe(10);
   expect(root.style.getPropertyValue("--pd-cic-d")).toBe("5");
+  expect(root.style.getPropertyValue("--pd-cic-l")).toBe("4"); // şablon col-lg-3 (992–1199 px)
   expect(root.style.getPropertyValue("--pd-cic-rot")).toBe("15deg");
   expect(container.querySelector('[data-pd-field="tiles.0.label"]').textContent).toBe("Araç Liftleri");
   expect(container.querySelector('[data-pd-field="tiles.0.label"]').tagName).toBe("H6");

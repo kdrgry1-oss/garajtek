@@ -30,6 +30,8 @@ export default function Render({ settings, ctx }) {
     ...(st.band_color ? { "--pd-cicar-band": st.band_color } : {}),
     ...(st.bubble_color ? { "--pd-cicar-bubble": st.bubble_color } : {}),
   };
+  // Noktalar “Yalnız mobil”: şablondaki gibi 1200 px altında (d-xl-none + style.css); “Göster”: her genişlikte
+  const xlDots = st.carousel && st.carousel.dots === "mobile" ? "d-xl-none pd-cicar__dots-lg " : "";
   const arrows = {
     sideArrowsClassName: "d-none d-xl-block u-slick__arrow-normal u-slick__arrow-centered--y rounded-circle text-black font-size-30 z-index-2",
     arrowLeftClassName: "fa fa-angle-left u-slick__arrow-inner--left left-n16",
@@ -58,7 +60,7 @@ export default function Render({ settings, ctx }) {
       <div className="container pd-cicar pd-cicar--v6" style={vars} data-testid="categories-icon-carousel">
         <div className="position-relative">
           <BlockCarousel value={st.carousel} className="u-slick u-slick--gutters-0 u-slick-overflow-visble pb-5 pt-2 px-1 pd-cicar__car" {...arrows}
-            dotsClassName="d-xl-none text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-3 pt-1">
+            dotsClassName={`${xlDots}text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-3 pt-1`}>
             {slides}
           </BlockCarousel>
         </div>
@@ -69,7 +71,7 @@ export default function Render({ settings, ctx }) {
     <div className="border-top bg-primary border-color-8 pd-cicar pd-cicar--v8" style={vars} data-testid="categories-icon-carousel">
       <div className="container position-relative">
         <BlockCarousel value={st.carousel} className="u-slick u-slick--gutters-0 u-slick-overflow-visble px-1 py-3 text-lh-38 pd-cicar__car" {...arrows}
-          dotsClassName="d-xl-none text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--dark u-slick__pagination--long mb-2 z-index-n1 mt-4 pt-1">
+          dotsClassName={`${xlDots}text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--dark u-slick__pagination--long mb-2 z-index-n1 mt-4 pt-1`}>
           {slides}
         </BlockCarousel>
       </div>

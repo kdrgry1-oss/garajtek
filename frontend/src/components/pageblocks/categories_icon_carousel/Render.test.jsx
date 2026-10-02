@@ -26,3 +26,14 @@ test("v6 kutulu görünüm, renkler, yüklenen ikon görseli", async () => {
   expect(r.container.querySelector(".pd-cicar").style.getPropertyValue("--pd-cicar-isz")).toBe("50px");
   r.unmount();
 });
+
+test("noktalar: “Yalnız mobil” 1200 px altı (d-xl-none), “Göster” her genişlikte", async () => {
+  let r = await renderBlock("categories_icon_carousel", {});
+  const ul = r.container.querySelector("ul.js-pagination");
+  if (ul) { expect(ul.className).toContain("d-xl-none"); expect(ul.className).toContain("pd-cicar__dots-lg"); }
+  r.unmount();
+  r = await renderBlock("categories_icon_carousel", { carousel: { ...require("./defaults.json").carousel, dots: true } });
+  const ul2 = r.container.querySelector("ul.js-pagination");
+  if (ul2) expect(ul2.className).not.toContain("d-xl-none");
+  r.unmount();
+});

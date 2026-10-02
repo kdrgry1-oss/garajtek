@@ -5,3 +5,12 @@
 .electro .pd-cbc__arrow:hover { text-decoration: none; }
 .electro .pd-cbc__link { color: var(--pd-cbc-link, #0077d0) !important; }
 .electro .pd-cbc__word { display: inline-block; line-height: 2.1875rem; font-size: 14px; }
+/* “Slider'ın üzerine bindir”: şablon home-v11'deki gibi yalnız hemen üstte slider / hero varken (my-5 my-xl-n10);
+   başka bir bölümün altındaysa üstteki içeriği örtmemesi için bindirme yapılmaz. */
+.electro .pd-cbc--overlap.mt-5 { margin-top: 0 !important; }
+.electro :is(.pd-block--hero_slider, .pd-block--hero_tabs, .pd-block--full_banner) + .pd-block--categories_brands_card .pd-cbc--overlap.mt-5,
+.electro :is(.pd-block--hero_slider, .pd-block--hero_tabs, .pd-block--full_banner) + .pd-insert + .pd-block--categories_brands_card .pd-cbc--overlap.mt-5 { margin-top: 3rem !important; }
+@media (min-width: 1200px) {
+  .electro :is(.pd-block--hero_slider, .pd-block--hero_tabs, .pd-block--full_banner) + .pd-block--categories_brands_card .pd-cbc--overlap.mt-5,
+  .electro :is(.pd-block--hero_slider, .pd-block--hero_tabs, .pd-block--full_banner) + .pd-insert + .pd-block--categories_brands_card .pd-cbc--overlap.mt-5 { margin-top: -4.5rem !important; }
+}

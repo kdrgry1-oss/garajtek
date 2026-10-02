@@ -267,7 +267,7 @@
       "label": "Üstteki slider'ın üzerine bindir",
       "tab": "Görünüm",
       "width": "half",
-      "help": "Masaüstünde kart yukarı kayar (şablon: -10 boşluk)."
+      "help": "Hemen üstte Ana Slider, Sekmeli Hero ya da Tam Genişlik Banner varsa kart masaüstünde onun üzerine kayar (şablon: -10 boşluk). Başka bir bölümün altındayken bindirme yapılmaz."
     },
     {
       "name": "radius",

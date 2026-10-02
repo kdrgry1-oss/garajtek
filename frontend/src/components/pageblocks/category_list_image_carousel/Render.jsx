@@ -15,10 +15,12 @@ export default function Render({ settings, ctx }) {
   const slides = (st.slides || []).filter((s) => s && ((s.groups || []).length || (s.links || []).length || (s.image && s.image.url)));
   if (!slides.length) return ctx && ctx.preview ? <div className="pd-stub" data-empty="">Slayt ekleyin.</div> : null;
   const style = { "--pd-clic-box": st.box_background || "#f9f9f9", "--pd-clic-line": st.border_color || "#eaeaea", "--pd-clic-r": `${Number(st.radius ?? 10)}px` };
-  const header = st.header && (st.header.title || st.header.right === "arrows")
-    ? (ctl) => <SectionHeader value={st.header} field="header" arrows={ctl} className="mb-4 pd-clic__header" titleClassName="section-title mb-0 pb-2 font-size-22" />
-    : undefined;
   const carousel = { ...(st.carousel || {}), per_view: { 0: 1 }, rows: 1, arrows: (st.carousel && st.carousel.arrows) || "header" };
+  // Başlık okları yalnız karusel “Oklar: Başlıkta” iken; “İki yanda / Yok” seçilince başlıkta ikinci bir ok takımı çıkmaz
+  const headArrows = carousel.arrows === "header";
+  const header = st.header && (st.header.title || (st.header.right === "arrows" && headArrows))
+    ? (ctl) => <SectionHeader value={st.header} field="header" arrows={headArrows ? ctl : null} className="mb-4 pd-clic__header" titleClassName="section-title mb-0 pb-2 font-size-22" />
+    : undefined;
   return (
     <div className="position-relative pb-1 pd-clic" style={style} data-testid="category-list-image-carousel">
       <BlockCarousel value={carousel} header={header} className="u-slick pd-clic__car"

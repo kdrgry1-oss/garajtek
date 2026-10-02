@@ -173,7 +173,7 @@
       "type": "carousel",
       "label": "Karusel",
       "tab": "Karusel",
-      "help": "Şablon (home-v8): 1200 px üstü 10, 992 px üstü 6, 768 px üstü 5, 554 px üstü 3, mobilde 2 (home-v6: 1200 px üstü 8, 1600 px üstü 10); yanlarda yuvarlak oklar (yalnız masaüstü), mobilde noktalar."
+      "help": "Şablon (home-v8): 1200 px üstü 10, 992 px üstü 6, 768 px üstü 5, 554 px üstü 3, mobilde 2 (home-v6: 1200 px üstü 8, 1600 px üstü 10); yanlarda yuvarlak oklar (yalnız masaüstü), mobilde noktalar. Noktalar “Yalnız mobil” seçiliyse bu blokta şablondaki gibi 1200 px altında (mobil + tablet) görünür."
     }
   ],
   "common": [
