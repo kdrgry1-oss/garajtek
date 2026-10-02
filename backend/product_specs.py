@@ -319,7 +319,9 @@ def format_value(f: Dict[str, Any], v: Any) -> str:
     if t == "bool":
         return "Evet" if v else "Hayır"
     if t == "multiselect":
-        return ", ".join(str(x) for x in (v or []))
+        if isinstance(v, (list, tuple)):
+            return ", ".join(str(x) for x in v)
+        return str(v)
     if t == "dimensions":
         parts = [_fmt_num(v.get(k)) if v.get(k) not in (None, "") else "—" for k in ("w", "d", "h")]
         return " × ".join(parts) + (f" {unit}" if unit else "")
