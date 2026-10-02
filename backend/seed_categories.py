@@ -21,7 +21,9 @@ Kullanım:
   python seed_categories.py --check       # yalnızca JSON doğrulaması (DB'ye dokunmaz)
 
 Sunucu açılışında `seed_if_empty()` çağrılır: categories koleksiyonu BOŞSA ağacı yükler; doluysa
-yalnızca `upgrade_seeded_header_menu()` çalışır (dokunulmamış otomatik menüyü kısaltır).
+yalnızca `upgrade_seeded_header_menu()` çalışır (dokunulmamış otomatik menüyü kısaltır) ve
+`seed_added_categories()` ilk kurulumdan sonra ağaca eklenen ("since" alanlı) kategorileri — ör.
+"Ürün Setleri" (urun-setleri) — bir kez oluşturur.
 """
 from __future__ import annotations
 
@@ -262,7 +264,7 @@ def build_header_menu(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def build_legacy_header_menu(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """v1 (ilk canlı kurulum) otomatik menüsü: HER üst kategori bir sekme + "İndirimli Ürünler".
     Yalnız upgrade_seeded_header_menu'nün eski kaydı tanıması için tutulur."""
-    children = _children_map(nodes)
+    children = _children_map([n for n in nodes if not n.get("since")])  # v1 sonrası eklenenler hariç
     tabs = [_category_tab(top, children) for top in children.get(None, [])
             if top.get("show_in_menu") is not False]
     tabs.append({"id": "sale", "label": "İndirimli Ürünler", "type": "link", "link": "/sale",
@@ -327,6 +329,50 @@ async def upgrade_seeded_header_menu(db=None, nodes: Optional[List[Dict[str, Any
         return False
 
 
+MIGRATIONS_DOC = "seed_categories_migrations"
+
+
+async def seed_added_categories(db=None, nodes: Optional[List[Dict[str, Any]]] = None) -> List[str]:
+    """Açılış kancası (idempotent): ilk kurulumdan SONRA ağaca eklenen düğümleri ("since" alanlı,
+    ör. "Ürün Setleri") dolu katalogda bir kez oluşturur. Her slug settings'e işaretlenir →
+    yönetici sonradan silerse tekrar açılmaz. Mevcut kategorilere dokunmaz."""
+    try:
+        if db is None:
+            from routes.deps import db as _db
+            db = _db
+        nodes = nodes if nodes is not None else load_tree()
+        added = [n for n in nodes if n.get("since")]
+        if not added:
+            return []
+        mig = await db.settings.find_one({"id": MIGRATIONS_DOC}, {"_id": 0}) or {}
+        done = set(mig.get("slugs") or [])
+        todo = [n for n in added if n["slug"] not in done]
+        if not todo:
+            return []
+        created = []
+        for n in todo:
+            if not await _find_existing(db, n["slug"]):
+                par = await _find_existing(db, n["parent"]) if n.get("parent") else None
+                if n.get("parent") and not par:
+                    continue  # ebeveyn panelden silinmiş → atla (işaretleme; ebeveyn gelirse açılır)
+                sub = [{**n, "parent": None}]
+                await seed_categories(db, sub)
+                if par:
+                    await db.categories.update_one({"slug": n["slug"]}, {"$set": {"parent_id": par["id"]}})
+                created.append(n["slug"])
+            done.add(n["slug"])
+        await db.settings.update_one({"id": MIGRATIONS_DOC},
+                                     {"$set": {"slugs": sorted(done),
+                                               "updated_at": datetime.now(timezone.utc).isoformat()}},
+                                     upsert=True)
+        if created:
+            logger.info(f"[kategori seed] yeni kategoriler eklendi: {created}")
+        return created
+    except Exception as e:  # açılışı asla düşürme
+        logger.error(f"[kategori seed] ek kategori hatası: {e}")
+        return []
+
+
 async def seed_if_empty(db=None) -> Optional[Dict[str, int]]:
     """Açılış kancası: categories koleksiyonu BOŞSA ağacı + header menüyü yükler."""
     try:
@@ -335,9 +381,11 @@ async def seed_if_empty(db=None) -> Optional[Dict[str, int]]:
             db = _db
         if await db.categories.find_one({}, {"_id": 1}):
             await upgrade_seeded_header_menu(db)
+            await seed_added_categories(db)
             return None
         nodes = load_tree()
         stats = await seed_categories(db, nodes)
+        await seed_added_categories(db, nodes)  # yalnız işaretler (hepsi zaten oluşturuldu)
         menu = await seed_header_menu(db, nodes)
         logger.info(f"[kategori seed] boş katalog → {stats}, header menü: {'yazıldı' if menu else 'mevcut'}")
         return stats

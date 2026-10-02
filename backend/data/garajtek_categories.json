@@ -800,6 +800,17 @@
       "source": "algikitelli"
     },
     {
+      "slug": "urun-setleri",
+      "name": "Ürün Setleri",
+      "parent": null,
+      "sort_order": 145,
+      "icon": "boxes",
+      "meta_title": "Ürün Setleri | Garajtek",
+      "meta_description": "Lastikçi, oto servis ve atölye için hazır ürün setleri: tek tıkla tüm ekipmanı sepete ekleyin, set indirimiyle kazanın.",
+      "source": "garajtek",
+      "since": 2
+    },
+    {
       "slug": "indirimli-urunler",
       "name": "İndirimli Ürünler",
       "parent": null,

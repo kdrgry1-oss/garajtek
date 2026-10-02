@@ -11,6 +11,11 @@ from activity_audit import record_admin_audit
 router = APIRouter(prefix="/admin/demo-content", tags=["Demo içerik"])
 
 
+def _tag() -> str:
+    from demo_content import DEMO_TAG
+    return DEMO_TAG
+
+
 @router.get("")
 async def demo_content_status(current_user: dict = Depends(require_super_admin)):
     from demo_content import demo_status
@@ -27,7 +32,7 @@ async def demo_content_load(request: Request, current_user: dict = Depends(requi
 
     res = await load_demo(db, _create)
     logger.info(f"demo content loaded: {res}")
-    await record_admin_audit(db, action="demo_content.load", entity_type="demo_content", entity_id="garajtek_demo_v1",
+    await record_admin_audit(db, action="demo_content.load", entity_type="demo_content", entity_id=_tag(),
                              before={}, after=res, current_user=current_user, request=request, source="settings.demo")
     return res
 
@@ -37,6 +42,6 @@ async def demo_content_remove(request: Request, current_user: dict = Depends(req
     from demo_content import remove_demo
     res = await remove_demo(db)
     logger.info(f"demo content removed: {res}")
-    await record_admin_audit(db, action="demo_content.remove", entity_type="demo_content", entity_id="garajtek_demo_v1",
+    await record_admin_audit(db, action="demo_content.remove", entity_type="demo_content", entity_id=_tag(),
                              before={}, after=res, current_user=current_user, request=request, source="settings.demo")
     return res

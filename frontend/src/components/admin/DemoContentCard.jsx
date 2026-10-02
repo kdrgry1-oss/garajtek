@@ -1,5 +1,6 @@
 // Demo içerik — gerçek ürünler eklenene kadar vitrini dolu göstermek için (yalnız süper yönetici).
-// Yükle: ~36 demo ürün + slider/banner/marka görselleri (Sayfa Tasarımı bloklarının boş alanlarına).
+// Yükle: 25 örnek ürün + 3 ürün seti + slider/banner/marka görselleri (Sayfa Tasarımı bloklarının boş alanlarına).
+// Eski demo sürümü yüklüyse "Yeniden Yükle" önce onu kaldırır, sonra güncel sürümü yükler.
 // Kaldır: YALNIZ demo etiketli kayıtlar silinir (backend/demo_content.py).
 import { useEffect, useState } from "react";
 import axios from "axios";
@@ -16,14 +17,14 @@ export default function DemoContentCard({ onChanged }) {
   if (st === false) return null; // yetki yok (yalnız süper yönetici)
   const run = async (method) => {
     const msg = method === "post"
-      ? "Demo içerik yüklensin mi? (~36 demo ürün, slider ve banner görselleri; önceki demo seti yenilenir)"
+      ? `Demo içerik yüklensin mi? (${st?.available_products || 25} örnek ürün, ${st?.available_sets || 3} ürün seti, slider ve banner görselleri; önceki demo seti kaldırılıp yenilenir)`
       : "Demo içerik kaldırılsın mı? Yalnız demo ürünler, demo bannerlar ve demo görseller silinir.";
     const ok = window.appConfirm ? await window.appConfirm(msg) : window.confirm(msg);
     if (!ok) return;
     setBusy(true);
     try {
       const r = await axios({ method, url: `${API}/admin/demo-content`, headers: headers(), timeout: 600000 });
-      toast.success(method === "post" ? `Demo içerik yüklendi: ${r.data?.created_products || 0} ürün` : `Demo içerik kaldırıldı: ${r.data?.removed_products || 0} ürün`);
+      toast.success(method === "post" ? `Demo içerik yüklendi: ${r.data?.created_products || 0} ürün, ${r.data?.created_sets || 0} set` : `Demo içerik kaldırıldı: ${r.data?.removed_products || 0} kayıt`);
       await load();
       if (onChanged) onChanged();
     } catch (e) {
@@ -35,7 +36,8 @@ export default function DemoContentCard({ onChanged }) {
       <h3 className="text-xs font-semibold text-amber-900">Demo İçerik</h3>
       <p className="mt-1 text-[11px] leading-snug text-amber-900/80">
         Gerçek ürünler eklenene kadar mağazayı dolu göstermek için örnek ürünler ve görseller.
-        {st ? <> Şu an: <b>{st.products}</b> demo ürün, <b>{st.banners}</b> banner.</> : null}
+        {st ? <> Şu an: <b>{st.products}</b> demo ürün, <b>{st.sets || 0}</b> set, <b>{st.banners}</b> banner.</> : null}
+        {st?.outdated ? <b className="block text-amber-900"> Eski demo sürümü yüklü — “Yeniden Yükle” ile güncelleyin.</b> : null}
       </p>
       <div className="mt-2 flex gap-1.5">
         <button type="button" disabled={busy} onClick={() => run("post")} data-testid="demo-load-btn"

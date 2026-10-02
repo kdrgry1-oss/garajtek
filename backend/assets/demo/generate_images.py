@@ -499,6 +499,89 @@ def art_inflator(p: Pen, c=YEL):
     p.rect(820, 640, 880, 700, STEEL, r=8)
 
 
+def art_engine_crane(p: Pen, c=RED):
+    """Katlanır motor indirme vinci (yandan)."""
+    p.rect(120, 800, 860, 840, shade(c, 0.8), r=10)          # taban kolu
+    p.line([(160, 820), (300, 760)], shade(c, 0.8), 34)       # ayak
+    p.rect(300, 330, 360, 820, c, r=10)                       # dikme
+    p.line([(330, 340), (850, 210)], c, 58)                   # bom
+    p.line([(345, 330), (840, 205)], shade(c, 1.3), 14)
+    p.line([(840, 220), (840, 380)], INK, 10)                 # zincir
+    p.rect(805, 380, 875, 420, STEEL, r=10)
+    p.line([(840, 420), (840, 470), (815, 490)], INK, 12)     # kanca
+    p.line([(355, 700), (560, 300)], STEEL, 36)               # hidrolik piston
+    p.rect(330, 640, 410, 760, INK, r=12)
+    p.line([(370, 650), (230, 520)], STEEL2, 16)              # pompa kolu
+    for x in (160, 520, 820):
+        p.caster(x, 880, 34)
+
+
+def art_press(p: Pen, c=BLUE):
+    """H tipi atölye presi."""
+    p.rect(200, 120, 260, 860, c, r=8)
+    p.rect(740, 120, 800, 860, c, r=8)
+    p.rect(180, 110, 820, 190, shade(c, 0.85), r=10)          # üst traves
+    p.rect(230, 540, 770, 590, shade(c, 1.2), r=8)            # tabla
+    p.rect(150, 850, 380, 885, shade(c, 0.7), r=8)
+    p.rect(620, 850, 850, 885, shade(c, 0.7), r=8)
+    p.rect(450, 190, 550, 330, YEL, r=10)                     # silindir
+    p.rect(480, 330, 520, 450, STEEL3, r=6)                   # piston
+    p.rect(455, 450, 545, 480, INK, r=6)
+    p.gauge(330, 280, 52)
+    p.line([(620, 250), (700, 400)], STEEL, 16)               # pompa kolu
+    for y in (640, 700, 760):
+        p.circ(230, y, 10, INK)
+        p.circ(770, y, 10, INK)
+
+
+def art_torque_wrench(p: Pen, c=STEEL2):
+    """Klik tip tork anahtarı (çapraz)."""
+    p.line([(170, 830), (700, 300)], c, 70)
+    p.line([(185, 800), (680, 305)], shade(c, 1.35), 16)
+    p.line([(130, 870), (300, 700)], INK, 96)                 # sap
+    p.line([(140, 860), (290, 710)], INK2, 60)
+    p.circ(760, 240, 95, STEEL)
+    p.circ(760, 240, 62, STEEL3)
+    p.rect(730, 210, 790, 270, INK, r=8)
+    for i in range(6):                                        # skala
+        x, y = 380 + i * 42, 620 - i * 42
+        p.line([(x - 18, y - 18), (x + 6, y + 6)], RED if i % 2 else INK, 6)
+    p.rect(330, 560, 390, 620, YEL, r=8)
+
+
+def art_booster(p: Pen, c=RED):
+    """Akü takviye / şarj cihazı (tekerlekli)."""
+    p.rect(250, 230, 750, 760, c, r=30)
+    p.rect(275, 255, 725, 300, shade(c, 1.25), r=14)
+    p.rect(320, 330, 680, 470, INK, r=14)                     # ekran paneli
+    p.rect(345, 355, 520, 445, "#2ecc71", r=8)
+    p.gauge(600, 400, 55)
+    for i, x in enumerate((340, 430, 520, 610)):
+        p.circ(x, 540, 24, YEL if i == 0 else STEEL3)
+    p.line([(400, 760), (330, 880)], INK, 18)                 # kablolar
+    p.line([(600, 760), (680, 880)], INK, 18)
+    p.rect(300, 870, 360, 920, RED2, r=8)
+    p.rect(650, 870, 710, 920, INK2, r=8)
+    p.line([(300, 230), (300, 150), (700, 150), (700, 230)], STEEL, 22)
+    p.wheel(320, 780, 48)
+    p.wheel(680, 780, 48)
+
+
+def art_smoke_tester(p: Pen, c=YEL):
+    """Duman kaçak tespit cihazı."""
+    p.rect(230, 360, 770, 800, c, r=40)
+    p.rect(255, 385, 745, 440, shade(c, 1.2), r=16)
+    p.rect(290, 480, 520, 640, INK, r=16)
+    p.rect(310, 500, 500, 560, "#67d4ff", r=8)
+    p.gauge(630, 560, 70)
+    p.rect(290, 680, 710, 740, shade(c, 0.85), r=12)
+    p.line([(770, 500), (860, 470), (900, 360), (860, 260)], INK, 22)   # hortum
+    p.rect(830, 210, 890, 270, STEEL, r=10)
+    for i, (x, y, r) in enumerate(((880, 160, 40), (820, 110, 30), (930, 100, 26))):  # duman
+        p.circ(x, y, r, STEEL4)
+    p.line([(400, 360), (400, 280), (600, 280), (600, 360)], INK, 26)  # sap
+
+
 ARTS = {k[4:]: v for k, v in globals().items() if k.startswith("art_")}
 
 
@@ -681,49 +764,75 @@ def brand_logo(name, style):
 
 
 ADS = [("ad-1", "socket_set", RED, (410, 281)), ("ad-2", "compressor", BLUE, (410, 281)), ("ad-3", "tool_cart", RED, (714, 486))]
-BRANDS = ["Grayzer", "Liftmax", "Airpro", "Torkmatik", "Balanstek", "Voltix", "Weldon", "Diagnox", "Teknolift", "Atölye Pro"]
+BRANDS = ["GarajTek Pro", "Liftmax", "Airpro", "Torkmatik", "Balanstek", "Voltix", "Weldon", "Diagnox", "Teknolift", "Atölye Pro"]
 
 
 # Ürün görsel planı: (anahtar, tür, renk, tuval boyutu) — farklı en-boy oranları gerçek
-# yüklemeleri taklit eder (kare, dikey, yatay).
+# yüklemeleri taklit eder (kare, dikey, yatay). Anahtarlar demo_content.P ile birebir.
 PRODUCT_ART = {
     "lift2-4t": ("lift2", YEL, (1200, 1200)),
     "lift2-5t": ("lift2", BLUE, (1000, 1300)),
-    "scissor-3t": ("scissor", RED, (1600, 1000)),
-    "scissor-35t": ("scissor", BLUE, (1400, 1000)),
+    "scissor-32t": ("scissor", RED, (1600, 1000)),
     "moto-lift": ("moto", BLUE, (1500, 1000)),
-    "comp-100": ("compressor", RED, (1400, 1000)),
-    "comp-200": ("compressor", BLUE, (1600, 1100)),
+    "comp-200": ("compressor", RED, (1400, 1000)),
     "comp-50-silent": ("compressor_v", BLUE, (900, 1300)),
     "impact-12": ("impact", YEL, (1000, 1000)),
-    "impact-34": ("impact", RED, (1200, 1000)),
     "tire-changer": ("tire_changer", RED, (1000, 1200)),
-    "tire-changer-pro": ("tire_changer", BLUE, (1000, 1000)),
     "balancer": ("balancer", BLUE, (1200, 1000)),
     "inflator": ("inflator", YEL, (800, 1000)),
     "floor-jack-3t": ("floor_jack", RED, (1500, 1000)),
-    "floor-jack-25t": ("floor_jack", YEL, (1200, 900)),
-    "trans-jack": ("trans_jack", RED, (900, 1200)),
-    "cart-7": ("tool_cart", RED, (900, 1200)),
-    "cart-5-blue": ("tool_cart", BLUE, (1000, 1200)),
-    "workbench": ("workbench", BLUE, (1400, 1000)),
+    "engine-crane": ("engine_crane", RED, (1400, 1100)),
+    "press-20t": ("press", BLUE, (1000, 1200)),
+    "cart-full-185": ("tool_cart", RED, (900, 1200)),
+    "cart-empty-7": ("tool_cart", BLUE, (1000, 1200)),
     "socket-108": ("socket_set", RED, (1400, 1000)),
-    "socket-46": ("socket_set", BLUE, (1200, 1000)),
+    "socket-94": ("socket_set", BLUE, (1200, 1000)),
+    "torque-wrench": ("torque_wrench", None, (1000, 1000)),
     "wrench-12": ("wrench_set", None, (1200, 1000)),
-    "ratchet-set": ("ratchet", None, (1000, 1000)),
-    "drill-18v": ("drill", YEL, (1000, 1000)),
-    "drill-12v": ("drill", BLUE, (1000, 1000)),
-    "grinder": ("grinder", BLUE, (1400, 900)),
-    "welder-200": ("welder", BLUE, (1200, 1000)),
-    "welder-160": ("welder", RED, (1000, 1000)),
-    "work-light": ("work_light", YEL, (1000, 1200)),
-    "obd-pro": ("obd", YEL, (900, 1200)),
-    "obd-basic": ("obd", RED, (1000, 1000)),
     "battery-tester": ("battery_tester", YEL, (1000, 1100)),
+    "booster": ("booster", RED, (1000, 1100)),
     "oil-drain-80": ("oil_drain", RED, (900, 1300)),
-    "oil-drain-70": ("oil_drain", YEL, (1000, 1200)),
-    "bleeder": ("bleeder", YEL, (1000, 1100)),
+    "smoke-tester": ("smoke_tester", YEL, (1100, 1000)),
+    "work-light": ("work_light", YEL, (1000, 1200)),
+    "workbench": ("workbench", BLUE, (1400, 1000)),
 }
+
+# Ürün Setleri kolaj görselleri (demo_content.SETS ile aynı anahtarlar)
+SET_ART = {
+    "set-lastikci": [("tire_changer", RED), ("balancer", BLUE), ("compressor", RED), ("impact", YEL)],
+    "set-oto-servis": [("lift2", YEL), ("floor_jack", RED), ("engine_crane", RED), ("oil_drain", RED),
+                       ("smoke_tester", YEL), ("battery_tester", YEL)],
+    "set-el-aletleri": [("tool_cart", BLUE), ("socket_set", BLUE), ("torque_wrench", None), ("wrench_set", None),
+                        ("impact", YEL), ("work_light", YEL)],
+}
+
+
+def set_image(arts, canvas=(1200, 1000), variant=0):
+    """Set kolajı: bileşen çizimleri ızgarada + sol üstte 'ÜRÜN SETİ' rozeti."""
+    W, H = canvas
+    im = Image.new("RGB", canvas, (246, 247, 249) if variant == 0 else (255, 255, 255))
+    d = ImageDraw.Draw(im)
+    n = len(arts)
+    cols = 2 if n <= 4 else 3
+    rows = math.ceil(n / cols)
+    top = 150
+    cw, ch = (W - 80) / cols, (H - top - 40) / rows
+    order = arts if variant == 0 else list(reversed(arts))
+    for i, (kind, col) in enumerate(order):
+        art = render_art(kind, col)
+        if variant and i % 2:
+            art = art.transpose(Image.FLIP_LEFT_RIGHT)
+        k = min(cw * 0.82 / art.width, ch * 0.82 / art.height)
+        art = art.resize((max(1, int(art.width * k)), max(1, int(art.height * k))), Image.LANCZOS)
+        cx = 40 + (i % cols) * cw + cw / 2
+        cy = top + (i // cols) * ch + ch / 2
+        d.ellipse((cx - cw * 0.42, cy + art.height / 2 - 14, cx + cw * 0.42, cy + art.height / 2 + 10), fill=(228, 231, 235))
+        im.paste(art, (int(cx - art.width / 2), int(cy - art.height / 2)), art)
+    d.rounded_rectangle((40, 40, 330, 112), radius=36, fill=(254, 215, 0))
+    d.text((185, 76), "ÜRÜN SETİ", font=_font("xbold", 34), fill=(51, 62, 72), anchor="mm")
+    d.text((360, 76), f"{n} ürün tek sepette", font=_font("semibold", 30), fill=(91, 102, 112), anchor="lm")
+    return im
+
 
 HEROES = [
     {"key": "hero-1", "arts": [("lift2", YEL, 0.96, 1360, 0)]},
@@ -735,7 +844,7 @@ SMALL = [
     {"key": "small-1", "art": "socket_set", "color": RED, "lines": [[("LOKMA ", False), ("TAKIMLARINDA", True)], [("BÜYÜK FIRSAT", False)]]},
     {"key": "small-2", "art": "compressor", "color": BLUE, "lines": [[("KOMPRESÖR", True)], [("SEZONU BAŞLADI", False)]]},
     {"key": "small-3", "art": "obd", "color": YEL, "lines": [[("ARIZA TESPİTİ", True)], [("ARTIK ÇOK KOLAY", False)]]},
-    {"key": "small-4", "art": "tool_cart", "color": RED, "lines": [[("TAKIM ", False), ("ARABALARI", True)], [("%15 İNDİRİMDE", False)]]},
+    {"key": "small-4", "art": "tool_cart", "color": BLUE, "lines": [[("ÜRÜN ", False), ("SETLERİ", True)], [("TEK TIKLA SEPETTE", False)]]},
 ]
 
 
@@ -747,6 +856,11 @@ def main():
         save(product_image(kind, col, canvas), f"products/{key}-1.webp")
         save(product_image(kind, col, (1000, 1000), bg=(255, 255, 255), flip=True, scale=0.7, tint=(247, 247, 247)), f"products/{key}-2.webp")
         save(detail_image(kind, col), f"products/{key}-3.webp")
+    for key, arts in SET_ART.items():
+        if only and key not in only and "sets" not in only:
+            continue
+        save(set_image(arts), f"products/{key}-1.webp")
+        save(set_image(arts, variant=1), f"products/{key}-2.webp")
     if not only or "banners" in only:
         for h in HEROES:
             save(hero(h), f"banners/{h['key']}.webp", q=80)

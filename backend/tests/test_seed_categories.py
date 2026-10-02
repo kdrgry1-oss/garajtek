@@ -286,7 +286,7 @@ def test_storefront_filter_keeps_real_test_category_and_tree(nodes):
                         key=lambda c: c["sort_order"])
     assert [c["slug"] for c in menu_roots] == [
         n["slug"] for n in nodes if not n.get("parent") and n.get("show_in_menu") is not False]
-    assert len(menu_roots) == 14
+    assert len(menu_roots) == 15  # 14 ana kategori + Ürün Setleri (v2)
     assert menu_roots[10]["slug"] == "test-ve-ariza-tespit-cihazlari"
     # Panelden açılmış (seed_source'suz) aynı isimli kategori de gizlenmez
     assert not is_test_placeholder({"id": "1", "slug": "test-ve-ariza-tespit-cihazlari",
@@ -306,3 +306,23 @@ def test_storefront_filter_hides_placeholders_with_subtree():
         {"id": "6", "slug": "test_1", "name": "x", "parent_id": "1"},
     ]
     assert [c["id"] for c in hide_test_placeholders(cats)] == ["1"]
+
+
+def test_added_categories_migration_on_existing_catalog(nodes):
+    """Canlı (dolu) katalogda "since" alanlı yeni kategori (Ürün Setleri) bir kez açılır;
+    yönetici silerse tekrar açılmaz; eski düğümlere dokunulmaz."""
+    old = [n for n in nodes if not n.get("since")]
+    db = FakeDB()
+    run(sc.seed_categories(db, old))
+    assert not any(c["slug"] == "urun-setleri" for c in db.categories.docs)
+    assert run(sc.seed_added_categories(db, nodes)) == ["urun-setleri"]
+    top = next(c for c in db.categories.docs if c["slug"] == "urun-setleri")
+    assert top["parent_id"] is None and top["name"] == "Ürün Setleri"
+    assert run(sc.seed_added_categories(db, nodes)) == []  # idempotent
+    db.categories.docs = [c for c in db.categories.docs if c["slug"] != "urun-setleri"]
+    assert run(sc.seed_added_categories(db, nodes)) == []  # silindiyse geri gelmez
+
+
+def test_legacy_menu_ignores_added_categories(nodes):
+    tabs = sc.build_legacy_header_menu(nodes)
+    assert "/urun-setleri" not in [t["link"] for t in tabs]
