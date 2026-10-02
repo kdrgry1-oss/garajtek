@@ -49,15 +49,15 @@
       "defaults_patch": {
         "height": {
           "desktop": 420,
-          "tablet": 400,
-          "mobile": 300
+          "tablet": 420,
+          "mobile": 200
         },
-        "caption_column": "offset3_5",
-        "dots_style": "v2",
+        "caption_column": "offset3_4",
+        "dots_style": "v1",
         "caption_padding_top": {
-          "desktop": 64,
-          "tablet": 40,
-          "mobile": 20
+          "desktop": 0,
+          "tablet": 0,
+          "mobile": 0
         }
       }
     },
@@ -355,7 +355,12 @@
           "label": "Üst başlık rengi",
           "tab": "Görünüm",
           "palette": "theme",
-          "width": "third"
+          "width": "third",
+          "show_if": {
+            "layout": [
+              "promo"
+            ]
+          }
         },
         {
           "name": "text_align",
@@ -816,7 +821,16 @@
                   "step": 50,
                   "width": "third"
                 }
-              ]
+              ],
+              "show_if": {
+                "_variant": [
+                  "v2_product",
+                  "boxed_side_banners",
+                  "rounded_with_deals",
+                  "fullscreen",
+                  "menu_strip"
+                ]
+              }
             }
           ]
         }
@@ -1071,7 +1085,7 @@
       "min": 200,
       "max": 900,
       "responsive": true,
-      "help": "Şablon: masaüstü 485, mobil 300 px."
+      "help": "Şablon: masaüstü ve tablet 485, mobil 300 px."
     },
     {
       "name": "background_color",
@@ -1107,6 +1121,10 @@
         {
           "value": "offset1_6",
           "label": "Solda geniş (tam ekran)"
+        },
+        {
+          "value": "offset3_4",
+          "label": "Menüden sonra dar + ürün görseli (şablon v2.0)"
         }
       ]
     },

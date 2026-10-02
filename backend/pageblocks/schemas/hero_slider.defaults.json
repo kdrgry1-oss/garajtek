@@ -1,14 +1,14 @@
 {
   "height": {
     "desktop": 485,
-    "tablet": 400,
+    "tablet": 485,
     "mobile": 300
   },
   "background_color": "#f9f9f9",
   "caption_column": "offset3_5",
   "caption_padding_top": {
     "desktop": 85,
-    "tablet": 60,
+    "tablet": 85,
     "mobile": 20
   },
   "mobile_font_scale": 71.43,

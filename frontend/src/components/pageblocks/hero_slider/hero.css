@@ -96,9 +96,9 @@ html.pd-no-anim .electro .pd-hero-layer { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { .electro .pd-hero-layer { animation: none !important; } }
 
 @media (max-width: 1199.98px) {
-  .electro .pd-hero__slide { height: var(--pd-hero-h-t, 400px); }
+  .electro .pd-hero__slide { height: var(--pd-hero-h-t, 485px); }
   .electro .pd-hero--boxed .pd-hero__slide { height: var(--pd-hero-h-t, 400px); }
-  .electro .pd-hero__caption { padding-top: var(--pd-hero-pt-t, 60px); }
+  .electro .pd-hero__caption { padding-top: var(--pd-hero-pt-t, 85px); }
 }
 @media (max-width: 767.98px) {
   .electro .pd-hero__slide, .electro .pd-hero--boxed .pd-hero__slide { height: var(--pd-hero-h-m, 300px); font-size: var(--pd-hero-fs-m, 10px); }
@@ -106,4 +106,18 @@ html.pd-no-anim .electro .pd-hero-layer { animation: none !important; }
   .electro .pd-hero__inner { padding: 0 1rem; }
   /* şablon: #owl-main .item mobilde de 485 px kalır, 300 px'te kırpılır (görsel ölçeği masaüstüyle aynı) */
   .electro .pd-hero--bleed .pd-hero__slide:not(.pd-hero__slide--mimg) .pd-hero__bg { height: max(100%, var(--pd-hero-h-d, 485px)); bottom: auto; }
+}
+
+/* v2_product — T2 index.html: .container.min-height-420 > .row.min-height-420.py-7.py-md-0 (içerik yüksekliği; en az
+   200 / 420 px), açıklama mt-md-8, şablon yardımcı sınıfları (font-size-64 …) — harf aralığı şablondaki gibi normal */
+.electro .pd-hero--v2_product { letter-spacing: normal; }
+.electro .pd-hero--v2_product .pd-hero__slide { height: auto; min-height: var(--pd-hero-h-d, 420px); }
+.electro .pd-hero--v2_product .pd-hero__caption--v2 { padding-top: 0; }
+.electro .pd-hero--v2_product .pd-hero__title-v2 { color: inherit; text-transform: none; margin-bottom: .5rem; }
+.electro .pd-hero--v2_product .pd-hero__title-v2 strong { font-weight: 700; }
+.electro .pd-hero--v2_product .pd-hero__caption--v2 h6 { color: inherit; }
+@media (max-width: 1199.98px) { .electro .pd-hero--v2_product .pd-hero__slide { height: auto; min-height: var(--pd-hero-h-t, 420px); } }
+@media (max-width: 767.98px) {
+  .electro .pd-hero--v2_product .pd-hero__slide { height: auto; min-height: var(--pd-hero-h-m, 200px); }
+  .electro .pd-hero--v2_product .pd-hero__slide .pd-hero__bg { height: 100%; }
 }

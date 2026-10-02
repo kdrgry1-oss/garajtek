@@ -261,7 +261,12 @@
       "tab": "Görünüm",
       "palette": "theme",
       "width": "half",
-      "allow_transparent": true
+      "allow_transparent": true,
+      "show_if": {
+        "_variant": [
+          "thumbs"
+        ]
+      }
     },
     {
       "name": "band_color",

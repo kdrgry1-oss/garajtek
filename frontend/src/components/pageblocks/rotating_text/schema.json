@@ -94,8 +94,6 @@
     }
   ],
   "common": [
-    "section",
-    "visibility",
-    "reveal"
+    "visibility"
   ]
 }

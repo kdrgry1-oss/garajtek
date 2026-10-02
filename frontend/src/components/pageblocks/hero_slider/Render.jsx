@@ -25,6 +25,7 @@ const CAPTION_COL = {
   center: "offset-lg-2 col-lg-8 col-12",
   left4: "col-lg-5 col-xl-4 col-12",
   offset1_6: "offset-xl-1 col-md-6 col-12",
+  offset3_4: "offset-xl-3 col-xl-4 col-6",
 };
 const EASING = { easeOutCubic: "cubic-bezier(0.215, 0.61, 0.355, 1)", linear: "linear" };
 const BOXED = ["boxed_side_banners", "rounded_with_deals", "menu_strip"];
@@ -103,6 +104,56 @@ function Caption({ s, i, active, easing }) {
   );
 }
 
+/** "$749,99" → <sup>$</sup>749<sup>99</sup> (T2 index .font-size-50); "₺49.900" binlik ayıracı korunur. */
+function PriceV2({ v }) {
+  const m = String(v || "").match(/^(\D*?)\s*(\d[\d.,\s]*?)(?:[.,](\d{2}))?\s*(\D*)$/);
+  if (!m) return <>{v}</>;
+  return <>{m[1] && <sup>{m[1]}</sup>}{m[2]}{m[3] && <sup>{m[3]}</sup>}{m[4] && <sup>{m[4]}</sup>}</>;
+}
+
+/** T2 index.html slayt açıklaması: h1.font-size-64.text-lh-57 (2. satır span.d-block.font-size-55), h6.font-size-15,
+ * span.font-size-13 + div.font-size-50.text-lh-45 fiyat, a.btn.rounded-lg.px-md-7.font-size-16 — şablon sınıflarıyla. */
+function CaptionV2({ s, i, active, easing }) {
+  const f = `slides.${i}`;
+  const a = s.animation || {};
+  const layout = s.layout || "promo";
+  const href = linkHref(s.button?.link);
+  const hasBtn = !!(s.button?.text && href);
+  const [first, ...rest] = String(s.title || "").split(/<br\s*\/?>/i);
+  const btn = { dark: "btn-dark", outline: "btn-outline-dark" }[s.button?.style] || "btn-primary";
+  return (
+    <div className={`pd-hero__caption pd-hero__caption--v2 text-${s.text_align || "left"}`}>
+      {layout === "promo" && s.pretitle && (
+        <Layer cfg={a.pretitle} active={active} easing={easing} className="font-size-15 font-weight-bold mb-3 text-uppercase" data-pd-field={`${f}.pretitle`}
+          style={{ color: s.accent_color || undefined }}>{s.pretitle}</Layer>
+      )}
+      {plainText(s.title) && (
+        <Layer cfg={a.title} active={active} easing={easing}>
+          <h2 className="font-size-64 text-lh-57 font-weight-light pd-hero__title-v2" data-pd-field={`${f}.title`}>
+            <RichText html={first} />
+            {rest.length > 0 && <RichText html={rest.join("<br>")} className="d-block font-size-55" />}
+          </h2>
+        </Layer>
+      )}
+      {layout === "price" && s.subtitle && (
+        <Layer cfg={a.subtitle} active={active} easing={easing} as="h6" className="font-size-15 font-weight-bold mb-3" data-pd-field={`${f}.subtitle`}>{s.subtitle}</Layer>
+      )}
+      {layout === "price" && (s.price || s.price_prefix) && (
+        <Layer cfg={a.price} active={active} easing={easing} className="mb-4">
+          {s.price_prefix && <span className="font-size-13" data-pd-field={`${f}.price_prefix`}>{s.price_prefix}</span>}
+          {s.price && <div className="font-size-50 font-weight-bold text-lh-45" data-pd-field={`${f}.price`}><PriceV2 v={s.price} /></div>}
+        </Layer>
+      )}
+      {hasBtn && (
+        <Layer cfg={a.button} active={active} easing={easing} className="pd-hero__action">
+          <SmartLink link={s.button.link} className={`btn ${btn} transition-3d-hover rounded-lg font-weight-normal py-2 px-md-7 px-3 font-size-16`} field={`${f}.button.text`}
+            onClick={() => promo(`hero_${i + 1}`, plainText(s.title) || href)}>{s.button.text}</SmartLink>
+        </Layer>
+      )}
+    </div>
+  );
+}
+
 function Slide({ s, i, st, active, easing, boxed }) {
   const f = `slides.${i}`;
   const layout = s.layout || "promo";
@@ -110,7 +161,17 @@ function Slide({ s, i, st, active, easing, boxed }) {
   const hasBtn = !!(s.button?.text && href);
   const col = CAPTION_COL[st.caption_column] || CAPTION_COL.offset3_5;
   const prod = s.product_image?.url ? s.product_image : null;
-  const inner = (
+  const v2p = st._variant === "v2_product";
+  const inner = v2p ? (
+    <div className="row min-height-420 py-7 py-md-0 pd-hero__row pd-hero__row--v2">
+      <div className={`${col} mt-md-8 pd-hero__col`}><CaptionV2 s={s} i={i} active={active} easing={easing} /></div>
+      {prod && (
+        <Layer cfg={s.animation?.product_image} active={active} easing={easing} className="col-xl-5 col-6 d-flex align-items-center pd-hero__media">
+          <SmartImage image={prod} width={840} eager={i === 0} field={`${f}.product_image`} className="img-fluid" />
+        </Layer>
+      )}
+    </div>
+  ) : (
     <div className={`row pd-hero__row${boxed ? " mx-0" : ""}`}>
       <div className={`${col} pd-hero__col`}><Caption s={s} i={i} active={active} easing={easing} /></div>
       {prod && (
@@ -127,7 +188,7 @@ function Slide({ s, i, st, active, easing, boxed }) {
           alt={s.background?.alt || plainText(s.title)} />
       ) : (
         <div className="pd-hero__bg el-ph el-ph--fill" aria-hidden="true" data-pd-field={`${f}.background`} data-pd-placeholder="">
-          <span className="el-ph__size el-ph__size--hero">1920 × 466</span>
+          <span className="el-ph__size el-ph__size--hero">{v2p ? "1920 × 422" : "1920 × 466"}</span>
         </div>
       )}
       {layout !== "image_only" && (boxed ? <div className="pd-hero__inner">{inner}</div> : <div className="container pd-hero__container">{inner}</div>)}
@@ -182,7 +243,7 @@ function DealTimer({ cd }) {
   const units = (cd.units || []).filter((u) => ["days", "hours", "minutes", "seconds"].includes(u));
   const val = (u) => (u === "hours" && !units.includes("days") ? t.hours + t.days * 24 : t[u]);
   return (
-    <div className="text-center mt-n3">
+    <div className="js-countdown text-center mt-n3" aria-live="off" data-testid="deal-countdown">
       <div className="flex-horizontal-center d-inline-flex bg-primary py-2 height-33 px-5 rounded-pill text-gray-2 font-size-15 font-weight-bold text-lh-1">
         {cd.heading && <h5 className="font-size-14 mb-0 font-weight-bold text-lh-1 mr-1" data-pd-field="side_deals.countdown.heading">{cd.heading}</h5>}
         {units.map((u, k) => (

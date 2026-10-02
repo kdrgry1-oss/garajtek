@@ -66,7 +66,7 @@ test("responsive alan cihaz sekmeli düzenlenir", () => {
   const row = container.querySelector('[data-field-path="height"]');
   click([...row.querySelectorAll('[role="tab"]')].find((b) => b.textContent === "Mobil"));
   typeInto(row.querySelector("input"), "333");
-  expect(state.value.height).toEqual({ desktop: 485, tablet: 400, mobile: 333 });
+  expect(state.value.height).toEqual({ desktop: 485, tablet: 485, mobile: 333 });
 });
 
 test("backend hatası satır içinde gösterilir ve sekmede işaretlenir", () => {

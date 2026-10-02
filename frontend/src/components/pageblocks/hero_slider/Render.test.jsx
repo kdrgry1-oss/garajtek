@@ -16,7 +16,7 @@ test("varsayılanlar: 3 slayt, şablon katmanları ve data-pd-field", async () =
   expect(container.querySelector('[data-pd-field="slides.1.pretitle"]').textContent).toBe("ATÖLYENİZE DEĞER KATIN");
   expect(container.querySelector('[data-pd-field="slides.1.title"]').className).toContain("pd-hero__title--2");
   expect(container.querySelector('[data-pd-field="slides.0.button.text"]').getAttribute("href")).toBe("/liftler");
-  // görsel yoksa şablon ölçüsünde yer tutucu
+  // görsel yoksa şablon ölçüsünde yer tutucu (SPEC §3)
   expect(container.querySelector('[data-pd-field="slides.0.background"][data-pd-placeholder]')).not.toBeNull();
   // noktalar
   expect(container.querySelectorAll(".pd-hero__dots li").length).toBe(3);
@@ -90,5 +90,22 @@ test("varyant boxed_side_banners: yan bannerlar; rounded_with_deals: fırsat kar
 test("boş slayt listesi → hiçbir şey çizilmez", async () => {
   const { container, unmount } = await renderBlock("hero_slider", { slides: [] });
   expect(container.querySelector(".pd-hero")).toBeNull();
+  unmount();
+});
+
+test("v2_product: T2 index sınıfları (font-size-64 / d-block font-size-55, sup'lu fiyat, col-xl-5 ürün görseli)", async () => {
+  const { container, unmount } = await renderBlock("hero_slider", {
+    _variant: "v2_product", caption_column: "offset3_4",
+    slides: [{ layout: "price", title: "THE NEW <br>STANDARD", subtitle: "UNDER", price_prefix: "FROM", price: "$749,99",
+      product_image: { url: "/api/upload/files/p.png", alt: "" }, button: { text: "Start", link: { kind: "url", url: "/sale" } } }],
+  });
+  const t = container.querySelector('[data-pd-field="slides.0.title"]');
+  expect(t.className).toContain("font-size-64");
+  expect(t.querySelector(".d-block.font-size-55").textContent).toBe("STANDARD");
+  const price = container.querySelector('[data-pd-field="slides.0.price"]');
+  expect(price.innerHTML).toBe("<sup>$</sup>749<sup>99</sup>");
+  expect(container.querySelector(".offset-xl-3.col-xl-4.col-6")).not.toBeNull();
+  expect(container.querySelector(".col-xl-5.col-6 img")).not.toBeNull();
+  expect(container.querySelector('[data-pd-field="slides.0.button.text"]').className).toContain("rounded-lg");
   unmount();
 });

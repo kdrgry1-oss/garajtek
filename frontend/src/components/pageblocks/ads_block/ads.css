@@ -3,7 +3,7 @@
    --pd-ads-ls (harf aralığı), --pd-ads-bg (kutu), --pd-ads-color, --pd-ads-pt/pb (metin alanı boşluğu), --pd-ads-arrow. */
 .electro .pd-ads { color: var(--pd-ads-color, #333e48); letter-spacing: -.01em; }
 .electro .pd-ads__ad, .electro .pd-ads__ad:hover, .electro .pd-ads__ad:focus { color: inherit; text-decoration: none; }
-.electro .pd-ads__media { display: table; width: 100%; table-layout: fixed; background-color: var(--pd-ads-bg, #f5f5f5); }
+.electro .pd-ads__media { display: table; width: 100%; table-layout: auto; background-color: var(--pd-ads-bg, #f5f5f5); }
 .electro .pd-ads__left, .electro .pd-ads__body { display: table-cell; vertical-align: middle; }
 .electro .pd-ads__left { padding-right: 10px; }
 .electro .pd-ads__left img, .electro .pd-ads__left .pd-ads__img { display: block; width: 100%; height: auto; }
@@ -14,6 +14,9 @@
 .electro .pd-ads__text { font-size: var(--pd-ads-fs, 1.286em); line-height: 1.278em; font-weight: 200; text-transform: uppercase;
   margin-bottom: .357em; letter-spacing: var(--pd-ads-ls, -.01em); }
 .electro .pd-ads__text strong { font-weight: 700; }
+/* şablon: .ad .ad-text margin-bottom 1.429em; yalnız .home-v1-ads-block .357em'e indirir (v2/v3 indirmez —
+   "From" öneki metnin altındaki bu boşluğa oturur) */
+.electro .pd-ads--v2 .pd-ads__text, .electro .pd-ads--v3 .pd-ads__text { margin-bottom: 1.429em; }
 .electro .pd-ads__text--card { font-size: var(--pd-ads-fs, 1.286em); line-height: 1.278em; }
 .electro .pd-ads--cards .pd-ads__card { background-color: var(--pd-ads-bg, #f5f5f5); }
 .electro .pd-ads--cards .pd-ads__text { margin-bottom: .5rem; }
@@ -37,8 +40,12 @@
 @media (min-width: 768px) and (max-width: 1199.98px) {
   .electro .pd-ads--cards .pd-ads__col { margin-bottom: 1.5rem; }
 }
-/* şablon _screen-sm-md: 768–991 px arası görsel tam genişlik, metin ortalı */
+/* şablon _screen-down-md: .home-v3-ads-block .ad:first-child .ad-text { margin-bottom: 0; font-size: 1.32em } (1.32/1.571 = .84) */
+@media (max-width: 991.98px) {
+  .electro .pd-ads--v3 .pd-ads__col:first-child .pd-ads__text { margin-bottom: 0; font-size: calc(var(--pd-ads-fs, 1.571em) * .84); }
+}
+/* şablon _screen-sm-md: 768–991 px arası (yalnız .home-v1-ads-block) görsel tam genişlik, metin ortalı */
 @media (min-width: 768px) and (max-width: 991.98px) {
-  .electro .pd-ads:not(.pd-ads--cards) .pd-ads__left { display: block; width: 100% !important; padding: 0; }
-  .electro .pd-ads:not(.pd-ads--cards) .pd-ads__body { display: block; width: 100% !important; text-align: center; padding: 1.25em 0; }
+  .electro .pd-ads--v1 .pd-ads__left { display: block; width: 100% !important; padding: 0; }
+  .electro .pd-ads--v1 .pd-ads__body { display: block; width: 100% !important; text-align: center; padding: 1.25em 0; }
 }
