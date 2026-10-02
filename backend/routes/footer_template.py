@@ -132,8 +132,12 @@ async def admin_update_footer_template(
     current_user: dict = Depends(require_admin)
 ):
     """Footer şablonunu güncelle (whitelist)."""
-    allowed = {"mode", "custom_html", "columns", "newsletter", "social", "copyright", "slogan"}
+    allowed = {"mode", "custom_html", "columns", "newsletter", "social", "copyright", "slogan", "payment_band_url"}
     update = {k: v for k, v in (payload or {}).items() if k in allowed}
+    if "payment_band_url" in update:
+        u = str(update["payment_band_url"] or "").strip()[:500]
+        # yalnız http(s) veya site-içi yol (javascript:/data: vb. reddedilir)
+        update["payment_band_url"] = u if (u.startswith("/") or u.lower().startswith(("https://", "http://"))) else ""
     if not update:
         raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
     update["updated_at"] = datetime.now(timezone.utc).isoformat()

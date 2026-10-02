@@ -165,19 +165,17 @@ function FooterWidgets() {
   );
 }
 
-function PaymentBadges() {
-  const badge = (label, inner) => (
-    <span className="d-inline-block bg-white border rounded p-1 ml-1 el-pay" aria-label={label} title={label}>{inner}</span>
-  );
+/** iyzico logo bandı ("iyzico ile Öde" + Mastercard / Visa / American Express / Troy).
+ * Görseller iyzico'nun resmi entegrasyon paketlerindeki varlıklardır (public/payment).
+ * Footer Tasarımı'nda payment_band_url verilirse onun yerine o görsel gösterilir. */
+export function PaymentBand({ url, className = "" }) {
+  if (url) {
+    return <div className={`el-payband ${className}`} data-testid="payment-icons"><img src={url} alt="iyzico ile Öde — Mastercard, Visa, American Express, Troy" height="28" loading="lazy" /></div>;
+  }
   return (
-    <div className="text-md-right" data-testid="payment-icons">
-      {badge("Visa", <span className="el-pay__visa">VISA</span>)}
-      {badge("Mastercard", (
-        <svg width="34" height="20" viewBox="0 0 34 20" aria-hidden="true"><circle cx="13" cy="10" r="8" fill="#eb001b" /><circle cx="21" cy="10" r="8" fill="#f79e1b" fillOpacity=".9" /></svg>
-      ))}
-      {badge("American Express", <span className="el-pay__amex">AMEX</span>)}
-      {badge("Troy", <span className="el-pay__troy">troy</span>)}
-      {badge("iyzico ile güvenli ödeme", <span className="el-pay__iyz"><i className="fas fa-lock mr-1" />iyzico</span>)}
+    <div className={`el-payband ${className}`} data-testid="payment-icons" aria-label="iyzico ile güvenli ödeme — Mastercard, Visa, American Express, Troy">
+      <img src="/payment/iyzico-ile-ode.png" alt="iyzico ile Öde" width="80" height="26" loading="lazy" />
+      <img src="/payment/kartlar.png" alt="Mastercard, Visa, American Express, Troy" width="206" height="20" loading="lazy" />
     </div>
   );
 }
@@ -302,7 +300,7 @@ export default function Footer({ hideWidgets = false }) {
             <div className="mb-3 mb-md-0">
               {copyright || <>© {new Date().getFullYear()} <Link to="/" className="font-weight-bold text-gray-90">{info.name}</Link> - Tüm hakları saklıdır</>}
             </div>
-            <PaymentBadges />
+            <PaymentBand url={tpl?.payment_band_url} />
           </div>
         </div>
       </div>

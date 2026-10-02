@@ -487,7 +487,7 @@ export default function AdminQuestions() {
                 <label className="flex items-center gap-2 mb-2">
                   <input type="checkbox" checked={!!aiSettings.use_emergent_key}
                     onChange={e => setAiSettings({ ...aiSettings, use_emergent_key: e.target.checked })} />
-                  <span className="text-sm font-medium">Emergent Universal Key kullan (ESKİ — kapalı tutun, kendi anahtarınızı girin)</span>
+                  <span className="text-sm font-medium">Eski ortak AI anahtarını kullan (ESKİ — kapalı tutun, kendi anahtarınızı girin)</span>
                 </label>
                 {!aiSettings.use_emergent_key && (
                   <>

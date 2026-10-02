@@ -33,7 +33,7 @@ function CopyRow({ label, value, mono = false, strong = false }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-100 last:border-0">
       <div className="min-w-0">
-        <p className="text-[10px] tracking-[0.15em] text-gray-500 uppercase">{label}</p>
+        <p className="text-xs text-gray-500">{label}</p>
         <p className={`text-black break-all ${mono ? "font-mono" : ""} ${strong ? "text-base font-medium tracking-wide" : "text-sm"}`}>
           {value}
         </p>
@@ -80,7 +80,7 @@ export default function BankTransferInfo({ orderNumber }) {
         <Building2 size={18} strokeWidth={1.6} />
         <div>
           <p className="text-sm font-medium tracking-wide">Havale / EFT ile Ödeme</p>
-          <p className="text-[11px] text-white/70">
+          <p className="text-xs text-white/70">
             Ödemenizi aşağıdaki hesaba yapın; havale onaylanınca siparişiniz hazırlanır.
           </p>
         </div>
@@ -98,7 +98,7 @@ export default function BankTransferInfo({ orderNumber }) {
         {orderNumber && (
           <Link
             to={`/odeme-bildirimi/${orderNumber}`}
-            className="mt-4 w-full h-11 bg-black text-white text-xs tracking-[0.2em] uppercase flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+            className="mt-4 w-full h-11 bg-black text-white text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
             data-testid="payment-notify-btn"
           >
             <Upload size={15} />
@@ -106,7 +106,7 @@ export default function BankTransferInfo({ orderNumber }) {
           </Link>
         )}
 
-        <p className="mt-3 text-[11px] text-gray-500 leading-relaxed">
+        <p className="mt-3 text-xs text-gray-500 leading-relaxed">
           <strong className="text-gray-700">Önemli:</strong> Havale/EFT açıklamasına
           mutlaka <strong className="text-black">sipariş numaranızı</strong> yazın
           {orderNumber ? ` (${orderNumber})` : ""}. Ödemeniz onaylandığında sipariş

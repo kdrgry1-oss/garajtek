@@ -121,3 +121,6 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Hesabım içerik panelleri (Tailwind) — tema yazı tipi ve rengiyle */
+.el-account-main { font-family: "Open Sans", Helvetica, Arial, sans-serif; color: #333e48; font-size: .875rem; }

@@ -1,3 +1,4 @@
+import PageShell from "../components/electro/PageShell";
 import { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import axios from "axios";
@@ -21,7 +22,11 @@ export const RETURN_REASONS = [
   "Diğer",
 ];
 
-export default function ReturnRequest() {
+export default function ReturnRequestPage() {
+  return <PageShell title="İade Talebi" testId="returnrequest-shell"><ReturnRequestBody /></PageShell>;
+}
+
+function ReturnRequestBody() {
   const { orderNumber } = useParams();
   const token = localStorage.getItem("token");
   const [order, setOrder] = useState(null);
@@ -137,7 +142,7 @@ export default function ReturnRequest() {
             </p>
             <button
               onClick={() => setRet(null)}
-              className="w-full bg-black text-white py-3 text-sm tracking-widest uppercase hover:bg-gray-800"
+              className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
             >
               Yeni İade Kodu Oluştur
             </button>
@@ -153,7 +158,7 @@ export default function ReturnRequest() {
         </div>
         <div className="border border-gray-200 p-5 space-y-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">İade Kargo Kodu</p>
+            <p className="text-xs text-gray-400 mb-1">İade Kargo Kodu</p>
             <p className="text-xl font-mono font-semibold break-all">{ret.return_code}</p>
             <p className="text-xs text-gray-500 mt-1">{ret.cargo_provider_name} · Son geçerlilik: <b>{vu}</b> (3 gün)</p>
           </div>
@@ -174,7 +179,7 @@ export default function ReturnRequest() {
           {/* Alıcı (şirket) adresi — gönderi nereye gidiyor */}
           {ret.company_address && (
             <div className="border-t border-gray-100 pt-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">Alıcı Adresi (Bize Gelir)</p>
+              <p className="text-xs text-gray-400 mb-1">Alıcı Adresi (Bize Gelir)</p>
               <p className="text-sm text-gray-700">{ret.company_address}</p>
             </div>
           )}
@@ -191,7 +196,7 @@ export default function ReturnRequest() {
             {contractNo && <p>Şube barkodu okutamazsa, gönderiyi <b>{SITE_NAME}</b> anlaşmalı müşteri numaramız <b>{contractNo}</b> ile teslim edebilirsiniz.</p>}
           </div>
         </div>
-        <a href="/hesabim" className="inline-block text-xs uppercase tracking-[0.15em] mt-6 underline underline-offset-4">Hesabıma Dön</a>
+        <a href="/hesabim" className="inline-block text-xs mt-6 underline underline-offset-4">Hesabıma Dön</a>
       </div>
     );
   }
@@ -201,7 +206,7 @@ export default function ReturnRequest() {
     <div className="max-w-xl mx-auto px-4 py-10 md:py-16">
       <div className="flex items-center gap-2 mb-1">
         <RotateCcw size={18} className="text-gray-500" />
-        <p className="text-xs uppercase tracking-[0.2em] text-gray-400">İade Talebi</p>
+        <p className="text-xs text-gray-400">İade Talebi</p>
       </div>
       <h1 className="text-2xl font-medium tracking-wide mb-6">Sipariş {order.order_number}</h1>
 
@@ -238,7 +243,7 @@ export default function ReturnRequest() {
           </div>
 
           {/* İade sebebi — ZORUNLU */}
-          <label className="block text-xs uppercase tracking-[0.15em] text-gray-500 mb-1">
+          <label className="block text-xs text-gray-500 mb-1">
             İade Sebebi <span className="text-red-600">*</span>
           </label>
           <select
@@ -268,7 +273,7 @@ export default function ReturnRequest() {
                 Lütfen IBAN ve hesap sahibi bilgilerini eksiksiz girin.
               </p>
               <div>
-                <label className="block text-xs uppercase tracking-[0.15em] text-gray-500 mb-1">IBAN <span className="text-red-600">*</span></label>
+                <label className="block text-xs text-gray-500 mb-1">IBAN <span className="text-red-600">*</span></label>
                 <input
                   value={refundIban}
                   onChange={(e) => setRefundIban(e.target.value.toUpperCase())}
@@ -276,10 +281,10 @@ export default function ReturnRequest() {
                   inputMode="text" autoComplete="off" data-testid="return-iban"
                   className={`w-full border p-3 text-sm bg-white focus:outline-none font-mono tracking-wide ${refundIban && !ibanValid ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-gray-500"}`}
                 />
-                {refundIban && !ibanValid && <p className="text-[11px] text-red-600 mt-1">IBAN TR ile başlamalı ve 26 haneli olmalı.</p>}
+                {refundIban && !ibanValid && <p className="text-xs text-red-600 mt-1">IBAN TR ile başlamalı ve 26 haneli olmalı.</p>}
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-[0.15em] text-gray-500 mb-1">IBAN Sahibi Ad Soyad <span className="text-red-600">*</span></label>
+                <label className="block text-xs text-gray-500 mb-1">IBAN Sahibi Ad Soyad <span className="text-red-600">*</span></label>
                 <input
                   value={refundName}
                   onChange={(e) => setRefundName(e.target.value)}
@@ -289,7 +294,7 @@ export default function ReturnRequest() {
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-[0.15em] text-gray-500 mb-1">Banka <span className="text-gray-400 normal-case tracking-normal">(opsiyonel)</span></label>
+                <label className="block text-xs text-gray-500 mb-1">Banka <span className="text-gray-400 normal-case tracking-normal">(opsiyonel)</span></label>
                 <input
                   value={refundBank}
                   onChange={(e) => setRefundBank(e.target.value)}
@@ -304,11 +309,11 @@ export default function ReturnRequest() {
           <button
             onClick={submit}
             disabled={submitting || !reasonCode || (isHavale && (!ibanValid || !refundName.trim()))}
-            className="w-full bg-black text-white py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
           >
             {submitting ? "Oluşturuluyor…" : "İade Talebi Oluştur"}
           </button>
-          <p className="text-[11px] text-gray-400 mt-3">
+          <p className="text-xs text-gray-400 mt-3">
             Hiç ürün seçmezseniz siparişteki tüm ürünler için iade oluşturulur. Onay sonrası 3 gün geçerli bir kargo kodu/barkodu verilir.
           </p>
         </>

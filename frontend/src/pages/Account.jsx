@@ -301,7 +301,7 @@ export default function Account() {
                   return (
                     <li key={m.id}>
                       <button type="button" role="tab" aria-selected={active} onClick={() => switchTab(m.id)} data-testid={`tab-${m.id}`}
-                        className={`dropdown-current btn btn-link p-0 text-left w-100${active ? " active font-weight-bold" : ""}`}>
+                        className={`dropdown-current btn btn-link p-0 text-left w-100 text-gray-90${active ? " active font-weight-bold" : ""}`}>
                         {m.label}
                       </button>
                     </li>
@@ -313,7 +313,7 @@ export default function Account() {
               </ul>
             </div>
           </aside>
-      <main className="min-w-0">
+      <main className="min-w-0 el-account-main">
         {activeTab === "profile"   && <ProfilePane user={user} editing={editingProfile} setEditing={setEditingProfile} form={profileForm} setForm={setProfileForm} onSubmit={handleUpdateProfile} />}
         {activeTab === "orders"    && <OrdersPane loading={loading} orders={orders} expandedOrder={expandedOrder} setExpandedOrder={setExpandedOrder} onChanged={fetchOrders} />}
         {activeTab === "addresses" && <AddressesPane loading={loading} addresses={addresses} editing={editingAddress} setEditing={setEditingAddress} form={addressForm} setForm={setAddressForm} onSubmit={handleSaveAddress} onDelete={handleDeleteAddress} />}
@@ -325,7 +325,7 @@ export default function Account() {
               <div className="max-w-xl mx-auto mb-6 border border-gray-100 rounded-lg p-5" data-testid="loyalty-card">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <div>
-                    <p className="text-[11px] tracking-[0.2em] uppercase text-gray-500 mb-1">Puanlarım</p>
+                    <p className="text-xs text-gray-500 mb-1">Puanlarım</p>
                     <p className="text-2xl font-light text-black">{Number(loyData.points || 0).toFixed(2)} ₺</p>
                   </div>
                   <div className="text-right">
@@ -335,15 +335,15 @@ export default function Account() {
                       : "bg-gray-50 text-gray-500 border-gray-200"}`}>
                       {loyData.tier === "platinum" ? "PLATINUM" : loyData.tier === "gold" ? "GOLD" : "SILVER"} ÜYE
                     </span>
-                    <p className="text-[11px] text-gray-500 mt-1.5">Her siparişte %{loyData.effective_earn_pct} puan kazanırsın</p>
+                    <p className="text-xs text-gray-500 mt-1.5">Her siparişte %{loyData.effective_earn_pct} puan kazanırsın</p>
                   </div>
                 </div>
                 {loyData.next_threshold && (
-                  <p className="text-[11px] text-gray-400 mt-3">
+                  <p className="text-xs text-gray-400 mt-3">
                     Son 12 ay harcaman: {Number(loyData.spend_12m || 0).toFixed(0)} ₺ — bir üst kademe için {Math.max(0, loyData.next_threshold - (loyData.spend_12m || 0)).toFixed(0)} ₺ kaldı
                   </p>
                 )}
-                <p className="text-[11px] text-gray-400 mt-1">1 puan = 1 TL · Ödemede "Puan Kullan" ile harcanır (sepetin en fazla %{loyData.redeem_max_pct}'i).</p>
+                <p className="text-xs text-gray-400 mt-1">1 puan = 1 TL · Ödemede "Puan Kullan" ile harcanır (sepetin en fazla %{loyData.redeem_max_pct}'i).</p>
               </div>
             )}
             {refData && refData.enabled === false ? (
@@ -367,7 +367,7 @@ export default function Account() {
                     className="flex-1 bg-gray-50 border border-gray-200 px-4 py-3 text-sm text-gray-700 focus:outline-none" />
                   <button onClick={() => {
                     try { navigator.clipboard.writeText(refData.share_url || ""); setRefCopied(true); setTimeout(() => setRefCopied(false), 1800); } catch { /* yok */ }
-                  }} className="bg-stone-900 hover:bg-stone-800 text-white px-4 flex items-center gap-1.5 text-xs tracking-wider uppercase">
+                  }} className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
                     <Copy size={14} /> {refCopied ? "Kopyalandı" : "Kopyala"}
                   </button>
                 </div>
@@ -377,11 +377,11 @@ export default function Account() {
                 <div className="grid grid-cols-2 gap-4 max-w-xs mx-auto">
                   <div className="border border-gray-100 rounded p-4">
                     <div className="text-2xl font-light text-black">{refData.invited ?? 0}</div>
-                    <div className="text-[11px] tracking-wide uppercase text-gray-500 mt-1">Davet edilen</div>
+                    <div className="text-xs tracking-wide text-gray-500 mt-1">Davet edilen</div>
                   </div>
                   <div className="border border-gray-100 rounded p-4">
                     <div className="text-2xl font-light text-emerald-700">{refData.rewarded ?? 0}</div>
-                    <div className="text-[11px] tracking-wide uppercase text-gray-500 mt-1">Ödül kazanılan</div>
+                    <div className="text-xs tracking-wide text-gray-500 mt-1">Ödül kazanılan</div>
                   </div>
                 </div>
               </div>
@@ -405,10 +405,10 @@ function ProfilePane({ user, editing, setEditing, form, setForm, onSubmit }) {
     <div className="grid lg:grid-cols-3 gap-6 max-w-4xl">
       <div className="lg:col-span-2 bg-white border border-gray-100 p-6 md:p-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-sm uppercase tracking-[0.2em] text-gray-700">Profil Bilgileri</h2>
+          <h2 className="text-lg font-semibold text-[#333e48] border-b border-gray-200 pb-2">Profil Bilgileri</h2>
           {!editing && (
             <button onClick={() => setEditing(true)} data-testid="edit-profile-btn"
-              className="text-xs uppercase tracking-[0.15em] text-black underline-offset-4 hover:underline flex items-center gap-1">
+              className="text-xs text-black underline-offset-4 hover:underline flex items-center gap-1">
               <Edit2 size={12} /> Düzenle
             </button>
           )}
@@ -424,14 +424,14 @@ function ProfilePane({ user, editing, setEditing, form, setForm, onSubmit }) {
               <Field label="Boy (cm)" value={form.height_cm} onChange={(v) => setForm({ ...form, height_cm: v })} type="number" />
               <Field label="Kilo (kg)" value={form.weight_kg} onChange={(v) => setForm({ ...form, weight_kg: v })} type="number" />
             </div>
-            <p className="text-[11px] text-gray-400 -mt-2">Boy/kilo, ürün sayfasında size en uygun bedeni önermek için kullanılır.</p>
+            <p className="text-xs text-gray-400 -mt-2">Boy/kilo, ürün sayfasında size en uygun bedeni önermek için kullanılır.</p>
             <div className="flex gap-3 pt-2">
               <button type="submit" data-testid="save-profile-btn"
-                className="bg-black text-white px-8 py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors">
+                className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
                 Kaydet
               </button>
               <button type="button" onClick={() => setEditing(false)}
-                className="border border-black text-black px-8 py-3 text-xs uppercase tracking-[0.2em] hover:bg-black hover:text-white transition-colors">
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#f5f5f5] text-[#333e48] px-6 py-2.5 text-sm hover:bg-[#e6e6e6] transition-colors">
                 İptal
               </button>
             </div>
@@ -456,18 +456,18 @@ function ProfilePane({ user, editing, setEditing, form, setForm, onSubmit }) {
             İzin VERİLERİ değişmedi; yalnız bu ekrandaki aç/kapa kaldırıldı. */}
       </div>
 
-      <aside className="bg-black text-white p-6 md:p-8 flex flex-col justify-between">
+      <aside className="bg-[#fed700] text-[#333e48] rounded-lg p-6 md:p-8 flex flex-col justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-3">{SITE_NAME} Üye Avantajı</p>
+          <p className="text-xs text-[#333e48]/70 mb-3">{SITE_NAME} Üye Avantajı</p>
           <h3 className="text-lg font-light leading-snug mb-4">
-            Yeni koleksiyona üyelere özel <span className="font-semibold">erken erişim</span>.
+            Üyelere özel <span className="font-semibold">fırsat ve kampanyalar</span>.
           </h3>
-          <p className="text-xs text-gray-300 leading-relaxed">
-            Ücretsiz kargo, kişisel kombin önerileri ve tüm sezonlara özel kampanyalardan ilk siz haberdar olun.
+          <p className="text-sm text-[#333e48]/80 leading-relaxed">
+            Sipariş takibi, hızlı ödeme ve atölye ekipmanlarındaki indirimlerden ilk siz haberdar olun.
           </p>
         </div>
-        <a href="/" className="text-xs uppercase tracking-[0.2em] mt-6 inline-flex items-center gap-2 group">
-          Yeni Sezonu Keşfet
+        <a href="/sale" className="text-sm font-semibold mt-6 inline-flex items-center gap-2 group">
+          Fırsatları Keşfet
           <ChevronRight size={14} className="transition-transform group-hover:translate-x-1" />
         </a>
       </aside>
@@ -478,7 +478,7 @@ function ProfilePane({ user, editing, setEditing, form, setForm, onSubmit }) {
 function Field({ label, value, onChange, type = "text", disabled = false, required = false, maxLength }) {
   return (
     <div>
-      <label className="block text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-2">
+      <label className="block text-xs text-gray-500 mb-2">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       <input
@@ -499,7 +499,7 @@ function Field({ label, value, onChange, type = "text", disabled = false, requir
 function Row({ k, v, icon: Icon }) {
   return (
     <div>
-      <dt className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-1.5 flex items-center gap-1.5">
+      <dt className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
         {Icon && <Icon size={11} />}
         {k}
       </dt>
@@ -528,7 +528,7 @@ function OrdersPane({ loading, orders, expandedOrder, setExpandedOrder, onChange
           <ShoppingBag size={20} className="text-gray-400" />
         </div>
         <p className="text-sm text-gray-500 mb-6 tracking-wide">Henüz siparişiniz bulunmuyor</p>
-        <a href="/" className="inline-block bg-black text-white px-8 py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors">
+        <a href="/" className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
           Alışverişe Başla
         </a>
       </div>
@@ -538,10 +538,10 @@ function OrdersPane({ loading, orders, expandedOrder, setExpandedOrder, onChange
   return (
     <div className="space-y-3 max-w-4xl">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm uppercase tracking-[0.2em] text-gray-700">
+        <h2 className="text-lg font-semibold text-[#333e48] border-b border-gray-200 pb-2">
           Siparişlerim <span className="text-gray-400">({orders.length})</span>
         </h2>
-        <a href="/siparis-takip" className="text-xs uppercase tracking-[0.15em] text-gray-500 hover:text-black underline-offset-4 hover:underline">
+        <a href="/siparis-takip" className="text-xs text-gray-500 hover:text-black underline-offset-4 hover:underline">
           Sipariş Takip
         </a>
       </div>
@@ -662,7 +662,7 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
             </div>
           )}
           {items.length > 4 && (
-            <div className="w-12 h-14 md:w-14 md:h-16 bg-black text-white text-[10px] flex items-center justify-center border-2 border-white">
+            <div className="w-12 h-14 md:w-14 md:h-16 bg-black text-white text-xs flex items-center justify-center border-2 border-white">
               +{items.length - 4}
             </div>
           )}
@@ -672,8 +672,8 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-sm font-medium tracking-wide truncate">{order.order_number}</span>
-            <span className="text-[11px] text-gray-400">•</span>
-            <span className="text-[11px] text-gray-500">{formatDate(order.created_at)}</span>
+            <span className="text-xs text-gray-400">•</span>
+            <span className="text-xs text-gray-500">{formatDate(order.created_at)}</span>
           </div>
           <p className="text-xs text-gray-500 mt-1">
             {itemCount} ürün · <span className="text-black font-medium">{(order.total ?? 0).toFixed(2)} ₺</span>
@@ -702,7 +702,7 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
           {order.status === "awaiting_payment" && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
               <span className="text-sm text-amber-900">Siparişiniz ödeme bekliyor. Havale/EFT sonrası dekontunuzu iletin.</span>
-              <a href={`/odeme-bildirimi/${order.order_number}`} className="inline-block bg-amber-600 text-white px-4 py-2 rounded-md text-xs uppercase tracking-[0.15em] hover:bg-amber-700 shrink-0">Ödeme Bildirimi Yap</a>
+              <a href={`/odeme-bildirimi/${order.order_number}`} className="inline-block bg-amber-600 text-white px-4 py-2 rounded-md text-xs hover:bg-amber-700 shrink-0">Ödeme Bildirimi Yap</a>
             </div>
           )}
           {order.status === "payment_notified" && (
@@ -712,11 +712,11 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
             <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
               <span className="text-sm text-rose-900">İade talebiniz oluşturuldu · Kod: <b className="font-mono">{order.return_request.return_code}</b></span>
               <div className="flex items-center gap-2 shrink-0">
-                <a href={`/iade/${order.order_number}`} className="inline-block bg-rose-600 text-white px-4 py-2 rounded-md text-xs uppercase tracking-[0.15em] hover:bg-rose-700">Barkodu Gör</a>
+                <a href={`/iade/${order.order_number}`} className="inline-block bg-rose-600 text-white px-4 py-2 rounded-md text-xs hover:bg-rose-700">Barkodu Gör</a>
                 {canCancelReturn && (
                   <button onClick={handleCancelReturn} disabled={cancellingReturn}
                     data-testid="cancel-return-btn"
-                    className="inline-block border border-rose-300 text-rose-700 px-4 py-2 rounded-md text-xs uppercase tracking-[0.15em] hover:bg-rose-100 disabled:opacity-50">
+                    className="inline-block border border-rose-300 text-rose-700 px-4 py-2 rounded-md text-xs hover:bg-rose-100 disabled:opacity-50">
                     {cancellingReturn ? "İptal ediliyor…" : "İade talebini iptal et"}
                   </button>
                 )}
@@ -724,14 +724,14 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
             </div>
           ) : canReturn ? (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
-              <span className="text-sm text-gray-700">Üründe sorun mu var? 14 gün içinde iade edebilirsiniz.</span>
-              <a href={`/iade/${order.order_number}`} className="inline-block bg-black text-white px-4 py-2 rounded-md text-xs uppercase tracking-[0.15em] hover:bg-gray-800 shrink-0">İade Talebi</a>
+              <span className="text-lg font-semibold text-[#333e48] border-b border-gray-200 pb-2">Üründe sorun mu var? 14 gün içinde iade edebilirsiniz.</span>
+              <a href={`/iade/${order.order_number}`} className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">İade Talebi</a>
             </div>
           ) : null}
           {canCancel && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className="text-sm text-gray-700">
+                <span className="text-lg font-semibold text-[#333e48] border-b border-gray-200 pb-2">
                   {needBank
                     ? "Havale/EFT ödemeniz iade edileceği için iptalde IBAN bilgisi gerekir."
                     : "Siparişiniz henüz hazırlanmaya başlamadı. Dilerseniz iptal edebilirsiniz."}
@@ -741,7 +741,7 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
                     onClick={handleCancel}
                     disabled={cancelling}
                     data-testid={`cancel-order-${order.id}`}
-                    className="inline-block bg-red-600 text-white px-4 py-2 rounded-md text-xs uppercase tracking-[0.15em] hover:bg-red-700 disabled:opacity-50 shrink-0"
+                    className="inline-block bg-red-600 text-white px-4 py-2 rounded-md text-xs hover:bg-red-700 disabled:opacity-50 shrink-0"
                   >
                     {cancelling ? "İptal ediliyor..." : "Siparişi İptal Et"}
                   </button>
@@ -753,7 +753,7 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
                   <input value={cIban} onChange={(e) => setCIban(e.target.value.toUpperCase())} placeholder="IBAN — TR00 0000 …"
                     data-testid="cancel-iban"
                     className={`w-full border p-2.5 text-sm bg-white font-mono tracking-wide focus:outline-none ${cIban && !cIbanValid ? "border-red-400" : "border-gray-300 focus:border-gray-600"}`} />
-                  {cIban && !cIbanValid && <p className="text-[11px] text-red-600">IBAN TR ile başlamalı ve 26 haneli olmalı.</p>}
+                  {cIban && !cIbanValid && <p className="text-xs text-red-600">IBAN TR ile başlamalı ve 26 haneli olmalı.</p>}
                   <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="IBAN Sahibi Ad Soyad"
                     data-testid="cancel-iban-name"
                     className="w-full border border-gray-300 p-2.5 text-sm bg-white focus:outline-none focus:border-gray-600" />
@@ -761,10 +761,10 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
                     className="w-full border border-gray-300 p-2.5 text-sm bg-white focus:outline-none focus:border-gray-600" />
                   <div className="flex gap-2 pt-1">
                     <button onClick={handleCancel} disabled={cancelling || !cIbanValid || !cName.trim()}
-                      className="bg-red-600 text-white px-4 py-2 rounded-md text-xs uppercase tracking-[0.15em] hover:bg-red-700 disabled:opacity-40">
+                      className="bg-red-600 text-white px-4 py-2 rounded-md text-xs hover:bg-red-700 disabled:opacity-40">
                       {cancelling ? "İptal ediliyor..." : "İptali Onayla"}
                     </button>
-                    <button onClick={() => setBankOpen(false)} className="px-4 py-2 rounded-md text-xs uppercase tracking-[0.15em] border border-gray-300 text-gray-600 hover:bg-gray-100">
+                    <button onClick={() => setBankOpen(false)} className="px-4 py-2 rounded-md text-xs border border-gray-300 text-gray-600 hover:bg-gray-100">
                       Vazgeç
                     </button>
                   </div>
@@ -801,7 +801,7 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
           <div className="grid md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
             {order.shipping_address && (
               <div>
-                <h4 className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-2">Teslimat Adresi</h4>
+                <h4 className="text-xs text-gray-500 mb-2">Teslimat Adresi</h4>
                 <p className="text-sm text-gray-700 leading-relaxed">
                   {order.shipping_address.first_name} {order.shipping_address.last_name}<br />
                   {order.shipping_address.address}<br />
@@ -811,13 +811,13 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
             )}
             {trackingNumber && (
               <div>
-                <h4 className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-2">Kargo Bilgisi</h4>
-                <p className="text-sm text-gray-700">
+                <h4 className="text-xs text-gray-500 mb-2">Kargo Bilgisi</h4>
+                <p className="text-lg font-semibold text-[#333e48] border-b border-gray-200 pb-2">
                   {order.cargo?.company_name || order.cargo?.company || order.cargo_provider_name || "Kargo"}: <span className="font-medium">{trackingNumber}</span>
                 </p>
                 {trackingUrl && (
                   <a href={trackingUrl} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.15em] mt-2 underline underline-offset-4 hover:no-underline">
+                    className="inline-flex items-center gap-1 text-xs mt-2 underline underline-offset-4 hover:no-underline">
                     Kargoyu Takip Et <ChevronRight size={12} />
                   </a>
                 )}
@@ -826,10 +826,10 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
             {/* Fatura — entegratörden (BirFatura vb.) gelen https fatura bağlantısı */}
             {/^https:\/\//i.test(String(order.invoice_pdf_url || "")) && (
               <div data-testid={`order-invoice-${order.id}`}>
-                <h4 className="text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-2">Fatura</h4>
-                {order.invoice_number && <p className="text-sm text-gray-700">No: <span className="font-medium">{order.invoice_number}</span></p>}
+                <h4 className="text-xs text-gray-500 mb-2">Fatura</h4>
+                {order.invoice_number && <p className="text-lg font-semibold text-[#333e48] border-b border-gray-200 pb-2">No: <span className="font-medium">{order.invoice_number}</span></p>}
                 <a href={order.invoice_pdf_url} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.15em] mt-2 underline underline-offset-4 hover:no-underline">
+                  className="inline-flex items-center gap-1 text-xs mt-2 underline underline-offset-4 hover:no-underline">
                   Faturayı Görüntüle <ChevronRight size={12} />
                 </a>
               </div>
@@ -857,7 +857,7 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
               <div className="flex justify-between text-gray-600"><span>Kargo</span><span>{Number(order.shipping_cost || 0) === 0 ? "Ücretsiz" : `${Number(order.shipping_cost).toFixed(2)} ₺`}</span></div>
             )}
             <div className="pt-2 mt-1 border-t border-gray-200 flex items-center justify-between">
-              <span className="text-xs uppercase tracking-[0.2em] text-gray-500">Toplam</span>
+              <span className="text-xs text-gray-500">Toplam</span>
               <span className="text-lg font-medium">{(order.total ?? 0).toFixed(2)} ₺</span>
             </div>
           </div>
@@ -884,12 +884,12 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
   return (
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm uppercase tracking-[0.2em] text-gray-700">
+        <h2 className="text-lg font-semibold text-[#333e48] border-b border-gray-200 pb-2">
           Adreslerim <span className="text-gray-400">({addresses.length})</span>
         </h2>
         {editing === null && (
           <button onClick={startNew} data-testid="add-address-btn"
-            className="flex items-center gap-2 bg-black text-white px-5 py-2.5 text-xs uppercase tracking-[0.15em] hover:bg-gray-800 transition-colors">
+            className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
             <Plus size={14} /> Yeni Adres
           </button>
         )}
@@ -898,7 +898,7 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
       {/* Form */}
       {editing !== null && (
         <div className="bg-white border border-gray-100 p-6 md:p-8">
-          <h3 className="text-sm uppercase tracking-[0.2em] text-gray-700 mb-5">
+          <h3 className="text-sm text-gray-700 mb-5">
             {editing?.id ? "Adres Düzenle" : "Yeni Adres"}
           </h3>
           <form onSubmit={onSubmit} className="space-y-5">
@@ -921,7 +921,7 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
               </div>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-2">Adres</label>
+              <label className="block text-xs text-gray-500 mb-2">Adres</label>
               <textarea
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
@@ -933,7 +933,7 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
               <input type="checkbox" checked={form.is_default}
                 onChange={(e) => setForm({ ...form, is_default: e.target.checked })}
                 className="accent-black"/>
-              <span className="uppercase tracking-[0.15em] text-gray-600">Varsayılan adres olarak işaretle</span>
+              <span className="text-gray-600">Varsayılan adres olarak işaretle</span>
             </label>
 
             {/* Kurumsal (Şirket) Fatura Bilgileri */}
@@ -942,7 +942,7 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
                 <input type="checkbox" checked={form.is_corporate}
                   onChange={(e) => setForm({ ...form, is_corporate: e.target.checked })}
                   className="accent-black"/>
-                <span className="uppercase tracking-[0.15em] text-gray-700 font-medium">🏢 Kurumsal Fatura (Şirket Adına)</span>
+                <span className="text-gray-700 font-medium">🏢 Kurumsal Fatura (Şirket Adına)</span>
               </label>
               {form.is_corporate && (
                 <div className="grid md:grid-cols-2 gap-5 bg-gray-50 p-4 -mx-1 rounded">
@@ -957,11 +957,11 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
 
             <div className="flex gap-3 pt-2">
               <button type="submit" data-testid="save-address-btn"
-                className="bg-black text-white px-8 py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors">
+                className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
                 Kaydet
               </button>
               <button type="button" onClick={() => setEditing(null)}
-                className="border border-black text-black px-8 py-3 text-xs uppercase tracking-[0.2em] hover:bg-black hover:text-white transition-colors">
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#f5f5f5] text-[#333e48] px-6 py-2.5 text-sm hover:bg-[#e6e6e6] transition-colors">
                 İptal
               </button>
             </div>
@@ -980,7 +980,7 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
             <MapPin size={20} className="text-gray-400" />
           </div>
           <p className="text-sm text-gray-500 mb-6">Henüz kayıtlı adresiniz yok</p>
-          <button onClick={startNew} className="inline-flex items-center gap-2 bg-black text-white px-8 py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors">
+          <button onClick={startNew} className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
             <Plus size={14} /> İlk Adresi Ekle
           </button>
         </div>
@@ -989,11 +989,11 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
           {addresses.map((addr) => (
             <div key={addr.id} className="bg-white border border-gray-100 p-5 relative group hover:border-gray-300 transition-colors">
               {addr.is_default && (
-                <span className="absolute top-3 right-3 inline-flex items-center gap-1 bg-black text-white text-[9px] uppercase tracking-[0.2em] px-2 py-0.5">
+                <span className="absolute top-3 right-3 inline-flex items-center gap-1 bg-black text-white text-[9px] px-2 py-0.5">
                   <Star size={9} /> Varsayılan
                 </span>
               )}
-              <h4 className="text-sm uppercase tracking-[0.15em] mb-3">{addr.title}</h4>
+              <h4 className="text-sm mb-3">{addr.title}</h4>
               <p className="text-sm text-gray-700 leading-relaxed">
                 {addr.first_name} {addr.last_name}<br />
                 <span className="text-gray-500">{addr.address}</span><br />
@@ -1004,11 +1004,11 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
               </p>
               <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
                 <button onClick={() => startEdit(addr)} data-testid={`edit-address-${addr.id}`}
-                  className="text-xs uppercase tracking-[0.15em] text-black hover:underline underline-offset-4 flex items-center gap-1">
+                  className="text-xs text-black hover:underline underline-offset-4 flex items-center gap-1">
                   <Edit2 size={11} /> Düzenle
                 </button>
                 <button onClick={() => onDelete(addr.id)} data-testid={`delete-address-${addr.id}`}
-                  className="text-xs uppercase tracking-[0.15em] text-gray-500 hover:text-red-600 flex items-center gap-1">
+                  className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1">
                   <Trash2 size={11} /> Sil
                 </button>
               </div>
@@ -1062,7 +1062,7 @@ function FavoritesPane() {
         </div>
         <p className="text-sm text-gray-500 mb-1 tracking-wide">Henüz kaydedilen ürününüz yok</p>
         <p className="text-xs text-gray-400 mb-6">Beğendiğiniz ürünleri kaydet ikonu ile listenize ekleyin.</p>
-        <a href="/" className="inline-block bg-black text-white px-8 py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors">
+        <a href="/" className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
           Ürünleri Keşfet
         </a>
       </div>
@@ -1112,7 +1112,7 @@ function SecurityPane() {
 
   return (
     <div className="bg-white border border-gray-100 p-6 md:p-8 max-w-xl" data-testid="security-pane">
-      <h2 className="text-sm uppercase tracking-[0.2em] text-gray-700 mb-2 flex items-center gap-2">
+      <h2 className="text-sm text-gray-700 mb-2 flex items-center gap-2">
         <Lock size={14} /> Şifre Değiştir
       </h2>
       <p className="text-xs text-gray-500 mb-6">Mevcut şifrenizi girip yeni bir şifre belirleyin. En az 6 karakter olmalı.</p>
@@ -1121,7 +1121,7 @@ function SecurityPane() {
         <Field label="Yeni Şifre" type="password" value={form.new_password} onChange={(v) => setForm({ ...form, new_password: v })} />
         <Field label="Yeni Şifre (Tekrar)" type="password" value={form.confirm} onChange={(v) => setForm({ ...form, confirm: v })} />
         <button type="submit" disabled={busy} data-testid="change-password-btn"
-          className="bg-black text-white px-8 py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 disabled:opacity-50 transition-colors">
+          className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
           {busy ? "Güncelleniyor..." : "Şifreyi Güncelle"}
         </button>
       </form>

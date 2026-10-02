@@ -266,6 +266,23 @@ function StructuredEditor({ tpl, setTpl }) {
         <input value={tpl.copyright || ""} onChange={(e) => setTpl({ ...tpl, copyright: e.target.value })}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
       </div>
+
+      {/* Ödeme logo bandı */}
+      <div className="bg-white border rounded-xl p-4">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
+          Ödeme Logo Bandı (alt şerit, sağda)
+        </label>
+        <input value={tpl.payment_band_url || ""} onChange={(e) => setTpl({ ...tpl, payment_band_url: e.target.value })}
+          placeholder="Boş bırakın = iyzico resmi bandı (iyzico ile Öde + Mastercard, Visa, Amex, Troy)"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" data-testid="payment-band-url" />
+        <p className="text-[11px] text-gray-500 mt-1">Farklı bir bant görseli kullanmak için görselin adresini yazın (https://… veya /…). Önerilen yükseklik 56 px (retina).</p>
+        <div className="mt-2 flex items-center gap-3 bg-gray-50 border rounded p-2">
+          {tpl.payment_band_url ? <img src={tpl.payment_band_url} alt="" className="h-7" /> : <>
+            <img src="/payment/iyzico-ile-ode.png" alt="iyzico ile Öde" className="h-7" />
+            <img src="/payment/kartlar.png" alt="Kartlar" className="h-5" />
+          </>}
+        </div>
+      </div>
     </div>
   );
 }

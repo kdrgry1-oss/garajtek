@@ -415,3 +415,8 @@
   .gt-checkout .gt-grid { grid-template-columns: minmax(0, 1fr); }
   .gt-checkout .gt-pds, .gt-checkout .gt-pds-errors { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* iyzico logo bandı (kartla ödemede, "Şimdi öde" altında) */
+.gt-checkout .gt-payband { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; margin: 12px 0 4px; }
+.gt-checkout .gt-payband img { display: inline-block; height: 18px; width: auto; }
+.gt-checkout .gt-payband img:first-child { height: 24px; }

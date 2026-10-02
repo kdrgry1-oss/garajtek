@@ -167,7 +167,7 @@
 }
 .electro .el-range__handle:focus-visible { outline: 2px solid #333e48; }
 
-/* --- Ödeme rozetleri (footer) ------------------------------------------------ */
+/* --- (eski) ödeme rozetleri — PaymentBand ile değiştirildi ------------------------- */
 .electro .el-pay { height: 30px; min-width: 50px; text-align: center; vertical-align: middle; line-height: 20px; }
 .electro .el-pay__visa { color: #1a1f71; font-weight: 800; font-style: italic; font-size: 14px; letter-spacing: .5px; }
 .electro .el-pay__amex { color: #2e77bb; font-weight: 800; font-size: 12px; }
@@ -270,9 +270,17 @@
 .electro .el-ad__upto { line-height: 1; }
 
 /* Günün fırsatı kartı — sabit genişlik (şablon: 370px), görsel kutusu içinde kalır */
-.electro .el-special { width: 100%; }
-@media (min-width: 768px) { .electro .el-special { width: 300px; } }
+.electro .el-special { width: 100%; max-width: 370px; }
+@media (min-width: 992px) { .electro .el-special { width: 300px; } }
 @media (min-width: 1200px) { .electro .el-special { width: 370px; } }
+/* Reklam kartı yazısı kelime ortasından bölünmesin */
+.electro .el-ad .el-banner-text { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+@media (max-width: 1199.98px) { .electro .el-ad .el-banner-text { font-size: .9375rem; line-height: 1.35; } }
+/* Dar sütunlarda (2-1-2 yanları, tablet) fiyat sepete-ekle düğmesine binmesin */
+@media (max-width: 1199.98px) {
+  .electro .el-212 .el-212__side .prodcut-price ins, .electro .el-212 .el-212__side .prodcut-price .text-gray-100 { font-size: 1rem; }
+  .electro [data-testid="home-tabs"] .prodcut-price ins, .electro [data-testid="home-tabs"] .prodcut-price .text-gray-100 { font-size: 1rem; }
+}
 
 /* 2-1-2 ızgara: yan sütunlarda iki ürün alt alta, büyük ürün ortada */
 .electro .el-212__side { flex-direction: column; }
@@ -295,3 +303,19 @@
 /* Panel "Sitede göster" (?menu-highlight=<grup>): ilgili menü alanını vurgula */
 @keyframes elMenuHl { 0%, 100% { box-shadow: 0 0 0 3px rgba(223, 55, 55, .9), 0 0 0 9px rgba(223, 55, 55, .25); } 50% { box-shadow: 0 0 0 3px rgba(223, 55, 55, .9), 0 0 0 15px rgba(223, 55, 55, .08); } }
 .electro .el-menu-hl { position: relative; z-index: 1005; border-radius: 4px; animation: elMenuHl 1.6s ease-in-out infinite; }
+
+/* iyzico logo bandı (footer telif şeridi) */
+.electro .el-payband { display: inline-flex; align-items: center; gap: .75rem; flex-wrap: wrap; background: #fff; border-radius: .25rem; padding: .25rem .75rem; }
+.electro .el-payband img { height: 22px; width: auto; }
+.electro .el-payband img:first-child { height: 28px; }
+@media (max-width: 575.98px) { .electro .el-payband img { height: 18px; } .electro .el-payband img:first-child { height: 24px; } }
+
+/* Sipariş durumu adımları (sipariş tamamlandı / takip) */
+.electro .el-steps { position: relative; gap: .5rem; }
+.electro .el-steps::before { content: ""; position: absolute; left: 8%; right: 8%; top: 20px; height: 2px; background: #e6e6e6; }
+.electro .el-steps__item { position: relative; flex: 1 1 0; text-align: center; }
+.electro .el-steps__dot { display: inline-flex; width: 40px; height: 40px; border-radius: 50%; align-items: center; justify-content: center; background: #f5f5f5; color: #878787; border: 2px solid #fff; }
+.electro .el-steps__item.active .el-steps__dot { background: var(--electro-primary); color: #333e48; }
+.electro .el-steps__label { display: block; margin-top: .4rem; font-size: .75rem; color: #878787; }
+.electro .el-steps__item.active .el-steps__label { color: #333e48; font-weight: 700; }
+.electro .max-width-890 { max-width: 890px; }

@@ -768,7 +768,7 @@ export default function ProductDetail() {
 
                   <div className="mb-4" data-testid="pdp-price">
                     <div className="d-flex align-items-baseline">
-                      <ins className={`font-size-36 text-decoration-none${hasDiscount ? " text-red" : ""}`}>{fmtPrice(displayPrice)}</ins>
+                      <ins className="font-size-36 text-decoration-none">{fmtPrice(displayPrice)}</ins>
                       {hasDiscount && <del className="font-size-20 ml-2 text-gray-6">{fmtPrice(listUnit)}</del>}
                     </div>
                     {_pv.campaignLabel && <div className="font-size-13 text-green">{_pv.campaignLabel}</div>}

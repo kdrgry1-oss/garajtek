@@ -1,3 +1,4 @@
+import PageShell from "../components/electro/PageShell";
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -6,7 +7,11 @@ import { UploadCloud, CheckCircle2, Copy, FileText } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-export default function PaymentNotification() {
+export default function PaymentNotificationPage() {
+  return <PageShell title="Ödeme Bildirimi" testId="paymentnotification-shell"><PaymentNotificationBody /></PageShell>;
+}
+
+function PaymentNotificationBody() {
   const { orderNumber } = useParams();
   const [order, setOrder] = useState(null);
   const [bank, setBank] = useState(null);
@@ -86,7 +91,7 @@ export default function PaymentNotification() {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-10 md:py-16">
-      <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">Ödeme Bildirimi</p>
+      <p className="text-xs text-gray-400 mb-1">Ödeme Bildirimi</p>
       <h1 className="text-2xl font-medium tracking-wide mb-6">Sipariş {order.order_number}</h1>
 
       <div className="border border-gray-200 p-4 mb-6">
@@ -99,7 +104,7 @@ export default function PaymentNotification() {
       {/* Banka bilgisi */}
       {bank && (
         <div className="border border-gray-200 p-4 mb-6">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-3">Havale / EFT Bilgileri</h2>
+          <h2 className="text-xs text-gray-400 mb-3">Havale / EFT Bilgileri</h2>
           <div className="space-y-1 text-sm">
             <p><span className="text-gray-500">Banka:</span> {bank.bank_name}</p>
             {bank.branch && <p><span className="text-gray-500">Şube:</span> {bank.branch}</p>}
@@ -122,7 +127,7 @@ export default function PaymentNotification() {
         </div>
       ) : (
         <div>
-          <h2 className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-3">Dekont Yükle</h2>
+          <h2 className="text-xs text-gray-400 mb-3">Dekont Yükle</h2>
           <label className="block border-2 border-dashed border-gray-300 hover:border-gray-500 transition-colors cursor-pointer p-8 text-center">
             <input type="file" accept="image/*,application/pdf" onChange={onPick} className="hidden" />
             {file ? (
@@ -133,7 +138,7 @@ export default function PaymentNotification() {
               <div className="text-gray-400">
                 <UploadCloud className="mx-auto mb-2" size={26} />
                 <p className="text-sm">PDF veya görsel seçmek için tıklayın</p>
-                <p className="text-[11px] mt-1">Maks. 8MB</p>
+                <p className="text-xs mt-1">Maks. 8MB</p>
               </div>
             )}
           </label>
@@ -149,7 +154,7 @@ export default function PaymentNotification() {
           <button
             onClick={submit}
             disabled={submitting || !file}
-            className="w-full bg-black text-white py-3 mt-4 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
           >
             {submitting ? "Gönderiliyor…" : "Ödeme Bildirimini Gönder"}
           </button>

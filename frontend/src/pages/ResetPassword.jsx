@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import Breadcrumb from "../components/electro/Breadcrumb";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -57,9 +58,11 @@ export default function ResetPassword() {
   return (
     <>
       <Header />
-      <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md border rounded-2xl p-6 md:p-8 shadow-sm">
-          <h1 className="text-xl font-semibold mb-2">Yeni Şifre Belirle</h1>
+      <main className="electro el-page">
+      <Breadcrumb items={[{ label: "Giriş", to: "/giris" }, { label: "Şifre Sıfırla" }]} />
+      <div className="container mb-8">
+        <div className="max-width-530 mx-auto border border-color-1 borders-radius-6 p-4 p-md-6">
+          <h1 className="font-size-26 font-weight-light mb-3">Yeni Şifre Belirle</h1>
           {!token ? (
             <div className="text-sm text-gray-700 space-y-3">
               <p>Bağlantı geçersiz veya eksik. Lütfen yeniden şifre sıfırlama bağlantısı isteyin.</p>
@@ -69,13 +72,13 @@ export default function ResetPassword() {
             </div>
           ) : (
             <>
-              <p className="text-sm text-gray-500 mb-5">Yeni şifrenizi belirleyin (en az 6 karakter).</p>
+              <p className="font-size-14 text-gray-90 mb-4">Yeni şifrenizi belirleyin (en az 6 karakter).</p>
               <input
                 type="password"
                 value={pw}
                 onChange={(e) => setPw(e.target.value)}
                 placeholder="Yeni şifre"
-                className="w-full px-4 py-3 border rounded-lg text-sm mb-3"
+                className="form-control mb-4"
                 autoFocus
               />
               <input
@@ -84,22 +87,23 @@ export default function ResetPassword() {
                 onChange={(e) => setPw2(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
                 placeholder="Yeni şifre (tekrar)"
-                className="w-full px-4 py-3 border rounded-lg text-sm mb-4"
+                className="form-control mb-4"
               />
               <button
                 onClick={submit}
                 disabled={loading}
-                className="w-full py-3 bg-black text-white rounded-lg text-sm hover:bg-gray-800 disabled:opacity-50"
+                className="btn btn-primary-dark-w btn-block rounded-pill"
               >
                 {loading ? "Güncelleniyor…" : "Şifreyi Güncelle"}
               </button>
             </>
           )}
           <div className="mt-5 text-sm text-center">
-            <Link to="/giris" className="text-gray-500 hover:text-black underline">Girişe dön</Link>
+            <Link to="/giris" className="text-blue">Girişe dön</Link>
           </div>
         </div>
       </div>
+      </main>
       <Footer />
     </>
   );

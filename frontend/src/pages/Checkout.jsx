@@ -1066,6 +1066,12 @@ export default function Checkout() {
                 ? <>Ödeme tutarı: <strong>{formatTRY(chargeTotal)}</strong>{isInstallmentSelected ? ` (${selectedInstallment} taksit)` : ""}. Bankanızın 3D Secure ekranına yönlendirileceksiniz.</>
                 : <>Ödenecek tutar: <strong>{formatTRY(chargeTotal)}</strong></>}
             </p>
+            {isCard && (
+              <div className="gt-payband" data-testid="checkout-payband" aria-label="iyzico ile güvenli ödeme">
+                <img src="/payment/iyzico-ile-ode.png" alt="iyzico ile Öde" width="74" height="24" />
+                <img src="/payment/kartlar.png" alt="Mastercard, Visa, American Express, Troy" width="186" height="18" />
+              </div>
+            )}
 
             <CheckoutFooter />
           </div>

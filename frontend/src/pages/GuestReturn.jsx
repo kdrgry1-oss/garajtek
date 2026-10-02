@@ -1,3 +1,4 @@
+import PageShell from "../components/electro/PageShell";
 import { useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -7,7 +8,11 @@ import { RETURN_REASONS } from "./ReturnRequest";
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const MS_14D = 14 * 24 * 3600 * 1000;
 
-export default function GuestReturn() {
+export default function GuestReturnPage() {
+  return <PageShell title="İade İşlemleri" testId="guestreturn-shell"><GuestReturnBody /></PageShell>;
+}
+
+function GuestReturnBody() {
   const [step, setStep] = useState("lookup"); // lookup | form | done
   const [orderNumber, setOrderNumber] = useState("");
   const [email, setEmail] = useState("");
@@ -98,7 +103,7 @@ export default function GuestReturn() {
             </p>
             <button
               onClick={() => { setRet(null); setStep("form"); }}
-              className="w-full bg-black text-white py-3 text-sm tracking-widest uppercase hover:bg-gray-800"
+              className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
             >
               Yeni İade Kodu Oluştur
             </button>
@@ -114,7 +119,7 @@ export default function GuestReturn() {
         </div>
         <div className="border border-gray-200 p-5 space-y-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">İade Kargo Kodu</p>
+            <p className="text-xs text-gray-400 mb-1">İade Kargo Kodu</p>
             <p className="text-xl font-mono font-semibold break-all">{ret.return_code}</p>
             <p className="text-xs text-gray-500 mt-1">{ret.cargo_provider_name} · Son geçerlilik: <b>{vu}</b> (3 gün)</p>
           </div>
@@ -131,7 +136,7 @@ export default function GuestReturn() {
           )}
           {ret.company_address && (
             <div className="border-t border-gray-100 pt-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">Alıcı Adresi (Bize Gelir)</p>
+              <p className="text-xs text-gray-400 mb-1">Alıcı Adresi (Bize Gelir)</p>
               <p className="text-sm text-gray-700">{ret.company_address}</p>
             </div>
           )}
@@ -143,7 +148,7 @@ export default function GuestReturn() {
             {contractNo && <p>Anlaşmalı No: <b className="font-mono text-gray-700">{contractNo}</b></p>}
           </div>
         </div>
-        <a href="/" className="inline-block text-xs uppercase tracking-[0.15em] mt-6 underline underline-offset-4">Anasayfaya Dön</a>
+        <a href="/" className="inline-block text-xs mt-6 underline underline-offset-4">Anasayfaya Dön</a>
       </div>
     );
   }
@@ -159,7 +164,7 @@ export default function GuestReturn() {
       <div className="max-w-xl mx-auto px-4 py-10 md:py-16">
         <div className="flex items-center gap-2 mb-1">
           <RotateCcw size={18} className="text-gray-500" />
-          <p className="text-xs uppercase tracking-[0.2em] text-gray-400">İade İşlemleri</p>
+          <p className="text-xs text-gray-400">İade İşlemleri</p>
         </div>
         <h1 className="text-2xl font-medium tracking-wide mb-4">Sipariş {order.order_number}</h1>
 
@@ -206,7 +211,7 @@ export default function GuestReturn() {
             </div>
 
             {/* İade sebebi — ZORUNLU */}
-            <label className="block text-xs uppercase tracking-[0.15em] text-gray-500 mb-1">
+            <label className="block text-xs text-gray-500 mb-1">
               İade Sebebi <span className="text-red-600">*</span>
             </label>
             <select
@@ -236,20 +241,20 @@ export default function GuestReturn() {
                   Lütfen IBAN ve hesap sahibi bilgilerini eksiksiz girin.
                 </p>
                 <div>
-                  <label className="block text-xs uppercase tracking-[0.15em] text-gray-500 mb-1">IBAN <span className="text-red-600">*</span></label>
+                  <label className="block text-xs text-gray-500 mb-1">IBAN <span className="text-red-600">*</span></label>
                   <input value={refundIban} onChange={(e) => setRefundIban(e.target.value.toUpperCase())}
                     placeholder="TR00 0000 0000 0000 0000 0000 00" autoComplete="off" data-testid="guest-return-iban"
                     className={`w-full border p-3 text-sm bg-white focus:outline-none font-mono tracking-wide ${refundIban && !ibanValid ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-gray-500"}`} />
-                  {refundIban && !ibanValid && <p className="text-[11px] text-red-600 mt-1">IBAN TR ile başlamalı ve 26 haneli olmalı.</p>}
+                  {refundIban && !ibanValid && <p className="text-xs text-red-600 mt-1">IBAN TR ile başlamalı ve 26 haneli olmalı.</p>}
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-[0.15em] text-gray-500 mb-1">IBAN Sahibi Ad Soyad <span className="text-red-600">*</span></label>
+                  <label className="block text-xs text-gray-500 mb-1">IBAN Sahibi Ad Soyad <span className="text-red-600">*</span></label>
                   <input value={refundName} onChange={(e) => setRefundName(e.target.value)} placeholder="Hesap sahibinin adı soyadı"
                     autoComplete="name" data-testid="guest-return-iban-name"
                     className="w-full border border-gray-200 p-3 text-sm bg-white focus:outline-none focus:border-gray-500" />
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-[0.15em] text-gray-500 mb-1">Banka <span className="text-gray-400 normal-case tracking-normal">(opsiyonel)</span></label>
+                  <label className="block text-xs text-gray-500 mb-1">Banka <span className="text-gray-400 normal-case tracking-normal">(opsiyonel)</span></label>
                   <input value={refundBank} onChange={(e) => setRefundBank(e.target.value)} placeholder="Örn. Ziraat Bankası"
                     className="w-full border border-gray-200 p-3 text-sm bg-white focus:outline-none focus:border-gray-500" />
                 </div>
@@ -259,18 +264,18 @@ export default function GuestReturn() {
             <button
               onClick={submit}
               disabled={submitting || !reasonCode || (isHavale && (!ibanValid || !refundName.trim()))}
-              className="w-full bg-black text-white py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
             >
               {submitting ? "Oluşturuluyor…" : "İade Talebi Oluştur"}
             </button>
-            <p className="text-[11px] text-gray-400 mt-3">
+            <p className="text-xs text-gray-400 mt-3">
               Hiç ürün seçmezseniz siparişteki tüm ürünler için iade oluşturulur. Onay sonrası 3 gün geçerli bir kargo kodu/barkodu verilir.
             </p>
           </>
         )}
         <button
           onClick={() => { setStep("lookup"); setOrder(null); setSelected({}); }}
-          className="mt-6 text-xs uppercase tracking-[0.15em] underline underline-offset-4 text-gray-500"
+          className="mt-6 text-xs underline underline-offset-4 text-gray-500"
         >
           ← Başka sipariş
         </button>
@@ -283,7 +288,7 @@ export default function GuestReturn() {
     <div className="max-w-md mx-auto px-4 py-12 md:py-20">
       <div className="flex items-center gap-2 mb-1">
         <RotateCcw size={18} className="text-gray-500" />
-        <p className="text-xs uppercase tracking-[0.2em] text-gray-400">İade İşlemleri</p>
+        <p className="text-xs text-gray-400">İade İşlemleri</p>
       </div>
       <h1 className="text-2xl font-medium tracking-wide mb-2">Üyeliksiz İade</h1>
       <p className="text-sm text-gray-500 mb-8">
@@ -291,7 +296,7 @@ export default function GuestReturn() {
       </p>
       <form onSubmit={lookup} className="space-y-4">
         <div>
-          <label className="text-xs uppercase tracking-[0.15em] text-gray-400">Sipariş No</label>
+          <label className="text-xs text-gray-400">Sipariş No</label>
           <input
             value={orderNumber}
             onChange={(e) => setOrderNumber(e.target.value)}
@@ -300,7 +305,7 @@ export default function GuestReturn() {
           />
         </div>
         <div>
-          <label className="text-xs uppercase tracking-[0.15em] text-gray-400">E-posta</label>
+          <label className="text-xs text-gray-400">E-posta</label>
           <input
             type="email"
             value={email}
@@ -311,7 +316,7 @@ export default function GuestReturn() {
         </div>
         <div className="text-center text-xs text-gray-400">— veya —</div>
         <div>
-          <label className="text-xs uppercase tracking-[0.15em] text-gray-400">Telefon</label>
+          <label className="text-xs text-gray-400">Telefon</label>
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -322,13 +327,13 @@ export default function GuestReturn() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-black text-white py-3 text-xs uppercase tracking-[0.2em] hover:bg-gray-800 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+          className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
         >
           <Search size={15} />
           {loading ? "Sorgulanıyor…" : "Siparişi Getir"}
         </button>
       </form>
-      <p className="text-[11px] text-gray-400 mt-6">
+      <p className="text-xs text-gray-400 mt-6">
         Üye iseniz <a href="/hesabim" className="underline underline-offset-2">hesabınızdan</a> da iade oluşturabilirsiniz.
       </p>
     </div>

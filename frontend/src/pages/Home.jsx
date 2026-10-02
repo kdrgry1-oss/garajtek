@@ -216,7 +216,7 @@ function AdsBlock({ block }) {
         {items.map((it, i) => {
           const size = SIZES.ads[i] || SIZES.ads[0];
           return (
-            <div className="col-md-4 mb-4 mb-md-0" key={i}>
+            <div className={`${i === 2 ? "col-md-12" : "col-md-6"} col-lg-4 mb-4 mb-lg-0`} key={i}>
               <SmartLink to={it.link || "/"} className="d-block text-gray-90 el-ad" onClick={() => promo(`ad_${i + 1}`, it.strong || it.link)} data-testid={`ad-${i + 1}`}>
                 <div className="min-height-132 py-1 d-flex bg-gray-1 align-items-center">
                   <div className="col-6 col-xl-5 col-wd-6 pr-0">
@@ -360,7 +360,7 @@ function DealsTabs({ block, pool }) {
   return (
     <div className="mb-5" data-testid="deals-tabs">
       <div className="row">
-        {special && <div className="col-md-auto mb-6 mb-md-0"><SpecialOffer product={special} title={st.special?.title || "Günün Fırsatı"} /></div>}
+        {special && <div className="col-lg-auto mb-6 mb-lg-0 d-flex justify-content-center"><SpecialOffer product={special} title={st.special?.title || "Günün Fırsatı"} /></div>}
         <div className="col min-width-0"><TabbedGrid tabs={tabs} /></div>
       </div>
     </div>
