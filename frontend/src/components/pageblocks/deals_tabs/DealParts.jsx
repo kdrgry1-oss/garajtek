@@ -29,6 +29,9 @@ export function stockValues(stock, product) {
   return { sold: Number(product?.sold_count || product?.sales_count || 0), available: stockOf(product) };
 }
 
+/** Elle girilen kazanç panel alanıdır (data-pd-field), otomatik hesaplanan katalog verisidir. */
+const amountAttr = (savings, field) => (savings?.mode === "manual" ? { "data-pd-field": `${field}.amount` } : { "data-pd-data": "" });
+
 /** v1 koyu kazanç kutusu (veya v2 ana renkli daire: shape="circle"). */
 export function SavingsBox({ savings, amount, field, shape = "box" }) {
   if (!savings?.show || !amount) return null;
@@ -38,7 +41,7 @@ export function SavingsBox({ savings, amount, field, shape = "box" }) {
       <div className="d-flex align-items-center flex-column justify-content-center bg-primary rounded-pill height-75 width-75 text-lh-1 flex-shrink-0"
         style={style} data-testid="savings-badge">
         <span className="font-size-12" data-pd-field={`${field}.label`}>{savings.label}</span>
-        <div className="font-size-20 font-weight-bold text-nowrap" data-pd-data="">{amount}</div>
+        <div className="font-size-20 font-weight-bold text-nowrap" {...amountAttr(savings, field)}>{amount}</div>
       </div>
     );
   }
@@ -46,7 +49,7 @@ export function SavingsBox({ savings, amount, field, shape = "box" }) {
     <div className="pdb-savings" style={style} data-testid="savings-badge">
       <span className="pdb-savings__text">
         <span data-pd-field={`${field}.label`}>{savings.label}</span>
-        <span className="pdb-savings__amount" data-pd-data="">{amount}</span>
+        <span className="pdb-savings__amount" {...amountAttr(savings, field)}>{amount}</span>
       </span>
     </div>
   );

@@ -48,10 +48,11 @@
 .electro .pdb-tabs-v1 a.active::after { content: ""; position: absolute; left: 0; bottom: 0; width: 100%; border-bottom: 2px solid var(--electro-primary, #fed700); }
 .electro .pdb-tabs-v1 a.active::before { content: ""; position: absolute; bottom: -4px; left: 50%; width: 10px; height: 4px; border-radius: 0 0 10px 10px; transform: translateX(-50%); background: var(--electro-primary, #fed700); }
 .electro .pdb-tabs-v1-wrap { padding-bottom: 5px; }
+/* şablon screen-down-sm: nav-inline öğeleri alt alta, ortalı (her biri 1.429em aralıklı) */
 @media (max-width: 767.98px) {
-  .electro .pdb-tabs-v1 { justify-content: flex-start; }
-  .electro .pdb-tabs-v1 > li + li { margin-left: 2em; }
-  .electro .pdb-tabs-v1 a { font-size: 1.214em; }
+  .electro .pdb-tabs-v1, .electro .pdb-tabs-v1.pdb-tabs--left { flex-direction: column; align-items: center; overflow: visible; white-space: normal; }
+  .electro .pdb-tabs-v1 > li, .electro .pdb-tabs-v1 > li + li { margin-left: 0; margin-bottom: 1.429em; }
+  .electro .pdb-tabs-v1 a { display: inline-block; }
 }
 
 /* sekme içi geçişler */
@@ -71,5 +72,10 @@ html.pd-no-anim .electro .pdb-skel { animation: none; }
 .electro .pdb-cols > * { flex: 0 0 calc(100% / var(--pdb-cm, 2)); max-width: calc(100% / var(--pdb-cm, 2)); min-width: 0; }
 @media (min-width: 768px) { .electro .pdb-cols > * { flex-basis: calc(100% / var(--pdb-ct, 3)); max-width: calc(100% / var(--pdb-ct, 3)); } }
 @media (min-width: 1200px) { .electro .pdb-cols > * { flex-basis: calc(100% / var(--pdb-cd, 4)); max-width: calc(100% / var(--pdb-cd, 4)); } }
+@media (min-width: 1480px) { .electro .pdb-cols > * { flex-basis: calc(100% / var(--pdb-cw, var(--pdb-cd, 4))); max-width: calc(100% / var(--pdb-cw, var(--pdb-cd, 4))); } }
+/* şablon `d-xl-none d-wd-block`: 1200–1479 px'te yarım kalan satırı gizle */
+@media (min-width: 1200px) and (max-width: 1479.98px) { .electro .pdb-cols > .pdb-xl-hide { display: none; } }
+/* v2 / indirim sekmeleri özel teklif kartı: şablon `border border-width-2 border-primary` (renk panelden değişebilir) */
+.electro .pdb-special2 { border: 2px solid var(--electro-primary, #fed700); }
 .electro .pdb-tabs-v1 > li { flex-shrink: 0; }
 .electro .pdb-tabs-v1 a { white-space: nowrap; }

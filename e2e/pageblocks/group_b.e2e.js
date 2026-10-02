@@ -79,7 +79,7 @@ const VARIANTS = [
   ["products_6_1", "6_1", ".pdb-61 .pdb-main__fixed"], ["products_6_1", "8_1", ".pdb-61--8"],
   ["deals_carousel", "gallery", ".pdb-dow__box .pdb-dow__slide"], ["deals_carousel", "cards", ".pdb-dow-cards .js-slide .product-item"],
   ["deals_week_limited", "v4", ".pdb-wdl .font-size-130"], ["deals_week_limited", "v11", ".pdb-wdl .font-size-sl-48"],
-  ["product_grid", "recommendations", ".pdb-grid .pdb-cols .product-item"], ["product_grid", "hot", ".pdb-grid .product-item__card"],
+  ["product_grid", "recommendations", ".pdb-grid .pdb-cols .product-item"], ["product_grid", "hot", ".pdb-grid .pagination .page-link"],
   ["banner_with_products_grid", "banner_list", ".pdb-bpg .list-group-item"], ["banner_with_products_grid", "menu", ".pdb-bpg .box-shadow-3"],
   ["banner_with_products_grid", "featured", ".pdb-bpg .pdb-main"],
 ];
@@ -188,7 +188,7 @@ async function textAt(p, type, path) {
       await p.goto(url, { waitUntil: "networkidle" });
       await p.waitForSelector("[data-pd-block]");
       // yapışkan şerit, "yukarı çık" düğmesi (kaydırmaya göre) ve önizlemenin "+ Blok ekle" çizgisi karşılaştırma dışı
-      await p.addStyleTag({ content: "html body .el-sticky-bar,html body .pd-insert,html body .pd-gotop{display:none!important}" });
+      await p.addStyleTag({ content: "html body .el-sticky-bar,html body .electro .el-sticky-bar.el-sticky-bar,html body .pd-insert,html body .pd-gotop{display:none!important}" });
       await p.waitForTimeout(1500);
       const ids = await p.$$eval("[data-pd-block]", (els) => els.map((e) => e.getAttribute("data-pd-block")));
       const out = {};

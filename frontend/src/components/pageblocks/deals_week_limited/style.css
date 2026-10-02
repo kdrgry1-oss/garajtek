@@ -1,0 +1,4 @@
+/* Grup B — v2.0 home-v4 / home-v11 "Week Deals limited". Şablonda karusel `position-static`: yan oklar
+   (left-n16 / right-n16) karuselin taşma kırpmasına girmeden sütunun kenarına göre konumlanır. */
+.electro .pdb-wdl .pd-carousel { position: static !important; }
+.electro .pdb-wdl .pdb-wdl__col { position: relative; }

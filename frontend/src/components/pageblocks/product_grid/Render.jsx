@@ -6,14 +6,26 @@ import useProductSource from "../_shared/useProductSource";
 import ProductCard from "../_shared/ProductCard";
 import { colCounts, colsStyle, dividerClasses } from "../deals_tabs/gridUtil";
 import GridHeader, { initialPill, pillSource } from "./GridHeader";
+import { isPreviewActive } from "../../../lib/pagePreview";
+
+/** Son bakılanlar ziyaretçiye özeldir; panel önizlemesinde geçmiş yoksa düzenlenen görünüm boş kalmasın diye
+ *  en yeni ürünler örnek olarak gösterilir (vitrinde etkisi yok). */
+function previewSample(src) {
+  if (!src || src.kind !== "recently_viewed" || !isPreviewActive()) return src;
+  let ids = [];
+  try { ids = JSON.parse(localStorage.getItem("recently_viewed") || "[]"); } catch { ids = []; }
+  return Array.isArray(ids) && ids.length ? src : { ...src, kind: "newest" };
+}
 
 export default function Render({ settings }) {
   const st = settings;
   const [pill, setPill] = useState(null);
   const active = pill ?? initialPill(st.header);
-  const src = useMemo(() => pillSource(st.header, active, st.source), [st.header, active, st.source]);
+  const src = useMemo(() => previewSample(pillSource(st.header, active, st.source)), [st.header, active, st.source]);
   const list = useProductSource(src);
-  const cols = colCounts(st.columns, { desktop: 6, tablet: 4, mobile: 2 });
+  const base = colCounts(st.columns, { desktop: 6, tablet: 4, mobile: 2 });
+  // şablon (home-v7 col-xl-2gdot4-only col-wd-2): 6+ sütunda 1200–1479 px arası bir sütun eksik, yarım satır gizli
+  const cols = base.desktop >= 6 ? { ...base, wide: base.desktop, desktop: base.desktop - 1 } : base;
   const more = st.show_more_button || {};
   const perPage = Math.max(1, Number(st.page_size) || 12);
   const [page, setPage] = useState(0);
@@ -32,6 +44,7 @@ export default function Render({ settings }) {
   const visible = shown ?? initial;
   if (!st.pagination && more.enabled) items = items.slice(0, visible);
   const card = st.card === "image_only" || st.card === "horizontal" ? st.card : "grid";
+  const gridCols = cols.wide ? { ...cols, xlMax: Math.floor(items.length / cols.desktop) * cols.desktop || items.length } : cols;
   const onPill = (i) => { setPill(i); setPage(0); setShown(null); };
   return (
     <div className="pdb-grid" data-testid="product-grid">
@@ -42,7 +55,7 @@ export default function Render({ settings }) {
         <ul className={`pdb-cols list-unstyled products-group no-gutters mb-0${card === "image_only" ? " pdb-grid--images" : ""}`} style={colsStyle(cols)} key={`${active}-${cur}`}>
           {items.map((p, i) => (
             <ProductCard key={p.id} product={p} card={card} as="li" listName="product_grid" index={i}
-              className={`${dividerClasses(i, cols)}${card === "image_only" ? " p-2" : ""}`} />
+              className={`${dividerClasses(i, gridCols)}${card === "image_only" ? " p-2" : ""}`} />
           ))}
         </ul>
       )}

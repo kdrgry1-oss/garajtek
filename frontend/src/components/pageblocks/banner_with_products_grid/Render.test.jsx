@@ -39,4 +39,21 @@ describe("banner_with_products_grid", () => {
     expect(container.querySelector('[data-pd-field="empty_text"]')).not.toBeNull();
     unmount();
   });
+
+  test("başlık sağ tarafı panelden: hap bağlantıları eklenir, 'Tümünü gör' ve 'Hiçbiri' işler", async () => {
+    mockFetch(P);
+    let r = await renderBlock("banner_with_products_grid", { header: { right: "pills", pills: [{ label: "Kampanyalar", link: { kind: "url", url: "/sale" } }] } });
+    const extra = r.container.querySelector('[data-pd-field="header.pills.0.label"]');
+    expect(extra.textContent).toBe("Kampanyalar");
+    expect(extra.getAttribute("href")).toBe("/sale");
+    r.unmount();
+    r = await renderBlock("banner_with_products_grid", { header: { right: "link" } });
+    expect(r.container.querySelectorAll(".nav-tab-pill a").length).toBe(4);
+    expect(r.container.querySelector('[data-pd-field="header.link.label"]')).not.toBeNull();
+    r.unmount();
+    r = await renderBlock("banner_with_products_grid", { header: { right: "none" } });
+    expect(r.container.querySelector(".nav-tab-pill")).toBeNull();
+    expect(r.container.querySelectorAll(".pdb-cols .product-item").length).toBe(8);
+    r.unmount();
+  });
 });

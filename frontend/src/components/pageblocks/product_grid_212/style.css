@@ -19,11 +19,6 @@
 .electro .pdb-212__side .product-item__inner { background: #fff; }
 .electro .pdb-212__side > .product-item::after { content: none !important; }
 .electro .pdb-212__mid { margin-bottom: 7px; }
-@media (min-width: 768px) and (max-width: 991.98px) {
-  .electro .pdb-212__side { width: 50%; flex-direction: row; }
-  .electro .pdb-212__side > li { width: 50%; }
-  .electro .pdb-212__side > li + li { margin-left: 7px; }
-}
 @media (min-width: 992px) {
   .electro .pdb-212__cols { flex-wrap: nowrap; }
   .electro .pdb-212__side { width: 23.685%; }
@@ -31,7 +26,7 @@
   .electro .pdb-212__cols--25 .pdb-212__side { width: 25%; }
   .electro .pdb-212__cols--25 .pdb-212__mid { width: 50%; }
 }
-@media (max-width: 991.98px) { .electro .pdb-212__mid { order: -1; } }
+/* şablon: lg altında tüm sütunlar %100 ve DOM sırasıyla (2 küçük, büyük, 2 küçük) alt alta */
 
 /* ---- büyük ürün kartı ---- */
 .electro .pdb-main { width: 100%; height: 100%; list-style: none; position: relative; }
@@ -70,3 +65,13 @@
   .electro .pdb-212__cols > .pdb-212__side:first-child { padding-left: 15px; }
   .electro .pdb-212__cols > .pdb-212__side:last-child { padding-right: 15px; }
 }
+
+/* şablon screen-down-sm (.products-2-1-2 .nav-inline): sekmeler alt alta, ortalı */
+@media (max-width: 767.98px) {
+  .electro .pdb-212__nav { flex-direction: column; align-items: center; overflow: visible; white-space: normal; }
+  .electro .pdb-212__nav > li:first-child, .electro .pdb-212__nav > li + li { margin-left: 0; }
+  .electro .pdb-212__nav > li { margin-bottom: 1.429em; }
+  .electro .pdb-212__nav a { display: inline-block; }
+}
+/* yan kartlar: .product-item flex olduğundan iç çerçeve içeriğe göre daralıyordu (390 px'te 332/360) — şablonda tam genişlik */
+.electro .pdb-212__side .product-item__outer { width: 100%; }

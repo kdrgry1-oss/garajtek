@@ -23,7 +23,19 @@
     {
       "value": "v1",
       "label": "v1 – Ana sayfa (koyu kazanç kutusu, 3 sütun)",
-      "defaults_patch": {}
+      "defaults_patch": {
+        "columns": "3",
+        "deal": {
+          "countdown": {
+            "units": [
+              "days",
+              "hours",
+              "minutes",
+              "seconds"
+            ]
+          }
+        }
+      }
     },
     {
       "value": "v2",
@@ -79,14 +91,23 @@
               "fill_with": "none"
             }
           }
-        ]
+        ],
+        "deal": {
+          "countdown": {
+            "units": [
+              "hours",
+              "minutes",
+              "seconds"
+            ]
+          }
+        }
       }
     },
     {
       "value": "discount_tabs",
       "label": "İndirim sekmeleri – başlıkta hap sekmeler (v2.0 home-v6)",
       "defaults_patch": {
-        "columns": "4",
+        "columns": "5",
         "tabs": [
           {
             "label": "%50 ve üzeri",
@@ -97,7 +118,7 @@
               "include_children": true,
               "tag": "",
               "brand_ids": [],
-              "limit": 8,
+              "limit": 10,
               "sort": "default",
               "exclude_out_of_stock": false,
               "exclude_ids": [],
@@ -113,7 +134,7 @@
               "include_children": true,
               "tag": "",
               "brand_ids": [],
-              "limit": 8,
+              "limit": 10,
               "sort": "default",
               "exclude_out_of_stock": false,
               "exclude_ids": [],
@@ -129,7 +150,7 @@
               "include_children": true,
               "tag": "",
               "brand_ids": [],
-              "limit": 8,
+              "limit": 10,
               "sort": "default",
               "exclude_out_of_stock": false,
               "exclude_ids": [],
@@ -145,14 +166,23 @@
               "include_children": true,
               "tag": "",
               "brand_ids": [],
-              "limit": 8,
+              "limit": 10,
               "sort": "default",
               "exclude_out_of_stock": false,
               "exclude_ids": [],
               "fill_with": "none"
             }
           }
-        ]
+        ],
+        "deal": {
+          "countdown": {
+            "units": [
+              "hours",
+              "minutes",
+              "seconds"
+            ]
+          }
+        }
       }
     }
   ],
@@ -479,9 +509,13 @@
         {
           "value": "4",
           "label": "4"
+        },
+        {
+          "value": "5",
+          "label": "5"
         }
       ],
-      "help": "Masaüstü sütun sayısı; tablette en çok 3, mobilde 2."
+      "help": "Geniş ekran (1480 px+) sütun sayısı. v1: masaüstünde bu sayı; v2: 1200–1479 px arası en çok 3; indirim sekmeleri: en çok 4. Tablette en çok 3; mobilde v1 tek sütun (şablon), diğerleri 2."
     },
     {
       "name": "card",

@@ -20,7 +20,11 @@
     {
       "value": "v4",
       "label": "v4 – başlık, % simgesi ve geri sayım",
-      "defaults_patch": {}
+      "defaults_patch": {
+        "carousel": {
+          "arrows": "none"
+        }
+      }
     },
     {
       "value": "v11",
@@ -38,6 +42,9 @@
           "countdown": {
             "enabled": false
           }
+        },
+        "carousel": {
+          "arrows": "side"
         }
       }
     }
@@ -99,25 +106,45 @@
               "name": "prefix",
               "type": "text",
               "label": "Ön yazı",
-              "width": "half"
+              "width": "half",
+              "show_if": {
+                "show": [
+                  true
+                ]
+              }
             },
             {
               "name": "value",
               "type": "text",
               "label": "Değer",
-              "width": "half"
+              "width": "half",
+              "show_if": {
+                "show": [
+                  true
+                ]
+              }
             },
             {
               "name": "suffix",
               "type": "text",
               "label": "Üst simge",
-              "width": "half"
+              "width": "half",
+              "show_if": {
+                "show": [
+                  true
+                ]
+              }
             },
             {
               "name": "sub",
               "type": "text",
               "label": "Alt yazı",
-              "width": "half"
+              "width": "half",
+              "show_if": {
+                "show": [
+                  true
+                ]
+              }
             }
           ]
         },
@@ -136,13 +163,23 @@
               "name": "text",
               "type": "text",
               "label": "Yazı",
-              "width": "half"
+              "width": "half",
+              "show_if": {
+                "show": [
+                  true
+                ]
+              }
             },
             {
               "name": "link",
               "type": "link",
               "label": "Bağlantı",
-              "width": "half"
+              "width": "half",
+              "show_if": {
+                "show": [
+                  true
+                ]
+              }
             }
           ]
         },

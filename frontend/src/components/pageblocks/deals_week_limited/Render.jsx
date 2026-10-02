@@ -8,6 +8,8 @@ import RichText from "../_shared/RichText";
 import SmartLink, { linkHref } from "../_shared/SmartLink";
 import { useCountdown } from "../_shared/Countdown";
 import { plainText } from "../_shared/schema";
+import { HeaderArrows } from "../deals_carousel/HeaderParts";
+import "./style.css";
 
 const UNITS = ["days", "hours", "minutes", "seconds"];
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -103,14 +105,15 @@ export default function Render({ settings }) {
       <div className="container">
         <div className={`row${v11 ? " align-items-center" : ""}`}>
           <Left st={st} v11={v11} />
-          <div className={v11 ? "col-md-8 col-lg-9" : "col-md-8 col-lg-9 col-wd-10"}>
+          <div className={`pdb-wdl__col ${v11 ? "col-md-8 col-lg-9" : "col-md-8 col-lg-9 col-wd-10"}`}>
             {!list ? <div className="pdb-skel" style={{ height: 340 }} /> : (
               <BlockCarousel value={st.carousel} className="position-static overflow-hidden u-slick-overflow-visble pb-5 pt-2 px-1"
                 dotsClassName={`text-center right-0 bottom-1 left-0 u-slick__pagination u-slick__pagination--long mb-0 z-index-n1 mt-3 pt-1${st.carousel?.arrows === "side" ? " d-xl-none" : ""}`}
                 sideArrowsClassName="d-none d-xl-inline-block u-slick__arrow-normal u-slick__arrow-centered--y font-size-25"
                 arrowLeftClassName="fas fa-chevron-left left-n16 u-slick__arrow-classic-inner--left z-index-9"
                 arrowRightClassName="fas fa-chevron-right right-n16 u-slick__arrow-classic-inner--right"
-                ariaLabel={plainText(st.left?.title)}>
+                ariaLabel={plainText(st.left?.title)}
+                header={st.carousel?.arrows === "header" ? (ctl) => <div className="d-flex justify-content-end mb-1"><HeaderArrows ctl={ctl} /></div> : undefined}>
                 {list.map((p, i) => (
                   <div className="js-slide products-group" key={p.id}>
                     <ProductCard product={p} card={st.card || "grid_small"} className="mx-1 remove-divider" innerClassName="product-item__inner bg-white px-wd-4 p-2 p-md-3" listName="week_deals_limited" index={i} />

@@ -22,7 +22,14 @@
     {
       "value": "gallery",
       "label": "Galeri – slayt başına tek fırsat (v1.0)",
-      "defaults_patch": {}
+      "defaults_patch": {
+        "header": {
+          "title": "Haftanın Fırsatları",
+          "tag": "h2",
+          "underline": false,
+          "right": "none"
+        }
+      }
     },
     {
       "value": "cards",
@@ -31,7 +38,8 @@
         "header": {
           "title": "Günün Fırsatları",
           "underline": true,
-          "right": "link"
+          "right": "link",
+          "tag": "h3"
         },
         "source": {
           "kind": "discounted",
@@ -49,10 +57,10 @@
         "carousel": {
           "per_view": {
             "0": 2,
-            "768": 3,
-            "992": 4,
-            "1200": 4,
-            "1400": 5
+            "576": 3,
+            "768": 4,
+            "1200": 5,
+            "1480": 7
           },
           "dots": true,
           "arrows": "none",
@@ -395,10 +403,34 @@
       "help": "Boşsa tema ana rengi."
     },
     {
+      "name": "gallery_carousel",
+      "type": "carousel",
+      "label": "Fırsat geçişi",
+      "tab": "Karusel",
+      "show_if": {
+        "_variant": [
+          "gallery"
+        ]
+      },
+      "hide": [
+        "per_view",
+        "slides_to_scroll",
+        "rows",
+        "gutter",
+        "last_active_divider"
+      ],
+      "help": "Galeri görünümünde her slaytta tek fırsat gösterilir. Oklar: “Yok” veya “Başlıkta” → şablondaki “Önceki / Sonraki Fırsat” yazıları (Başlıkta seçilirse başlık satırına ‹ › de eklenir); “İki yanda / Dışta” → yazılar yerine yan oklar."
+    },
+    {
       "name": "carousel",
       "type": "carousel",
-      "label": "Karusel",
-      "tab": "Karusel"
+      "label": "Karusel (kartlar)",
+      "tab": "Karusel",
+      "show_if": {
+        "_variant": [
+          "cards"
+        ]
+      }
     }
   ],
   "common": [

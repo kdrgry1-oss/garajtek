@@ -49,4 +49,25 @@ describe("deals_carousel", () => {
     expect(b.container.textContent).toBe("");
     b.unmount();
   });
+
+  test("başlık etiketi/hizalama/sağ taraf ve 'Başlıkta' oklar panelden", async () => {
+    mockFetch(P);
+    let r = await renderBlock("deals_carousel", { header: { tag: "h3", align: "center", right: "link" }, gallery_carousel: { arrows: "header" } });
+    expect(r.container.querySelector('h3[data-pd-field="header.title"]')).not.toBeNull();
+    expect(r.container.querySelector(".pdb-dow__header.justify-content-center")).not.toBeNull();
+    expect(r.container.querySelector('[data-pd-field="header.link.label"]')).not.toBeNull();
+    expect(r.container.querySelector('[data-testid="header-arrows"]')).not.toBeNull();
+    expect(r.container.querySelector('[data-pd-field="prev_label"]')).not.toBeNull();
+    r.unmount();
+    r = await renderBlock("deals_carousel", { gallery_carousel: { arrows: "side" } });
+    expect(r.container.querySelector(".pdb-dow__nav")).toBeNull();
+    expect(r.container.querySelectorAll(".slick-arrow").length).toBe(2);
+    r.unmount();
+    r = await renderBlock("deals_carousel", { _variant: "cards", header: { tag: "h2", right: "pills", pills: [{ label: "Tümü", as_tab: true, active: true }] }, carousel: { arrows: "header" } });
+    expect(r.container.querySelector('h2[data-pd-field="header.title"]')).not.toBeNull();
+    expect(r.container.querySelector('[data-pd-field="header.pills.0.label"]')).not.toBeNull();
+    expect(r.container.querySelector('[data-testid="header-arrows"]')).not.toBeNull();
+    expect(hardcodedTexts(r.container)).toEqual([]);
+    r.unmount();
+  });
 });

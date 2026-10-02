@@ -2,7 +2,7 @@
 // (nav-pills nav-tab-pill) veya "Tümünü gör ›" bağlantısı. Değer şeması SPEC §2.5 section_header.
 import SmartLink, { linkHref } from "../_shared/SmartLink";
 
-export default function GridHeader({ value, field = "header", active = 0, onPill, className = "mb-4", pillField }) {
+export default function GridHeader({ value, field = "header", active = 0, onPill, className = "mb-4", pillField, withLink = false }) {
   const h = value || {};
   const pills = (h.pills || []).map((p, i) => ({ p, i })).filter(({ p }) => p && p.label);
   const right = h.right || "none";
@@ -11,7 +11,7 @@ export default function GridHeader({ value, field = "header", active = 0, onPill
     ? <h2 className="sr-only" data-pd-field={`${field}.title`}>{h.title}</h2>
     : <Tag className={`section-title${h.underline === false ? "" : " section-title__full"} mb-0 pb-2 font-size-22`} data-pd-field={`${field}.title`}>{h.title}</Tag>) : null;
   const showPills = right === "pills" && pills.length > 0;
-  const showLink = right === "link" && h.link?.label && linkHref(h.link.link);
+  const showLink = (right === "link" || withLink) && h.link?.label && linkHref(h.link.link);
   if (!title && !showPills && !showLink) return null;
   if (h.tag === "sr-only" && !showPills && !showLink) return title;
   return (

@@ -57,8 +57,14 @@ export default function Render({ settings }) {
   const featured = useProductSource(st.side === "featured_product" && st.featured_product ? { ...MANUAL, product_ids: [st.featured_product], limit: 1 } : null);
   const cols = colCounts(st.columns, { desktop: 4, tablet: 3, mobile: 2 });
   if (!tabs.length) return null;
-  const header = { ...(st.header || {}), right: tabs.length > 1 ? "pills" : st.header?.right === "link" ? "link" : "none",
-    pills: tabs.map(({ t }) => ({ label: t.label, as_tab: true, link: { kind: "none", url: "" } })) };
+  // Sağ taraf: "Haplar" → sekme hapları (+ başlığın kendi hap bağlantıları); "Bağlantı" → sekme hapları + "Tümünü gör";
+  // "Hiçbiri" (veya ok/geri sayım) → sekme hapı yok, başlangıçta seçili sekmenin ürünleri gösterilir.
+  const hr = st.header?.right || "pills";
+  const tabPills = (hr === "pills" || hr === "link") && tabs.length > 1 ? tabs.map(({ t }) => ({ label: t.label, as_tab: true, link: { kind: "none", url: "" } })) : [];
+  const extra = hr === "pills" ? (st.header?.pills || []).map((p, j) => ({ p, j })).filter(({ p }) => p && p.label) : [];
+  const header = { ...(st.header || {}), right: tabPills.length || extra.length ? "pills" : hr === "link" ? "link" : "none",
+    pills: [...tabPills, ...extra.map(({ p }) => ({ label: p.label, as_tab: false, link: p.link || { kind: "none", url: "" } }))] };
+  const pillField = (pos) => (pos < tabPills.length ? `tabs.${tabs[pos].i}.label` : `header.pills.${extra[pos - tabPills.length].j}.label`);
   const links = (st.category_links || []).map((c, i) => ({ c, i })).filter(({ c }) => c && c.label);
   const banner = st.banner || {};
   let side = null;
@@ -94,11 +100,11 @@ export default function Render({ settings }) {
       </div>
     </div>
   );
-  const onPill = (pos) => setPicked(pos);
+  const onPill = (pos) => { if (pos < tabPills.length) setPicked(pos); };
   return (
     <div className="pdb-bpg" data-testid="banner-products-grid">
       <div className="position-relative text-center z-index-2">
-        <GridHeader value={header} active={activePos} onPill={onPill} className="mb-0" pillField={(pos) => `tabs.${tabs[pos].i}.label`} />
+        <GridHeader value={header} active={tabPills.length ? activePos : -1} onPill={onPill} className="mb-0" pillField={pillField} withLink={hr === "link"} />
       </div>
       <div className={`row${st.side_position === "right" ? " flex-row-reverse" : ""}`}>
         {side}

@@ -74,7 +74,7 @@
       "type": "section_header",
       "label": "Başlık",
       "tab": "İçerik",
-      "help": "Birden çok sekme varsa başlığın sağında sekme hapları görünür (aşağıdaki “Sekmeler”den)."
+      "help": "Sağ taraf “Hap / sekme bağlantıları”: birden çok sekme varsa sekme hapları (aşağıdaki “Sekmeler”), ardından buraya eklenen hap bağlantıları. “Tümünü gör bağlantısı”: sekme hapları + bağlantı. “Hiçbiri”: hap yok, başlangıçta seçili sekme gösterilir."
     },
     {
       "name": "tabs",
@@ -279,7 +279,8 @@
           "url": "",
           "new_tab": false
         }
-      }
+      },
+      "help": "Kategori listesi / kutulu menü bağlantıları. Banner görünümünde listenin görünmesi için “Kategori listesini göster” açık olmalı."
     },
     {
       "name": "columns",

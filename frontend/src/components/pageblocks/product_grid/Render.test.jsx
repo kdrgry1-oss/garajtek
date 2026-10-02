@@ -11,7 +11,9 @@ describe("product_grid", () => {
     expect(container.querySelector('[data-pd-field="header.title"]').textContent).toBe("Size Özel Öneriler");
     expect(container.querySelector('[data-pd-field="header.link.label"]').getAttribute("href")).toBe("/tum-urunler");
     const ul = container.querySelector(".pdb-cols");
-    expect(ul.style.getPropertyValue("--pdb-cd")).toBe("6");
+    // şablon home-v7: 1480+ 6 sütun, 1200–1479 5 sütun (yarım satır gizli)
+    expect(ul.style.getPropertyValue("--pdb-cw")).toBe("6");
+    expect(ul.style.getPropertyValue("--pdb-cd")).toBe("5");
     expect(ul.style.getPropertyValue("--pdb-cm")).toBe("2");
     expect(ul.querySelectorAll(".product-item").length).toBe(14);
     expect(hardcodedTexts(container)).toEqual([]);
@@ -40,6 +42,15 @@ describe("product_grid", () => {
     mockFetch([]);
     const { container, unmount } = await renderBlock("product_grid", { _variant: "recently_viewed" });
     expect(container.textContent).toBe("");
+    unmount();
+  });
+
+  test("bugünün popülerleri varyantı: şablon gibi sayfalı 4 sütunlu ızgara kartı", async () => {
+    mockFetch(P);
+    const { container, unmount } = await renderBlock("product_grid", { _variant: "hot" });
+    expect(container.querySelector(".pdb-cols").style.getPropertyValue("--pdb-cd")).toBe("4");
+    expect(container.querySelectorAll(".page-link").length).toBe(2);
+    expect(container.querySelector(".product-item__card")).toBeNull();
     unmount();
   });
 });

@@ -38,8 +38,8 @@ function DealCard({ deal, product, variant }) {
   }
   const body = <DealBodyV2 product={product} titleHtml={titleHtml} image={deal.image_override} link={link || undefined} />;
   return (
-    <div className={`p-3 border border-width-2 borders-radius-20 bg-white${variant === "v2" ? " min-width-370" : ""} el-special`}
-      style={{ borderColor: deal.border_color || "var(--electro-primary)" }} data-testid="special-offer">
+    <div className={`p-3 pdb-special2 borders-radius-20 bg-white${variant === "v2" ? " min-width-370" : ""} el-special`}
+      style={deal.border_color ? { borderColor: deal.border_color } : undefined} data-testid="special-offer">
       <div className="d-flex justify-content-between align-items-center m-1 ml-2">
         {deal.title && <h3 className="font-size-22 mb-0 font-weight-normal text-lh-28 max-width-120" data-pd-field="deal.title">{deal.title}</h3>}
         <SavingsBox savings={deal.savings} amount={amount} field="deal.savings" shape="circle" />
@@ -148,7 +148,11 @@ export default function Render({ settings }) {
   const product = (dealList || [])[0] || null;
   if (!tabs.length && !product) return null;
   const n = Number(st.columns) || 3;
-  const cols = { desktop: n, tablet: Math.min(n, 3), mobile: Math.min(n, 2) };
+  // şablon kırılımları: v1 col-lg-8 içinde n sütun; v2 col-md-4 / col-wd-3 (1200–1479'da 3 sütun, 7.–8. ürün gizli);
+  // indirim sekmeleri col-md-4 / col-xl-3 / col-wd-2gdot4 (1480+'da 5 sütun).
+  const cols = variant === "v1" ? { desktop: n, tablet: Math.min(n, 3), mobile: 1 }
+    : variant === "v2" ? { wide: n, desktop: Math.min(n, 3), tablet: Math.min(n, 3), mobile: Math.min(n, 2), xlMax: n > 3 ? 6 : 0 }
+      : { wide: n, desktop: Math.min(n, 4), tablet: Math.min(n, 3), mobile: Math.min(n, 2) };
   const gridSt = { ...st, _limit: cur?.source?.limit };
   const right = tabs.length ? (
     <>

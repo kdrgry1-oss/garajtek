@@ -141,6 +141,25 @@
     "pad": true
   },
   "border_color": "",
+  "gallery_carousel": {
+    "per_view": {
+      "0": 1
+    },
+    "slides_to_scroll": 1,
+    "rows": 1,
+    "gutter": 0,
+    "autoplay": false,
+    "interval": 5000,
+    "pause_on_hover": true,
+    "loop": false,
+    "rewind": false,
+    "transition": "slide",
+    "speed": 300,
+    "dots": true,
+    "arrows": "none",
+    "drag": true,
+    "last_active_divider": false
+  },
   "carousel": {
     "per_view": {
       "0": 1

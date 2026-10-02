@@ -60,10 +60,8 @@
   "carousel": {
     "per_view": {
       "0": 2,
-      "768": 2,
-      "992": 2,
-      "1200": 3,
-      "1400": 4,
+      "992": 3,
+      "1200": 4,
       "1480": 5
     },
     "slides_to_scroll": 1,
@@ -77,7 +75,7 @@
     "transition": "slide",
     "speed": 300,
     "dots": true,
-    "arrows": "side",
+    "arrows": "none",
     "drag": true,
     "last_active_divider": false
   },

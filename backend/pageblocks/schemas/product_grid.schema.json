@@ -21,7 +21,18 @@
     {
       "value": "recommendations",
       "label": "Size özel öneriler (6 sütun)",
-      "defaults_patch": {}
+      "defaults_patch": {
+        "pagination": false,
+        "card": "grid",
+        "columns": {
+          "desktop": 6,
+          "tablet": 4,
+          "mobile": 2
+        },
+        "header": {
+          "right": "link"
+        }
+      }
     },
     {
       "value": "recently_viewed",
@@ -50,15 +61,17 @@
           "tablet": 4,
           "mobile": 3
         },
-        "empty_text": ""
+        "empty_text": "",
+        "pagination": false
       }
     },
     {
       "value": "hot",
-      "label": "Bugünün popüler ürünleri (yatay kart)",
+      "label": "Bugünün popüler ürünleri (sayfalı ızgara, v2.0 home-v10)",
       "defaults_patch": {
         "header": {
-          "title": "Bugünün Popüler Ürünleri"
+          "title": "Bugünün Popüler Ürünleri",
+          "right": "none"
         },
         "source": {
           "kind": "best_sellers",
@@ -67,18 +80,20 @@
           "include_children": true,
           "tag": "",
           "brand_ids": [],
-          "limit": 8,
+          "limit": 36,
           "sort": "default",
           "exclude_out_of_stock": false,
           "exclude_ids": [],
           "fill_with": "none"
         },
-        "card": "horizontal",
+        "card": "grid",
         "columns": {
           "desktop": 4,
-          "tablet": 2,
-          "mobile": 1
-        }
+          "tablet": 3,
+          "mobile": 2
+        },
+        "pagination": true,
+        "page_size": 12
       }
     }
   ],
@@ -124,7 +139,8 @@
       "min": 1,
       "max": 8,
       "step": 1,
-      "unit": "adet"
+      "unit": "adet",
+      "help": "Cihaz başına sütun sayısı. Şablondaki gibi masaüstünde 6 ve üzeri sütunda 1200–1479 px arası ekranlarda bir sütun eksik gösterilir (yarım kalan satır gizlenir); 1480 px ve üzeri tam sayı."
     },
     {
       "name": "card",

@@ -15,7 +15,7 @@ export function colCounts(v, fallback = { desktop: 4, tablet: 3, mobile: 2 }) {
   return { desktop: d, tablet: Math.min(d, fallback.tablet), mobile: Math.min(d, fallback.mobile) };
 }
 
-export const colsStyle = (c) => ({ "--pdb-cd": c.desktop, "--pdb-ct": c.tablet, "--pdb-cm": c.mobile });
+export const colsStyle = (c) => ({ "--pdb-cd": c.desktop, "--pdb-ct": c.tablet, "--pdb-cm": c.mobile, ...(c.wide ? { "--pdb-cw": c.wide } : {}) });
 
 /** Satırın son kartının sağ ayırıcısını gizleyen Electro sınıfları. */
 export function dividerClasses(i, c) {
@@ -23,6 +23,8 @@ export function dividerClasses(i, c) {
   const out = [];
   if (n % c.mobile === 0) out.push("remove-divider-sm-down");
   if (n % c.tablet === 0) out.push("remove-divider-md-lg");
-  if (n % c.desktop === 0) out.push("remove-divider-xl", "remove-divider-wd");
+  if (n % c.desktop === 0) out.push("remove-divider-xl");
+  if (n % (c.wide || c.desktop) === 0) out.push("remove-divider-wd");
+  if (c.xlMax && i >= c.xlMax) out.push("pdb-xl-hide");
   return out.join(" ");
 }
