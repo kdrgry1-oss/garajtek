@@ -290,6 +290,9 @@ async def apply_tracking(db, order: Dict, info: Dict, *, code: str, notify: bool
         upd["cargo.events"] = info["events"][-30:]
     if tn:
         link = carrier.tracking_url(tn) if carrier else ""
+        _prev = str(order.get("cargo_tracking_link") or "")
+        if "accountid=" in _prev:  # Aras hesap linki takip no'dan bağımsız çalışır → koru
+            link = _prev
         upd.update({"cargo_tracking_number": tn, "cargo.tracking_number": tn, "cargo_gonderi_no": tn})
         if link:
             upd.update({"cargo_tracking_link": link, "cargo_tracking_url": link, "cargo.tracking_link": link})
@@ -345,7 +348,9 @@ async def refresh_order_tracking(db, order: Dict) -> Dict:
     if new_status:
         msg += f" · Sipariş durumu → {new_status}"
     return {"success": True, "tracking_number": tn, "status": info.get("status"),
-            "kargo_statu_aciklama": info.get("status_text"), "tracking_link": carrier.tracking_url(tn),
+            "kargo_statu_aciklama": info.get("status_text"),
+            "tracking_link": (order.get("cargo_tracking_link") if "accountid=" in str(order.get("cargo_tracking_link") or "")
+                              else carrier.tracking_url(tn)),
             "new_status": new_status, "message": msg}
 
 

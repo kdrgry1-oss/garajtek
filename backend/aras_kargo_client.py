@@ -26,7 +26,9 @@ Tüm fonksiyonlar SENKRONDUR (httpx) — çağıran asyncio.to_thread ile çalı
 """
 from __future__ import annotations
 
+from urllib.parse import quote
 import json
+import re
 import logging
 from typing import Dict, List, Optional
 
@@ -99,12 +101,21 @@ def endpoints(env: str = "test", *, ship_url: str = "", query_url: str = "") -> 
     }
 
 
-def tracking_url(tracking_no: str = "") -> str:
-    """Müşteri takip linki (Kargo Takip Entegrasyonu dokümanı, 13 haneli takip no ile)."""
+def tracking_url(tracking_no: str = "", *, account_id: str = "", receiver_code: str = "") -> str:
+    """Müşteri takip linki.
+
+    Aras'ın verdiği hesap linki varsa (mainpage.aspx?accountid=…&alici_kod=…) onu kullanır:
+    alici_kod = gönderide IntegrationCode olarak yollanan sipariş referansı; bu link gönderi
+    şubede okutulmadan (takip no oluşmadan) da çalışır. Yoksa 13 haneli takip no ile link."""
+    acc = re.sub(r"[^0-9A-Fa-f]", "", str(account_id or ""))
+    rc = str(receiver_code or "").strip()
+    if acc and rc:
+        return ("https://kargotakip.araskargo.com.tr/mainpage.aspx?accountid="
+                f"{acc}&alici_kod={quote(rc, safe='')}")
     tn = str(tracking_no or "").strip()
     if not tn:
         return "https://www.araskargo.com.tr/tr/cargo-tracking"
-    return f"https://kargotakip.araskargo.com.tr/mainpage.aspx?code={tn}"
+    return f"https://kargotakip.araskargo.com.tr/mainpage.aspx?code={quote(tn, safe='')}"
 
 
 def piece_barcode(integration_code: str, piece_no: int = 1) -> str:

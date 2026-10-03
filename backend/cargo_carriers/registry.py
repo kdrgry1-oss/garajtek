@@ -108,7 +108,8 @@ class ArasCarrier(Carrier):
             "ok": True,
             "barcode": barcode,                     # etikete basılan, şubenin okuttuğu parça barkodu
             "tracking_number": "",                  # Aras takip no şube irsaliye kesince oluşur (senkron doldurur)
-            "tracking_url": ac.tracking_url(""),
+            "tracking_url": ac.tracking_url("", account_id=str(cfg.get("tracking_account_id") or ""),
+                                            receiver_code=integration_code),
             "message": res.get("message") or "Aras Kargo kaydı oluşturuldu",
             "extra": {"integration_code": integration_code,
                       "piece_barcodes": [d["BarcodeNumber"] for d in payload["PieceDetails"]],

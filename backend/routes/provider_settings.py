@@ -102,6 +102,10 @@ CARGO_PROVIDERS = {
                help="Kapıda ödemeli gönderide Aras kuralı gereği her zaman gönderici öder."),
             _f("cod_collection_type", "Kapıda Ödeme Tahsilat Tipi", type="select",
                options=[{"value": "0", "label": "Nakit (0)"}, {"value": "1", "label": "Kredi kartı (1)"}]),
+            _f("tracking_account_id", "Kargo Takip Hesap ID (accountid)",
+               help="Aras'ın verdiği takip linkindeki accountid değeri "
+                    "(kargotakip.araskargo.com.tr/mainpage.aspx?accountid=…&alici_kod=…). "
+                    "Girilirse müşteriye sipariş numarasıyla çalışan takip linki gönderilir."),
             _f("sender_address_id", "Gönderici Adres ID (opsiyonel)",
                help="Aras'ta birden çok çıkış adresiniz varsa SenderAccountAddressId."),
             _f("default_desi", "Varsayılan Desi", type="number", placeholder="1",

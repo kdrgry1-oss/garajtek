@@ -240,3 +240,13 @@ def test_connection_test_ok(monkeypatch):
 
 def test_tracking_url_fallback():
     assert ac.tracking_url("") .startswith("https://www.araskargo.com.tr")
+
+
+def test_tracking_url_account_link():
+    url = ac.tracking_url("", account_id="3EDFB773F97707408998E37D59A98002", receiver_code="W10023")
+    assert url == ("https://kargotakip.araskargo.com.tr/mainpage.aspx?"
+                   "accountid=3EDFB773F97707408998E37D59A98002&alici_kod=W10023")
+    # account id temizlenir; alıcı kodu kaçışlanır
+    assert "alici_kod=A%26B" in ac.tracking_url("", account_id="ab<cd>", receiver_code="A&B")
+    # hesap yoksa takip no ile eski link
+    assert ac.tracking_url("1234567890123").endswith("code=1234567890123")
