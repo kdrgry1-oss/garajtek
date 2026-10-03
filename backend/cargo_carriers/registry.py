@@ -1,7 +1,7 @@
 """
 cargo_carriers/registry.py — Kargo firması (taşıyıcı) arayüzü + kayıt defteri.
 
-Sipariş akışı kargo firmasını KODU ile çağırır (MNG / ARAS / PTT); her taşıyıcı aynı arayüzü
+Sipariş akışı kargo firmasını KODU ile çağırır (ARAS / PTT); her taşıyıcı aynı arayüzü
 uygular:
     test_connection(cfg)                         → {ok, message}
     create(ctx)                                  → {ok, barcode, tracking_number, tracking_url, extra, message}
@@ -10,9 +10,9 @@ uygular:
                                                     delivered_at, tracking_url, events}
     tracking_url(tracking_no)                    → müşteri takip linki
 
-MNG (DHL eCommerce) için gönderi OLUŞTURMA mevcut ve kapsamlı akışta kalır
-(routes/orders.py:create_cargo_barcode); burada yalnızca test/iptal/takip sarılır.
-Aras ve PTT tamamen bu arayüz üzerinden çalışır (cargo_carriers/service.py).
+Desteklenen entegrasyonlar yalnızca Aras Kargo ve PTT Kargo'dur; ikisi de tamamen bu arayüz
+üzerinden çalışır (cargo_carriers/service.py). Eski siparişlerde kayıtlı başka firma kodları
+(ör. geçmişte kullanılan entegrasyonlar) yalnızca görüntülenir; bu kayıt defterinde yer almaz.
 
 Ayarlar: providers_config(kind="cargo").providers.<key> (şifreli; routes/provider_settings.py)
 + settings(id="cargo_carrier_settings") {default_carrier, default_desi, default_kg}.
@@ -21,9 +21,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
-from .common import CarrierError, ST_CREATED, ST_ACCEPTED, ST_DELIVERED, ST_UNKNOWN
+from .common import CarrierError
 
 logger = logging.getLogger(__name__)
 
@@ -216,52 +217,10 @@ class PttCarrier(Carrier):
         return r
 
 
-# ---------------------------------------------------------------------------
-class MngCarrier(Carrier):
-    """DHL eCommerce (eski MNG). Gönderi oluşturma routes/orders.py'deki mevcut akışta kalır."""
-    code, key, name = "MNG", "mng", "DHL E-Commerce (MNG)"
-    supports_create = False
-
-    def tracking_url(self, tracking_no: str = "") -> str:
-        tn = str(tracking_no or "").strip()
-        return f"https://kargotakip.dhlecommerce.com.tr/?takipNo={tn}" if tn else "https://www.dhlecommerce.com.tr/gonderitakip"
-
-    def is_configured(self, cfg: Dict) -> bool:
-        return bool(cfg.get("username") and cfg.get("password"))
-
-    async def test_connection(self, cfg: Dict) -> Dict:
-        from mng_kargo_client import baglanti_test
-        r = await asyncio.to_thread(baglanti_test)
-        return {"ok": bool(r.get("ok")), "message": ("MNG/DHL servisi yanıt verdi: " + str(r.get("result") or ""))
-                if r.get("ok") else f"MNG/DHL: {r.get('error')}"}
-
-    async def cancel(self, order: Dict, cfg: Dict) -> Dict:
-        from mng_kargo_client import cancel_shipment
-        cargo = order.get("cargo") or {}
-        r = await asyncio.to_thread(cancel_shipment, username=cfg.get("username", ""), password=cfg.get("password", ""),
-                                    siparis_no=str(order.get("order_number") or order.get("id")),
-                                    gonderi_no=cargo.get("mng_gonderi_no") or "")
-        return {"ok": bool(r.get("ok")), "message": r.get("hata") or "MNG gönderisi iptal edildi"}
-
-    async def track(self, order: Dict, cfg: Dict) -> Dict:
-        from mng_kargo_client import get_mng_shipment_status
-        info = await asyncio.to_thread(get_mng_shipment_status, username=cfg.get("username", ""),
-                                       password=cfg.get("password", ""),
-                                       siparis_no=str(order.get("order_number") or order.get("id")))
-        if not info.get("ok"):
-            return {"ok": False, "error": info.get("error")}
-        gn = info.get("gonderi_no") or ""
-        txt = (info.get("kargo_statu_aciklama") or "").lower()
-        st = ST_DELIVERED if (info.get("teslim_tarihi") or ("teslim edildi" in txt)) else (ST_ACCEPTED if gn else ST_CREATED)
-        return {"ok": True, "found": True, "tracking_number": gn, "status": st,
-                "status_text": info.get("kargo_statu_aciklama") or "", "tracking_url": self.tracking_url(gn),
-                "delivered_at": info.get("teslim_tarihi") or ""}
-
-
-CARRIERS: Dict[str, Carrier] = {c.code: c for c in (MngCarrier(), ArasCarrier(), PttCarrier())}
+CARRIERS: Dict[str, Carrier] = {c.code: c for c in (ArasCarrier(), PttCarrier())}
 _KEY_TO_CODE = {c.key: c.code for c in CARRIERS.values()}
-_ALIASES = {"ARAS": "ARAS", "ARASKARGO": "ARAS", "PTT": "PTT", "PTTKARGO": "PTT",
-            "MNG": "MNG", "DHL": "MNG", "MNGKARGO": "MNG", "DHLECOMMERCE": "MNG"}
+_ALIASES = {"ARAS": "ARAS", "ARASKARGO": "ARAS", "PTT": "PTT", "PTTKARGO": "PTT"}
+DEFAULT_CODE = "ARAS"   # hiçbir seçim yoksa: Aras → (yoksa) PTT
 
 
 def normalize_code(code) -> str:
@@ -294,7 +253,7 @@ async def get_carrier_settings(db) -> Dict:
 
 async def resolve_default_code(db) -> str:
     """Varsayılan kargo firması: Kargo Ayarları'ndaki açık seçim → providers_config.active_provider
-    (yalnız canlı entegrasyonu olan MNG/ARAS/PTT) → MNG."""
+    (yalnız ARAS/PTT) → kimlik bilgisi girilmiş ilk firma (Aras, sonra PTT) → ARAS."""
     s = await get_carrier_settings(db)
     if s["default_carrier"] in CARRIERS:
         return s["default_carrier"]
@@ -305,7 +264,13 @@ async def resolve_default_code(db) -> str:
             return c
     except Exception:
         pass
-    return "MNG"
+    try:
+        for c in ("ARAS", "PTT"):
+            if CARRIERS[c].is_configured(await load_carrier_config(db, c)):
+                return c
+    except Exception:
+        pass
+    return DEFAULT_CODE
 
 
 async def load_carrier_config(db, code: str) -> Dict:
@@ -326,3 +291,70 @@ async def load_carrier_config(db, code: str) -> Dict:
     cfg["default_kg"] = _num(cfg.get("default_kg"), gs["default_kg"])
     cfg["env"] = cfg.get("env") or "test"
     return cfg
+
+
+# ---------------------------------------------------------------------------
+# Başlangıç migrasyonu: kaldırılan entegrasyonlar → Aras
+# ---------------------------------------------------------------------------
+async def migrate_legacy_default(db) -> Dict:
+    """İDEMPOTENT: kayıtlı aktif/varsayılan kargo firması artık desteklenmeyen bir firmaysa
+    (ör. 'mng' / 'dhl_ecommerce') varsayılanı 'aras' / 'ARAS' yapar. Kayıtlı kimlik bilgileri
+    SİLİNMEZ (providers.<eski> olduğu gibi kalır, yalnız yok sayılır). Her açılışta güvenle çalışır."""
+    out = {"active_provider": None, "default_carrier": None}
+    now = datetime.now(timezone.utc).isoformat()
+    doc = await db.providers_config.find_one({"kind": "cargo"}, {"_id": 0, "active_provider": 1}) or {}
+    ap = str(doc.get("active_provider") or "").strip()
+    if ap and ap.lower() not in {c.key for c in CARRIERS.values()}:
+        await db.providers_config.update_one(
+            {"kind": "cargo"},
+            {"$set": {"active_provider": "aras", "legacy_active_provider": ap, "updated_at": now}})
+        out["active_provider"] = f"{ap} → aras"
+    s = await db.settings.find_one({"id": CARRIER_SETTINGS_ID}, {"_id": 0, "default_carrier": 1}) or {}
+    dc = str(s.get("default_carrier") or "").strip()
+    if dc and normalize_code(dc) not in CARRIERS:
+        await db.settings.update_one(
+            {"id": CARRIER_SETTINGS_ID},
+            {"$set": {"default_carrier": DEFAULT_CODE, "legacy_default_carrier": dc, "updated_at": now}})
+        out["default_carrier"] = f"{dc} → {DEFAULT_CODE}"
+    out["shipping_fee_carrier"] = await _migrate_fee_carrier(db, now)
+    return out
+
+
+async def _migrate_fee_carrier(db, now: str):
+    """Müşteriye yansıyan kargo ücreti 'varsayılan kargo firması'nın ücretidir (settings.main
+    default_cargo_company + cargo_fees; panelde tenant_config.shipping). Firma eski bir anahtarsa
+    (ör. 'mng') 'aras' yapılır ve Aras ücreti boşsa ESKİ ÜCRET Aras'a kopyalanır → checkout tutarı
+    DEĞİŞMEZ. Diğer eski ücret anahtarları silinmez (yok sayılır)."""
+    valid = {c.key for c in CARRIERS.values()}
+    changed = []
+
+    def _plan(cur_key, fees):
+        k = str(cur_key or "").strip()
+        if not k or k.lower() in valid:
+            return None
+        fees = dict(fees or {}) if isinstance(fees, dict) else {}
+        if fees.get("aras") in (None, "") and fees.get(k) not in (None, ""):
+            fees["aras"] = fees.get(k)
+        return k, fees
+
+    main = await db.settings.find_one({"id": "main"}, {"_id": 0, "default_cargo_company": 1, "cargo_fees": 1}) or {}
+    p = _plan(main.get("default_cargo_company"), main.get("cargo_fees"))
+    if p:
+        await db.settings.update_one({"id": "main"}, {"$set": {
+            "default_cargo_company": "aras", "cargo_fees": p[1],
+            "legacy_default_cargo_company": p[0], "updated_at": now}})
+        changed.append(f"main:{p[0]} → aras")
+    tc = await db.settings.find_one({"id": "tenant_config"}, {"_id": 0, "shipping": 1}) or {}
+    ship = tc.get("shipping") or {}
+    p = _plan(ship.get("default_carrier"), ship.get("carrier_fees"))
+    if p:
+        await db.settings.update_one({"id": "tenant_config"}, {"$set": {
+            "shipping.default_carrier": "aras", "shipping.carrier_fees": p[1]}})
+        changed.append(f"tenant_config:{p[0]} → aras")
+    if changed:
+        try:
+            import tenant_config as _tc
+            _tc.invalidate(db)
+        except Exception:
+            pass
+    return ", ".join(changed) or None

@@ -178,9 +178,9 @@ async def cancel_my_order(order_id: str, payload: dict = Body(default={}), curre
 # kullanır: cargo_company / cargo_tracking_number / shipped_at (eski nested cargo.* fallback).
 
 _CARGO_NAME_MAP = {
-    "MNG": "MNG Kargo", "DHL": "DHL", "Yurtici": "Yurtiçi Kargo",
-    "Aras": "Aras Kargo", "PTT": "PTT Kargo", "UPS": "UPS",
-    "Other": "Kargo",
+    "Aras": "Aras Kargo", "PTT": "PTT Kargo", "Other": "Kargo",
+    # Eski siparişler (entegrasyonu kaldırılmış firmalar) — yalnız görüntüleme
+    "MNG": "MNG Kargo", "DHL": "DHL", "Yurtici": "Yurtiçi Kargo", "UPS": "UPS",
 }
 
 
@@ -194,16 +194,12 @@ def _public_track_link(order: dict, tn: str) -> str:
     if not tn:
         return ""
     code = (order.get("cargo_company") or "").strip()
-    if code == "Yurtici":
-        return f"https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code={tn}"
     if code == "Aras":
         return f"https://kargotakip.araskargo.com.tr/CargoStatusByTrackingNumber.aspx?code={tn}"
     if code == "PTT":
         return f"https://gonderitakip.ptt.gov.tr/Track/Verify?q={tn}"
-    if code == "UPS":
-        return f"https://www.ups.com/track?tracknum={tn}"
-    # MNG canlı entegrasyonda DHL eCommerce üzerinden taşınır → DHL deep-link
-    return f"https://kargotakip.dhlecommerce.com.tr/?takipNo={tn}"
+    # Diğer/eski firmalar: kayıtlı link yoksa üretilmez (müşteri takip no'yu görür)
+    return ""
 
 
 @router.get("/track/{tracking_code}")

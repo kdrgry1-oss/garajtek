@@ -1,8 +1,11 @@
-# Kargo Entegrasyonları — DHL eCommerce (MNG), Aras Kargo, PTT Kargo
+# Kargo Entegrasyonları — Aras Kargo, PTT Kargo
 
 Bu belge, yönetim panelindeki **Ayarlar › Kargo Ayarları** sayfasında Aras Kargo ve PTT Kargo
 entegrasyonlarının nasıl kurulacağını, hangi bilginin nereden alınacağını ve canlıya geçmeden
-önceki test akışını anlatır. MNG (DHL eCommerce) entegrasyonu aynı şekilde çalışmaya devam eder.
+önceki test akışını anlatır. Desteklenen kargo entegrasyonları yalnızca Aras Kargo ve PTT Kargo'dur;
+eski (MNG/DHL eCommerce vb.) entegrasyonlar kaldırılmıştır. Bu firmalarla gönderilmiş eski siparişlerde
+kayıtlı firma adı, takip numarası ve takip linki görüntülenmeye devam eder. Kayıtlı varsayılan firma eski
+bir entegrasyonsa açılışta otomatik olarak Aras Kargo yapılır (kayıtlı bilgiler silinmez).
 
 ---
 
@@ -171,7 +174,7 @@ Ayrıntılı kayıtlar: `cargo_logs` koleksiyonu (`GET /api/orders/cargo/logs`) 
 ## 6. Kod haritası
 
 - `backend/aras_kargo_client.py`, `backend/ptt_kargo_client.py` — SOAP istemcileri (saf, test edilebilir)
-- `backend/cargo_carriers/registry.py` — taşıyıcı arayüzü (MNG/ARAS/PTT), ayar okuma, varsayılan firma
+- `backend/cargo_carriers/registry.py` — taşıyıcı arayüzü (ARAS/PTT), ayar okuma, varsayılan firma, eski varsayılan → Aras başlangıç migrasyonu
 - `backend/cargo_carriers/service.py` — oluştur / iptal / takip / zamanlanmış senkron
 - `backend/routes/cargo_carriers.py` — `/api/cargo-carriers/*` uçları
 - `backend/routes/orders.py` — `cargo-barcode`, `cargo-refresh`, `cargo-label` Aras/PTT'ye yönlenir

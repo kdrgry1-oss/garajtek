@@ -58,11 +58,11 @@ class TestCargoCompanies:
         
         data = response.json()
         assert isinstance(data, list)
-        assert len(data) >= 5, "Expected at least 5 cargo companies"
+        assert len(data) >= 2, "Expected at least 2 cargo companies"
         
         # Verify expected companies
         company_codes = [c["code"] for c in data]
-        expected_codes = ["MNG", "DHL", "YURTICI", "ARAS", "PTT"]
+        expected_codes = ["ARAS", "PTT"]
         for code in expected_codes:
             assert code in company_codes, f"Missing cargo company: {code}"
         
@@ -157,7 +157,7 @@ class TestShipOrder:
         order_id = sample_order["id"]
         response = requests.post(
             f"{BASE_URL}/api/orders/{order_id}/ship",
-            params={"cargo_company": "MNG", "tracking_number": "MNG123456789012"},
+            params={"cargo_company": "Aras", "tracking_number": "ARAS123456789012"},
             headers={"Authorization": f"Bearer {admin_token}"}
         )
         assert response.status_code == 200
@@ -165,7 +165,7 @@ class TestShipOrder:
         data = response.json()
         assert data["success"] == True
         assert "tracking_url" in data
-        assert "MNG" in data["tracking_url"]
+        assert "aras" in data["tracking_url"].lower()
         assert "message" in data
         
         print(f"✓ Ship order success: {data['message']}")
@@ -177,7 +177,7 @@ class TestShipOrder:
             pytest.skip("No orders available for testing")
         
         order_id = sample_order["id"]
-        companies = ["DHL", "YURTICI", "ARAS", "PTT"]
+        companies = ["Aras", "PTT"]
         
         for company in companies:
             response = requests.post(
@@ -208,7 +208,7 @@ class TestShipOrder:
         """Test shipping non-existent order"""
         response = requests.post(
             f"{BASE_URL}/api/orders/non-existent-order-id/ship",
-            params={"cargo_company": "MNG", "tracking_number": "MNG123"},
+            params={"cargo_company": "Aras", "tracking_number": "ARAS123"},
             headers={"Authorization": f"Bearer {admin_token}"}
         )
         assert response.status_code == 404
@@ -222,7 +222,7 @@ class TestShipOrder:
         order_id = sample_order["id"]
         response = requests.post(
             f"{BASE_URL}/api/orders/{order_id}/ship",
-            params={"cargo_company": "MNG", "tracking_number": "MNG123"}
+            params={"cargo_company": "Aras", "tracking_number": "ARAS123"}
         )
         assert response.status_code == 401
         print("✓ Ship order correctly requires authentication")

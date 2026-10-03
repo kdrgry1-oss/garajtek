@@ -1,4 +1,4 @@
-"""Çoklu kargo firması (taşıyıcı) altyapısı: MNG/DHL eCommerce, Aras Kargo, PTT Kargo.
+"""Çoklu kargo firması (taşıyıcı) altyapısı: Aras Kargo, PTT Kargo.
 
 Bkz. registry.py (arayüz + kayıt defteri), service.py (sipariş akışı), docs/KARGO.md.
 """

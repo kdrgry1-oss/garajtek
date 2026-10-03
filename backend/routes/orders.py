@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 import time
 import uuid
 import re
-import os   # MNG kargo webhook'u MNG_WEBHOOK_SECRET okurken kullanıyor (ithal edilmemişti)
+import os
 
 from .deps import db, logger, get_current_user, require_admin, require_permission, generate_id, _search_tr_regex, tr_day_start_utc, tr_day_end_utc, limiter, safe_str
 from .attribution import resolve_attribution_for_order
@@ -259,9 +259,16 @@ async def _order_notify_vars(order: dict, **extra) -> dict:
                or str(order.get("cargo_tracking_number") or "").strip()
                or str(cargo.get("tracking_number") or "").strip())
     track_link = (order.get("cargo_tracking_link") or cargo.get("tracking_link")
-                  or (f"https://kargotakip.dhlecommerce.com.tr/?takipNo={real_tn}" if real_tn
-                      else "https://www.dhlecommerce.com.tr/gonderitakip"))
-    cargo_provider = (order.get("cargo_provider_name") or cargo.get("provider_name") or "MNG Kargo")
+                  or order.get("cargo_tracking_url") or "")
+    if not track_link and real_tn:
+        try:
+            from cargo_carriers import get_carrier as _gc
+            _car = _gc(order.get("cargo_provider_code") or order.get("cargo_company") or "")
+            track_link = _car.tracking_url(real_tn) if _car else ""
+        except Exception:
+            track_link = ""
+    cargo_provider = (str(extra.get("cargo_provider") or "").strip()
+                      or order.get("cargo_provider_name") or cargo.get("provider_name") or "Kargo")
 
     try:
         from order_statuses import customer_label_for as _clf
@@ -901,7 +908,7 @@ async def get_order_by_number(order_number: str, request: Request):
             for x in obj:
                 _scrub(x)
     _scrub(order)
-    # İade uygunluğu delivered_at'e bağlı; kargo senkronu teslimatı raporlamadıysa (MNG status 0'da
+    # İade uygunluğu delivered_at'e bağlı; kargo senkronu teslimatı raporlamadıysa (statü
     # takılı) müşteri iade açamıyordu → varsayılan-teslim fallback ile delivered_at'i doldur.
     try:
         if not order.get("delivered_at"):
@@ -4076,9 +4083,8 @@ async def add_order_note(
 # =============================================================================
 # FAZ 5 — Kargo durum güncellemeleri (ship / undeliver / deliver)
 # =============================================================================
-VALID_CARGO_COMPANIES = {
-    "MNG", "DHL", "Yurtici", "Aras", "PTT", "UPS", "Other"
-}
+# Elle "Kargoya Ver": entegre firmalar (Aras / PTT) + "Other" (diğer/manuel takip no).
+VALID_CARGO_COMPANIES = {"Aras", "PTT", "Other"}
 
 
 @router.post("/{order_id}/ship")
@@ -4091,6 +4097,10 @@ async def ship_order(
     """Siparişi kargoya ver: status=shipped + cargo_company + cargo_tracking_number.
     Bildirim hook'u (order_shipped) otomatik tetiklenir.
     """
+    # Panel firma KODU gönderir (ARAS / PTT); kayıtta görünen ad biçimine çevir (Aras / PTT / Other).
+    _cc_key = "".join(ch for ch in str(cargo_company or "").upper().replace("İ", "I") if ch.isalnum())
+    cargo_company = {"ARAS": "Aras", "ARASKARGO": "Aras", "PTT": "PTT", "PTTKARGO": "PTT",
+                     "OTHER": "Other", "DIGER": "Other"}.get(_cc_key, cargo_company)
     if cargo_company not in VALID_CARGO_COMPANIES:
         raise HTTPException(status_code=400, detail=f"Geçersiz kargo firması. Geçerli: {sorted(VALID_CARGO_COMPANIES)}")
 
@@ -4601,13 +4611,13 @@ async def stock_diag(q: str = Query(...), key: str = Query(""), days: int = Quer
     }
 
 
-# ==================== KARGO BARKOD / MNG SHIPMENT ====================
+# ==================== KARGO BARKOD (Aras / PTT) ====================
 
 def _normalize_phone(p: str) -> str:
     if not p:
         return ""
     digits = "".join(ch for ch in str(p) if ch.isdigit())
-    # Türkiye: 90XXXXXXXXXX (12) → 5XXXXXXXXX (10) format, MNG cep formatı tercih eder
+    # Türkiye: 90XXXXXXXXXX (12) → 5XXXXXXXXX (10) format (kargo cep formatı)
     if digits.startswith("90") and len(digits) == 12:
         return digits[2:]
     if digits.startswith("0") and len(digits) == 11:
@@ -4615,63 +4625,10 @@ def _normalize_phone(p: str) -> str:
     return digits
 
 
-async def _get_mng_settings() -> dict:
-    """MNG Kargo ayarlarını DB'den çeker; kimlik bilgileri (kullanıcı adı/parola)
-    GÜVENLİK gereği artık kaynak koda gömülü DEĞİL — DB ayarı yoksa ortam
-    değişkeninden (MNG_USERNAME / MNG_PASSWORD) okunur. Şirket kodu/vergi no
-    gizli olmadığından sabit kalır."""
-    import os as _os
-    s = await db.settings.find_one({"id": "mng_kargo"}, {"_id": 0}) or {}
-
-    # DENETİM FIX (#9): "Kargo Firması Ayarları" formu credential'ları providers_config
-    # (kind='cargo', active_provider='mng') altına yazıyor; eski _get_mng_settings ise yalnız
-    # settings.mng_kargo'yu okuyordu → formdaki bilgiler HİÇ KULLANILMIYORDU. Artık cargo
-    # config birincil kaynak: mng aktifse oradaki username/password/customer_number kullanılır
-    # (customer_number ↔ customer_code hizalanır). settings.mng_kargo + env yedek kalır.
-    _cargo = {}
-    try:
-        _cc = await db.providers_config.find_one({"kind": "cargo"}, {"_id": 0}) or {}
-        try:
-            from routes.provider_settings import decrypt_provider_doc as _dpd
-            _cc = _dpd("cargo", _cc)   # A1.1: sırları çöz (at-rest şifreli)
-        except Exception:
-            pass
-        # Çoklu taşıyıcı (Aras/PTT eklendi): varsayılan firma başka olsa da MNG bilgileri
-        # kayıtlıysa kullanılır — aksi halde varsayılanı Aras/PTT yapmak MNG senkronunu durdururdu.
-        _cargo = ((_cc.get("providers") or {}).get("mng") or {})
-    except Exception:
-        _cargo = {}
-
-    def _dec(v):
-        if not v:
-            return v
-        try:
-            from security.crypto import decrypt as _dec_secret
-            return _dec_secret(v)
-        except Exception:
-            return v
-
-    _username = _cargo.get("username") or s.get("username") or _os.environ.get("MNG_USERNAME", "")
-    _pw_raw = _cargo.get("password") or s.get("password") or _os.environ.get("MNG_PASSWORD", "")
-    _pw = _dec(_pw_raw)
-    _cust = (_cargo.get("customer_number") or _cargo.get("customer_code")
-             or s.get("customer_code") or "")
-    # env: cargo config 'prod' → canlı; 'test' → test. is_active: cargo dolu ya da settings.
-    _cargo_active = bool(_cargo.get("username") and _cargo.get("password"))
-    return {
-        "username": _username,
-        "password": _pw,
-        "customer_code": _cust,
-        "tax_no": _cargo.get("identity_no") or s.get("tax_no") or "6080712084",
-        "env": _cargo.get("env") or s.get("env") or "",
-        "is_active": _cargo_active or s.get("is_active", True),
-    }
-
-
 async def _get_sender_info() -> dict:
     """Mağaza/Gönderici + İADE ALICI (şirket) bilgilerini DB'den çeker (settings.id=store_info).
     store_info boşsa merkezî Firma Bilgileri'ne (company.get_company) düşer → iade gönderisinin alıcı
-    adresi firma bilgisi girildiyse dolu olur ve MNG/DHL barkodu gerçekten üretilebilir (boş adres yüzünden barkod üretilememe sorunu çözülür)."""
+    adresi firma bilgisi girildiyse dolu olur (etiket/iade adresi boş kalmaz)."""
     store = await db.settings.find_one({"id": "store_info"}, {"_id": 0}) or {}
     try:
         from company import get_company as _get_company
@@ -4690,15 +4647,15 @@ async def _get_sender_info() -> dict:
 @router.post("/{order_id}/cargo-barcode")
 async def create_cargo_barcode(
     order_id: str,
-    cargo_company: str = Query("MNG"),
+    cargo_company: str = Query("AUTO"),
     current_user: dict = Depends(require_admin)
 ):
-    """Aktif kargo firmasında barkod / takip numarası oluşturur ve sipariş üzerine yazar.
-    Şu an MNG Kargo entegrasyonu canlı; diğer firmalar için manuel takip no input'u gerekir.
+    """Seçili kargo firmasında (Aras Kargo / PTT Kargo) barkod / gönderi kaydı oluşturur ve
+    sipariş üzerine yazar. AUTO/boş → Kargo Ayarları'ndaki varsayılan firma.
     """
-    company = (cargo_company or "MNG").upper()
+    company = (cargo_company or "AUTO").upper()
     if company in ("AUTO", "DEFAULT"):
-        # Kargo Ayarları'ndaki varsayılan taşıyıcı (MNG / ARAS / PTT) — cargo_carriers.registry
+        # Kargo Ayarları'ndaki varsayılan taşıyıcı (ARAS / PTT) — cargo_carriers.registry
         from cargo_carriers import resolve_default_code as _cc_default
         company = await _cc_default(db)
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
@@ -4715,11 +4672,9 @@ async def create_cargo_barcode(
             "Önce siparişin ödemesini 'Ödendi' olarak işaretleyin (havale onayı), sonra barkod alın."
         ))
 
-    # Eğer mevcut barkod/takip no varsa direkt dön — yoksa tekrar MNG'ye gidip
-    # "duplicate siparis_no" hatası alınır (502 → "barkod oluşmuyor" görünümü).
+    # Eğer mevcut barkod/takip no varsa direkt dön — kargo firmasında mükerrer kayıt açılmasın.
     # cargo_barcode_number = bizim Self Barkodumuz (her zaman dolu); cargo_tracking_number = gerçek takip no (boş olabilir).
     _existing_tn = (order.get("cargo_tracking_number") or order.get("cargo_barcode_number")
-                    or (order.get("cargo") or {}).get("mng_siparis_no")
                     or (order.get("cargo") or {}).get("tracking_number"))
     if _existing_tn:
         return {
@@ -4729,574 +4684,52 @@ async def create_cargo_barcode(
             "message": "Sipariş zaten kargo barkoduna sahip",
         }
 
-    # Aras Kargo / PTT Kargo: canlı SOAP entegrasyonu (cargo_carriers/service.py) — aynı sipariş alanları
-    from cargo_carriers import normalize_code as _cc_norm
-    if _cc_norm(company) in ("ARAS", "PTT"):
-        from cargo_carriers.service import create_shipment_for_order as _cc_create
-        return await _cc_create(db, order, _cc_norm(company), current_user)
-
-    if company != "MNG":
-        # Diğer firmalar için sahte/placeholder takip no üret (henüz canlı entegrasyon yok)
-        import random
-        tracking = f"{company}-{int(time.time())}{random.randint(100,999)}"
-        await db.orders.update_one(
-            {"id": order_id},
-            {"$set": {
-                "cargo_tracking_number": tracking,
-                "cargo_provider_name": company,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }}
-        )
-        return {
-            "success": True,
-            "tracking_number": tracking,
-            "cargo_provider_name": company,
-            "message": f"{company} için manuel takip no atandı (canlı API entegrasyonu yok)",
-        }
-
-    # ===== MNG KARGO CANLI =====
-    import sys, os
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from mng_kargo_client import create_shipment as mng_create
-
-    settings = await _get_mng_settings()
-    if not settings["is_active"]:
-        raise HTTPException(status_code=400, detail="MNG Kargo entegrasyonu pasif. Lütfen Ayarlar > Kargo bölümünden aktif edin.")
-
-    # Sipariş üzerinden teslim adresini al
-    ship = order.get("shipping_address") or {}
-    full_name = (
-        f"{ship.get('first_name','')} {ship.get('last_name','')}".strip()
-        or ship.get("name")
-        or "Alıcı"
-    )
-    phone = _normalize_phone(ship.get("phone"))
-    if not phone:
-        raise HTTPException(status_code=400, detail="Alıcı telefonu eksik. MNG barkodu oluşturulamaz.")
-    il = (ship.get("city") or "").strip()
-    ilce = (ship.get("district") or "").strip()
-    adres = (ship.get("address") or "").strip()
-    # DENETİM A-2: ilçe de zorunlu — MNG pChIlce boşsa gönderiyi reddeder/yanlış şubeye
-    # yönlendirir (influencer yolu zaten dördünü şart koşuyor, sipariş yolu asimetrikti).
-    if not (il and ilce and adres):
-        raise HTTPException(status_code=400, detail="Alıcı il, ilçe ve adresi eksik. MNG barkodu oluşturulamaz.")
-
-    # İçerik: ürün isimleri. DENETİM A-1: MNG pChIcerik gerçek limiti 200 karakter (E022);
-    # çok ürünlü siparişte 200-250 arası düşerse kargo reddedilir → "barkod oluşmuyor".
-    items = order.get("items") or []
-    icerik = "; ".join([f"{it.get('quantity',1)}x {it.get('product_name','')}".strip() for it in items])[:200] or "Ürün"
-    kiymet = float(order.get("total") or order.get("subtotal") or 0)
-
-    # Sipariş numarası (MNG için unique olmalı, varsa siparişin order_number'ı)
-    siparis_no = str(order.get("order_number") or order.get("id") or order_id)
-
-    # Kapıda ödeme?
-    payment_method = (order.get("payment_method") or "").lower()
-    kapida = 1 if payment_method in ("cash_on_delivery", "kapida") else 0
-    odeme_sekli = "U" if kapida else "P"  # P=Peşin (Gönderici Öder), U=Ücretli (Alıcı Öder)
-
-    # Senkron SOAP çağrısı event loop'u BLOKE etmesin diye thread'e taşı (aksi halde
-    # MNG WSDL yavaşlığı/erişilemezliği Railway worker'ını kilitleyip 503'e yol açar).
-    import asyncio as _aio_cargo
-    try:
-        res = await _aio_cargo.to_thread(
-            mng_create,
-            username=settings["username"],
-            password=settings["password"],
-            siparis_no=siparis_no,
-            irsaliye_no=str(order.get("invoice_number") or "")[:20],
-            kiymet=kiymet,
-            icerik=icerik,
-            hizmet_sekli="NORMAL",  # NORMAL | ONCELIKLI | GUNICI | AKSAM_TESLIMAT
-            teslim_sekli=1,
-            al_sms=0,
-            gn_sms=1 if phone else 0,
-            # MNG format: "Kg:Desi:En:Boy:Yukseklik:;" (her paket ; ile ayrılır)
-            # Varsayılan: 1 paket, 1kg, 1 desi, 20x30x15cm
-            parca_list="1:1:20:30:15:;",
-            alici_ad=full_name,
-            odeme_sekli=odeme_sekli,
-            adres_farkli="0",
-            il=il,
-            ilce=ilce,
-            adres=adres,
-            tel_cep=phone,
-            email=ship.get("email") or order.get("user_email") or "",
-            kapida_odeme=kapida,
-            platform_adi="",  # Pazaryeri değil — boş geç (harici kanal/GG/TRND aksi takdirde)
-            platform_kodu="",
-        )
-    except Exception as _mng_exc:
-        # MNG bağlantı/SOAP exception'ı: 503 (Railway) yerine okunabilir 502 + gerçek sebep döndür.
-        logger.error(f"MNG create_shipment exception (order={order_id}): {_mng_exc}")
-        try:
-            await db.cargo_logs.insert_one({
-                "id": generate_id(), "order_id": order_id, "provider": "MNG",
-                "action": "create_shipment", "status": "exception",
-                "request_summary": {"siparis_no": siparis_no, "il": il, "ilce": ilce},
-                "error": str(_mng_exc)[:1000],
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            })
-        except Exception:
-            pass
-        raise HTTPException(status_code=502, detail=f"MNG Kargo bağlantı hatası: {str(_mng_exc)[:300]}")
-
-    if not res.get("ok"):
-        _hata = str(res.get("hata") or "")
-        # E005: MNG'de bu sipariş_no'ya ait kayıt ZATEN VAR (önceki denemede oluştu ama
-        # yanıt bize dönmeden timeout/503 olduğu için DB'ye yazılamadı). Bu bir HATA değil —
-        # mevcut kaydı FaturaSiparisListesi'nden çekip kurtarıyoruz (yeni kayıt oluşturmadan).
-        _recovered = False
-        if ("ZATEN VAR" in _hata.upper()) or ("E005" in _hata.upper()):
-            # Kayıt MNG'de KESİN var. Gerçek MNG gönderi no'yu çekmeyi dene (FaturaSiparisListesi);
-            # ama günlük sorgu limiti ("GUNLUK SORGULAMA SINIRI") veya boş dönse BİLE sipariş_no'yu
-            # barkod kabul edip kurtar — etiket barkodu zaten sipariş no'yu kodluyor, gerçek gönderi no
-            # sonradan scheduler/backfill ile dolar. Amaç: etiket HEMEN oluşsun.
-            _existing_barkod = ""
-            _existing_gonderi = ""
-            try:
-                from mng_kargo_client import get_mng_shipment_status as _gss_recover
-                _rec = await _aio_cargo.to_thread(
-                    _gss_recover,
-                    username=settings["username"], password=settings["password"], siparis_no=siparis_no
-                )
-                if _rec.get("ok"):
-                    _existing_barkod = (_rec.get("mng_siparis_no") or "").strip()
-                    _existing_gonderi = (_rec.get("gonderi_no") or "").strip()
-                else:
-                    logger.warning(f"E005 FaturaSiparisListesi başarısız (siparis_no={siparis_no}): {_rec.get('error')}")
-            except Exception as _re:
-                logger.warning(f"E005 kurtarma sorgusu hata (siparis_no={siparis_no}): {_re}")
-            res = {
-                "ok": True,
-                "barkod": _existing_barkod or siparis_no,   # gerçek MNG no varsa o; yoksa sipariş no (etiket için yeterli)
-                "gonderi_no": _existing_gonderi,
-                "raw": "recovered_from_E005",
-            }
-            _recovered = True
-            logger.info(f"E005 kurtarma (siparis_no={siparis_no}): barkod={res['barkod']}, gonderi={_existing_gonderi or '(sonra dolacak)'}")
-
-        if not _recovered:
-            # MNG hatasını cargo_logs'a yaz
-            await db.cargo_logs.insert_one({
-                "id": generate_id(),
-                "order_id": order_id,
-                "provider": "MNG",
-                "action": "create_shipment",
-                "status": "error",
-                "request_summary": {"siparis_no": siparis_no, "alici_ad": full_name, "il": il, "ilce": ilce},
-                "error": res.get("hata"),
-                "raw": str(res.get("raw"))[:1000] if res.get("raw") else None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            })
-            raise HTTPException(status_code=502, detail=f"MNG Kargo hatası: {res.get('hata') or 'Bilinmeyen hata'}")
-
-    barkod = res["barkod"]  # MNG_SIPARIS_NO (MNG Self Barkod) — gerçek kargo takip kodu
-    
-    # MNGGonderiBarkod denemesi → NZ-formatlı kargo barkodu (kurumsal hesaplarda anında dolar).
-    # Yetki hatası alırsa graceful fallback: MNG_SIPARIS_NO kullanılır.
-    nz_barkod = ""
-    nz_gonderi_no = ""
-    try:
-        from mng_kargo_client import get_mng_barcode_immediately
-        kapida = (order.get("payment_method") or "").lower() in ("cash_on_delivery", "kapida")
-        nz_res = await _aio_cargo.to_thread(
-            get_mng_barcode_immediately,
-            username=settings["username"], password=settings["password"],
-            siparis_no=siparis_no,
-            irsaliye_no=str(order.get("invoice_number") or "")[:20],
-            urun_bedeli=kiymet,
-            kapida_tahsilat=kapida,
-        )
-        if nz_res.get("ok"):
-            nz_barkod = nz_res.get("barkod", "")
-            nz_gonderi_no = nz_res.get("gonderi_no", "")
-            logger.info(f"MNG NZ barkod alındı: {nz_barkod} (gonderi_no={nz_gonderi_no})")
-        else:
-            logger.info(f"MNGGonderiBarkod denenemedi/başarısız (graceful fallback): {nz_res.get('hata')}")
-    except Exception as nz_err:
-        logger.warning(f"MNGGonderiBarkod exception (fallback to siparis_no): {nz_err}")
-
-    # FaturaSiparisListesi'nden ek kargo durumu çek (şube, kargo statu, varsa GONDERI_NO)
-    from mng_kargo_client import get_mng_shipment_status
-    try:
-        status_info = await _aio_cargo.to_thread(
-            get_mng_shipment_status,
-            username=settings["username"], password=settings["password"], siparis_no=siparis_no
-        )
-    except Exception as _st_exc:
-        logger.warning(f"get_mng_shipment_status exception (graceful fallback): {_st_exc}")
-        status_info = {"ok": False}
-    gonderi_no_status = (status_info.get("gonderi_no") or "") if status_info.get("ok") else ""
-    kargo_takip_url = (status_info.get("kargo_takip_url") or "") if status_info.get("ok") else ""
-    kargo_statu = (status_info.get("kargo_statu") or "0") if status_info.get("ok") else "0"
-    kargo_statu_aciklama = (status_info.get("kargo_statu_aciklama") or "") if status_info.get("ok") else ""
-
-    # Self Barkod hesapları için: MNG_SIPARIS_NO zaten gerçek kargo takip kodudur
-    # NZ-formatlı havuz tahsis edilen kurumsal hesaplarda GONDERI_NO field'ında ayrı bir kod gelir
-    # Öncelik: NZ (anında MNGGonderiBarkod) → GONDERI_NO (FaturaSiparisListesi sonradan dolu) → MNG_SIPARIS_NO
-    # Gerçek kargo takip no SADECE kargo firması gönderi numarası üretince dolar (NZ barkod / NZ gönderi / GONDERI_NO).
-    # MNG Self Barkod (barkod = MNG_SIPARIS_NO) = bizim oluşturduğumuz barkod → kargoya verildiği/kargoda olduğu
-    # anlamına GELMEZ, bu yüzden takip no olarak YAZILMAZ. Gerçek no scheduler/backfill ile sonradan yakalanır.
-    real_tracking = nz_barkod or nz_gonderi_no or gonderi_no_status or ""
-    public_tracking = real_tracking or barkod  # bildirim metni / geriye dönük fallback
-    # MNG->DHL devri: kargotakip.dhlecommerce.com.tr/?takipNo={no} dogru deep-link (no ile direkt takip,
-    # form/CAPTCHA gerektirmez). Gerçek no yoksa manuel takip sayfasina dusulur.
-    track_link = (f"https://kargotakip.dhlecommerce.com.tr/?takipNo={real_tracking}" if real_tracking else "https://www.dhlecommerce.com.tr/gonderitakip")
-    update_doc = {
-        "cargo_tracking_number": real_tracking,    # SADECE gerçek takip no; yoksa boş (scheduler/backfill doldurur)
-        "cargo_barcode_number": barkod,            # MNG Self Barkod — bizim barkodumuz (takip no DEĞİL)
-        "cargo_tracking_link": track_link,
-        "cargo_provider_name": "MNG Kargo",
-        "cargo_provider_code": "MNG",
-        "cargo": {
-            "provider": "MNG",
-            "provider_name": "MNG Kargo",
-            "tracking_number": public_tracking,   # etiket/yazdırma butonu için DOLU (gerçek no yoksa barkod). Gerçek takip no order.cargo_tracking_number'da; kargo sütunu barkodu gerçek saymaz (ctn==barcodeNo).
-            "tracking_link": track_link,
-            "label_format": "10x15cm",
-            "mng_siparis_no": barkod,                      # MNG Self Barkod (her zaman dolu)
-            "mng_gonderi_no": gonderi_no_status,           # NZ formatlı (FaturaSiparisListesi sonrası)
-            "mng_nz_barkod": nz_barkod,                    # NZ formatlı (MNGGonderiBarkod anında, varsa)
-            "mng_nz_gonderi_no": nz_gonderi_no,
-            "mng_kargo_statu": kargo_statu,
-            "mng_kargo_statu_aciklama": kargo_statu_aciklama,
-            "cikis_subesi": status_info.get("cikis_subesi"),
-            "teslim_subesi": status_info.get("teslim_subesi"),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-        "cargo_barcode_created": True,
-        # BARKOD OLUSTURMA = siparis HAZIRLANIYOR. "Kargoya Verildi" (shipped) DEGIL —
-        # o, kargocu/DHL gonderiyi fiilen okuttugunda scheduler (_dhl_cargo_poll_tick) ile
-        # gercek takip kodu yakalaninca olur. Burada erken "shipped" YAPMA.
-        "status": "preparing" if order.get("status") in ("pending", "confirmed", "processing") else order.get("status"),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.orders.update_one({"id": order_id}, {"$set": update_doc})
-
-    # Bildirim: "Hazirlaniyor" (Ayarlar > Siparis Durumlari'nda acildiysa). "Kargoya Verildi"
-    # bildirimi barkod olusturmada GONDERILMEZ — gercek DHL takip kodu yakalaninca scheduler gonderir.
-    try:
-        if update_doc.get("status") == "preparing":
-            from order_statuses import get_status_config
-            _cfg = await get_status_config(db)
-            _nz = (_cfg.get("notify") or {}).get("preparing") or {}
-            _ch = [c for c in ("sms", "email") if _nz.get(c)]
-            if _ch:
-                from notification_service import send_notification
-                ship_addr = order.get("shipping_address") or {}
-                await send_notification(
-                    db,
-                    event="order_preparing",
-                    to_phone=ship_addr.get("phone") or order.get("customer_phone"),
-                    to_email=ship_addr.get("email") or order.get("customer_email") or order.get("user_email"),
-                    variables=await _order_notify_vars(order, order_number=order.get("order_number") or order_id, cargo_provider="MNG Kargo"),
-                    channels=_ch,
-                )
-    except Exception as ne:
-        logger.warning(f"Hazirlaniyor bildirimi gönderilemedi (order={order_id}): {ne}")
-    await db.cargo_logs.insert_one({
-        "id": generate_id(),
-        "order_id": order_id,
-        "provider": "MNG",
-        "action": "create_shipment",
-        "status": "success",
-        "tracking_number": barkod,
-        "request_summary": {"siparis_no": siparis_no, "alici_ad": full_name, "il": il, "ilce": ilce},
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return {
-        "success": True,
-        "tracking_number": public_tracking,
-        "tracking_link": track_link,
-        "mng_siparis_no": barkod,
-        "mng_gonderi_no": gonderi_no_status,
-        "mng_kargo_statu": kargo_statu,
-        "cargo_provider_name": "MNG Kargo",
-        "message": f"✅ MNG kargo barkodu oluşturuldu: {public_tracking}",
-    }
+    # Aras Kargo / PTT Kargo: canlı SOAP entegrasyonu (cargo_carriers/service.py)
+    from cargo_carriers import normalize_code as _cc_norm, CARRIERS as _CC
+    _code = _cc_norm(company)
+    if _code not in _CC:
+        raise HTTPException(status_code=400, detail=(
+            f"Desteklenmeyen kargo firması: {cargo_company}. Kullanılabilir: Aras Kargo, PTT Kargo."))
+    from cargo_carriers.service import create_shipment_for_order as _cc_create
+    return await _cc_create(db, order, _code, current_user)
 
 
 @router.post("/{order_id}/cargo-refresh")
 async def refresh_cargo_tracking(order_id: str, current_user: dict = Depends(require_admin)):
     """Kargo takip durumunu yeniler — anlaşılır mesajla.
 
-    - Diğer kanal (eski içe aktarılmış) kaydı → MNG'de SORGULANMAZ (yanlış 'bulunamadı'
-      hatası önlenir); mevcut takip no gösterilir.
-    - Site siparişi → MNG FaturaSiparisListesi'nden gönderi no/durum çekilir.
-    Hiçbir durumda kuru 'yenilenemedi' dönmez: MNG'de kayıt yok / gönderi no henüz atanmadı /
-    yetki-IP whitelist hatası ayrı ayrı, ne yapılacağını söyleyen mesajla döner.
+    - Diğer kanal (eski içe aktarılmış) kaydı → kargo firmasında SORGULANMAZ; mevcut takip no gösterilir.
+    - Aras / PTT ile gönderilmiş sipariş → ilgili taşıyıcının takip servisi (cargo_carriers/service.py).
+    - Entegrasyonu olmayan (eski) firma kaydı → sorgu yapılmaz; kayıtlı takip bilgisi döner.
     """
-    import sys, os
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from mng_kargo_client import get_mng_shipment_status
-
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
-
     cargo = order.get("cargo") or {}
-    siparis_no = str(order.get("order_number") or order_id)
+    _tn = order.get("cargo_tracking_number") or cargo.get("tracking_number") or ""
+    _link = order.get("cargo_tracking_link") or cargo.get("tracking_link") or ""
 
-    # ── Diğer kanal kaydı: MNG'de aranmaz ──
     from sales_channels import channel_of as _ch_of, OTHER as _OTHER
     if _ch_of(order) == _OTHER or order.get("payment_method") == "marketplace":
-        _tn = order.get("cargo_tracking_number") or cargo.get("tracking_number") or ""
         return {
             "success": True,
             "tracking_number": _tn,
-            "message": (
-                "Diğer kanal kaydı — MNG sorgusu yapılmaz. "
-                + (f"Mevcut takip: {_tn}" if _tn else "Kayıtta takip numarası yok.")
-            ),
+            "message": ("Diğer kanal kaydı — kargo firması sorgusu yapılmaz. "
+                        + (f"Mevcut takip: {_tn}" if _tn else "Kayıtta takip numarası yok.")),
         }
 
-    # ── Aras / PTT ile gönderilmiş site siparişi → ilgili taşıyıcının takip servisi ──
     if str(order.get("cargo_provider_code") or "").upper() in ("ARAS", "PTT"):
         from cargo_carriers.service import refresh_order_tracking as _cc_refresh
         return await _cc_refresh(db, order)
 
-    # ── Site siparişi: MNG'den durum çek (hata yutulmaz, kategorize edilir) ──
-    settings = await _get_mng_settings()
-    try:
-        import asyncio as _aio_mng
-        info = await _aio_mng.to_thread(  # SOAP (≤40 sn) → olay döngüsünü kilitlemesin
-            get_mng_shipment_status,
-            username=settings["username"], password=settings["password"], siparis_no=siparis_no
-        )
-    except Exception as _e:
-        logger.error(f"cargo-refresh MNG exception {siparis_no}: {_e}")
-        info = {"ok": False, "error": str(_e)}
-
-    if not info.get("ok"):
-        _err = str(info.get("error") or "").lower()
-        # MNG'de kayıt yok → genelde MNG kargo barkodu hiç oluşturulmamış (site siparişi elle "Kargoya Verildi")
-        if (not _err) or any(t in _err for t in ("bulunamad", "kayıt", "kayit", "not found", "no record")):
-            return {
-                "success": False,
-                "tracking_number": order.get("cargo_tracking_number") or "",
-                "message": (
-                    f"Bu sipariş ({siparis_no}) MNG'de bulunamadı. Site siparişi MNG ile gönderilmediyse "
-                    "önce 📦 (MNG kargo barkodu) butonuyla oluşturun; barkod oluşunca takip no burada görünür."
-                ),
-            }
-        # Yetki / IP whitelist / bağlantı → gerçek sistem hatası (kırmızı uyarı)
-        raise HTTPException(
-            status_code=502,
-            detail=(f"MNG durumu alınamadı: {info.get('error')}. "
-                    "Yetki/IP whitelist veya bağlantı sorunu olabilir — MNG paneli > API IP izinlerini kontrol edin."),
-        )
-
-    gonderi_no = info.get("gonderi_no") or ""   # GERÇEK kargo takip no (boş olabilir)
-    mng_siparis_no = info.get("mng_siparis_no") or cargo.get("mng_siparis_no") or ""
-    # ÖNEMLİ: iç sipariş no'yu (mng_siparis_no) ASLA takip no diye yazma. Sadece gerçek gönderi no.
-    track_link = (f"https://kargotakip.dhlecommerce.com.tr/?takipNo={gonderi_no}"
-                  if gonderi_no else "https://www.dhlecommerce.com.tr/gonderitakip")
-
-    # Durum alanlarını her zaman güncelle; takip no'yu yalnız GERÇEK gönderi no doluysa yaz.
-    update = {
-        "cargo.mng_siparis_no": mng_siparis_no,
-        "cargo.mng_gonderi_no": gonderi_no,
-        "cargo.mng_kargo_statu": info.get("kargo_statu"),
-        "cargo.mng_kargo_statu_aciklama": info.get("kargo_statu_aciklama"),
-        "cargo.cikis_subesi": info.get("cikis_subesi"),
-        "cargo.teslim_subesi": info.get("teslim_subesi"),
-        "cargo.teslim_tarihi": info.get("teslim_tarihi"),
-        "cargo_status_text": info.get("kargo_statu_aciklama") or "",
-        "cargo_query_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if gonderi_no:
-        update["cargo_gonderi_no"] = gonderi_no
-        update["cargo_tracking_number"] = gonderi_no
-        update["cargo_tracking_link"] = track_link
-        update["cargo.tracking_number"] = gonderi_no
-        update["cargo.tracking_link"] = track_link
-    else:
-        # Gerçek no yok → daha önce YANLIŞLIKLA yazılmış (iç no = takip no) değeri TEMİZLE,
-        # böylece sipariş listesinde yanlış numara yerine "takip bekleniyor" görünür.
-        _wrong = (order.get("cargo_tracking_number") or "")
-        if _wrong and _wrong == mng_siparis_no:
-            update["cargo_tracking_number"] = ""
-            update["cargo_gonderi_no"] = ""
-            update["cargo.tracking_number"] = ""
-    await db.orders.update_one({"id": order_id}, {"$set": update})
-
-    if gonderi_no:
-        _msg = f"📦 Gönderi No: {gonderi_no}" + (f" · {info.get('kargo_statu_aciklama')}" if info.get("kargo_statu_aciklama") else "")
-    else:
-        # Gerçek gönderi no yok = kargo henüz teslim alıp işleme almamış.
-        _aci = (info.get("kargo_statu_aciklama") or "").strip()
-        _msg = ("Bu sipariş henüz kargoya verilmedi / kargo firması gönderi no atamadı"
-                + (f" ({_aci})" if _aci else "")
-                + ". Kargo şubede işleme alınınca gönderi no OTOMATİK çekilecek.")
+    _name = order.get("cargo_provider_name") or cargo.get("provider_name") or order.get("cargo_company") or ""
     return {
         "success": True,
-        "tracking_number": gonderi_no,   # gerçek no yoksa boş
-        "mng_siparis_no": mng_siparis_no,
-        "mng_gonderi_no": gonderi_no,
-        "kargo_statu": info.get("kargo_statu"),
-        "kargo_statu_aciklama": info.get("kargo_statu_aciklama"),
-        "tracking_link": track_link,
-        "message": _msg,
-    }
-
-
-@router.post("/cargo/backfill-tracking")
-async def backfill_cargo_tracking(
-    since: str = "",
-    force: bool = False,
-    all_statuses: bool = False,
-    site_only: bool = False,
-    current_user: dict = Depends(require_admin),
-):
-    """Kargoya verilmiş siparişlerin MNG (DHL eCommerce) takip numaralarını TOPLU çeker.
-
-    - since boş → TÜM ZAMANLAR (tarih sınırı yok). Tarih verilirse (YYYY-MM-DD) o tarihten sonrası.
-    - force=False → yalnız takip no'su EKSİK olanları sorgular (verimli); force=True → hepsini yeniden.
-    - all_statuses=True → durum filtresi uygulamaz (varsayılan: yalnız kargo durumundaki siparişler).
-    - site_only=True → pazaryeri (harici kanal önekli) siparişleri ATLAR; yalnız site siparişlerini sorgular
-      (MNG/DHL'de zaten pazaryeri siparişi yok → boşuna sorgu/yanlış 'bulunamadı' önlenir).
-    - get_mng_shipment_status (SALT OKUMA) → yeni kargo OLUŞTURMAZ, bildirim göndermez.
-    - MNG sorgusu thread'de (event loop bloklanmaz); sıralı → MNG'yi hammer'lamaz.
-
-    ÖNEMLİ: Gerçek takip no'yu MNG 'FaturaSiparisListesi' üretir — MNG kargoyu okutunca dolar
-    ve bu sorgu MNG tarafında IP whitelist ister. DHL'in bir 'günlük sorgu limiti' YOKTUR.
-    Dönüşteki 'diagnosis' her siparişin GERÇEK nedenini sayar (atanmadı / yetki / hata).
-    """
-    import asyncio
-    from mng_kargo_client import get_mng_shipment_status
-
-    settings = await _get_mng_settings()
-    q = {}
-    if since:
-        q["created_at"] = {"$gte": since}
-    if not all_statuses:
-        q["status"] = {"$in": [
-            "shipped", "in_transit", "out_for_delivery", "delivered",
-            "return_requested", "return_approved", "return_in_transit",
-            "returned", "undelivered",
-        ]}
-    cur = db.orders.find(
-        q,
-        {"_id": 0, "id": 1, "order_number": 1, "cargo_tracking_number": 1, "cargo": 1, "status": 1},
-    ).sort("created_at", -1)
-    orders = await cur.to_list(length=20000)
-
-    updated, skipped, failed = [], [], []
-    # Gerçek neden sayaçları — kullanıcı "limit mi?" diye soruyor; net görünsün.
-    diagnosis = {
-        "guncellendi": 0,
-        "zaten_takip_no_vardi": 0,
-        "mngde_kayit_var_takip_no_yok": 0,  # MNG kaydı oluşmuş, GONDERI_NO atanmamış (kargo henüz okutulmadı)
-        "mngde_kayit_yok_veya_yetki": 0,    # hiç satır dönmedi → bulunamadı VEYA IP whitelist/yetki eksik
-        "sorgu_hatasi": 0,                  # exception / SOAP hatası
-        "gunluk_limit": 0,                  # MNG/DHL günlük sorgu limiti mesajı
-    }
-    limit_hit = False
-    site_taranan = 0
-    for o in orders:
-        on = str(o.get("order_number") or "")
-        _is_site = bool(on and (on.startswith("W") or on.startswith("IW")))
-        if site_only and not _is_site:
-            continue  # SADECE site siparişleri (W / IW); harici kanal ve diğerleri atlanır
-        if _is_site:
-            site_taranan += 1
-        existing = o.get("cargo_tracking_number") or (o.get("cargo") or {}).get("tracking_number")
-        _internal_no = (o.get("cargo") or {}).get("mng_siparis_no") or ""
-        # Daha önce YANLIŞLIKLA iç sipariş no'su takip no diye yazılmışsa, "zaten var" sayma —
-        # yeniden sorgula ki ya gerçek no ile düzelt ya da temizle.
-        _existing_wrong = bool(existing) and existing == _internal_no
-        if existing and not _existing_wrong and not force:
-            skipped.append(on)
-            diagnosis["zaten_takip_no_vardi"] += 1
-            continue
-        siparis_no = on or str(o.get("id"))
-        try:
-            info = await asyncio.to_thread(
-                get_mng_shipment_status,
-                username=settings["username"], password=settings["password"], siparis_no=siparis_no,
-            )
-        except Exception as e:
-            failed.append({"no": siparis_no, "reason": "sorgu_hatasi", "err": str(e)[:160]})
-            diagnosis["sorgu_hatasi"] += 1
-            continue
-        if not info.get("ok"):
-            _err_txt = (info.get("error") or "")
-            if any(k in _err_txt.lower() for k in ("sorgulama sınır", "sorgulama sinir",
-                                                   "günlük sorgu", "gunluk sorgu", "sorgu limit",
-                                                   "limit aşıl", "limit asil")):
-                diagnosis["gunluk_limit"] += 1
-                limit_hit = True
-                failed.append({"no": siparis_no, "reason": "gunluk_limit", "err": _err_txt[:160]})
-                break  # limiti uzatmamak için taramayı durdur
-            failed.append({"no": siparis_no, "reason": "sorgu_hatasi", "err": _err_txt[:160]})
-            diagnosis["sorgu_hatasi"] += 1
-            continue
-        gonderi = (info.get("gonderi_no") or "").strip()  # SADECE gerçek GONDERI_NO; iç no'ya düşme
-        if not gonderi:
-            has_record = bool((info.get("mng_siparis_no") or "").strip())
-            reason = "mngde_kayit_var_takip_no_yok" if has_record else "mngde_kayit_yok_veya_yetki"
-            diagnosis[reason] += 1
-            # Yanlış (iç no) yazılmış takip no varsa TEMİZLE → listede "takip bekleniyor" görünsün.
-            if _existing_wrong:
-                await db.orders.update_one(
-                    {"id": o["id"]},
-                    {"$set": {"cargo_tracking_number": "", "cargo_gonderi_no": "",
-                              "cargo.tracking_number": "",
-                              "cargo_status_text": info.get("kargo_statu_aciklama") or "",
-                              "updated_at": datetime.now(timezone.utc).isoformat()}},
-                )
-            failed.append({
-                "no": siparis_no, "reason": reason,
-                "kargo_statu": info.get("kargo_statu"),
-                "kargo_statu_aciklama": info.get("kargo_statu_aciklama"),
-                "mng_siparis_no": info.get("mng_siparis_no"),
-            })
-            continue
-        await db.orders.update_one(
-            {"id": o["id"]},
-            {"$set": {
-                "cargo_tracking_number": gonderi,
-                "cargo_tracking_link": f"https://kargotakip.dhlecommerce.com.tr/?takipNo={gonderi}",
-                "cargo.tracking_number": gonderi,
-                "cargo.tracking_link": f"https://kargotakip.dhlecommerce.com.tr/?takipNo={gonderi}",
-                "cargo.mng_gonderi_no": gonderi,
-                "cargo.mng_kargo_statu": info.get("kargo_statu"),
-                "cargo.mng_kargo_statu_aciklama": info.get("kargo_statu_aciklama"),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }},
-        )
-        updated.append({"no": siparis_no, "gonderi_no": gonderi})
-        diagnosis["guncellendi"] += 1
-
-    # Günlük limite takıldıysak scheduler poll de bugün geri çekilsin diye bayrağı kaydet.
-    if limit_hit:
-        try:
-            await db.settings.update_one(
-                {"id": "mng_kargo"},
-                {"$set": {"daily_limit_hit_at": datetime.now(timezone.utc).isoformat()}},
-                upsert=True,
-            )
-        except Exception:
-            pass
-
-    return {
-        "since": since or "(tüm zamanlar)", "force": force, "all_statuses": all_statuses,
-        "site_only": site_only, "limit_hit": limit_hit,
-        "scanned": len(orders), "site_taranan": site_taranan,
-        "updated": len(updated), "skipped": len(skipped), "failed": len(failed),
-        "diagnosis": diagnosis,
-        "aciklama": (
-            ("⚠️ MNG/DHL GÜNLÜK SORGU LİMİTİNE takıldı — tarama durduruldu, bugün için yeterli sorgu yapıldı; "
-             "yarın otomatik devam eder. Bu limit DHL/MNG tarafındadır, bizim kodumuzda limit yoktur. "
-             if limit_hit else
-             "Bu limit (varsa) DHL/MNG tarafındadır; bizim kodumuzda günlük limit yoktur. ")
-            + "Takip no MNG 'FaturaSiparisListesi'nden gelir; MNG kargoyu okutunca dolar (IP whitelist gerektirir). "
-            "'mngde_kayit_var_takip_no_yok' = MNG kaydı oluşmuş ama numara henüz atanmamış. "
-            "'mngde_kayit_yok_veya_yetki' = MNG'den satır dönmedi (bulunamadı VEYA whitelist/yetki eksik)."
-        ),
-        "updatedList": updated[:200], "failedList": failed[:80],
+        "tracking_number": _tn,
+        "tracking_link": _link,
+        "message": ((f"{_name}: " if _name else "")
+                    + "Bu kargo firması için canlı takip entegrasyonu yok (yalnız Aras Kargo / PTT Kargo). "
+                    + (f"Kayıtlı takip: {_tn}" if _tn else "Kayıtta takip numarası yok.")),
     }
 
 
@@ -5336,87 +4769,10 @@ async def bulk_mark_refunded_silent(payload: dict, current_user: dict = Depends(
     return {"requested": len(order_ids), "updated": len(done), "updatedIds": done, "missingIds": missing}
 
 
-@router.post("/cargo/relink-dhl")
-async def relink_cargo_dhl(current_user: dict = Depends(require_admin)):
-    """Eski/yanlis kargo takip linklerini DHL deep-link formatina cevirir:
-    kargotakip.dhlecommerce.com.tr/?takipNo={no} (no ile direkt takip, form/CAPTCHA yok).
-    Sadece MNG/DHL linki olan siparisleri etkiler (harici kanal kendi linkine dokunulmaz).
-    No bos olan kayitlarda manuel takip sayfasina dusulur. Bildirimsiz; MNG API cagirmaz."""
-    now = datetime.now(timezone.utc).isoformat()
-    DEEP = "https://kargotakip.dhlecommerce.com.tr/?takipNo="
-    FALLBACK = "https://www.dhlecommerce.com.tr/gonderitakip"
-    rx = {"$regex": "mngkargo|dhlecommerce|gonderitakip|BarkodNo", "$options": "i"}
-    q = {"cargo_tracking_link": rx}
-    matched = await db.orders.count_documents(q)
-    link_expr = {
-        "$cond": [
-            {"$gt": [{"$strLenCP": {"$ifNull": ["$cargo_tracking_number", ""]}}, 0]},
-            {"$concat": [DEEP, "$cargo_tracking_number"]},
-            FALLBACK,
-        ]
-    }
-    r = await db.orders.update_many(q, [{"$set": {
-        "cargo_tracking_link": link_expr,
-        "cargo.tracking_link": link_expr,
-        "updated_at": now,
-    }}])
-    return {"matched": matched, "modified": r.modified_count}
-
-
-@router.post("/{order_id}/create-mng-shipment")
-async def create_mng_shipment(order_id: str, current_user: dict = Depends(require_admin)):
-    """MNG Kargo'ya sipariş gönder ve barkod al (kısayol)."""
-    return await create_cargo_barcode(order_id=order_id, cargo_company="MNG", current_user=current_user)
-
-
-@router.get("/cargo/mng-test")
-async def mng_connection_test(siparis_no: str = None, current_user: dict = Depends(require_admin)):
-    """TEŞHİS: MNG/DHL SOAP servisine (service.mngkargo.com.tr) sunucudan erişim testi.
-    Barkod OLUŞTURMAZ — sadece Baglanti_Test() ping atar. 200 + JSON döner (CORS güvenli).
-    ok=true → erişim var; ok=false → error alanında gerçek sebep (timeout/whitelist/DNS).
-    """
-    import asyncio as _aio_t, time as _t
-    from mng_kargo_client import baglanti_test
-    t0 = _t.time()
-    try:
-        res = await _aio_t.to_thread(baglanti_test)
-        out = {"ok": bool(res.get("ok")), "result": str(res.get("result"))[:300],
-               "error": str(res.get("error"))[:500] if res.get("error") else None,
-               "ms": int((_t.time() - t0) * 1000)}
-    except Exception as e:
-        out = {"ok": False, "error": str(e)[:500], "ms": int((_t.time() - t0) * 1000)}
-    # MNG ayar özeti (şifre maskeli) — credential dolu mu kontrolü
-    try:
-        s = await _get_mng_settings()
-        out["settings"] = {
-            "username": (s.get("username") or "")[:4] + "***" if s.get("username") else "(boş)",
-            "has_password": bool(s.get("password")),
-            "customer_code": s.get("customer_code") or "(boş)",
-            "enabled": s.get("enabled", True),
-        }
-    except Exception as se:
-        out["settings_error"] = str(se)[:200]
-    # siparis_no verilirse FaturaSiparisListesi'nden mevcut kaydı da test et (E005 kurtarma kaynağı)
-    if siparis_no:
-        try:
-            from mng_kargo_client import get_mng_shipment_status as _gss_t
-            _s2 = await _get_mng_settings()
-            _ss = await _aio_t.to_thread(
-                _gss_t, username=_s2["username"], password=_s2["password"], siparis_no=siparis_no
-            )
-            # Ham yanıtı okunur bir önizlemeye indir (JSON şişmesin, panelde görünür).
-            if isinstance(_ss, dict) and "raw" in _ss:
-                _ss["raw_preview"] = str(_ss.pop("raw"))[:2000]
-            out["shipment_status"] = _ss
-        except Exception as _e2:
-            out["shipment_status_error"] = str(_e2)[:300]
-    return out
-
-
 @router.get("/cargo/logs")
 async def get_cargo_logs_diag(limit: int = 10, current_user: dict = Depends(require_admin)):
     """TEŞHİS: Son kargo işlem logları (create_shipment hataları/exception'ları dahil).
-    create-mng-shipment 503/502 verdiğinde gerçek MNG hatası buraya yazılır."""
+    Barkod oluşturma 502 verdiğinde kargo firmasının gerçek hatası buraya yazılır."""
     try:
         logs = await db.cargo_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(
             length=min(int(limit or 10), 50))
@@ -5428,7 +4784,7 @@ async def get_cargo_logs_diag(limit: int = 10, current_user: dict = Depends(requ
 @router.post("/bulk-cargo-barcode")
 async def bulk_create_cargo_barcode(
     order_ids: List[str],
-    cargo_company: str = Query("MNG"),
+    cargo_company: str = Query("AUTO"),
     current_user: dict = Depends(require_admin)
 ):
     """Birden çok sipariş için topluca kargo barkodu oluştur.
@@ -5437,7 +4793,7 @@ async def bulk_create_cargo_barcode(
     idi ve '/{order_id}/cargo-barcode' route'u daha önce tanımlı olduğu için FastAPI bu
     isteği order_id='bulk' sanıp tekil route'a yönlendiriyor, toplu işlem ÇALIŞMIYORDU.
     """
-    # DENETİM (cost-redteam #8): tek istekte MNG çağrı sayısını sınırla (burst-DoS/maliyet).
+    # DENETİM (cost-redteam #8): tek istekte kargo API çağrı sayısını sınırla (burst-DoS/maliyet).
     if order_ids and len(order_ids) > 200:
         raise HTTPException(status_code=400, detail="Tek seferde en fazla 200 sipariş işlenebilir.")
     success = []
@@ -5482,157 +4838,6 @@ async def bulk_update_status(
             errors.append({"order_id": oid, "error": str(e)})
     return {"success": True, "success_count": len(success),
             "error_count": len(errors), "errors": errors}
-
-
-# ═══════════════════ MNG KARGO WEBHOOK ═══════════════════════════════
-@router.post("/cargo/mng-webhook")
-async def mng_cargo_webhook(payload: dict, request: Request):
-    """MNG Kargo'dan gelen kargo durum güncelleme webhook'u.
-
-    MNG Kargo, gönderi durumu değiştikçe önceden tanımlanmış URL'e bu yapıda
-    POST atar:
-      {"BARKOD": "NZ123", "ISLEM_KODU": "300", "ISLEM_ADI": "Dağıtımda",
-       "TARIH": "2026-05-06T12:30:00", "REFERANS_NO": "FC123ABCD"}
-
-    İşlem kodları (MNG standardı):
-      - 100: Şubeye girdi
-      - 200: Transfere alındı
-      - 300: Dağıtıma çıktı
-      - 400: Teslim edildi
-      - 500: İade
-
-    GÜVENLİK (Y7): Bu uç önceden KİMLİKSİZDİ — sipariş numarasını bilen biri herhangi
-    bir siparişi 'teslim edildi' (iade penceresi açar) ya da 'iade' işaretleyebiliyordu.
-    Artık paylaşılan bir gizli anahtar zorunludur: X-Webhook-Secret başlığı veya ?key=
-    parametresi, MNG'ye tanımlı URL'deki gizli anahtarla eşleşmeli. Anahtar hem env
-    (MNG_WEBHOOK_SECRET) hem de settings(mng_kargo).webhook_secret üzerinden okunur."""
-    import hmac as _hmac
-    _secret = (os.environ.get("MNG_WEBHOOK_SECRET") or "").strip()
-    if not _secret:
-        _mset = await db.settings.find_one({"id": "mng_kargo"}, {"_id": 0, "webhook_secret": 1}) or {}
-        _secret = (_mset.get("webhook_secret") or "").strip()
-    # A2.7: Gizli anahtar YALNIZ başlık veya URL query'den okunur. Gövdedeki 'secret' alanı
-    # kaldırıldı (gövde entegrasyon loglarında saklandığından sır sızıntısı riskiydi). MNG
-    # yalnız callback URL yapılandırmasına izin verdiğinden ?key= fallback'i korunur (TLS altında).
-    _provided = (request.headers.get("x-webhook-secret")
-                 or request.query_params.get("key") or "").strip()
-    if not _secret or not _provided or not _hmac.compare_digest(_provided, _secret):
-        logger.warning("MNG webhook reddedildi: gizli anahtar eksik/yanlış")
-        raise HTTPException(status_code=401, detail="Yetkisiz webhook")
-
-    barkod = (payload.get("BARKOD") or payload.get("barcode") or "").strip()
-    islem_kodu = str(payload.get("ISLEM_KODU") or payload.get("status_code") or "")
-    islem_adi = (payload.get("ISLEM_ADI") or payload.get("status_text") or "").strip()
-    tarih = (payload.get("TARIH") or payload.get("event_time") or
-             datetime.now(timezone.utc).isoformat())
-    referans_no = (payload.get("REFERANS_NO") or payload.get("reference_no") or "").strip()
-
-    if not barkod and not referans_no:
-        raise HTTPException(status_code=400, detail="BARKOD veya REFERANS_NO zorunlu")
-
-    # Siparişi barkod veya referans_no ile bul
-    query_or = []
-    if barkod:
-        query_or.extend([
-            {"cargo_tracking_number": barkod},
-            {"cargo.mng_nz_barkod": barkod},
-            {"cargo.mng_gonderi_no": barkod},
-            {"cargo.mng_siparis_no": barkod},
-        ])
-    if referans_no:
-        query_or.append({"order_number": referans_no})
-
-    order = await db.orders.find_one({"$or": query_or}, {"_id": 0, "id": 1, "order_number": 1, "cargo_status_history": 1})
-    if order:
-        # A2.7: İDEMPOTENSİ — aynı (barkod, işlem kodu, tarih) olayı tekrar gelirse (MNG retry /
-        # replay) yeniden işleme; teslim/iade gibi yan etkiler ikinci kez tetiklenmesin.
-        for _h in (order.get("cargo_status_history") or []):
-            if (str(_h.get("code") or "") == islem_kodu
-                    and str(_h.get("at") or "") == str(tarih)
-                    and str(_h.get("barkod") or "") == barkod):
-                return {"success": True, "matched": True, "duplicate": True,
-                        "order_id": order["id"], "order_number": order.get("order_number")}
-    if not order:
-        # Sessizce 200 dön — MNG retry yapmasın, sadece logla
-        await db.integration_logs.insert_one({
-            "id": generate_id(),
-            "service": "mng_kargo",
-            "event": "webhook_unknown_order",
-            "barkod": barkod,
-            "referans_no": referans_no,
-            "payload": payload,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
-        return {"success": True, "matched": False}
-
-    # Sipariş durumu mapping. DENETİM (bizlogic Y2/F6): "500" (kargo iadesi = teslim edilemeyip
-    # geri dönen paket) MÜŞTERİ İADESİ DEĞİL → order.status'u 'returned' YAPMA (stok/return kaydı
-    # olmadan sahte iade + ciro düşümü olurdu); yalnız cargo alanlarına yansır.
-    status_map = {
-        "100": ("preparing", "Şubeye Girdi"),
-        "200": ("shipped", "Transfere Alındı"),
-        "300": ("shipped", "Dağıtımda"),
-        "400": ("delivered", "Teslim Edildi"),
-        "500": (None, "Kargo İadesi (şubede)"),
-    }
-    new_status, _ = status_map.get(islem_kodu, (None, None))
-
-    update_set = {
-        "cargo_last_status_code": islem_kodu,
-        "cargo_last_status_text": islem_adi,
-        "cargo_last_event_at": tarih,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    # DENETİM Y2: terminal/geri-geçiş koruması — geç gelen kargo event'i iptal/iade/teslim
-    # edilmiş siparişi EZMESİN, delivered'ı shipped'e geri DÜŞÜRMESİN.
-    _cur_st = str(order.get("status") or "")
-    _TERMINAL = {"cancelled", "cancel_refunded", "refunded", "returned",
-                 "return_approved", "return_rejected", "delivered"}
-    _RANK = {"preparing": 1, "shipped": 2, "delivered": 3}
-    if new_status:
-        _allow = True
-        if _cur_st in _TERMINAL and not (new_status == "delivered" and _cur_st != "delivered"):
-            _allow = False
-        if _allow and _RANK.get(new_status, 0) < _RANK.get(_cur_st, 0):
-            _allow = False
-        if _allow:
-            update_set["status"] = new_status
-            if new_status == "delivered":
-                update_set["delivered_at"] = tarih
-
-    history_entry = {
-        "code": islem_kodu, "text": islem_adi, "at": tarih,
-        "barkod": barkod, "raw": payload,
-    }
-
-    await db.orders.update_one(
-        {"id": order["id"]},
-        {
-            "$set": update_set,
-            "$push": {"cargo_status_history": history_entry},
-        },
-    )
-
-    # Log'a yaz
-    await db.integration_logs.insert_one({
-        "id": generate_id(),
-        "service": "mng_kargo",
-        "event": "webhook_update",
-        "order_id": order["id"],
-        "order_number": order.get("order_number"),
-        "barkod": barkod,
-        "code": islem_kodu,
-        "text": islem_adi,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-
-    return {
-        "success": True,
-        "matched": True,
-        "order_id": order["id"],
-        "order_number": order.get("order_number"),
-        "new_status": new_status,
-    }
 
 
 def _render_label_barcode_png_b64(code: str, *, max_width_mm: float = 88.0,
@@ -5873,24 +5078,13 @@ async def get_cargo_label(order_id: str, current_user: dict = Depends(require_pe
     except Exception:
         pass
 
-    barkod = order.get("cargo_tracking_number") or ""
     cargo_obj = order.get("cargo") or {}
-    mng_siparis_no = cargo_obj.get("mng_siparis_no") or ""
-    mng_gonderi_no = cargo_obj.get("mng_gonderi_no") or ""
-    mng_nz_barkod = cargo_obj.get("mng_nz_barkod") or ""
-    # Tek barkod: NZ > GONDERI_NO > MNG_SIPARIS_NO > tracking > sipariş_no
-    real_kargo_takip = mng_nz_barkod or mng_gonderi_no or mng_siparis_no or barkod or ""
     siparis_no = str(order.get("order_number") or order_id)
-    # ✅ Barkod ÇUBUKLARI = SİPARİŞ NO (W10047). Depo/operasyon barkodu okutunca siparişi
-    # bulabilsin diye. Önceden çubuklar kargo takip no'yu (örn. 170553284) kodluyordu ama
-    # alttaki yazı sipariş no idi → okutunca sipariş no yerine takip no çıkıyordu.
+    # Barkod ÇUBUKLARI varsayılan = SİPARİŞ NO (depo/operasyon okutunca siparişi bulsun).
     main_barcode = siparis_no
-    # Kargo Takip yazısı etiket/barkod altından KALDIRILDI (kullanıcı talebi).
-    # Barkod çubukları + altındaki sipariş no zaten yeterli; ayrıca "Kargo Takip: ..." satırı basılmaz.
     tracking_line = ""
     sender = await _get_sender_info()
-    mng = await _get_mng_settings()
-    sender_company = mng.get("customer_code") or sender["name"] or ""
+    sender_company = sender["name"] or ""
     # Aras / PTT: etiket barkodu = taşıyıcının okuttuğu barkod (Aras parça barkodu / PTT 13 haneli
     # barkod). Şube bu barkodu okutur; altında sipariş no da basılı kalır (tracking_line).
     _cc_code = str(order.get("cargo_provider_code") or "").upper()
@@ -5898,7 +5092,6 @@ async def get_cargo_label(order_id: str, current_user: dict = Depends(require_pe
     if _cc_bc:
         main_barcode = str(_cc_bc)
         tracking_line = f"Sipariş No: {siparis_no}"
-        sender_company = sender["name"] or sender_company
     sender_addr_line = f"{sender['address']}, {sender['district']}/{sender['city']}".strip(" ,/")
 
     ship = order.get("shipping_address") or {}
@@ -5938,9 +5131,19 @@ async def get_cargo_label(order_id: str, current_user: dict = Depends(require_pe
         remarks = "Alıcı Ödemeli" if payment_method in ("cash_on_delivery", "kapida") else "Gönderici Ödemeli"
 
     # Kargo bilgileri (paylaşılan referans şablonuna göre)
-    cargo_company_display = "DHL E-Commerce"  # MNG ibaresi kaldırıldı
-    if _cc_bc:
-        cargo_company_display = "Aras Kargo" if _cc_code == "ARAS" else "PTT Kargo"
+    if _cc_code == "ARAS":
+        cargo_company_display = "Aras Kargo"
+    elif _cc_code == "PTT":
+        cargo_company_display = "PTT Kargo"
+    else:
+        # Eski kayıt (entegrasyonu kaldırılmış firma) → kayıtlı firma adı; yoksa varsayılan firma
+        cargo_company_display = order.get("cargo_provider_name") or cargo_obj.get("provider_name") or ""
+        if not cargo_company_display:
+            try:
+                from cargo_carriers import resolve_default_code as _rdc, CARRIERS as _CC
+                cargo_company_display = _CC[await _rdc(db)].name
+            except Exception:
+                cargo_company_display = "Aras Kargo"
     payment_method = (order.get("payment_method") or "").lower()
     is_kapida = payment_method in ("cash_on_delivery", "kapida")
     odeme_turu = "Kapıda Ödemeli" if is_kapida else "Peşin Ödemeli"
@@ -5966,59 +5169,6 @@ async def get_cargo_label(order_id: str, current_user: dict = Depends(require_pe
         tracking_line=tracking_line,
     )
     return HTMLResponse(content=html, headers={"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
-
-
-# ==================== MNG KARGO AYARLARI ====================
-# Bu ayarları integrations.py altındaki generic /{marketplace}/settings de yönetebilir,
-# ancak özelleştirilmiş alanlar için ayrı endpoint sağlıyoruz.
-
-@router.get("/cargo/mng-settings")
-async def get_mng_settings(current_user: dict = Depends(require_admin)):
-    """MNG Kargo ayarlarını döndür (şifre maskelenir)."""
-    import os as _os
-    s = await db.settings.find_one({"id": "mng_kargo"}, {"_id": 0}) or {}
-    return {
-        "customer_code": s.get("customer_code") or "",
-        "username": s.get("username") or _os.environ.get("MNG_USERNAME", ""),
-        "password": "********" if (s.get("password") or _os.environ.get("MNG_PASSWORD")) else "",
-        "tax_no": s.get("tax_no") or "6080712084",
-        "is_active": s.get("is_active", True),
-        "barkod_cikti_turu": s.get("barkod_cikti_turu") or "Standart",
-        "musteri_kodu_goster": s.get("musteri_kodu_goster", False),
-    }
-
-
-@router.post("/cargo/mng-settings")
-async def save_mng_settings(payload: dict, current_user: dict = Depends(require_admin)):
-    """MNG Kargo ayarlarını kaydet."""
-    update = {
-        "customer_code": payload.get("customer_code", ""),
-        "username": payload.get("username", ""),
-        "tax_no": payload.get("tax_no", ""),
-        "is_active": bool(payload.get("is_active", True)),
-        "barkod_cikti_turu": payload.get("barkod_cikti_turu", "Standart"),
-        "musteri_kodu_goster": bool(payload.get("musteri_kodu_goster", False)),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if payload.get("password") and payload.get("password") != "********":
-        # GÜVENLİK: MNG parolasını at-rest ŞİFRELE (_get_mng_settings okurken çözülür).
-        try:
-            from security.crypto import encrypt as _enc_secret
-            update["password"] = _enc_secret(payload.get("password"))
-        except Exception:
-            update["password"] = payload.get("password")
-    await db.settings.update_one({"id": "mng_kargo"}, {"$set": update}, upsert=True)
-    return {"success": True, "message": "MNG Kargo ayarları kaydedildi"}
-
-
-@router.post("/cargo/mng-test")
-async def test_mng_connection(current_user: dict = Depends(require_admin)):
-    """MNG Kargo bağlantı testi (Baglanti_Test)."""
-    import sys, os
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from mng_kargo_client import baglanti_test
-    import asyncio as _aio_mng
-    return await _aio_mng.to_thread(baglanti_test)
 
 
 # =============================================================================
@@ -6124,85 +5274,19 @@ async def get_payment_receipt(order_id: str, current_user: dict = Depends(requir
     return Response(content=raw, media_type=_ct or "application/octet-stream", headers=_headers)
 
 
-@router.post("/cargo/poll-now")
-async def cargo_poll_now(current_user: dict = Depends(require_admin)):
-    """Admin: DHL/MNG kargo durum taramasini hemen calistir (5 dk'lik job'in manuel tetigi)."""
-    try:
-        import sys, os
-        sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-        from scheduler import _dhl_cargo_poll_tick
-        await _dhl_cargo_poll_tick()
-        return {"success": True, "message": "DHL/MNG kargo taraması çalıştırıldı."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Tarama hatası: {e}")
-
-
-@router.get("/cargo/poll-health")
-async def cargo_poll_health(current_user: dict = Depends(require_admin)):
-    """Admin: DHL/MNG kargo durum taraması sağlık/izleme bilgisi.
-
-    Ayarlar > Kargo sayfasındaki izleme paneli bu veriyi gösterir: son çalışma
-    zamanı, sonuç (running/ok/skipped/error), sorgulanan/değişen sipariş sayıları,
-    son hata mesajı, ortalama süre ve MNG/DHL ayarlarının aktif olup olmadığı.
-    Senkron hiç çalışmadıysa status='unknown' döner (panel bunu uyarı olarak gösterir).
-    """
-    h = await db.settings.find_one({"id": "dhl_poll_health"}, {"_id": 0}) or {}
-    mng = await _get_mng_settings()
-    # Günlük limit bayrağı mng_kargo ayar dokümanında saklanır (poll + backfill ortak kullanır).
-    _mng_lim = await db.settings.find_one({"id": "mng_kargo"}, {"_id": 0, "daily_limit_hit_at": 1}) or {}
-    _lim_at = _mng_lim.get("daily_limit_hit_at") or ""
-    _lim_today = False
-    if _lim_at:
-        try:
-            _lim_today = datetime.fromisoformat(_lim_at).date() == datetime.now(timezone.utc).date()
-        except Exception:
-            _lim_today = False
-    hist = list(reversed(h.get("history") or []))[:20]  # yeni → eski
-    return {
-        "ok": True,
-        "interval_min": h.get("interval_min", 5),
-        "status": h.get("status") or "unknown",
-        "last_run_at": h.get("last_run_at"),
-        "last_finish_at": h.get("last_finish_at"),
-        "updated_at": h.get("updated_at"),
-        "processed": h.get("processed", 0),
-        "matched": h.get("matched", 0),
-        "last_note": h.get("last_note", ""),
-        "shipped": h.get("shipped", 0),
-        "delivered": h.get("delivered", 0),
-        "updated": h.get("updated", 0),
-        "errors": h.get("errors", 0),
-        "duration_ms": h.get("duration_ms", 0),
-        "last_error": h.get("last_error", ""),
-        "skipped_reason": h.get("skipped_reason", ""),
-        "daily_limit": bool(h.get("daily_limit")) or _lim_today,
-        "daily_limit_hit_at": _lim_at,
-        "mng_active": bool(mng.get("is_active")),
-        "mng_user_set": bool(mng.get("username")),
-        "history": hist,
-    }
-
-
 # =============================================================================
-# Faz 4 — Müşteri iadesi (14 gün) + DHL/MNG iade barkodu (3 gün geçerli)
+# Faz 4 — Müşteri iadesi (14 gün) + iade kodu/barkodu (3 gün geçerli)
 # Veri: db.customer_returns + order.return_request (özet)
 # =============================================================================
-# Anlaşmalı kargo (MNG/DHL E-Commerce) müşteri/sözleşme numarası.
+# Anlaşmalı kargo müşteri/sözleşme numarası.
 # Müşteri HER İADEDE bu numarayı yedek olarak görür; per-gönderi barkod tanınmazsa
 # en yakın şubeye bu numarayla teslim edebilir (gönderi bizim sözleşmemize işlenir).
-# Firma-özel: kodda sabit YOK. Kaynak: settings.mng_kargo.return_contract_no → env RETURN_CONTRACT_NO.
+# Firma-özel: kodda sabit YOK. Kaynak: env RETURN_CONTRACT_NO.
 RETURN_CONTRACT_NO = os.environ.get("RETURN_CONTRACT_NO", "").strip()
 
 
 async def _return_contract_no() -> str:
-    """Anlaşmalı kargo iade sözleşme no'su (admin ayarı → env). Boşsa "" (müşteriye gösterilmez)."""
-    try:
-        s = await db.settings.find_one({"id": "mng_kargo"}, {"_id": 0, "return_contract_no": 1}) or {}
-        v = str(s.get("return_contract_no") or "").strip()
-        if v:
-            return v
-    except Exception:
-        pass
+    """Anlaşmalı kargo iade sözleşme no'su (env). Boşsa "" (müşteriye gösterilmez)."""
     return RETURN_CONTRACT_NO
 
 
@@ -6253,14 +5337,13 @@ def _public_return(rec: dict) -> dict:
         "id": rec.get("id"),
         "order_number": rec.get("order_number"),
         "return_code": rec.get("return_code"),
-        "iade_no": rec.get("iade_no") or rec.get("mng_ref") or "",
+        "iade_no": rec.get("iade_no") or rec.get("mng_ref") or "",   # mng_ref: eski kayıtlar
         "gonderi_no": rec.get("gonderi_no") or "",
         "contract_no": rec.get("contract_no") or RETURN_CONTRACT_NO,
         "company_address": rec.get("company_address") or "",
         "status": status,
         "valid_until": rec.get("valid_until"),
         "cargo_provider_name": rec.get("cargo_provider_name"),
-        "mng_ok": rec.get("mng_ok", False),
         "items": rec.get("items") or [],
         "reason": rec.get("reason", ""),
         "created_at": rec.get("created_at"),
@@ -6273,11 +5356,11 @@ async def _ensure_return_email_template():
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
     from email_layout import email_shell, info_row
-    SENTINEL = "<!--store-email-v4-->"
+    SENTINEL = "<!--store-email-v5-->"
     body = SENTINEL + email_shell(
         icon="↩", eyebrow="İADE", title="İade talebin oluşturuldu",
         intro_html=("Merhaba {customer_name}, {order_number} numaralı siparişin için iade talebin oluşturuldu. "
-                    "Ürünü en yakın DHL / MNG şubesine aşağıdaki kodu veya barkodu göstererek teslim edebilirsin."),
+                    "Ürünü anlaşmalı kargo firmamızın ({cargo_provider}) en yakın şubesine aşağıdaki kodu veya barkodu göstererek teslim edebilirsin."),
         body_html=(info_row("İade Kargo Kodu", "{return_code}")
                    + info_row("İade No", "{iade_no}")
                    + info_row("Anlaşmalı No (yedek)", "{contract_no}")
@@ -6323,11 +5406,16 @@ async def _notify_return(order: dict, code: str, valid_until: str, barcode_img: 
             vu = datetime.fromisoformat(valid_until).strftime("%d.%m.%Y %H:%M")
         except Exception:
             vu = valid_until
+        try:  # iade şubesi = güncel varsayılan kargo firması (siparişin eski firması değil)
+            from cargo_carriers import resolve_default_code as _rdc, CARRIERS as _CC
+            _ret_cargo = _CC[await _rdc(db)].name
+        except Exception:
+            _ret_cargo = "Aras Kargo"
         await send_notification(
             db, "order_return_requested",
             to_phone=addr.get("phone") or order.get("phone"),
             to_email=addr.get("email") or order.get("email"),
-            variables=await _order_notify_vars(order, return_code=code, iade_no=iade_no or code, contract_no=await _return_contract_no(), valid_until=vu, return_barcode_img=barcode_img),
+            variables=await _order_notify_vars(order, return_code=code, iade_no=iade_no or code, contract_no=await _return_contract_no(), valid_until=vu, return_barcode_img=barcode_img, cargo_provider=_ret_cargo),
             channels=ch,
         )
     except Exception as e:
@@ -6335,7 +5423,7 @@ async def _notify_return(order: dict, code: str, valid_until: str, barcode_img: 
 
 
 async def _effective_delivered_at(order: dict):
-    """Gerçek teslim tarihi varsa onu döndür. YOKSA fallback: MNG/DHL kargo durum senkronu bazen
+    """Gerçek teslim tarihi varsa onu döndür. YOKSA fallback: kargo durum senkronu bazen
     teslimatı HİÇ raporlamıyor (kargo_statu 0 / "İşlem Yapılmadı"da takılı) → sipariş 'preparing'de
     kalıp `delivered_at` boş kalıyor ve müşteri teslim aldığı hâlde İADE AÇAMIYOR. Bu durumda:
     ödenmiş + yeterince eski (kargoya verilme/sipariş tarihinden İşletme-Kuralı eşiği kadar gün geçmiş)
@@ -6375,7 +5463,7 @@ async def _effective_delivered_at(order: dict):
 
 async def _build_return_for_order(order: dict, payload: dict, actor: dict) -> dict:
     """İade talebi ÇEKİRDEĞİ — üye ve misafir uçları aynı mantığı kullanır.
-    14 gün penceresi (teslimden) + 3 gün kod geçerliliği + DHL/MNG iade kodu/barkod + kayıt + bildirim.
+    14 gün penceresi (teslimden) + 3 gün kod geçerliliği + iade kodu/barkod + kayıt + bildirim.
     actor: log için {email,id,...} (üye current_user ya da misafir için sentetik)."""
     # --- 14 gün penceresi (teslim anından itibaren, 1 sn bile geçse engelle) ---
     # delivered_at boşsa: kargo senkronu teslimatı raporlamamış olabilir → varsayılan-teslim fallback.
@@ -6464,8 +5552,12 @@ async def _build_return_for_order(order: dict, payload: dict, actor: dict) -> di
     iade_no = f"IW{order.get('order_number', '')}{rid[:6]}".replace(" ", "")
     icerik = "IADE - " + "; ".join(f"{i['quantity']}x {i['name']}" for i in items)
     warehouse = await _get_sender_info()
-    cargo_name = "DHL E-Commerce"
-    gonderi_no, mng_ok = await _create_return_shipment(
+    try:
+        from cargo_carriers import resolve_default_code as _rdc, CARRIERS as _CC
+        cargo_name = _CC[await _rdc(db)].name
+    except Exception:
+        cargo_name = "Aras Kargo"
+    gonderi_no, _ship_ok = await _create_return_shipment(
         iade_no, float(order.get("total") or 0), icerik, warehouse
     )
     return_code = gonderi_no or iade_no
@@ -6479,7 +5571,7 @@ async def _build_return_for_order(order: dict, payload: dict, actor: dict) -> di
         "return_code": return_code, "iade_no": iade_no, "gonderi_no": gonderi_no,
         "contract_no": await _return_contract_no(),
         "company_address": _company_return_address(warehouse),
-        "mng_ref": iade_no, "mng_ok": mng_ok, "cargo_provider_name": cargo_name,
+        "cargo_provider_name": cargo_name,
         "barcode_png_b64": png_b64, "status": "created",
         "created_at": now_iso, "valid_until": valid_until,
         "guest": bool(not (actor or {}).get("id")),
@@ -7948,36 +7040,11 @@ async def update_return_approval(return_id: str, payload: dict,
 # ============================================================================
 
 async def _create_return_shipment(ref: str, kiymet: float, icerik: str, recipient: dict):
-    """Parametrik MNG/DHL iade gönderisi (best-effort). recipient = ŞİRKET (alıcı) adresi.
-    Gönderi MNG'ye 'IW…' sipariş no (iade no) ile kaydedilir → şube barkodu okutunca paket bize gelir.
-    Dönüş: (gonderi_no, mng_ok). gonderi_no = MNG'nin ürettiği GERÇEK (taranabilir) gönderi no/barkod;
-    üretilemezse "" döner (çağıran taraf iade no'ya / anlaşmalı no'ya düşmeye karar verir)."""
-    gonderi_no = ""   # gerçek gönderi no/barkod; MNG üretemezse boş — sahte iç kod ASLA döndürülmez
-    mng_ok = False
-    try:
-        import sys, os, asyncio as _aio
-        sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-        from mng_kargo_client import create_shipment as mng_create
-        s = await _get_mng_settings()
-        if s.get("is_active") and recipient.get("address") and recipient.get("city"):
-            res = await _aio.to_thread(
-                mng_create,
-                username=s["username"], password=s["password"],
-                siparis_no=ref, kiymet=float(kiymet or 0),
-                icerik=(icerik or "IADE")[:200],
-                hizmet_sekli="NORMAL", teslim_sekli=1, al_sms=0, gn_sms=0,
-                parca_list="1:1:20:30:15:;",
-                alici_ad=recipient.get("name", ""), odeme_sekli="GO", adres_farkli="0",
-                il=recipient["city"], ilce=recipient.get("district", ""), adres=recipient["address"],
-                tel_cep=recipient.get("phone", ""), email="", kapida_odeme=0,
-                platform_adi="", platform_kodu="",
-            )
-            if res.get("ok") and res.get("barkod"):
-                gonderi_no = str(res["barkod"]).strip()
-                mng_ok = True
-    except Exception as e:
-        logger.warning(f"return shipment create failed: {e}")
-    return gonderi_no, mng_ok
+    """İade / geri gönderim kargo kaydı (best-effort). Aras Kargo / PTT Kargo entegrasyonlarında
+    müşteri→depo iade gönderisi API ile ÖNCEDEN açılmaz: müşteri paketi iade kodu (IW…) ile
+    anlaşmalı kargo şubesine teslim eder. Dönüş: (gonderi_no, ok) → her zaman ("", False);
+    çağıran taraf iade no'ya / anlaşmalı no'ya düşer (sahte iç kod ASLA döndürülmez)."""
+    return "", False
 
 
 async def _within_return_window(order: dict) -> bool:
@@ -8018,7 +7085,7 @@ async def reissue_return_barcode(return_id: str,
     iade_no = rec.get("iade_no") or rec.get("mng_ref") or f"IW{rec.get('order_number','')}{generate_id()[:6]}".replace(" ", "")
     icerik = "IADE - " + "; ".join(f"{i.get('quantity',1)}x {i.get('name','Ürün')}" for i in items)
     warehouse = await _get_sender_info()
-    gonderi_no, mng_ok = await _create_return_shipment(iade_no, order.get("total") or 0, icerik, warehouse)
+    gonderi_no, ship_ok = await _create_return_shipment(iade_no, order.get("total") or 0, icerik, warehouse)
     code = gonderi_no or iade_no
     png_b64 = _render_return_barcode_png_b64(code)
     now = datetime.now(timezone.utc)
@@ -8027,7 +7094,7 @@ async def reissue_return_barcode(return_id: str,
         "return_code": code, "iade_no": iade_no, "gonderi_no": gonderi_no,
         "contract_no": await _return_contract_no(),
         "company_address": _company_return_address(warehouse),
-        "mng_ref": iade_no, "mng_ok": mng_ok, "barcode_png_b64": png_b64,
+        "barcode_png_b64": png_b64,
         "valid_until": valid_until, "updated_at": now.isoformat(),
         "status": "created" if rec.get("status") in (None, "created", "in_transit") else rec.get("status"),
     }})
@@ -8043,7 +7110,7 @@ async def reissue_return_barcode(return_id: str,
                    f'alt="{code}" style="height:90px"/></div>' if _base else "")
     _spawn(_notify_return(order, code, valid_until, barcode_img, iade_no=iade_no))
 
-    return {"success": True, "return_code": code, "mng_ok": mng_ok, "valid_until": valid_until}
+    return {"success": True, "return_code": code, "carrier_ok": ship_ok, "valid_until": valid_until}
 
 
 @router.post("/returns/{return_id}/reject")
@@ -8073,7 +7140,7 @@ async def reject_return(return_id: str, payload: dict,
             "district": addr.get("district", ""), "address": addr.get("address", ""),
         }
         ref = f"RET{rec.get('order_number','')}{generate_id()[:6]}".replace(" ", "")
-        _rgn, _mng = await _create_return_shipment(ref, order.get("total") or 0, "IADE RED - geri gonderim", recipient)
+        _rgn, _ok = await _create_return_shipment(ref, order.get("total") or 0, "IADE RED - geri gonderim", recipient)
         reship_code = _rgn or ref
 
     rejection = {
@@ -9131,7 +8198,7 @@ async def reship_return(return_id: str, payload: Optional[dict] = Body(default=N
         "district": addr.get("district", ""), "address": addr.get("address", ""),
     }
     ref = f"RET{rec.get('order_number','')}{generate_id()[:6]}".replace(" ", "")
-    _rgn, _mng = await _create_return_shipment(ref, order.get("total") or 0, "IADE RED - geri gonderim", recipient)
+    _rgn, _ok = await _create_return_shipment(ref, order.get("total") or 0, "IADE RED - geri gonderim", recipient)
     reship_code = _rgn or ref
     now_iso = datetime.now(timezone.utc).isoformat()
     await db.customer_returns.update_one({"id": return_id}, {"$set": {

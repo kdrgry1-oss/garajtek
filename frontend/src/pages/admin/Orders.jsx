@@ -83,10 +83,8 @@ const statusOptions = [
   { value: "payment_failed", label: "Ödeme Alınamadı (para alınmadı)", class: "status-undelivered" },
 ];
 
+// Elle "Kargoya Ver" modalı: yalnız entegre firmalar (Aras / PTT)
 const cargoCompanies = [
-  { value: "MNG", label: "DHL E-Commerce" },
-  { value: "DHL", label: "DHL" },
-  { value: "YURTICI", label: "Yurtiçi Kargo" },
   { value: "ARAS", label: "Aras Kargo" },
   { value: "PTT", label: "PTT Kargo" },
 ];
@@ -154,12 +152,12 @@ export default function AdminOrders({ unpaidView = false }) {
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState(null);
   const [bulkAction, setBulkAction] = useState("");
-  const [selectedCargo, setSelectedCargo] = useState("MNG");
+  const [selectedCargo, setSelectedCargo] = useState("ARAS");
   // Varsayılan kargo firması (Kargo Ayarları) → toplu barkod / kargoya ver modalının başlangıç seçimi
   useEffect(() => {
     axios.get(`${API}/cargo-carriers`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       .then(({ data }) => { if (data?.default_carrier) setSelectedCargo(data.default_carrier); })
-      .catch(() => { /* ayar okunamazsa MNG kalır */ });
+      .catch(() => { /* ayar okunamazsa Aras kalır */ });
   }, []);
   const [shipModalOpen, setShipModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -437,22 +435,6 @@ export default function AdminOrders({ unpaidView = false }) {
       toast.error("Kargo işlemi başarısız");
     }
   };
-
-  const handleCreateMngShipment = async (orderId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(
-        `${API}/orders/${orderId}/create-mng-shipment`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success(res.data.message || `DHL E-Commerce kargo barkodu: ${res.data.tracking_number}`);
-      fetchOrders();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "DHL E-Commerce oluşturulamadı");
-    }
-  };
-
 
   const handlePrintLabel = async (orderId) => {
     try { await openAdminDocument(`/orders/${orderId}/cargo-label`, 'width=400,height=600', true); }
@@ -1342,8 +1324,8 @@ export default function AdminOrders({ unpaidView = false }) {
                     <td>
                       {(() => {
                         const c = order.cargo || {};
-                        const barcodeNo = order.cargo_barcode_number || c.mng_siparis_no || ""; // bizim barkodumuz — takip no DEĞİL
-                        // Gerçek kargo takip no: kargo firması gönderi numarası (NZ / GONDERI_NO) — barkod hariç
+                        const barcodeNo = order.cargo_barcode_number || c.mng_siparis_no || ""; // bizim barkodumuz — takip no DEĞİL (mng_*: eski kayıtlar)
+                        // Gerçek kargo takip no — barkod hariç (mng_* alanları: entegrasyonu kaldırılmış eski kayıtlar, yalnız görüntüleme)
                         let trk = order.cargo_gonderi_no || c.mng_nz_barkod || c.mng_nz_gonderi_no || c.mng_gonderi_no || "";
                         if (!trk) {
                           const ctn = order.cargo_tracking_number || c.tracking_number || "";
@@ -1582,7 +1564,7 @@ export default function AdminOrders({ unpaidView = false }) {
                     Faturayı Sıfırla
                   </button>
                 )}
-                {/* Kargo: firma seç → barkod oluştur / takibi yenile / iptal (MNG-DHL, Aras, PTT) */}
+                {/* Kargo: firma seç → barkod oluştur / takibi yenile / iptal (Aras, PTT) */}
                 <OrderCargoActions
                   order={selectedOrder}
                   onChanged={async () => {
@@ -1593,7 +1575,7 @@ export default function AdminOrders({ unpaidView = false }) {
                     } catch { /* detay tazelenemezse liste yine güncellenir */ }
                   }}
                 />
-                {/* Kargo oluşturma (DHL E-Commerce / Manuel Kargo) ve 'Onay SMS' butonları
+                {/* Eski kargo oluşturma / Manuel Kargo ve 'Onay SMS' butonları
                     kaldırıldı — istek üzerine. Kargo takip no VARSA etiket + kargo SMS kalır. */}
                 {(selectedOrder.cargo?.tracking_number || selectedOrder.cargo_tracking_number) && (
                   <>

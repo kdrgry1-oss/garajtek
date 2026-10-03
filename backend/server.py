@@ -225,6 +225,16 @@ async def lifespan(app: FastAPI):
         except Exception as _lpe:
             logger.error(f"[legal-pages] hata: {_lpe}")
 
+        # KARGO: yalnız Aras Kargo / PTT Kargo desteklenir. Kayıtlı aktif/varsayılan firma eski bir
+        # entegrasyonsa (ör. MNG/DHL eCommerce) varsayılanı Aras'a çevir. İdempotent; kayıt silmez.
+        try:
+            from cargo_carriers.registry import migrate_legacy_default as _cargo_mig
+            _cm = await _cargo_mig(db)
+            if any(_cm.values()):
+                logger.warning(f"[kargo-migrasyon] varsayilan kargo firmasi guncellendi: {_cm}")
+        except Exception as _cme:
+            logger.error(f"[kargo-migrasyon] hata: {_cme}")
+
         # Create indexes
         await db.products.create_index("slug")
         await db.products.create_index("stock_code")
@@ -570,7 +580,7 @@ _docs_enabled = os.environ.get("ENABLE_API_DOCS", "").strip() == "1" or \
 app = FastAPI(
     title="E-Commerce API",
     version="3.0",
-    description="Modular E-Commerce API with Iyzico, MNG/Aras/PTT Kargo and e-invoice integrations",
+    description="Modular E-Commerce API with Iyzico, Aras/PTT Kargo and e-invoice integrations",
     lifespan=lifespan,
     docs_url="/docs" if _docs_enabled else None,
     redoc_url="/redoc" if _docs_enabled else None,
@@ -720,7 +730,7 @@ api_router.include_router(stock_notify_router)
 from routes.payment import router as payment_router
 api_router.include_router(payment_router)
 
-# Çoklu kargo firması (MNG/DHL + Aras Kargo + PTT Kargo) — cargo_carriers/
+# Kargo firmaları (Aras Kargo + PTT Kargo) — cargo_carriers/
 from routes.cargo_carriers import router as cargo_carriers_router
 api_router.include_router(cargo_carriers_router)
 

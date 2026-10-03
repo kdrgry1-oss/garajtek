@@ -138,7 +138,7 @@ RULE_CATALOG = [
              "Yalnız site siparişlerine uygulanır. GİB reddederse ANINDA KAPATIN (deploy gerekmez)."},
     {"group": "İade & Değişim", "key": "return.presume_delivered_after_days", "label": "Varsayılan teslim (kargo durumu gelmezse)",
      "type": "number", "default": 5, "unit": "gün", "options": [3, 4, 5, 7, 10],
-     "help": "Kargo firması teslimat durumunu raporlamazsa (MNG/DHL statü takılırsa), kargoya "
+     "help": "Kargo firması teslimat durumunu raporlamazsa (statü takılırsa), kargoya "
              "verilme/sipariş tarihinden bu kadar gün geçmiş ÖDENMİŞ siparişler teslim edilmiş "
              "sayılır → müşteri iade başlatabilir (admin yine onaylar). 0 = kapalı."},
 

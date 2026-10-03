@@ -20,7 +20,7 @@ const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("toke
 /**
  * Entegrasyonlar — yalnız mağazanın kullandığı servisler:
  *   • Ödeme: iyzico (kart), Havale/EFT, Kapıda ödeme (Ödeme Tipleri)
- *   • Kargo: DHL E-Commerce (MNG), Aras Kargo, PTT Kargo (Ayarlar → Kargo Firmaları)
+ *   • Kargo: Aras Kargo, PTT Kargo (Ayarlar → Kargo Firmaları)
  *   • e-Fatura / e-Arşiv: BirFatura
  *   • Reklam pikselleri + CAPI (Meta / TikTok / Google)
  *   • SMS + İYS (NetGSM)
@@ -140,7 +140,7 @@ export default function Integrations() {
       items: [
         {
           id: "cargo",
-          name: "DHL E-Commerce (MNG) · Aras Kargo · PTT Kargo",
+          name: "Aras Kargo · PTT Kargo",
           description: "Gönderi oluşturma, etiket, takip ve iade kargosu ayarları.",
           icon: <Truck className="w-7 h-7" />,
           link: "/admin/ayarlar?tab=cargo",

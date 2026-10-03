@@ -83,7 +83,6 @@ PERMISSION_TREE = [
         "children": [
             {"key": "integrations.view", "label": "Görüntüle"},
             {"key": "integrations.iyzico", "label": "Iyzico Yapılandır"},
-            {"key": "integrations.mng", "label": "MNG Kargo"},
             {"key": "integrations.netgsm", "label": "NetGSM SMS"},
             {"key": "integrations.birfatura", "label": "BirFatura e-Fatura/e-Arşiv"},
         ],

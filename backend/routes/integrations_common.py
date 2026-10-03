@@ -201,7 +201,7 @@ async def restore_xml_missing_products_once():
 
 ALLOWED_PROVIDERS = {
     # kargo sağlayıcıları
-    "mng", "aras", "ptt", "ups", "dhl",
+    "aras", "ptt",
 }
 @router.get("/{marketplace}/settings")
 async def get_marketplace_settings(marketplace: str, current_user: dict = Depends(require_admin)):
@@ -314,7 +314,7 @@ async def test_marketplace_connection(marketplace: str, current_user: dict = Dep
         pass
 
     try:
-        if marketplace in {"mng", "aras", "ptt"}:
+        if marketplace in {"aras", "ptt"}:
             user = (settings.get("username") or "").strip()
             pw = (settings.get("password") or "").strip()
             key = (settings.get("api_key") or "").strip()

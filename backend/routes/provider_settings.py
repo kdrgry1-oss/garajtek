@@ -4,8 +4,9 @@ provider_settings.py — Kargo Entegratör Ayarları
 =============================================================================
 
 AMAÇ:
-  Yöneticinin kargo firmaları arasından istediğini seçip, sadece o entegratörün gerektirdiği
-  bilgileri girip sisteme entegre edebilmesi için ayar altyapısı.
+  Yöneticinin desteklenen kargo firmalarından (yalnız Aras Kargo ve PTT Kargo) istediğini seçip,
+  sadece o entegratörün gerektirdiği bilgileri girip sisteme entegre edebilmesi için ayar altyapısı.
+  Eski (kaldırılmış) entegrasyonlara ait kayıtlı veriler silinmez; yalnız yok sayılır.
 
 NASIL ÇALIŞIR?
   - Her provider için "schema" (alanlar + validasyon ipucu) tanımlıdır.
@@ -13,9 +14,10 @@ NASIL ÇALIŞIR?
   - Kayıt: `providers_config` koleksiyonunda tek bir döküman tutulur:
       {
         "kind": "cargo",
-        "active_provider": "mng",
+        "active_provider": "aras",
         "providers": {
-          "mng": {<credentials>},
+          "aras": {<credentials>},
+          "ptt": {<credentials>},
           ...
         }
       }
@@ -65,20 +67,6 @@ def _f(key, label, type="text", required=False, placeholder="", help=None, optio
 
 
 CARGO_PROVIDERS = {
-    "mng": {
-        "name": "DHL E-Commerce",
-        "website": "https://www.mngkargo.com.tr",
-        "description": "DHL E-Commerce (eski MNG Kargo) API entegrasyonu.",
-        "fields": [
-            _f("customer_number", "Müşteri Numarası", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("identity_type", "Kimlik Tipi", placeholder="1 (TCKN) / 2 (VKN)"),
-            _f("identity_no", "Kimlik No"),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
     # Aras / PTT: CANLI SOAP entegrasyonu (backend/aras_kargo_client.py, ptt_kargo_client.py,
     # cargo_carriers/). Alan anahtarları cargo_carriers/registry.py tarafından okunur.
     "aras": {
@@ -138,78 +126,6 @@ CARGO_PROVIDERS = {
                options=[{"value": "", "label": "Hayır (PTT'de kayıtlı bilgi)"}, {"value": "true", "label": "Evet (Mağaza bilgileri)"}]),
             _f("default_desi", "Varsayılan Desi", type="number", placeholder="1"),
             _f("default_kg", "Varsayılan Ağırlık (kg)", type="number", placeholder="1"),
-        ],
-    },
-    "sendeo": {
-        "name": "Sendeo",
-        "website": "https://sendeo.com.tr",
-        "description": "Sendeo Kargo entegrasyonu.",
-        "fields": [
-            _f("customer_code", "Müşteri Kodu", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "kolay-gelsin": {
-        "name": "Kolay Gelsin",
-        "website": "https://www.kolaygelsin.com",
-        "description": "Kolay Gelsin Kargo.",
-        "fields": [
-            _f("customer_code", "Müşteri Kodu", required=True),
-            _f("api_key", "API Key", type="password", required=True),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "dhl": {
-        "name": "DHL Express",
-        "website": "https://www.dhl.com",
-        "description": "DHL Express uluslararası kargo API entegrasyonu.",
-        "fields": [
-            _f("account_number", "Hesap Numarası", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "ups": {
-        "name": "UPS",
-        "website": "https://www.ups.com",
-        "description": "UPS kargo entegrasyonu.",
-        "fields": [
-            _f("account_number", "Hesap Numarası", required=True),
-            _f("access_key", "Access Key", type="password", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "fedex": {
-        "name": "FedEx",
-        "website": "https://www.fedex.com",
-        "description": "FedEx kargo API entegrasyonu.",
-        "fields": [
-            _f("account_number", "Hesap Numarası", required=True),
-            _f("api_key", "API Key", type="password", required=True),
-            _f("api_secret", "API Secret", type="password", required=True),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
-        ],
-    },
-    "tnt": {
-        "name": "TNT",
-        "website": "https://www.tnt.com",
-        "description": "TNT uluslararası kargo.",
-        "fields": [
-            _f("account_number", "Hesap Numarası", required=True),
-            _f("username", "Kullanıcı Adı", required=True),
-            _f("password", "Şifre", type="password", required=True),
-            _f("env", "Ortam", type="select", required=True,
-               options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
         ],
     },
 }
@@ -316,7 +232,12 @@ async def get_schemas(kind: str, current_user: dict = Depends(require_admin)):
 async def get_config(kind: str, current_user: dict = Depends(require_admin)):
     """Kayıtlı active_provider + per-provider credential map döner.
     Y14: Gizli alanlar (şifre/api anahtarı) maskelenir ('********'); düz metin sızmaz."""
-    doc = await _get_config_doc(kind)
+    doc = dict(await _get_config_doc(kind))
+    # Eski (kaldırılmış) firmalara ait kayıtlar DB'de korunur ama panele dönmez.
+    valid_keys = set(PROVIDERS_BY_KIND[kind].keys())
+    doc["providers"] = {k: v for k, v in (doc.get("providers") or {}).items() if k in valid_keys}
+    if doc.get("active_provider") and doc["active_provider"] not in valid_keys:
+        doc["active_provider"] = None
     return _mask_config_doc(kind, doc)
 
 
@@ -350,6 +271,11 @@ async def save_config(kind: str, payload: dict,
                     pval[fk] = cur.get(fk)
                 else:
                     pval.pop(fk, None)
+
+    # Eski (kaldırılmış) entegrasyonlara ait kayıtlı veriler silinmesin: olduğu gibi geri yaz.
+    for pkey, pval in _existing_providers.items():
+        if pkey not in valid_keys:
+            providers.setdefault(pkey, pval)
 
     # A1.1: Gizli alanları AT-REST ŞİFRELE (düz metin disk/DB'ye yazılmasın).
     # Maske-koruma yukarıda mevcut (zaten şifreli) değeri geri yazmış olabilir;
@@ -404,8 +330,8 @@ async def test_connection(kind: str, payload: dict,
         return {"success": False, "message": "Eksik alan(lar): " + ", ".join(missing),
                 "missing": missing}
 
-    # Canlı entegrasyonu olan kargo firmaları (MNG/DHL, Aras, PTT): gerçek SOAP bağlantı testi.
-    if kind == "cargo" and provider_key in ("mng", "aras", "ptt"):
+    # Canlı entegrasyonu olan kargo firmaları (Aras, PTT): gerçek SOAP bağlantı testi.
+    if kind == "cargo" and provider_key in ("aras", "ptt"):
         from routes.cargo_carriers import test_carrier as _cc_test
         return await _cc_test(provider_key, {"config": config}, current_user)
 

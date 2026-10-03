@@ -632,8 +632,7 @@ async def send_test_template(req: TestTemplateReq, current_user: dict = Depends(
     )
     cargo = order.get("cargo") or {}
     real_tn = (
-        cargo.get("mng_nz_barkod") or cargo.get("mng_nz_gonderi_no")
-        or cargo.get("mng_gonderi_no") or order.get("cargo_tracking_number") or ""
+        order.get("cargo_tracking_number") or cargo.get("tracking_number") or ""
     ).strip()
     track_link = cargo.get("tracking_link") or order.get("cargo_tracking_url") or ""
     ev_name = next((e["name"] for e in DEFAULT_EVENTS if e["key"] == req.event), req.event)
@@ -646,7 +645,7 @@ async def send_test_template(req: TestTemplateReq, current_user: dict = Depends(
         "tracking_number": real_tn,
         "tracking_link": track_link,
         "tracking_url": track_link,
-        "cargo_provider": cargo.get("provider_name") or order.get("cargo_provider_name") or "MNG Kargo",
+        "cargo_provider": cargo.get("provider_name") or order.get("cargo_provider_name") or "Aras Kargo",
         "amount": float(order.get("total") or 0),
         "total": float(order.get("total") or 0),
         "status_label": ev_name,

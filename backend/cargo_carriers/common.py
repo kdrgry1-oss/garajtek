@@ -1,8 +1,7 @@
 """
 cargo_carriers/common.py — Kargo istemcilerinin (Aras / PTT) ortak yardımcıları.
 
-  - SOAP isteği gönderme (httpx, senkron; çağıran taraf asyncio.to_thread ile çalıştırır,
-    mng_kargo_client.py'deki desenle aynı)
+  - SOAP isteği gönderme (httpx, senkron; çağıran taraf asyncio.to_thread ile çalıştırır)
   - XML kaçış / ad-alanından bağımsız etiket okuma
   - Telefon normalizasyonu (10 hane, başında 0 yok)
   - İl adı normalizasyonu (il_mapping.IL_CODE_TO_NAME — plaka kodu veya serbest yazım → resmî ad)
@@ -160,7 +159,7 @@ def clip(s, n: int) -> str:
 
 
 def is_cod_order(order: dict) -> bool:
-    """Kapıda ödeme siparişi mi? (orders.py MNG akışıyla aynı ölçüt)."""
+    """Kapıda ödeme siparişi mi? ."""
     pm = str(order.get("payment_method") or "").lower()
     return pm in ("cash_on_delivery", "kapida", "kapida_odeme", "cod")
 

@@ -41,13 +41,9 @@ def db(tmp_path, monkeypatch):
     async def _order_notify_vars(order, **extra):
         return dict(extra)
 
-    async def _get_mng_settings():
-        return {"username": "mnguser", "password": "x", "env": "test", "is_active": True}
-
     orders_stub._get_sender_info = _get_sender_info
     orders_stub._log_order_event = _log_order_event
     orders_stub._order_notify_vars = _order_notify_vars
-    orders_stub._get_mng_settings = _get_mng_settings
     ps_stub = types.ModuleType("routes.provider_settings")
     ps_stub.decrypt_provider_doc = lambda kind, doc: doc
     routes_pkg = sys.modules.get("routes") or types.ModuleType("routes")
@@ -85,14 +81,18 @@ PTT_CFG = {"ptt": {"customer_number": "900000001", "password": "s", "env": "test
 # --------------------------------------------------------------------------- registry
 def test_normalize_and_lookup():
     assert normalize_code("aras") == "ARAS" and normalize_code("Aras Kargo") == "ARAS"
-    assert normalize_code("ptt") == "PTT" and normalize_code("DHL") == "MNG"
+    assert normalize_code("ptt") == "PTT" and normalize_code("PTT Kargo") == "PTT"
     assert get_carrier("ptt").name == "PTT Kargo"
     assert get_carrier("yurtici") is None
+    # Yalnız Aras + PTT: kaldırılan entegrasyonlar kayıt defterinde yok
+    assert sorted(registry.CARRIERS) == ["ARAS", "PTT"]
+    for legacy in ("MNG", "mng", "DHL", "dhl_ecommerce", "sendeo", "kolay-gelsin", "UPS", "fedex", "tnt"):
+        assert get_carrier(legacy) is None, legacy
 
 
 def test_default_carrier_resolution(db):
     async def go():
-        assert await registry.resolve_default_code(db) == "MNG"          # hiçbir ayar yok
+        assert await registry.resolve_default_code(db) == "ARAS"         # hiçbir ayar yok → Aras
         await db.providers_config.insert_one({"kind": "cargo", "active_provider": "ptt", "providers": {}})
         assert await registry.resolve_default_code(db) == "PTT"          # provider ayarlarında aktif
         await db.settings.insert_one({"id": registry.CARRIER_SETTINGS_ID, "default_carrier": "ARAS"})
@@ -103,7 +103,6 @@ def test_default_carrier_resolution(db):
 def test_tracking_urls():
     assert get_carrier("ARAS").tracking_url("123").endswith("code=123")
     assert get_carrier("PTT").tracking_url("2750365698456").endswith("q=2750365698456")
-    assert "dhlecommerce" in get_carrier("MNG").tracking_url("1")
 
 
 def test_compute_package_from_products_and_defaults():
@@ -281,12 +280,60 @@ def test_ptt_create_retry_reuses_barcode_then_poll_delivers(db, monkeypatch):
     run(go())
 
 
-def test_mng_poll_query_excludes_aras_ptt(db):
-    """scheduler._dhl_cargo_poll_tick sorgusundaki $nin filtresi: alanı olmayan (eski MNG) siparişler
-    eşleşmeye devam eder, ARAS/PTT siparişleri dışarıda kalır."""
+def test_default_falls_back_to_configured_ptt(db):
+    """Açık seçim yok, aktif sağlayıcı eski bir firma: kimlik bilgisi girilmiş olan PTT seçilir."""
     async def go():
-        await db.orders.insert_many([{"id": "a", "cargo_provider_code": "MNG"}, {"id": "b"},
-                                     {"id": "c", "cargo_provider_code": "ARAS"}, {"id": "d", "cargo_provider_code": "PTT"}])
-        ids = sorted([o["id"] async for o in db.orders.find({"cargo_provider_code": {"$nin": ["ARAS", "PTT"]}})])
-        assert ids == ["a", "b"]
+        await db.providers_config.insert_one({"kind": "cargo", "active_provider": "mng", "providers": dict(PTT_CFG)})
+        assert await registry.resolve_default_code(db) == "PTT"
+    run(go())
+
+
+def test_legacy_mng_default_migrates_to_aras(db):
+    """Canlı DB'de aktif/varsayılan 'mng' kayıtlıysa açılış migrasyonu Aras'a çevirir; kayıtlar silinmez,
+    ikinci çalıştırma hiçbir şey yapmaz (idempotent)."""
+    async def go():
+        await db.providers_config.insert_one({"kind": "cargo", "active_provider": "mng",
+                                              "providers": {"mng": {"username": "u", "password": "p"}, **ARAS_CFG}})
+        await db.settings.insert_one({"id": registry.CARRIER_SETTINGS_ID, "default_carrier": "MNG", "default_desi": 2})
+        r = await registry.migrate_legacy_default(db)
+        assert r["active_provider"] == "mng → aras" and r["default_carrier"] == "MNG → ARAS"
+        doc = await db.providers_config.find_one({"kind": "cargo"}, {"_id": 0})
+        assert doc["active_provider"] == "aras" and doc["providers"]["mng"]["username"] == "u"
+        st = await db.settings.find_one({"id": registry.CARRIER_SETTINGS_ID}, {"_id": 0})
+        assert st["default_carrier"] == "ARAS" and st["default_desi"] == 2
+        assert await registry.resolve_default_code(db) == "ARAS"
+        r2 = await registry.migrate_legacy_default(db)
+        assert r2 == {"active_provider": None, "default_carrier": None, "shipping_fee_carrier": None}
+    run(go())
+
+
+def test_legacy_fee_carrier_migrates_without_price_change(db):
+    """Müşteriye yansıyan kargo ücreti eski firmanın (mng) ücretiyse Aras'a taşınır; tutar değişmez."""
+    async def go():
+        await db.settings.insert_one({"id": "main", "default_cargo_company": "mng",
+                                      "cargo_fees": {"mng": 99.9, "ptt": 70}, "shipping_fee": 90})
+        await db.settings.insert_one({"id": "tenant_config", "shipping": {"default_carrier": "mng",
+                                      "carrier_fees": {"mng": 99.9, "aras": 85}}})
+        r = await registry.migrate_legacy_default(db)
+        assert "main:mng → aras" in r["shipping_fee_carrier"]
+        main = await db.settings.find_one({"id": "main"}, {"_id": 0})
+        assert main["default_cargo_company"] == "aras" and main["cargo_fees"]["aras"] == 99.9
+        assert main["cargo_fees"]["mng"] == 99.9                      # eski veri silinmez
+        tc = await db.settings.find_one({"id": "tenant_config"}, {"_id": 0})
+        assert tc["shipping"]["default_carrier"] == "aras" and tc["shipping"]["carrier_fees"]["aras"] == 85
+        assert (await registry.migrate_legacy_default(db))["shipping_fee_carrier"] is None
+    run(go())
+
+
+def test_legacy_mng_order_cancel_clears_locally(db):
+    """Eski MNG kaydı (kargoya verilmemiş): firmada iptal edilemez, sipariş alanları yerelde temizlenir."""
+    async def go():
+        order = _order(status="preparing", cargo_provider_code="MNG", cargo_provider_name="MNG Kargo",
+                       cargo_barcode_created=True, cargo_barcode_number="123456",
+                       cargo={"provider": "MNG", "mng_siparis_no": "123456"})
+        await db.orders.insert_one(dict(order))
+        res = await service.cancel_order_shipment(db, order)
+        assert res["success"] and res["local_only"]
+        o = await db.orders.find_one({"id": "o1"}, {"_id": 0})
+        assert o["status"] == "confirmed" and not o.get("cargo_barcode_number") and not o.get("cargo")
     run(go())

@@ -1,5 +1,5 @@
 /**
- * OrderCargoActions.jsx — Sipariş detayında kargo işlemleri (MNG/DHL, Aras Kargo, PTT Kargo).
+ * OrderCargoActions.jsx — Sipariş detayında kargo işlemleri (Aras Kargo, PTT Kargo).
  *
  *   - Kargo firması seçimi (varsayılan: Kargo Ayarları'ndaki "Varsayılan kargo firması")
  *   - "Barkod Oluştur / Kargoya Ver"  → POST /api/cargo-carriers/orders/{id}/create?carrier=…
@@ -20,7 +20,6 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const auth = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
 export const CARRIER_OPTIONS = [
-  { value: "MNG", label: "DHL E-Commerce (MNG)" },
   { value: "ARAS", label: "Aras Kargo" },
   { value: "PTT", label: "PTT Kargo" },
 ];
@@ -32,6 +31,7 @@ export function cargoSummary(order) {
   const o = order || {};
   const cargo = o.cargo || {};
   const code = (o.cargo_provider_code || cargo.provider || "").toUpperCase();
+  // cargo.mng_siparis_no: entegrasyonu kaldırılmış eski kayıtlar (yalnız görüntüleme)
   const barcode = o.cargo_barcode_number || cargo.barcode || cargo.mng_siparis_no || "";
   const tracking = o.cargo_tracking_number || "";
   const hasShipment = Boolean(o.cargo_barcode_created || barcode || tracking);
@@ -44,7 +44,9 @@ export function cargoSummary(order) {
     statusText: o.cargo_status_text || cargo.status_text || "",
     env: cargo.env || "",
     hasShipment,
-    canCancel: hasShipment && PRE_SHIP.includes(o.status || "") && ["ARAS", "PTT", "MNG"].includes(code),
+    // Aras/PTT: firmada iptal; eski (entegrasyonsuz) kayıt: yalnız siparişten kaldırılır
+    canCancel: hasShipment && PRE_SHIP.includes(o.status || ""),
+    legacy: hasShipment && !!code && !["ARAS", "PTT"].includes(code),
   };
 }
 
@@ -57,8 +59,8 @@ export default function OrderCargoActions({ order, onChanged }) {
   useEffect(() => {
     let off = false;
     axios.get(`${API}/cargo-carriers`, auth())
-      .then(({ data }) => { if (!off) setCarrier((c) => c || data?.default_carrier || "MNG"); })
-      .catch(() => { if (!off) setCarrier((c) => c || "MNG"); });
+      .then(({ data }) => { if (!off) setCarrier((c) => c || data?.default_carrier || "ARAS"); })
+      .catch(() => { if (!off) setCarrier((c) => c || "ARAS"); });
     return () => { off = true; };
   }, []);
 
@@ -82,7 +84,10 @@ export default function OrderCargoActions({ order, onChanged }) {
     "Kargo kaydı oluşturuldu");
   const refresh = () => call("refresh", `${API}/cargo-carriers/orders/${order.id}/refresh`, "Takip güncellendi");
   const cancel = () => {
-    if (!window.confirm(`${s.name || "Kargo"} kaydı iptal edilsin mi? Barkod geçersiz olur.`)) return;
+    const q = s.legacy
+      ? `${s.name || s.code} kaydı siparişten kaldırılsın mı? (Bu firmanın entegrasyonu yok; gerekiyorsa firma panelinden ayrıca iptal edin.)`
+      : `${s.name || "Kargo"} kaydı iptal edilsin mi? Barkod geçersiz olur.`;
+    if (!window.confirm(q)) return;
     call("cancel", `${API}/cargo-carriers/orders/${order.id}/cancel`, "Kargo kaydı iptal edildi");
   };
 

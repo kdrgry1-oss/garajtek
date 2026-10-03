@@ -14,7 +14,7 @@
  * İl listesi ALFABETİK (Türkçe localeCompare). Kullanıcı yazınca filtrelenir (81 il arasında
  * scroll yerine arama). İlçe de aynı şekilde aranabilir (il seçilince o ilin ilçeleri).
  * Combobox: input + filtrelenmiş liste + dışarı-tıkla-kapat + klavye (↑/↓/Enter/Esc).
- * Checkout / Account / Admin order formlarında ortak kullanım; MNG barkod akışı için
+ * Checkout / Account / Admin order formlarında ortak kullanım; kargo barkod akışı için
  * value/onChange sözleşmesi ve data-testid'ler aynen korundu.
  */
 import { useEffect, useRef, useState } from "react";

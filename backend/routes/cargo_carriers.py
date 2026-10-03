@@ -1,5 +1,5 @@
 """
-routes/cargo_carriers.py — Çoklu kargo firması (MNG/DHL, Aras, PTT) uçları.
+routes/cargo_carriers.py — Kargo firması (Aras Kargo, PTT Kargo) uçları.
 
   GET  /api/cargo-carriers                         → taşıyıcı listesi + varsayılan + desi/kg ayarları
   POST /api/cargo-carriers/settings                → varsayılan taşıyıcı, varsayılan desi/kg
@@ -10,8 +10,8 @@ routes/cargo_carriers.py — Çoklu kargo firması (MNG/DHL, Aras, PTT) uçları
   POST /api/cargo-carriers/poll-now                → Aras/PTT toplu durum senkronu (zamanlayıcının yaptığı)
   GET  /api/cargo-carriers/poll-health             → son senkron özeti
 
-Mevcut MNG uçları (orders.py: /orders/{id}/cargo-barcode, /cargo-refresh, /cargo-label) korunur;
-cargo-barcode / cargo-refresh, Aras/PTT siparişlerinde bu modüldeki servise yönlenir.
+orders.py uçları (/orders/{id}/cargo-barcode, /cargo-refresh, /cargo-label) de bu modüldeki
+servise yönlenir.
 """
 from datetime import datetime, timezone
 
@@ -35,18 +35,10 @@ async def list_carriers(current_user: dict = Depends(require_admin)):
     settings = await get_carrier_settings(db)
     out = []
     for code, c in CARRIERS.items():
-        if code == "MNG":
-            try:
-                from routes.orders import _get_mng_settings
-                m = await _get_mng_settings()
-                configured, env = bool(m.get("username") and m.get("password")), m.get("env") or ""
-            except Exception:
-                configured, env = False, ""
-        else:
-            cfg = await load_carrier_config(db, code)
-            configured, env = c.is_configured(cfg), cfg.get("env", "test")
+        cfg = await load_carrier_config(db, code)
+        configured, env = c.is_configured(cfg), cfg.get("env", "test")
         out.append({"code": code, "key": c.key, "name": c.name, "configured": configured,
-                    "env": env, "live_create": code in ("MNG", "ARAS", "PTT")})
+                    "env": env, "live_create": True})
     return {"carriers": out, "default_carrier": await resolve_default_code(db), "settings": settings}
 
 
@@ -83,14 +75,10 @@ async def test_carrier(code: str, payload: dict = None, current_user: dict = Dep
     carrier = get_carrier(code)
     if not carrier:
         raise HTTPException(status_code=404, detail="Kargo firması bulunamadı")
-    if carrier.code == "MNG":
-        from routes.orders import _get_mng_settings
-        cfg = await _get_mng_settings()
-    else:
-        cfg = await load_carrier_config(db, carrier.code)
-        for k, v in ((payload or {}).get("config") or {}).items():
-            if v not in (None, "", "********"):
-                cfg[k] = v
+    cfg = await load_carrier_config(db, carrier.code)
+    for k, v in ((payload or {}).get("config") or {}).items():
+        if v not in (None, "", "********"):
+            cfg[k] = v
     if not carrier.is_configured(cfg):
         return {"success": False, "message": f"{carrier.name}: kullanıcı/müşteri no ve şifre girilmemiş"}
     try:
@@ -103,7 +91,7 @@ async def test_carrier(code: str, payload: dict = None, current_user: dict = Dep
 
 
 @router.post("/orders/{order_id}/create")
-async def create_for_order(order_id: str, carrier: str = Query("", description="MNG | ARAS | PTT (boş = varsayılan)"),
+async def create_for_order(order_id: str, carrier: str = Query("", description="ARAS | PTT (boş = varsayılan)"),
                            current_user: dict = Depends(require_permission("orders.cargo"))):
     from routes.orders import create_cargo_barcode
     return await create_cargo_barcode(order_id=order_id, cargo_company=carrier or "AUTO", current_user=current_user)

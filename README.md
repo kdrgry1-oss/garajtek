@@ -30,7 +30,7 @@ veya isteğe bağlı Cloudflare R2'de durur. Her gece 03:30'da yedek alınır (i
 - **Ödeme:** iyzico 3D Secure (kendi kart formu), havale/EFT (dekont bildirimi), kapıda ödeme (opsiyonel), hediye çeki, puan.
 - **Kampanya motoru:** yüzde/tutar indirim, X al Y öde, kupon, ilk sipariş, ödeme yöntemine göre indirim, istiflenebilirlik kuralları.
 - **Sipariş & operasyon:** sipariş durumu yaşam döngüsü, iade/iptal, stok hareket defteri, otomatik iptal + mutabakat, ödeme mutabakatı.
-- **Entegrasyonlar:** iyzico; DHL E-Commerce (MNG), Aras ve PTT kargo; BirFatura (e-Arşiv/e-Fatura); NetGSM SMS + İYS; Brevo/SES/SMTP e-posta; Meta/TikTok/Google piksel + CAPI; WhatsApp Business ve Instagram.
+- **Entegrasyonlar:** iyzico; Aras Kargo ve PTT Kargo; BirFatura (e-Arşiv/e-Fatura); NetGSM SMS + İYS; Brevo/SES/SMTP e-posta; Meta/TikTok/Google piksel + CAPI; WhatsApp Business ve Instagram.
 - **Pazarlama:** e-posta kampanyaları, terkedilmiş sepet e-postası (izinli üyelere), atıf (UTM) raporları.
 - **Raporlar:** satış, kâr & stok değeri, kategori içgörüleri, iade/iptal, ödeme, lokasyon.
 - **Güvenlik:** RBAC, admin MFA, hesap/IP kilitleme, rate-limit, şifreli sır kasası (Fernet), olay/uyarı kayıtları, olay döngüsü kilitlenme izleyicisi.

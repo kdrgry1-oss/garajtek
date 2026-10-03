@@ -412,7 +412,7 @@ export const TRAINING = [
       {
         title: "Entegrasyonlar",
         path: "/admin/entegrasyonlar",
-        what: "Kullanılan tüm entegrasyonlar tek ekranda: iyzico, Havale/EFT & kapıda ödeme, kargo firmaları (DHL E-Commerce/MNG, Aras, PTT), BirFatura e-fatura, reklam pikselleri & CAPI, NetGSM SMS & İYS, WhatsApp & Instagram.",
+        what: "Kullanılan tüm entegrasyonlar tek ekranda: iyzico, Havale/EFT & kapıda ödeme, kargo firmaları (Aras Kargo, PTT Kargo), BirFatura e-fatura, reklam pikselleri & CAPI, NetGSM SMS & İYS, WhatsApp & Instagram.",
         where: "Entegrasyonlar → Tüm Entegrasyonlar.",
         how: ["İlgili kartın ayar bağlantısını aç; bilgileri gir ve bağlantıyı test et."],
       },
@@ -470,7 +470,7 @@ export const TRAINING = [
       {
         title: "Kargo Firması Ayarları & Gönderici Adresi",
         path: "/admin/ayarlar/kargo",
-        what: "DHL E-Commerce (MNG), Aras ve PTT kargo entegrasyonu, barkod ve çıkış/depo adresi.",
+        what: "Aras Kargo ve PTT Kargo entegrasyonu, barkod ve çıkış/depo adresi.",
         where: "Ayarlar → Kargo Firması Ayarları / Gönderici Adresi.",
         how: ["Kargo API bilgilerini ve gönderici adresini gir; barkod üretimini test et."],
       },

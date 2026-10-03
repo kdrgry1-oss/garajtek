@@ -47,10 +47,7 @@ function MaintenanceSubscribers() {
 
 const CARGO_COMPANIES = [
   { key: "aras", label: "Aras Kargo" },
-  { key: "mng", label: "MNG Kargo" },
   { key: "ptt", label: "PTT Kargo" },
-  { key: "ups", label: "UPS" },
-  { key: "sendeo", label: "Sendeo" },
 ];
 
 export default function AdminSettings() {

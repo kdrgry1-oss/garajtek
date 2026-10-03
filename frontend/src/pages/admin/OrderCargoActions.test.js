@@ -27,7 +27,18 @@ describe("cargoSummary", () => {
     expect(s.link).toContain("ptt.gov.tr");
   });
 
-  it("taşıyıcı listesi MNG, Aras, PTT içerir", () => {
-    expect(CARRIER_OPTIONS.map((c) => c.value)).toEqual(["MNG", "ARAS", "PTT"]);
+  it("taşıyıcı listesi yalnız Aras ve PTT içerir", () => {
+    expect(CARRIER_OPTIONS.map((c) => c.value)).toEqual(["ARAS", "PTT"]);
+  });
+
+  it("eski (entegrasyonu kaldırılmış) MNG kaydı görüntülenir, yerelde kaldırılabilir", () => {
+    const s = cargoSummary({
+      status: "preparing", cargo_provider_code: "MNG", cargo_provider_name: "MNG Kargo",
+      cargo_barcode_created: true, cargo_tracking_number: "",
+      cargo_tracking_link: "https://kargotakip.example/?no=1", cargo: { provider: "MNG", mng_siparis_no: "123456" },
+    });
+    expect(s).toMatchObject({ code: "MNG", name: "MNG Kargo", barcode: "123456", hasShipment: true, canCancel: true, legacy: true });
+    const shipped = cargoSummary({ status: "delivered", cargo_provider_code: "MNG", cargo_tracking_number: "NZ1" });
+    expect(shipped).toMatchObject({ tracking: "NZ1", canCancel: false });
   });
 });

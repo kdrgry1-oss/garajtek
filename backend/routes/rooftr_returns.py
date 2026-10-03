@@ -1195,7 +1195,7 @@ async def open_rooftr_return(order_id: str, current_user: dict = Depends(require
     rec = {
         "id": rid, "order_id": order_id, "order_number": order.get("order_number", ""),
         "user_id": order.get("user_id"), "items": items, "reason": "",
-        "return_code": rr.get("return_code", "") or "", "mng_ok": False,
+        "return_code": rr.get("return_code", "") or "",
         "cargo_provider_name": order.get("cargo_provider_name", "") or "",
         "status": cr_status, "source": "order_bridge",
         "created_at": order.get("created_at") or datetime.now(timezone.utc).isoformat(),

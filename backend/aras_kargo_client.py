@@ -22,7 +22,7 @@ Kaynak: Aras Kargo resmî dokümanları
      QueryType=9 + TrackingNumber → kargo hareketleri.
 
 Kimlik bilgileri koda gömülmez; providers_config(kind=cargo).providers.aras altında şifreli tutulur.
-Tüm fonksiyonlar SENKRONDUR (httpx) — çağıran asyncio.to_thread ile çalıştırır (MNG istemcisiyle aynı).
+Tüm fonksiyonlar SENKRONDUR (httpx) — çağıran asyncio.to_thread ile çalıştırır.
 """
 from __future__ import annotations
 

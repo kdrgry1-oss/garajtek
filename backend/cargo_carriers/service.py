@@ -1,7 +1,7 @@
 """
 cargo_carriers/service.py — Taşıyıcıdan bağımsız sipariş kargo akışı (Aras / PTT).
 
-  create_shipment_for_order  → barkod/gönderi kaydı + sipariş alanları (MNG akışıyla aynı şema)
+  create_shipment_for_order  → barkod/gönderi kaydı + sipariş alanları
   cancel_order_shipment      → kargo firmasında iptal + sipariş kargo alanlarını temizle
   refresh_order_tracking     → tek sipariş takip sorgusu + durum çevirme
   poll_tick                  → zamanlayıcı: açık Aras/PTT gönderilerini toplu senkronla
@@ -30,7 +30,7 @@ from .registry import get_carrier, load_carrier_config, normalize_code
 logger = logging.getLogger(__name__)
 
 LIVE_CODES = ("ARAS", "PTT")          # bu modülün uçtan uca yönettiği taşıyıcılar
-COMPANY_FIELD = {"ARAS": "Aras", "PTT": "PTT", "MNG": "MNG"}   # customer.py _CARGO_NAME_MAP anahtarı
+COMPANY_FIELD = {"ARAS": "Aras", "PTT": "PTT"}   # customer.py _CARGO_NAME_MAP anahtarı
 _PRE_SHIP = ("pending", "confirmed", "processing", "preparing", "ready_to_ship")
 SHIPPED_STATES = (ST_ACCEPTED, ST_IN_TRANSIT, ST_OUT_FOR_DELIVERY, ST_FAILED)
 
@@ -192,7 +192,7 @@ async def create_shipment_for_order(db, order: Dict, code: str, current_user: Op
         "cargo": {
             "provider": code,
             "provider_name": carrier.name,
-            "tracking_number": tn or barcode,      # etiket/yazdır butonu için dolu (MNG ile aynı kural)
+            "tracking_number": tn or barcode,      # etiket/yazdır butonu için dolu
             "tracking_link": link,
             "barcode": barcode,
             "label_format": "10x15cm",
@@ -244,15 +244,23 @@ _CARGO_FIELDS_TO_CLEAR = ("cargo_tracking_number", "cargo_barcode_number", "carg
 async def cancel_order_shipment(db, order: Dict, current_user: Optional[Dict] = None) -> Dict:
     code = normalize_code(order.get("cargo_provider_code") or (order.get("cargo") or {}).get("provider") or "")
     carrier = get_carrier(code)
-    if not carrier or (not order.get("cargo_barcode_created") and not order.get("cargo_barcode_number")):
+    if not order.get("cargo_barcode_created") and not order.get("cargo_barcode_number"):
         raise HTTPException(status_code=400, detail="Siparişte iptal edilecek kargo kaydı yok")
     if order.get("status") in ("shipped", "in_transit", "out_for_delivery", "delivered"):
         raise HTTPException(status_code=400, detail="Kargoya verilmiş/teslim edilmiş gönderi iptal edilemez")
-    if code == "MNG":
-        from routes.orders import _get_mng_settings
-        cfg = await _get_mng_settings()
-    else:
-        cfg = await load_carrier_config(db, code)
+    if not carrier:
+        # Artık entegrasyonu olmayan (eski) bir kargo firmasıyla açılmış kayıt: firmada iptal
+        # edilemez; yalnız sipariş üzerindeki kargo alanları temizlenir → Aras/PTT ile yeniden açılabilir.
+        _old = order.get("cargo_provider_name") or code or "eski kargo"
+        await db.orders.update_one({"id": order["id"]}, {
+            "$set": {"cargo_barcode_created": False, "updated_at": _now(),
+                     "status": "confirmed" if order.get("status") == "preparing" else order.get("status")},
+            "$unset": {k: "" for k in _CARGO_FIELDS_TO_CLEAR}})
+        await _order_event(order, f"{_old} kargo kaydı siparişten kaldırıldı (entegrasyon yok)", current_user,
+                           {"cargo_company": code, "barcode": order.get("cargo_barcode_number")})
+        return {"success": True, "local_only": True,
+                "message": f"{_old} kaydı siparişten kaldırıldı. Kargo firması panelinde ayrıca iptal edin."}
+    cfg = await load_carrier_config(db, code)
     try:
         res = await carrier.cancel(order, cfg)
     except CarrierError as e:

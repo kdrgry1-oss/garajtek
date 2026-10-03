@@ -183,7 +183,7 @@ Adres: {{sirket.adres}} · Telefon: {{sirket.telefon}} · E-posta: {{sirket.epos
 <h3>5. Kişisel Verilerin Aktarılması</h3>
 <p>Kişisel verileriniz, yukarıdaki amaçlarla ve KVKK md.8 ve md.9'a uygun olarak, yalnızca gerekli olduğu ölçüde aşağıdaki alıcı gruplarına aktarılabilir:</p>
 <ul>
-<li><strong>Kargo ve lojistik firmaları</strong> (ör. MNG Kargo, Aras Kargo, PTT Kargo, anlaşmalı ambar / nakliye firmaları): teslimat için ad, adres, telefon,</li>
+<li><strong>Kargo ve lojistik firmaları</strong> (ör. Aras Kargo, PTT Kargo, anlaşmalı ambar / nakliye firmaları): teslimat için ad, adres, telefon,</li>
 <li><strong>Ödeme kuruluşu ve bankalar</strong> (ör. iyzico — İyzi Ödeme ve Elektronik Para Hizmetleri A.Ş.): ödemenin alınması, iadesi ve dolandırıcılık kontrolleri,</li>
 <li><strong>E-fatura / e-arşiv entegratörü</strong> (ör. BirFatura) ve Gelir İdaresi Başkanlığı: faturalandırma,</li>
 <li><strong>Barındırma, altyapı ve güvenlik hizmeti sağlayıcıları</strong> (ör. Cloudflare — içerik dağıtımı ve saldırı koruması), yazılım ve bakım destek firmaları,</li>
@@ -309,7 +309,7 @@ Adres: {{sirket.adres}} · Telefon: {{sirket.telefon}} · E-posta: {{sirket.epos
 <p>Kredi kartıyla taksitli ödemelerde vade farkı ve taksit tutarı ödeme ekranında gösterilir. Havale/EFT ile ödemelerde sipariş, tutarın SATICI hesabına geçmesiyle işleme alınır. Kapıda ödeme seçeneği sunulan siparişlerde kapıda ödeme hizmet bedeli ödeme ekranında ayrıca gösterilir.</p>
 <h3>4. Teslimat</h3>
 <ul>
-<li>Ürünler, ALICI'nın bildirdiği teslimat adresine, anlaşmalı kargo firmaları (ör. MNG, Aras, PTT Kargo) veya büyük hacimli/ağır ürünlerde anlaşmalı ambar/nakliye firmaları aracılığıyla gönderilir.</li>
+<li>Ürünler, ALICI'nın bildirdiği teslimat adresine, anlaşmalı kargo firmaları (ör. Aras Kargo, PTT Kargo) veya büyük hacimli/ağır ürünlerde anlaşmalı ambar/nakliye firmaları aracılığıyla gönderilir.</li>
 <li>Stokta bulunan ürünler genellikle 1–3 iş günü içinde kargoya verilir; tahmini süre ürün sayfasında belirtilir. Teslim süresi, her halükârda sipariş tarihinden itibaren yasal azami süre olan <strong>30 günü</strong> aşamaz.</li>
 <li>Teslimat masrafları, ödeme ekranında ve yukarıdaki tabloda gösterilmiştir. Paletli/ağır ürünlerin araçtan indirilmesi ve kat/iç mekâna taşınması, aksi açıkça belirtilmedikçe teslimat bedeline dahil değildir.</li>
 <li>Kurulum hizmeti, ürün sayfasında belirtilmişse veya ayrıca satın alınmışsa verilir; kurulum şartları <a href="/sayfa/garanti-kosullari">Garanti ve Teknik Servis</a> sayfasında açıklanmıştır.</li>
@@ -439,7 +439,7 @@ Adres: {{sirket.adres}} · Telefon: {{sirket.telefon}} · E-posta: {{sirket.epos
 </ul>
 <h3>Taşıyıcı Firmalar</h3>
 <ul>
-<li><strong>Standart koliler:</strong> MNG Kargo, Aras Kargo veya PTT Kargo ile adrese teslim.</li>
+<li><strong>Standart koliler:</strong> Aras Kargo veya PTT Kargo ile adrese teslim.</li>
 <li><strong>Ağır ve büyük hacimli ürünler</strong> (lift, büyük kompresör, lastik makinesi, motor vinci vb.): paletli olarak anlaşmalı ambar / nakliye firmalarıyla gönderilir. Bazı bölgelerde ürün, alıcıya en yakın ambar şubesinden teslim alınabilir; bu durumda önceden bilgilendirilirsiniz.</li>
 </ul>
 <p>Kargonuz yola çıktığında takip numarası SMS / e-posta ile iletilir; durumunu <a href="/siparis-takip">Sipariş Takibi</a> sayfasından izleyebilirsiniz.</p>
@@ -627,7 +627,7 @@ Adres: {{sirket.adres}} · Telefon: {{sirket.telefon}} · E-posta: {{sirket.epos
 <h4>Siparişim ne zaman kargoya verilir?</h4>
 <p>Stoktaki ürünler ödeme onayından sonra genellikle 1–3 iş günü içinde kargoya verilir. Tedarikli ürünlerde tahmini süre ürün sayfasında yazar. Yasal azami teslim süresi 30 gündür.</p>
 <h4>Hangi kargo firmalarıyla çalışıyorsunuz?</h4>
-<p>Koliler MNG Kargo, Aras Kargo veya PTT Kargo ile; lift, büyük kompresör gibi ağır ürünler paletli olarak anlaşmalı ambar/nakliye firmalarıyla gönderilir.</p>
+<p>Koliler Aras Kargo veya PTT Kargo ile; lift, büyük kompresör gibi ağır ürünler paletli olarak anlaşmalı ambar/nakliye firmalarıyla gönderilir.</p>
 <h4>Siparişimi nasıl takip ederim?</h4>
 <p>Kargoya verildiğinde takip numarası SMS/e-posta ile gönderilir. <a href="/siparis-takip">Sipariş Takibi</a> sayfasından veya "Hesabım" bölümünden durumu görebilirsiniz.</p>
 <h4>Ağır ürünler kapıya kadar mı geliyor?</h4>
