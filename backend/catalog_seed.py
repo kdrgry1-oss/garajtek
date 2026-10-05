@@ -350,6 +350,23 @@ async def fetch_missing_images(db, *, store_image, fetcher=None) -> dict:
 
 # ── açılış kancası ──────────────────────────────────────────────────────────
 
+FEATURED_MARKER = f"{SEED_ID}_featured_v1"
+
+
+async def mark_featured_once(db) -> int:
+    """Fatura ürünlerini BİR KEZ "Öne Çıkan" yapar (ana sayfa Öne Çıkanlar sekmesi/sütunu).
+    Sonradan yönetici öne çıkarmayı kaldırırsa tekrar açılmaz (bayraklı)."""
+    if await db.settings.find_one({"id": FEATURED_MARKER}, {"_id": 0, "id": 1}):
+        return 0
+    if not await db.products.count_documents({"catalog_seed": SEED_ID}):
+        return 0  # ürünler henüz oluşmadı → bayrak yazılmaz, sonraki açılışta tekrar denenir
+    r = await db.products.update_many({"catalog_seed": SEED_ID}, {"$set": {"is_featured": True}})
+    await db.settings.update_one(
+        {"id": FEATURED_MARKER},
+        {"$set": {"id": FEATURED_MARKER, "done": True, "applied_at": _now()}}, upsert=True)
+    return getattr(r, "modified_count", 0)
+
+
 async def run_startup(db=None, *, delays=RETRY_DELAYS) -> None:
     """server.py lifespan'inden arka plan görevi olarak çağrılır; açılışı asla düşürmez.
     CATALOG_SEED_DISABLED=1 → hiçbir şey yapmaz (yerel test/izole ortam)."""
@@ -371,6 +388,10 @@ async def run_startup(db=None, *, delays=RETRY_DELAYS) -> None:
     except Exception as e:  # noqa: BLE001
         logger.error(f"[{SEED_ID}] ürün tohumu hatası: {e}")
         return
+    try:
+        await mark_featured_once(db)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[{SEED_ID}] öne çıkarma hatası: {e}")
     try:
         from routes.upload import store_image_bytes
     except Exception as e:  # noqa: BLE001

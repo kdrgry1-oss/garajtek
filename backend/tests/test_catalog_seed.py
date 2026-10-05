@@ -234,3 +234,16 @@ def test_fetch_images_official_page_then_fallback_and_never_overwrite(db):
     assert [d["stock_code"] for d in pend] == ["GT-IZL-YIA"]
     _run(db.products.update_one({"id": y["id"]}, {"$set": {"images_fetch_attempts": cs.MAX_IMAGE_ATTEMPTS}}))
     assert _run(cs.pending_image_products(db)) == []
+
+
+
+def test_mark_featured_once_runs_once(db):
+    async def go():
+        assert await cs.mark_featured_once(db) == 0  # ürün yok → bayrak yazılmaz
+        await db.products.insert_one({"id": "a", "catalog_seed": cs.SEED_ID, "is_featured": False})
+        await cs.mark_featured_once(db)
+        assert (await db.products.find_one({"id": "a"}))["is_featured"] is True
+        await db.products.update_one({"id": "a"}, {"$set": {"is_featured": False}})  # yönetici kaldırdı
+        await cs.mark_featured_once(db)
+        assert (await db.products.find_one({"id": "a"}))["is_featured"] is False
+    _run(go())
