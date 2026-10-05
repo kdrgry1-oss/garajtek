@@ -1,0 +1,234 @@
+{
+  "seed_id": "catalog_seed_al_2026_09",
+  "_note": "Al Nalburiye alış faturası (25-09-2026) ürünleri. Satış fiyatı = 3 × (satır tutarı / adet, KDV hariç net alış) × 1,20 (KDV dahil), 2 haneye yuvarlanır. Ürün bilgileri üretici (izeltas.com.tr) ve yetkili satıcı sayfalarındaki teknik verilerden derlendi; açıklamalar özgündür. Görseller açılışta sunucu tarafından source_page_urls / image_urls adreslerinden çekilir (yalnız görseli olmayan ürüne).",
+  "supplier": "Al Nalburiye",
+  "invoice_date": "2026-09-25",
+  "markup": 3,
+  "vat_rate": 20,
+  "products": [
+    {
+      "key": "izl-iki-agiz-12",
+      "name": "İzeltaş İki Ağız Anahtar Takımı Kısa Boy 12 Parça (6x7 – 30x32 mm)",
+      "brand": "İzeltaş",
+      "category_slug": "anahtar-takimlari",
+      "stock_code": "GT-IZL-IKAT12",
+      "qty": 3,
+      "line_total": 4426.95,
+      "expected_price": 5312.34,
+      "specs": {
+        "model": "0100 İki Ağız Anahtar Takımı Kısa Boy",
+        "mpn": "0100 00 2112",
+        "origin_country": "Türkiye",
+        "warranty_months": 24,
+        "certifications": ["TSE"],
+        "usage_area": "Oto tamir, motosiklet bakımı, sanayi ve atölye montaj işleri",
+        "piece_count": 12,
+        "material": "Krom-Vanadyum (Cr-V)",
+        "net_weight_kg": 1.95,
+        "box_contents": "12 adet iki ağız (çatal) anahtar: 6x7, 8x9, 10x11, 12x13, 14x15, 16x17, 18x19, 20x22, 21x23, 24x26, 25x28, 30x32 mm"
+      },
+      "extra_specs": [
+        {"name": "Standart", "value": "TS ISO 10102 / DIN 3110"},
+        {"name": "Yüzey", "value": "Krom kaplama (parlak)"},
+        {"name": "Üretim", "value": "Sıcak dövme, ısıl işlem görmüş"},
+        {"name": "Boy", "value": "Kısa boy"},
+        {"name": "Ölçü Aralığı", "value": "6x7 – 30x32 mm"}
+      ],
+      "intro": "Türkiye'de üretilen İzeltaş 0100 serisi, 6x7 mm'den 30x32 mm'ye kadar en sık kullanılan on iki çatal anahtar ölçüsünü tek takımda toplar. Kısa gövde, motor bölmesi ve şasi altı gibi dar alanlarda anahtarı rahatça çevirmenizi sağlar.",
+      "bullets": [
+        "Krom-vanadyum çelikten sıcak dövme gövde, ısıl işlemle sertleştirilmiş ağızlar",
+        "Parlak krom kaplama: paslanmaya karşı koruma, kolay temizlik",
+        "TS ISO 10102 / DIN 3110 ölçü standartlarına uygun ağız toleransları",
+        "Kısa boy tasarım; sıkışık bölgelerde manevra kolaylığı",
+        "Oto tamir, motosiklet, tarım makinesi ve genel atölye işleri için ideal"
+      ],
+      "table": [
+        ["Marka", "İzeltaş"], ["Ürün Kodu", "0100 00 2112"], ["Parça Sayısı", "12"],
+        ["Ölçüler", "6x7, 8x9, 10x11, 12x13, 14x15, 16x17, 18x19, 20x22, 21x23, 24x26, 25x28, 30x32 mm"],
+        ["Malzeme", "Krom-Vanadyum çelik"], ["Yüzey", "Krom kaplama"], ["Standart", "TS ISO 10102 / DIN 3110"],
+        ["Takım Ağırlığı", "≈ 1.945 g"], ["Menşei", "Türkiye"]
+      ],
+      "dims": [35, 15, 4],
+      "kg": 2.1,
+      "meta_title": "İzeltaş İki Ağız Anahtar Takımı Kısa Boy 12 Parça 0100",
+      "meta_description": "İzeltaş 0100 00 2112 kısa boy çatal anahtar takımı: 6x7–30x32 mm, 12 parça, krom-vanadyum, DIN 3110. Yerli üretim, hızlı kargo – GarajTek.",
+      "source_page_urls": [
+        "https://izeltas.com.tr/urunler/anahtarlar/catal-anahtarlar/0100-iki-agiz-anahtar-takimi-kisa-boy-mm/",
+        "https://izeltas.com.tr/en/urunler/anahtarlar/catal-anahtarlar/0100-iki-agiz-anahtar-takimi-kisa-boy-mm/",
+        "https://www.hirdavatalalim.com.tr/urun/izeltas-0100-00-2112-iki-agiz-anahtar-takimi-12-parca",
+        "https://www.n11.com/urun/izeltas-0100-iki-agiz-anahtar-takimi-kisa-boy-12-parca-0100002112-1069406",
+        "https://www.akakce.com/acik-agiz-anahtar/en-ucuz-izeltas-12-li-iki-agiz-anahtar-takimi-kisa-boy-6-32-mm-0100002112-fiyati,625246408.html"
+      ],
+      "image_urls": []
+    },
+    {
+      "key": "bosch-pense-3",
+      "name": "Bosch Pense Seti 3 Parça (Kargaburun, Yan Keski, Pense) 1600A02C0S",
+      "brand": "Bosch",
+      "category_slug": "penseler",
+      "stock_code": "GT-BSH-PNS3",
+      "barcode": "4059952655857",
+      "qty": 6,
+      "line_total": 6503.90,
+      "expected_price": 3902.34,
+      "specs": {
+        "model": "Pense Seti 3 Parça (Home & Garden)",
+        "mpn": "1600A02C0S",
+        "warranty_months": 24,
+        "usage_area": "Elektrik/elektronik tamiri, oto bakım, montaj ve genel tamir işleri",
+        "piece_count": 3,
+        "material": "Karbon Çelik",
+        "net_weight_kg": 0.61,
+        "box_contents": "1 adet kombine pense 180 mm, 1 adet kargaburun 180 mm, 1 adet yan keski 160 mm"
+      },
+      "extra_specs": [
+        {"name": "Yüzey", "value": "Mat krom-nikel kaplama"},
+        {"name": "Kesici Ağız Sertliği", "value": "60 HRC (indüksiyonla sertleştirilmiş)"},
+        {"name": "Sap", "value": "Ergonomik, yumuşak tutma bölgeli (soft grip)"},
+        {"name": "EAN", "value": "4059952655857"}
+      ],
+      "intro": "Bosch'un üç parçalı pense seti; günlük tamir, kablo ve montaj işlerinde en çok ihtiyaç duyulan kombine pense, kargaburun ve yan keskiyi bir arada sunar. Sert karbon çelik gövde ve mat krom-nikel yüzey, uzun ömür ve paslanmaya karşı direnç sağlar.",
+      "bullets": [
+        "Kombine pense 180 mm, kargaburun 180 mm, yan keski 160 mm",
+        "İndüksiyonla sertleştirilmiş kesici ağızlar (60 HRC) — temiz ve kolay kesim",
+        "Mat krom-nikel kaplama ile korozyona karşı yüksek dayanım",
+        "Geniş yumuşak tutma bölgeli ergonomik saplar, yorulmadan kullanım",
+        "Elektrik tesisatı, oto bakım ve ev-atölye tamirleri için çok yönlü set"
+      ],
+      "table": [
+        ["Marka", "Bosch"], ["Parça No", "1600A02C0S"], ["EAN", "4059952655857"],
+        ["Set İçeriği", "Kombine pense 180 mm, kargaburun 180 mm, yan keski 160 mm"],
+        ["Malzeme", "Sert karbon çelik"], ["Yüzey", "Mat krom-nikel"], ["Kesici Sertliği", "60 HRC"],
+        ["Ağırlık", "≈ 606 g"]
+      ],
+      "dims": [25, 20, 4],
+      "kg": 0.75,
+      "meta_title": "Bosch 3'lü Pense Seti Kargaburun Yan Keski 1600A02C0S",
+      "meta_description": "Bosch 1600A02C0S 3 parça pense seti: kombine pense, kargaburun ve yan keski. Krom-nikel kaplama, 60 HRC kesici ağız, ergonomik sap – GarajTek.",
+      "source_page_urls": [
+        "https://www.koctas.com.tr/bosch-3lu-pense-yan-keski-kargaburun-seti-1600a02c0s/p/5000682766",
+        "https://www.pazarama.com/bosch-home-and-garden-pense-seti-3-parca-1600a02c0s-p-4059952655857",
+        "https://www.hirdavatalalim.com.tr/urun/bosch-pense-seti-3-parca-kargaburun-yan-keski-pense-1600a02c0s",
+        "https://www.tokgozler.com/bosch-pense-seti-3-parca-kargaburun-yan-keski-pense-1600a02c0s-7332",
+        "https://www.akakce.com/pense/en-ucuz-bosch-1600a02c0s-3-lu-seti-fiyati,1099428141.html",
+        "https://www.sanitino.fi/en/bosch-tools-3-piece-pliers-set-1600a02c0s"
+      ],
+      "image_urls": []
+    },
+    {
+      "key": "izl-kombine-12",
+      "name": "İzeltaş Kombine Anahtar Takımı Kısa Boy 12 Parça (8 – 22 mm)",
+      "brand": "İzeltaş",
+      "category_slug": "anahtar-takimlari",
+      "stock_code": "GT-IZL-KAT12",
+      "qty": 6,
+      "line_total": 10824.00,
+      "expected_price": 6494.40,
+      "specs": {
+        "model": "0320 Kombine Anahtar Takımı Kısa Boy",
+        "mpn": "0320 00 2112",
+        "origin_country": "Türkiye",
+        "warranty_months": 24,
+        "certifications": ["TSE"],
+        "usage_area": "Oto tamir, motor bakımı, sanayi, ev tamiratı ve hobi işleri",
+        "piece_count": 12,
+        "material": "Krom-Vanadyum (Cr-V)",
+        "net_weight_kg": 1.19,
+        "box_contents": "12 adet kombine (bir ucu yıldız, bir ucu çatal) anahtar: 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 22 mm"
+      },
+      "extra_specs": [
+        {"name": "Standart", "value": "TS 3794 – TS ISO 7738 Form A / DIN 3113"},
+        {"name": "Yüzey", "value": "Krom kaplama"},
+        {"name": "Boy", "value": "Kısa boy"},
+        {"name": "Ölçü Aralığı", "value": "8 – 22 mm"}
+      ],
+      "intro": "İzeltaş 0320 kısa boy kombine anahtar takımı, her ölçüde bir yıldız ve bir çatal ağzı aynı anahtarda birleştirir; 8 mm'den 22 mm'ye on iki ölçüyle araç ve makine bakımında en çok kullanılan somunların tamamını karşılar.",
+      "bullets": [
+        "Yıldız uç sıkı ve kaymasız kavrama, çatal uç hızlı sökme-takma sağlar",
+        "Krom-vanadyum çelik gövde, krom kaplı yüzey",
+        "TS ISO 7738 Form A / DIN 3113 standardına uygun üretim",
+        "Kısa boy: dar motor bölmeleri ve sıkışık montaj noktaları için pratik",
+        "Türkiye'de üretilmiş, yaygın yedek ve servis desteği"
+      ],
+      "table": [
+        ["Marka", "İzeltaş"], ["Ürün Kodu", "0320 00 2112"], ["Parça Sayısı", "12"],
+        ["Ölçüler", "8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 22 mm"],
+        ["Malzeme", "Krom-Vanadyum çelik"], ["Yüzey", "Krom kaplama"],
+        ["Standart", "TS 3794 – TS ISO 7738 Form A / DIN 3113"], ["Takım Ağırlığı", "≈ 1.190 g"], ["Menşei", "Türkiye"]
+      ],
+      "dims": [28, 14, 4],
+      "kg": 1.3,
+      "meta_title": "İzeltaş Kombine Anahtar Takımı Kısa Boy 12 Parça 0320",
+      "meta_description": "İzeltaş 0320 00 2112 kısa boy kombine anahtar takımı: 8–22 mm, 12 parça, krom-vanadyum, DIN 3113. Yerli üretim, hızlı kargo – GarajTek.",
+      "source_page_urls": [
+        "https://izeltas.com.tr/urunler/anahtarlar/kombine-anahtarlar/0320-kombine-anahtar-takimi-kisa-boy-mm/",
+        "https://izeltas.com.tr/en/urunler/anahtarlar/kombine-anahtarlar/0320-kombine-anahtar-takimi-kisa-boy-mm/",
+        "https://www.n11.com/urun/izeltas-0320-kombine-anahtar-takimi-kisa-boy-12-parca-0320002112-23744483",
+        "https://www.takimcantam.com/urun/izeltas-12-li-kombine-takim-kisa-0320-00-2112",
+        "https://www.akakce.com/kombine-anahtar/en-ucuz-izeltas-0320-kisa-boy-12-li-kombine-anahtar-takimi-fiyati,7675151.html"
+      ],
+      "image_urls": []
+    },
+    {
+      "key": "izl-yildiz-iki-agiz",
+      "name": "İzeltaş Yıldız İki Ağız Anahtar (0430 Serisi)",
+      "brand": "İzeltaş",
+      "category_slug": "yildiz-iki-agiz-anahtarlar",
+      "stock_code": "GT-IZL-YIA",
+      "variant_label": "Ölçü",
+      "variants": [
+        {"size": "6x7 mm",   "sku": "GT-IZL-YIA-0607", "mpn": "0430 03 0607", "qty": 6, "line_total": 910.80,  "expected_price": 546.48},
+        {"size": "8x9 mm",   "sku": "GT-IZL-YIA-0809", "mpn": "0430 03 0809", "qty": 6, "line_total": 920.70,  "expected_price": 552.42},
+        {"size": "10x11 mm", "sku": "GT-IZL-YIA-1011", "mpn": "0430 03 1011", "qty": 6, "line_total": 1019.70, "expected_price": 611.82},
+        {"size": "12x13 mm", "sku": "GT-IZL-YIA-1213", "mpn": "0430 03 1213", "qty": 6, "line_total": 1155.00, "expected_price": 693.00},
+        {"size": "14x15 mm", "sku": "GT-IZL-YIA-1415", "mpn": "0430 03 1415", "qty": 6, "line_total": 1217.70, "expected_price": 730.62},
+        {"size": "16x17 mm", "sku": "GT-IZL-YIA-1617", "mpn": "0430 03 1617", "qty": 6, "line_total": 1379.40, "expected_price": 827.64},
+        {"size": "18x19 mm", "sku": "GT-IZL-YIA-1819", "mpn": "0430 03 1819", "qty": 6, "line_total": 1782.00, "expected_price": 1069.20},
+        {"size": "20x22 mm", "sku": "GT-IZL-YIA-2022", "mpn": "0430 03 2022", "qty": 6, "line_total": 1791.90, "expected_price": 1075.14}
+      ],
+      "specs": {
+        "model": "0430 Yıldız İki Ağız Anahtar (mm)",
+        "mpn": "0430 03",
+        "origin_country": "Türkiye",
+        "warranty_months": 24,
+        "certifications": ["TSE"],
+        "usage_area": "Oto tamir, sanayi bakım, montaj ve atölye işleri",
+        "piece_count": 1,
+        "material": "Krom-Vanadyum (Cr-V)",
+        "box_contents": "1 adet seçilen ölçüde yıldız iki ağız anahtar"
+      },
+      "extra_specs": [
+        {"name": "Standart", "value": "TS 3794 – TS ISO 10104 Form B / DIN 838"},
+        {"name": "Yüzey", "value": "Krom kaplama"},
+        {"name": "Ağız Tipi", "value": "Her iki uçta 12 köşe yıldız (çift altıgen)"},
+        {"name": "Ölçü Seçenekleri", "value": "6x7, 8x9, 10x11, 12x13, 14x15, 16x17, 18x19, 20x22 mm"},
+        {"name": "Uzunluk (6x7 / 8x9)", "value": "176 mm / 190 mm"}
+      ],
+      "intro": "İzeltaş 0430 yıldız iki ağız anahtar, iki ucunda da farklı ölçüde 12 köşe yıldız ağız bulunan, somunu her yönden saran klasik servis anahtarıdır. İhtiyacınız olan ölçüyü tek tek seçebilir, eksik kalan anahtarınızı takım almadan tamamlayabilirsiniz.",
+      "bullets": [
+        "Somunu çepeçevre saran 12 köşe yıldız ağız — köşe yuvarlamadan yüksek tork",
+        "Krom-vanadyum çelik, krom kaplı yüzey",
+        "TS ISO 10104 Form B / DIN 838 standardına uygun üretim",
+        "6x7 mm'den 20x22 mm'ye sekiz ölçü seçeneği",
+        "Türkiye'de üretim; takımdaki eksik ölçüyü tamamlamak için ideal"
+      ],
+      "table": [
+        ["Marka", "İzeltaş"], ["Seri", "0430 (mm)"], ["Ölçüler", "6x7, 8x9, 10x11, 12x13, 14x15, 16x17, 18x19, 20x22 mm"],
+        ["Malzeme", "Krom-Vanadyum çelik"], ["Yüzey", "Krom kaplama"],
+        ["Standart", "TS 3794 – TS ISO 10104 Form B / DIN 838"], ["Menşei", "Türkiye"]
+      ],
+      "dims": [30, 6, 2],
+      "kg": 0.3,
+      "meta_title": "İzeltaş Yıldız İki Ağız Anahtar 0430 – 6x7'den 20x22 mm'ye",
+      "meta_description": "İzeltaş 0430 yıldız iki ağız anahtar: 6x7, 8x9, 10x11, 12x13, 14x15, 16x17, 18x19, 20x22 mm. Krom-vanadyum, DIN 838, yerli üretim – GarajTek.",
+      "source_page_urls": [
+        "https://izeltas.com.tr/urunler/anahtarlar/yildiz-anahtarlar/0430-yildiz-iki-agiz-anahtar-mm/",
+        "https://izeltas.com.tr/en/urunler/anahtarlar/yildiz-anahtarlar/0430-yildiz-iki-agiz-anahtar-mm/",
+        "https://www.tokgozler.com/izeltas-yildiz-iki-agiz-anahtar-12x13-mm",
+        "https://www.takimcantam.com/urun/izeltas-12-13-yildiz-anahtar-0430-03-1213",
+        "https://www.akakce.com/yildiz-anahtar/en-ucuz-izeltas-0430-12x13-mm-yildiz-iki-agiz-anahtar-fiyati,210707754.html"
+      ],
+      "image_urls": []
+    }
+  ]
+}

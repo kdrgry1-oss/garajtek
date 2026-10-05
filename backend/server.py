@@ -438,6 +438,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Category seed start warning: {e}")
 
+    # Gerçek alış faturası ürünleri (Al Nalburiye 25-09-2026): bir kez, idempotent oluşturulur
+    # (kategori seed'ini bekler); görselsiz kalanlara üretici görselleri arka planda indirilir.
+    try:
+        import asyncio as _asyncio
+        from catalog_seed import run_startup as _catalog_seed_startup
+        _asyncio.create_task(_catalog_seed_startup())
+    except Exception as e:
+        logger.warning(f"Catalog seed start warning: {e}")
+
     # Kapıda ödeme varsayılanı: yönetici hiç değiştirmediyse BİR KEZ açılır (cod_rules.ensure_cod_default).
     try:
         await ensure_cod_default_once()
