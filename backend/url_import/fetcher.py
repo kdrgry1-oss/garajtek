@@ -228,8 +228,10 @@ class Fetcher:
                 await asyncio.sleep(wait)
             self._last[host] = time.monotonic()
 
-    async def fetch(self, url: str, *, kind: str = "html", max_bytes: Optional[int] = None) -> FetchResult:
-        """GET; yönlendirmeleri elle izler. kind: "html" | "image"."""
+    async def fetch(self, url: str, *, kind: str = "html", max_bytes: Optional[int] = None,
+                    headers: Optional[Dict[str, str]] = None) -> FetchResult:
+        """GET; yönlendirmeleri elle izler. kind: "html" | "image". headers: yalnız Referer kabul
+        edilir (görsel sıcak-bağlantı korumalı CDN'ler için ürün sayfası adresi)."""
         limit = max_bytes or (MAX_HTML_BYTES if kind == "html" else MAX_IMAGE_BYTES)
         accept = HTML_ACCEPT if kind == "html" else IMAGE_ACCEPT
         cur = str(url or "").strip()
@@ -239,7 +241,11 @@ class Fetcher:
             await self._throttle(host)
             self.requests += 1
             try:
-                async with self.client.stream("GET", cur, headers={"Accept": accept}) as r:
+                req_headers = {"Accept": accept}
+                ref = str((headers or {}).get("Referer") or "").strip()
+                if ref.startswith(("http://", "https://")) and len(ref) < 2048:
+                    req_headers["Referer"] = ref
+                async with self.client.stream("GET", cur, headers=req_headers) as r:
                     if r.status_code in (301, 302, 303, 307, 308):
                         loc = r.headers.get("location")
                         if not loc:

@@ -38,7 +38,7 @@ SEED_ID = "catalog_seed_al_2026_09"
 MARKER = f"{SEED_ID}_applied"
 DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", f"{SEED_ID}.json")
 MAX_IMAGES = 4
-MAX_IMAGE_ATTEMPTS = 6          # tüm açılışlar boyunca ürün başına üst sınır
+MAX_IMAGE_ATTEMPTS = 12         # tüm açılışlar boyunca ürün başına üst sınır
 RETRY_DELAYS = (0, 60, 300)     # aynı açılış içinde deneme aralıkları (sn)
 
 CreateProduct = Callable[[dict], Awaitable[dict]]
@@ -230,68 +230,79 @@ def _og_images(body: bytes, url: str, charset: Optional[str]) -> List[str]:
             if m.get("content")]
 
 
-async def _collect_image_urls(fetcher, doc: dict) -> List[tuple]:
-    """[(görsel_url, kaynak_sayfa)] — önce doğrudan görsel adresleri, sonra sayfa sırasıyla
-    ilk görsel veren sayfa (üretici sayfası önde; boşsa yetkili satıcı sayfası)."""
+async def _page_images(fetcher, page: str) -> List[str]:
+    """Bir kaynak sayfadaki ürün görselleri (JSON-LD/microdata/platform galerisi; aksi hâlde og:image önde)."""
     from url_import.fetcher import BlockedURL, FetchError
     from url_import.parser import parse_product
 
-    out = [(u, "") for u in doc.get("source_image_urls") or []]
-    if out:
-        return out
-    for page in doc.get("source_page_urls") or []:
-        try:
-            r = await fetcher.fetch(page, kind="html")
-            pd = parse_product(r.body, r.url, r.charset)
-        except (FetchError, BlockedURL) as e:
-            logger.info(f"[{SEED_ID}] sayfa alınamadı {page}: {e}")
-            continue
-        except Exception as e:  # noqa: BLE001 — ayrıştırma hatası diğer kaynakları engellemesin
-            logger.info(f"[{SEED_ID}] sayfa ayrıştırılamadı {page}: {e}")
-            continue
-        imgs = [u for u in pd.images if u]
-        if pd.sources.get("images") not in ("jsonld", "microdata", "platform"):
-            # genel galeri seçicisi kurumsal sayfalarda logo/banner yakalayabilir → og:image önce
-            imgs = _og_images(r.body, r.url, r.charset) + imgs
-        if imgs:
-            return [(u, page) for u in imgs]
-    return []
+    try:
+        r = await fetcher.fetch(page, kind="html")
+        pd = parse_product(r.body, r.url, r.charset)
+    except (FetchError, BlockedURL) as e:
+        logger.info(f"[{SEED_ID}] sayfa alınamadı {page}: {e}")
+        return []
+    except Exception as e:  # noqa: BLE001 — ayrıştırma hatası diğer kaynakları engellemesin
+        logger.info(f"[{SEED_ID}] sayfa ayrıştırılamadı {page}: {e}")
+        return []
+    imgs = [u for u in pd.images if u]
+    if pd.sources.get("images") not in ("jsonld", "microdata", "platform"):
+        # genel galeri seçicisi kurumsal sayfalarda logo/banner yakalayabilir → og:image önce
+        imgs = _og_images(r.body, r.url, r.charset) + imgs
+    out: List[str] = []
+    for u in imgs:
+        if u not in out:
+            out.append(u)
+    return out
+
+
+async def _download(fetcher, img_url: str, referer: str) -> bytes:
+    from url_import.job import convert_image
+
+    headers = {"Referer": referer} if referer else None
+    r = await fetcher.fetch(img_url, kind="image", headers=headers)
+    return await asyncio.to_thread(convert_image, r.body, r.content_type)
 
 
 async def fetch_images_for_product(db, doc: dict, *, fetcher, store_image) -> int:
-    """Tek ürün: görselleri indirir ve (ürün hâlâ görselsizse) yazar. Döner: yazılan görsel sayısı."""
+    """Tek ürün: kaynakları sırayla dener (doğrudan görsel adresleri → üretici sayfası → yetkili
+    satıcı sayfaları); görsel İNDİRİLEBİLEN ilk kaynağın görsellerini (en çok MAX_IMAGES) ürün hâlâ
+    görselsizse yazar. Döner: yazılan görsel sayısı."""
     from url_import.fetcher import BlockedURL, FetchError
-    from url_import.job import convert_image
 
     pid = doc["id"]
     saved: List[dict] = []
-    err = ""
+    errs: List[str] = []
+    sources = []
+    if doc.get("source_image_urls"):
+        sources.append(("", list(doc["source_image_urls"])))
+    sources += [(pg, None) for pg in doc.get("source_page_urls") or []]
     try:
-        cands = await _collect_image_urls(fetcher, doc)
-        seen = set()
-        for img_url, page in cands:
-            if len(saved) >= MAX_IMAGES:
+        for page, imgs in sources:
+            if imgs is None:
+                imgs = await _page_images(fetcher, page)
+                if not imgs:
+                    errs.append(f"{urlsplit(page).hostname}: görsel yok/erişilemedi")
+                    continue
+            for img_url in imgs:
+                if len(saved) >= MAX_IMAGES:
+                    break
+                try:
+                    webp = await _download(fetcher, img_url, page)
+                except (FetchError, BlockedURL, ValueError) as e:
+                    errs.append(f"{img_url.rsplit('/', 1)[-1][:60]}: {e}")
+                    continue
+                host = (urlsplit(page or img_url).hostname or "").lower()
+                res = await store_image(
+                    webp, "image/webp", "webp", f"{doc.get('catalog_seed_key') or pid}-{len(saved) + 1}.webp",
+                    extra={"catalog_seed": SEED_ID, "product_id": pid, "source_page": page,
+                           "source_image": img_url, "source_host": host})
+                if res and res.get("url"):
+                    saved.append({"url": res["url"], "page": page})
+            if saved:
                 break
-            if img_url in seen:
-                continue
-            seen.add(img_url)
-            try:
-                r = await fetcher.fetch(img_url, kind="image")
-                webp = await asyncio.to_thread(convert_image, r.body, r.content_type)
-            except (FetchError, BlockedURL, ValueError) as e:
-                err = f"{img_url.rsplit('/', 1)[-1][:60]}: {e}"
-                continue
-            host = (urlsplit(page or img_url).hostname or "").lower()
-            res = await store_image(
-                webp, "image/webp", "webp", f"{doc.get('catalog_seed_key') or pid}-{len(saved) + 1}.webp",
-                extra={"catalog_seed": SEED_ID, "product_id": pid, "source_page": page,
-                       "source_image": img_url, "source_host": host})
-            if res and res.get("url"):
-                saved.append({"url": res["url"], "page": page})
-        if not cands:
-            err = "kaynak sayfalardan görsel alınamadı (erişim hatası ya da görsel yok)"
     except Exception as e:  # noqa: BLE001
-        err = str(e)[:200]
+        errs.append(str(e)[:200])
+    err = "; ".join(errs)[-400:]
     cur = await db.products.find_one({"id": pid}, {"_id": 0, "images": 1}) or {}
     if saved and _no_images(cur):
         await db.products.update_one({"id": pid}, {"$set": {

@@ -154,6 +154,8 @@ def _fetcher(routes):
         r = routes.get(str(req.url))
         if r is None:
             return httpx.Response(404, text="yok")
+        if callable(r):
+            return r(req)
         status, headers, body = r
         return httpx.Response(status, headers=headers, content=body)
 
@@ -186,11 +188,17 @@ def test_fetch_images_official_page_then_fallback_and_never_overwrite(db):
         ikat[0]: (200, H, b'<html><head><meta property="og:image" content="https://izeltas.com.tr/img/0100-set.jpg">'
                           b'<meta property="og:title" content="0100"></head><body><h1>0100</h1></body></html>'),
         "https://izeltas.com.tr/img/0100-set.jpg": (200, J, _img()),
-        # Bosch: ilk sayfa 404 → ikinci (yetkili satıcı) sayfası JSON-LD görseli
+        # Bosch: ilk sayfanın görseli sıcak-bağlantı korumalı (hep 403) → ikinci sayfaya geçilir;
+        # ikinci sayfanın CDN'i yalnız doğru Referer ile görsel verir
+        bosch[0]: (200, H, b'<html><head><meta property="og:image" content="https://cdn.koctas.example/b.jpg">'
+                           b'</head><body></body></html>'),
+        "https://cdn.koctas.example/b.jpg": (403, {"content-type": "text/html"}, b"forbidden"),
         bosch[1]: (200, H, b'<html><head><script type="application/ld+json">{"@type":"Product","name":"Pense",'
                            b'"image":["https://cdn.example.com/pense-1.jpg","https://cdn.example.com/pense-2.jpg"]}'
                            b'</script></head><body></body></html>'),
-        "https://cdn.example.com/pense-1.jpg": (200, J, _img((10, 80, 10))),
+        "https://cdn.example.com/pense-1.jpg": lambda req: (
+            httpx.Response(200, headers=J, content=_img((10, 80, 10))) if req.headers.get("referer") == bosch[1]
+            else httpx.Response(403)),
         "https://cdn.example.com/pense-2.jpg": (200, J, _img((10, 10, 80))),
     }
     # yönetici kombine takıma kendi görselini yüklemiş → dokunulmamalı
@@ -217,6 +225,7 @@ def test_fetch_images_official_page_then_fallback_and_never_overwrite(db):
     assert k["images"] == ["/api/upload/files/admin.webp"] and not k.get("images_fetched_at")
     y = _run(db.products.find_one({"stock_code": "GT-IZL-YIA"}))
     assert y["images"] == [] and y["images_fetch_attempts"] == 1 and y["images_fetch_error"]
+    assert b["images_fetch_error"] == "" and b["images_fetch_attempts"] == 1
     files = _run(db.files.find({}, {"_id": 0}).to_list(50))
     assert all(f["catalog_seed"] == cs.SEED_ID and not f.get("demo") for f in files)
 
