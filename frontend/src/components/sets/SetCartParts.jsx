@@ -31,6 +31,7 @@ function useStartReplace() {
 }
 
 export const OOS_MESSAGE = "Bu ürün stokta bulunmamaktadır. Başka bir ürünle değiştirmek ister misiniz?";
+export const DISCONTINUED_MESSAGE = "Bu ürün artık satışta değil. Başka bir ürünle değiştirmek ister misiniz?";
 
 /** Aynı en alt kategoriden stoklu öneriler (sözleşme 7.4) — seçilen ürün kalemin yerine geçer. */
 function Alternatives({ line, limit }) {
@@ -92,7 +93,7 @@ export function PendingLineBox({ line, compact = false }) {
       <img src={optimizeImg(line.image, 120) || "/placeholder.jpg"} alt={line.name} width="56" height="56" loading="lazy" />
       <div className="gt-set-pending-body">
         <div className="gt-set-pending-name">{line.name}</div>
-        <div className="gt-set-pending-msg" data-testid="oos-message"><i className="fas fa-exclamation-triangle mr-1" />{OOS_MESSAGE}</div>
+        <div className="gt-set-pending-msg" data-testid="oos-message"><i className="fas fa-exclamation-triangle mr-1" />{line.discontinued ? DISCONTINUED_MESSAGE : OOS_MESSAGE}</div>
         {line.setId && <div className="font-size-12 text-gray-90 mb-1">“{line.setName}” setinin parçası — değiştirdiğiniz ürünle set indirimi korunur.</div>}
         <div className="gt-set-pending-actions">
           <button type="button" className="btn btn-primary-dark-w btn-xs gt-set-replace-btn" onClick={() => startReplace(line)}

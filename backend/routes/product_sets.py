@@ -112,7 +112,8 @@ async def cart_stock(payload: dict):
         active = bool(p) and p.get("is_active") is not False and not p.get("is_deleted")
         stock = ps.item_stock(p, vid or None) if active else 0
         qty = max(1, int(ps._f(ln.get("quantity"), 1) or 1))
-        out[f"{pid}|{vid}"] = {"stock": stock, "active": active, "available": active and stock >= 1,
+        out[f"{pid}|{vid}"] = {"stock": stock, "active": active, "exists": bool(p) and not p.get("is_deleted"),
+                               "available": active and stock >= 1,
                                "enough": active and stock >= qty,
                                "leaf_category": ps.leaf_category(p, by_id) if p else None}
     return {"items": out}

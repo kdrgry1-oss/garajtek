@@ -281,16 +281,30 @@ export function CartProvider({ children }) {
       data = r.ok ? await r.json() : null;
     } catch { data = null; }
     if (!data || !data.items) return;
-    const gone = cur.filter((l) => !l.needsReplacement && data.items[`${l.productId}|${l.variantId || ""}`]
+    // Silinmiş / satıştan kaldırılmış ürün (set parçası değilse): "stokta yok" demek yanıltıcı →
+    // kalem sepetten çıkarılır ve kullanıcı bilgilendirilir.
+    const keyOf = (l) => `${l.productId}|${l.variantId || ""}`;
+    const isGone = (l) => { const i = data.items[keyOf(l)]; return !!i && (i.exists === false || i.active === false); };
+    const removed = cur.filter((l) => !l.setId && isGone(l));
+    if (removed.length) {
+      const ids = new Set(removed.map((l) => l.id));
+      setItems((prev) => prev.filter((l) => !ids.has(l.id)));
+      try {
+        toast.info(`${removed.length === 1 ? `“${removed[0].name}”` : `${removed.length} ürün`} artık satışta olmadığı için sepetinizden çıkarıldı.`);
+      } catch { /* yoksay */ }
+    }
+    const gone = cur.filter((l) => !(!l.setId && isGone(l))).filter((l) => !l.needsReplacement && data.items[`${l.productId}|${l.variantId || ""}`]
       && !data.items[`${l.productId}|${l.variantId || ""}`].available).map((l) => l.name);
     setItems((prev) => {
       let changed = false;
       const next = prev.map((l) => {
         const info = data.items[`${l.productId}|${l.variantId || ""}`];
         if (!info) return l;
+        if (!l.setId && (info.exists === false || info.active === false)) return l; // yukarıda çıkarıldı
         if (!l.needsReplacement && !info.available) {
           changed = true;
           return { ...l, needsReplacement: true, oosAuto: true, stock: 0,
+            discontinued: info.exists === false || info.active === false,
             replaceCategory: info.leaf_category || l.replaceCategory || null };
         }
         if (l.needsReplacement && info.available && info.stock >= (l.setQty || 1)) {
