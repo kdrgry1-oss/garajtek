@@ -92,7 +92,7 @@ def test_json_is_valid_and_reasonable(nodes):
         assert n["slug"] == sc.tr_slugify(n["name"])
         assert n.get("meta_title") and n.get("meta_description")
     tops = [n for n in nodes if not n.get("parent")]
-    assert 10 <= len(tops) <= 16
+    assert 10 <= len(tops) <= 20
     assert all(n.get("icon") for n in tops)
     # 3 seviyeyi aşmaz
     by_slug = {n["slug"]: n for n in nodes}
@@ -286,7 +286,7 @@ def test_storefront_filter_keeps_real_test_category_and_tree(nodes):
                         key=lambda c: c["sort_order"])
     assert [c["slug"] for c in menu_roots] == [
         n["slug"] for n in nodes if not n.get("parent") and n.get("show_in_menu") is not False]
-    assert len(menu_roots) == 15  # 14 ana kategori + Ürün Setleri (v2)
+    assert len(menu_roots) == 18  # 14 ana kategori + Ürün Setleri (v2) + 3 yeni (v3)
     assert menu_roots[10]["slug"] == "test-ve-ariza-tespit-cihazlari"
     # Panelden açılmış (seed_source'suz) aynı isimli kategori de gizlenmez
     assert not is_test_placeholder({"id": "1", "slug": "test-ve-ariza-tespit-cihazlari",
@@ -315,7 +315,7 @@ def test_added_categories_migration_on_existing_catalog(nodes):
     db = FakeDB()
     run(sc.seed_categories(db, old))
     assert not any(c["slug"] == "urun-setleri" for c in db.categories.docs)
-    assert run(sc.seed_added_categories(db, nodes)) == ["urun-setleri"]
+    assert run(sc.seed_added_categories(db, nodes)) == [n["slug"] for n in nodes if n.get("since")]
     top = next(c for c in db.categories.docs if c["slug"] == "urun-setleri")
     assert top["parent_id"] is None and top["name"] == "Ürün Setleri"
     assert run(sc.seed_added_categories(db, nodes)) == []  # idempotent

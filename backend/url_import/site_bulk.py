@@ -240,6 +240,8 @@ async def process_host(db, host: str, job) -> Dict[str, int]:
         st = item.get("status")
         upd = {"updated_at": _now(), "product_id": item.get("product_id") or ""}
         if st in ("imported", "updated"):
+            if item.get("product_id"):
+                await recategorize(db, only_ids=[item["product_id"]])
             upd["status"] = "done"
             counts[st] += 1
         elif st == "skipped":
@@ -254,6 +256,33 @@ async def process_host(db, host: str, job) -> Dict[str, int]:
             if job.counters.get("failed", 0) > before.get("failed", 0) and "HTTP 429" in upd["error"]:
                 await asyncio.sleep(60)
         await db.site_import_queue.update_one({"url": row["url"]}, {"$set": upd})
+
+
+async def recategorize(db, only_ids: Optional[List[str]] = None) -> int:
+    """Ürün adı kurallarıyla (keyword_cats) kategorisiz ya da yanlış kategorideki aktarılmış
+    ürünleri doğru yaprak kategoriye taşır (atalarıyla). Tekrarlanabilir; değişeni sayar."""
+    from .catmap import CategoryMapper
+    from .keyword_cats import match
+
+    cats = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "parent_id": 1,
+                                         "is_active": 1}).to_list(5000)
+    mapper = CategoryMapper(cats)
+    by_slug = {c.get("slug"): c for c in cats if c.get("slug")}
+    q: Dict = {"seed_source": SEED_SOURCE}
+    if only_ids is not None:
+        q["id"] = {"$in": only_ids}
+    changed = 0
+    async for p in db.products.find(q, {"_id": 0, "id": 1, "name": 1, "category_id": 1}):
+        slug = match(p.get("name") or "", has_category=bool(p.get("category_id")))
+        cat = by_slug.get(slug) if slug else None
+        if not cat or str(cat.get("id")) == str(p.get("category_id") or ""):
+            continue
+        ids = mapper.ancestors(str(cat["id"]))
+        await db.products.update_one({"id": p["id"]}, {"$set": {
+            "categories": ids[:1], "category_id": ids[0], "category_name": cat.get("name") or "",
+            "category_ids": ids, "category_source": "kural", "updated_at": _now()}})
+        changed += 1
+    return changed
 
 
 async def cleanup_non_products(db, delete_file) -> dict:
@@ -310,6 +339,9 @@ async def run(db, *, create_product, store_image, delete_file, sites: Optional[L
         await _set_state(db, discovered=discovered)
         logger.warning("[%s] %s: %s ile %d adres bulundu", SEED_SOURCE, host, method, len(urls))
 
+    recat = await recategorize(db)
+    if recat:
+        logger.warning("[%s] ürün adına göre kategori düzeltildi: %d", SEED_SOURCE, recat)
     cleaned = await cleanup_non_products(db, delete_file)
     if cleaned["removed_products"] or cleaned["skipped"]:
         logger.warning("[%s] ürün olmayan adresler ayıklandı: %s", SEED_SOURCE, cleaned)

@@ -100,3 +100,29 @@ def test_tag_pages_skipped_and_wrong_imports_removed(db, monkeypatch):
     assert res == {"skipped": 1, "removed_products": 1, "removed_files": 1}
     assert _run(db.products.count_documents({})) == 1
     assert _run(db.site_import_queue.find_one({"url": tag}))["status"] == "skipped"
+
+
+def test_recategorize_by_name_rules(db):
+    from seed_categories import load_tree, seed_categories
+    _run(seed_categories(db, load_tree()))
+    cats = {c["slug"]: c for c in _run(db.categories.find({}, {"_id": 0}).to_list(500))}
+    fren_test = cats["fren-test-cihazlari"]["id"]
+    _run(db.products.insert_many([
+        {"id": "a", "seed_source": SB.SEED_SOURCE, "name": "Grayzer Silikon Sprey 500 ML", "category_id": ""},
+        {"id": "b", "seed_source": SB.SEED_SOURCE, "name": "Grayzer Fren Balata Temizleme Spreyi 500 ML",
+         "category_id": fren_test},
+        {"id": "c", "seed_source": SB.SEED_SOURCE, "name": "DHT 125 mm Tezgah Üstü Mengene", "category_id": ""},
+        {"id": "d", "seed_source": SB.SEED_SOURCE, "name": "DHT 1 Ton Katlanır Hidrolik Vinç",
+         "category_id": cats["motor-vincleri"]["id"]},
+        {"id": "e", "seed_source": "baska", "name": "Silikon Sprey", "category_id": ""},
+    ]))
+    assert _run(SB.recategorize(db)) == 3
+    get = lambda i: _run(db.products.find_one({"id": i}, {"_id": 0}))  # noqa: E731
+    a = get("a")
+    assert a["category_id"] == cats["temizleme-ve-bakim-spreyleri"]["id"]
+    assert a["category_ids"][-1] == cats["bakim-kimyasallari-ve-spreyler"]["id"]
+    assert get("b")["category_name"] == "Temizleme ve Bakım Spreyleri"
+    assert get("c")["category_id"] == cats["mengeneler"]["id"]
+    assert get("d")["category_id"] == cats["motor-vincleri"]["id"]
+    assert get("e")["category_id"] == ""
+    assert _run(SB.recategorize(db)) == 0

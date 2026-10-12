@@ -820,6 +820,215 @@
       "meta_description": "İndirimli Ürünler: kampanyalı ve indirimli atölye ekipmanları. Garajtek'te uygun fiyat ve taksit seçenekleriyle.",
       "source": "grayzer",
       "show_in_menu": false
+    },
+    {
+      "slug": "bakim-kimyasallari-ve-spreyler",
+      "name": "Bakım Kimyasalları ve Spreyler",
+      "parent": null,
+      "sort_order": 150,
+      "icon": "spray-can",
+      "meta_title": "Bakım Kimyasalları ve Spreyler | Garajtek",
+      "meta_description": "Motor, fren, yakıt sistemi ve radyatör için temizleyici ve bakım spreyleri, sıvı conta ve katkılar. Garajtek'te.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "temizleme-ve-bakim-spreyleri",
+      "name": "Temizleme ve Bakım Spreyleri",
+      "parent": "bakim-kimyasallari-ve-spreyler",
+      "sort_order": 10,
+      "icon": "spray-can",
+      "meta_title": "Temizleme ve Bakım Spreyleri | Garajtek",
+      "meta_description": "Motor temizleme, fren balata temizleme, pas sökücü, silikon ve çok amaçlı bakım spreyleri.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "yakit-motor-ve-radyator-katkilari",
+      "name": "Yakıt, Motor ve Radyatör Katkıları",
+      "parent": "bakim-kimyasallari-ve-spreyler",
+      "sort_order": 20,
+      "icon": "droplet",
+      "meta_title": "Yakıt, Motor ve Radyatör Katkıları | Garajtek",
+      "meta_description": "Enjektör ve yakıt sistemi temizleyicileri, motor iç temizleyici, radyatör temizleyici ve sızıntı önleyiciler.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "sivi-conta-ve-yapistiricilar",
+      "name": "Sıvı Conta ve Yapıştırıcılar",
+      "parent": "bakim-kimyasallari-ve-spreyler",
+      "sort_order": 30,
+      "icon": "droplet",
+      "meta_title": "Sıvı Conta ve Yapıştırıcılar | Garajtek",
+      "meta_description": "RTV sıvı conta ve atölye yapıştırıcıları.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "oto-aksesuar-ve-arac-koruma",
+      "name": "Oto Aksesuar ve Araç Koruma",
+      "parent": null,
+      "sort_order": 155,
+      "icon": "car",
+      "meta_title": "Oto Aksesuar ve Araç Koruma | Garajtek",
+      "meta_description": "Servis sırasında aracı koruyan koltuk kılıfı, direksiyon kılıfı, streç ve koruma setleri.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "koltuk-direksiyon-ve-arac-koruma",
+      "name": "Koltuk, Direksiyon ve Araç Koruma",
+      "parent": "oto-aksesuar-ve-arac-koruma",
+      "sort_order": 10,
+      "icon": "car",
+      "meta_title": "Koltuk, Direksiyon ve Araç Koruma | Garajtek",
+      "meta_description": "Tek kullanımlık koltuk kılıfları, direksiyon streci ve kılıfı, araç koruma setleri ve rulo askı aparatları.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "atolye-ekipmanlari-ve-sarf",
+      "name": "Atölye Ekipmanları ve Sarf",
+      "parent": null,
+      "sort_order": 160,
+      "icon": "warehouse",
+      "meta_title": "Atölye Ekipmanları ve Sarf | Garajtek",
+      "meta_description": "Mengene, yatma tahtası, tamirci koltuğu, manyetik tepsi, o-ring setleri ve iş güvenliği ürünleri.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "mengeneler",
+      "name": "Mengeneler",
+      "parent": "atolye-ekipmanlari-ve-sarf",
+      "sort_order": 10,
+      "icon": "vise",
+      "meta_title": "Mengeneler | Garajtek",
+      "meta_description": "Tezgah üstü mengeneler: 100–200 mm çene genişliği, sabit ve döner tabanlı modeller.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "yatma-tahtalari-ve-tamirci-koltuklari",
+      "name": "Yatma Tahtaları ve Tamirci Koltukları",
+      "parent": "atolye-ekipmanlari-ve-sarf",
+      "sort_order": 20,
+      "icon": "armchair",
+      "meta_title": "Yatma Tahtaları ve Tamirci Koltukları | Garajtek",
+      "meta_description": "Araç altı yatma tahtaları, tabureli bakım tablaları ve çekmeceli tamirci koltukları.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "manyetik-tepsi-aski-ve-duzenleyiciler",
+      "name": "Manyetik Tepsi, Askı ve Düzenleyiciler",
+      "parent": "atolye-ekipmanlari-ve-sarf",
+      "sort_order": 30,
+      "icon": "magnet",
+      "meta_title": "Manyetik Tepsi, Askı ve Düzenleyiciler | Garajtek",
+      "meta_description": "Manyetik takım tepsileri, mıknatıslı anten, pano askı kancaları ve takım çantaları.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "o-ring-ve-sarf-malzemeleri",
+      "name": "O-Ring ve Sarf Malzemeleri",
+      "parent": "atolye-ekipmanlari-ve-sarf",
+      "sort_order": 40,
+      "icon": "circle",
+      "meta_title": "O-Ring ve Sarf Malzemeleri | Garajtek",
+      "meta_description": "O-ring ve conta setleri, tel fırçalar ve atölye sarf malzemeleri.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "is-guvenligi",
+      "name": "İş Güvenliği",
+      "parent": "atolye-ekipmanlari-ve-sarf",
+      "sort_order": 50,
+      "icon": "shield",
+      "meta_title": "İş Güvenliği | Garajtek",
+      "meta_description": "İş güvenliği ayakkabıları ve kişisel koruyucu ekipmanlar.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "bits-uc-setleri",
+      "name": "Bits Uç Setleri",
+      "parent": "el-aletleri",
+      "sort_order": 85,
+      "icon": "wrench",
+      "meta_title": "Bits Uç Setleri | Garajtek",
+      "meta_description": "Torx, allen ve yıldız bits uç setleri, kaplamalı profesyonel uçlar.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "rulman-ve-rayli-cektirmeler",
+      "name": "Rulman ve Raylı Çektirmeler",
+      "parent": "el-aletleri",
+      "sort_order": 86,
+      "icon": "wrench",
+      "meta_title": "Rulman ve Raylı Çektirmeler | Garajtek",
+      "meta_description": "Rulman çektirme, raylı çektirme ve yatak çektirme setleri.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "olcum-aletleri",
+      "name": "Ölçüm Aletleri",
+      "parent": "el-aletleri",
+      "sort_order": 87,
+      "icon": "ruler",
+      "meta_title": "Ölçüm Aletleri | Garajtek",
+      "meta_description": "Kumpas, sentil (feeler) ve hassas ölçüm aletleri.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "ege-testere-ve-pafta-kilavuz",
+      "name": "Eğe, Testere ve Pafta Kılavuz",
+      "parent": "el-aletleri",
+      "sort_order": 88,
+      "icon": "wrench",
+      "meta_title": "Eğe, Testere ve Pafta Kılavuz | Garajtek",
+      "meta_description": "Eğe setleri, testere kolları ve pafta-kılavuz takımları.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "tas-motorlari",
+      "name": "Taş Motorları",
+      "parent": "elektrikli-ve-sarjli-el-aletleri",
+      "sort_order": 60,
+      "icon": "disc",
+      "meta_title": "Taş Motorları | Garajtek",
+      "meta_description": "Tezgah tipi taş motorları, tel fırçalı ve ışıklı modeller.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "kaporta-cektirme-spot-makineleri",
+      "name": "Kaporta Çektirme (Spot) Makineleri",
+      "parent": "kaynak-kesme-ve-aydinlatma",
+      "sort_order": 40,
+      "icon": "zap",
+      "meta_title": "Kaporta Çektirme (Spot) Makineleri | Garajtek",
+      "meta_description": "Spot kaporta çektirme makineleri ve kaporta dayama setleri.",
+      "source": "garajtek",
+      "since": 3
+    },
+    {
+      "slug": "kontrol-kalemleri-ve-olcum-cihazlari",
+      "name": "Kontrol Kalemleri ve Ölçüm Cihazları",
+      "parent": "test-ve-ariza-tespit-cihazlari",
+      "sort_order": 70,
+      "icon": "gauge",
+      "meta_title": "Kontrol Kalemleri ve Ölçüm Cihazları | Garajtek",
+      "meta_description": "Oto kontrol kalemleri, steteskop, endoskop kamera, lazerli termometre, boya ve izolasyon ölçüm cihazları.",
+      "source": "garajtek",
+      "since": 3
     }
   ]
 }
