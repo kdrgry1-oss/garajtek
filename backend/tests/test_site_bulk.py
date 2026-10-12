@@ -83,3 +83,20 @@ def test_crawl_fallback_without_sitemap(db, monkeypatch):
             assert await SB.discover_sitemap(f, B) == []
             return await SB.discover_crawl(f, B)
     assert _run(go()) == [f"{B}/urun/lift-4-ton"]
+
+
+def test_tag_pages_skipped_and_wrong_imports_removed(db, monkeypatch):
+    monkeypatch.delenv("URL_IMPORT_ALLOW_PRIVATE", raising=False)
+    store = Store(db)
+    assert SB.is_candidate(f"{B}/meta-etiket/duz-keski-fiyat", B) is False
+    assert SB.is_candidate(f"{B}/takim-arabalari-7-cekmeceli", B) is True
+    tag = f"{B}/meta-etiket/duz-keski"
+    _run(db.site_import_queue.insert_one({"url": tag, "host": "shop.example", "status": "done", "attempts": 0}))
+    _run(db.site_import_queue.insert_one({"url": f"{B}/urun/a", "host": "shop.example", "status": "done"}))
+    _run(db.products.insert_one({"id": "t1", "seed_source": SB.SEED_SOURCE, "source_url": tag}))
+    _run(db.products.insert_one({"id": "ok1", "seed_source": SB.SEED_SOURCE, "source_url": f"{B}/urun/a"}))
+    _run(db.files.insert_one({"id": "f1", "seed_source": SB.SEED_SOURCE, "source_page": tag}))
+    res = _run(SB.cleanup_non_products(db, store.delete))
+    assert res == {"skipped": 1, "removed_products": 1, "removed_files": 1}
+    assert _run(db.products.count_documents({})) == 1
+    assert _run(db.site_import_queue.find_one({"url": tag}))["status"] == "skipped"

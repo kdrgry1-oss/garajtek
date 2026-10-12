@@ -46,6 +46,10 @@ START_DELAY = 90  # açılıştaki diğer tohumlar (kategori, fatura ürünleri)
 LOC_RE = re.compile(r"<loc>\s*(?:<!\[CDATA\[)?\s*([^<\]\s]+)\s*(?:\]\]>)?\s*</loc>", re.I)
 PRODUCT_SITEMAP_RE = re.compile(r"(product|urun|item)", re.I)
 SKIP_SITEMAP_RE = re.compile(r"(categor|kategori|brand|marka|blog|page|sayfa|post|tag|image|video|news)", re.I)
+# etiket / arama / SEO açılış sayfaları (ör. grayzer.net/meta-etiket/duz-keski-fiyat) ürün değildir
+TAG_PATH_RE = re.compile(r"/(?:[^/]*-)?(etiket|etiketler|tag|tags|arama|search|filtre|filter|marka|markalar|"
+                         r"brand|brands)(?:-[^/]*)?/", re.I)
+PRODUCT_PATH_MIN = 20  # sitede bu kadar /urun/ biçimli adres varsa yalnız onlar ürün sayılır
 ASSET_RE = re.compile(r"\.(jpe?g|png|gif|webp|svg|pdf|css|js|xml|zip)(\?|$)", re.I)
 
 
@@ -81,6 +85,8 @@ def is_candidate(url: str, base: str) -> bool:
     if not _same_host(url, base) or ASSET_RE.search(url):
         return False
     path = urlsplit(url).path or "/"
+    if TAG_PATH_RE.search(path.rsplit("/", 1)[0] + "/"):  # yalnız klasör kısmı (son parça ürün adı olabilir)
+        return False
     if PRODUCT_PATH.search(url):
         return True
     return path not in ("", "/") and not NON_PRODUCT_PATH.search(path)
@@ -123,6 +129,9 @@ async def discover_sitemap(fetcher: Fetcher, base: str) -> List[str]:
         bucket = product_urls if name_is_prod else other_urls
         bucket.extend(u for u in locs if is_candidate(u, base))
     urls = product_urls or other_urls
+    strict = [u for u in urls if PRODUCT_PATH.search(u)]
+    if len(strict) >= PRODUCT_PATH_MIN:
+        urls = strict
     out, seen = [], set()
     for u in urls:
         k = clean_url(u)
@@ -247,6 +256,37 @@ async def process_host(db, host: str, job) -> Dict[str, int]:
         await db.site_import_queue.update_one({"url": row["url"]}, {"$set": upd})
 
 
+async def cleanup_non_products(db, delete_file) -> dict:
+    """Kuyruktaki ürün olmayan adresleri (etiket/SEO sayfaları) atlar, bunlardan açılmış ürünleri ve
+    görsellerini siler. Her çalıştırmada güvenle tekrarlanabilir."""
+    hosts: Dict[str, List[dict]] = {}
+    async for r in db.site_import_queue.find({}, {"_id": 0, "url": 1, "host": 1, "status": 1}):
+        hosts.setdefault(r.get("host") or "", []).append(r)
+    bad: List[str] = []
+    for host, rows in hosts.items():
+        base = "https://" + host
+        strict = sum(1 for r in rows if PRODUCT_PATH.search(r["url"])) >= PRODUCT_PATH_MIN
+        for r in rows:
+            if not is_candidate(r["url"], base) or (strict and not PRODUCT_PATH.search(r["url"])):
+                bad.append(r["url"])
+    removed = files = 0
+    for u in bad:
+        await db.site_import_queue.update_one({"url": u}, {"$set": {"status": "skipped", "reason": "not_product",
+                                                                    "updated_at": _now()}})
+        p = await db.products.find_one({"seed_source": SEED_SOURCE, "source_url": u}, {"_id": 0, "id": 1})
+        for rec in await db.files.find({"seed_source": SEED_SOURCE, "source_page": u}, {"_id": 0}).to_list(50):
+            try:
+                await delete_file(rec)
+            except Exception:  # noqa: BLE001
+                pass
+            await db.files.delete_one({"id": rec.get("id")})
+            files += 1
+        if p:
+            await db.products.delete_one({"id": p["id"]})
+            removed += 1
+    return {"skipped": len(bad), "removed_products": removed, "removed_files": files}
+
+
 async def run(db, *, create_product, store_image, delete_file, sites: Optional[List[str]] = None,
               fetcher_factory=Fetcher) -> dict:
     sites = sites or SITES
@@ -269,6 +309,10 @@ async def run(db, *, create_product, store_image, delete_file, sites: Optional[L
         discovered[host] = {"method": method, "found": len(urls), "added": added, "at": _now()}
         await _set_state(db, discovered=discovered)
         logger.warning("[%s] %s: %s ile %d adres bulundu", SEED_SOURCE, host, method, len(urls))
+
+    cleaned = await cleanup_non_products(db, delete_file)
+    if cleaned["removed_products"] or cleaned["skipped"]:
+        logger.warning("[%s] ürün olmayan adresler ayıklandı: %s", SEED_SOURCE, cleaned)
 
     async def _worker(base):
         f = fetcher_factory()
