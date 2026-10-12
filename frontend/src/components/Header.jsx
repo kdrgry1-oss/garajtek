@@ -781,7 +781,7 @@ export default function Header({ announcement, announcementFirst = false, announ
         <header id="header" className="u-header u-header-left-aligned-nav" ref={headerRef} data-testid="site-header">
           <div className="u-header__section">
             {/* Topbar */}
-            {tb.enabled !== false && <div className={`u-header-topbar py-2 d-none d-${tb.hide_below === "lg" ? "lg" : "xl"}-block${topCls}${hlCls("topbar")}`} data-menu-group="topbar" data-testid="topbar">
+            {tb.enabled !== false && <div className={`u-header-topbar el-topbar py-2 d-none d-${tb.hide_below === "lg" ? "lg" : "xl"}-block${topCls}${hlCls("topbar")}`} data-menu-group="topbar" data-testid="topbar">
               <div className="container">
                 <div className="d-flex align-items-center">
                   <div className="topbar-left">
@@ -822,7 +822,7 @@ export default function Header({ announcement, announcementFirst = false, announ
             {annBelow && topAnnouncement}
 
             {/* Logo + arama/menü + ikonlar */}
-            <div className={`py-2 ${home ? "py-xl-5" : "py-xl-4"}${hd.mobile_band_primary === false ? "" : " bg-primary-down-lg"}${hv === "v3_full_color" && home ? " bg-primary" : ""}`}>
+            <div className={`el-masthead py-2 ${home ? "py-xl-5" : "py-xl-4"}${hd.mobile_band_primary === false ? "" : " bg-primary-down-lg"}${hv === "v3_full_color" && home ? " bg-primary" : ""}`}>
               <div className="container my-0dot5 my-xl-0">
                 <div className="row align-items-center">
                   <div className="col-auto">

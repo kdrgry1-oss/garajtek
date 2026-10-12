@@ -391,5 +391,12 @@ async def run_startup(db=None) -> None:
         res = await run(db, create_product=lambda d: create_product(d, req, user),
                         store_image=store_image_bytes, delete_file=delete_stored_file)
         logger.warning("[%s] bitti: %s", SEED_SOURCE, res)
+        try:
+            from routes.product_sets import create_set_product
+            from .site_sets import create_sets_once
+            sets = await create_sets_once(db, create_set=lambda d: create_set_product(d, req, user))
+            logger.warning("[%s] ürün setleri: %s", SEED_SOURCE, sets)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[%s] set oluşturma hatası: %s", SEED_SOURCE, e)
     except Exception as e:  # noqa: BLE001
         logger.exception("[%s] site aktarımı hatası: %s", SEED_SOURCE, e)

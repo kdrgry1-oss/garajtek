@@ -27,3 +27,24 @@
   .electro .pd-feat--v1:not(.pd-feat--vertical) .pd-feat__item + .pd-feat__item { border-left: 0; }
   .electro .pd-feat--v1:not(.pd-feat--vertical) .pd-feat__item:last-child { border-bottom: 0; }
 }
+/* stats — istatistik bandı: büyük sayı + açıklama, eşit hücreler, masaüstünde tek satır, mobilde 2 sütun */
+.electro .pd-feat--stats .pd-feat__stats { display: grid; grid-template-columns: repeat(var(--pd-feat-cols, 4), minmax(0, 1fr));
+  background-color: var(--pd-feat-bg, #fff); }
+.electro .pd-feat--stats-border .pd-feat__stats { border: 1px solid #e7eaf0; border-radius: 8px; overflow: hidden; }
+.electro .pd-feat__stat { display: flex; flex-direction: column; justify-content: center; padding: var(--pd-feat-py, 1.6em) 1.5em;
+  min-height: 110px; color: inherit; }
+.electro a.pd-feat__stat:hover { text-decoration: none; background: rgba(0, 0, 0, .02); }
+.electro .pd-feat--stats-border .pd-feat__stat + .pd-feat__stat { border-left: 1px solid #e7eaf0; }
+.electro .pd-feat__stat-icon .pd-feat__i { font-size: 1.8em; margin-bottom: .35em; }
+.electro .pd-feat__stat-num { font-size: 2em; font-weight: 800; line-height: 1.1; letter-spacing: -.02em; color: var(--pd-feat-color, #333e48); }
+.electro .pd-feat__stat-num::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 4px; border-radius: 50%;
+  vertical-align: top; background: var(--pd-feat-icon, var(--electro-primary, #fed700)); }
+.electro .pd-feat__stat-txt { margin-top: .3em; font-size: .929em; color: #6b7280; }
+@media (max-width: 767.98px) {
+  .electro .pd-feat--stats .pd-feat__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .electro .pd-feat__stat { min-height: 90px; padding: 1.1em 1em; }
+  .electro .pd-feat__stat-num { font-size: 1.5em; }
+  .electro .pd-feat--stats-border .pd-feat__stat + .pd-feat__stat { border-left: 0; }
+  .electro .pd-feat--stats-border .pd-feat__stat:nth-child(2n) { border-left: 1px solid #e7eaf0; }
+  .electro .pd-feat--stats-border .pd-feat__stat:nth-child(n+3) { border-top: 1px solid #e7eaf0; }
+}

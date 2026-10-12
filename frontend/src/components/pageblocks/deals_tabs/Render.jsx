@@ -140,20 +140,26 @@ export default function Render({ settings }) {
   const def = Math.min(Math.max(0, Number(st.default_tab) || 0), Math.max(0, tabs.length - 1));
   const active = picked !== null && tabs.some((t) => t.i === picked) ? picked : (tabs[def] ? tabs[def].i : 0);
   const cur = tabs.find((t) => t.i === active) || null;
-  const items = useProductSource(cur ? cur.source : null);
   const src = useMemo(() => (!deal.enabled ? null : deal.mode === "manual"
     ? (deal.product ? { kind: "manual", product_ids: [deal.product], limit: 1 } : null)
     : { kind: "discounted", sort: "discount_desc", limit: 1, exclude_out_of_stock: true }), [deal.enabled, deal.mode, deal.product]);
   const dealList = useProductSource(src);
   const product = (dealList || [])[0] || null;
+  // v1'de özel teklif kartı yoksa sekme ızgarası tam genişliğe yayılır: masaüstünde 5'li, 2 sıra (10 ürün).
+  const wideGrid = variant === "v1" && (!src || (Array.isArray(dealList) && !dealList.length));
+  const tabSource = useMemo(() => {
+    if (!cur || !cur.source) return null;
+    return wideGrid ? { ...cur.source, limit: Math.max(Number(cur.source.limit) || 0, 10) } : cur.source;
+  }, [cur, wideGrid]);
+  const items = useProductSource(tabSource);
   if (!tabs.length && !product) return null;
   const n = Number(st.columns) || 3;
   // şablon kırılımları: v1 col-lg-8 içinde n sütun; v2 col-md-4 / col-wd-3 (1200–1479'da 3 sütun, 7.–8. ürün gizli);
   // indirim sekmeleri col-md-4 / col-xl-3 / col-wd-2gdot4 (1480+'da 5 sütun).
-  const cols = variant === "v1" ? { desktop: n, tablet: Math.min(n, 3), mobile: 1 }
+  const cols = variant === "v1" ? (wideGrid ? { desktop: Math.max(n, 5), tablet: 3, mobile: 2 } : { desktop: n, tablet: Math.min(n, 3), mobile: 2 })
     : variant === "v2" ? { wide: n, desktop: Math.min(n, 3), tablet: Math.min(n, 3), mobile: Math.min(n, 2), xlMax: n > 3 ? 6 : 0 }
       : { wide: n, desktop: Math.min(n, 4), tablet: Math.min(n, 3), mobile: Math.min(n, 2) };
-  const gridSt = { ...st, _limit: cur?.source?.limit };
+  const gridSt = { ...st, _limit: tabSource?.limit ?? cur?.source?.limit };
   const right = tabs.length ? (
     <>
       {variant !== "discount_tabs" && <TabNav tabs={tabs} active={active} setActive={setActive} variant={variant} align={st.tab_align} />}

@@ -123,3 +123,26 @@
 .gt-codq-submit { font-weight: 700; font-size: 16px; padding: 12px; border-radius: 1.5rem; margin-top: 6px; }
 @media (max-width: 575px) { .gt-codq-grid, .gt-codq-pds { grid-template-columns: 1fr; } .gt-codq-overlay { padding: 0; } .gt-codq { border-radius: 0; min-height: 100%; } }
 .gt-codq a, .electro .gt-codq a { color: #0062bd; text-decoration: underline; }
+
+/* Ürün sayfası satın alma butonları — 2×2: [Kapıda Öde | WhatsApp] / [Sepete Ekle | Hemen Al] */
+.gt-buy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.electro .btn.gt-buy-btn, .gt-buy-btn { display: flex; align-items: center; justify-content: center; min-height: 54px;
+  padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 15px; line-height: 1.2; text-align: center;
+  white-space: normal; border: 0; }
+.electro .btn.gt-buy-btn i { font-size: 18px; }
+.electro .btn.el-cod-btn--grid { margin: 0; flex-direction: column; box-shadow: none; }
+.electro .btn.el-cod-btn--grid .el-cod-btn-title { font-size: 15px; }
+.electro .btn.el-cod-btn--grid .el-cod-btn-sub { font-size: 11.5px; }
+.electro .btn.gt-buy-btn--wa { background: #25d366; color: #fff; }
+.electro .btn.gt-buy-btn--wa:hover { background: #1ebe5b; color: #fff; }
+.electro .btn.gt-buy-btn--cart { background: var(--electro-primary, #fed700); color: #333e48; }
+.electro .btn.gt-buy-btn--cart:hover { filter: brightness(.95); color: #333e48; }
+.electro .btn.gt-buy-btn--now { background: #d71920; color: #fff; }
+.electro .btn.gt-buy-btn--now:hover { background: #b9141a; color: #fff; }
+.electro .btn.gt-buy-btn:disabled { opacity: .6; }
+@media (max-width: 575.98px) {
+  .gt-buy-grid { gap: 8px; }
+  .electro .btn.gt-buy-btn, .gt-buy-btn { min-height: 50px; font-size: 13.5px; padding: 6px 8px; }
+  .electro .btn.el-cod-btn--grid .el-cod-btn-title { font-size: 13px; }
+  .electro .btn.el-cod-btn--grid .el-cod-btn-sub { display: none; }
+}

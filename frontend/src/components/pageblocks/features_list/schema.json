@@ -36,6 +36,19 @@
           }
         }
       }
+    },
+    {
+      "value": "stats",
+      "label": "İstatistik bandı – büyük sayı + açıklama (mobilde 2 sütun)",
+      "defaults_patch": {
+        "_section": {
+          "margin_bottom": {
+            "desktop": 40,
+            "tablet": 32,
+            "mobile": 24
+          }
+        }
+      }
     }
   ],
   "tabs": [

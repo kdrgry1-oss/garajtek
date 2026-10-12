@@ -38,12 +38,12 @@ SCHEMA_VERSION = 2
 DEFAULT_HOME = [
     ("hero_slider", "v1", "Ana Slider"),
     ("ads_block", "v1", "Reklam Kutuları"),
+    ("brands_carousel", "", "Markalar"),
     ("deals_tabs", "v1", "Özel Teklif ve Ürün Sekmeleri"),
     ("product_grid_212", "2_1_2", "Kategori Fırsatları (2-1-2)"),
     ("best_sellers", "", "Çok Satanlar"),
     ("full_banner", "image", "Tam Genişlik Banner"),
     ("product_slider", "", "Yeni Eklenenler"),
-    ("brands_carousel", "", "Markalar"),
     ("product_columns", "", "Alt Ürün Sütunları"),
 ]
 

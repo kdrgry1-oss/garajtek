@@ -28,6 +28,26 @@ export default function Render({ settings }) {
     "--pd-feat-py": `${Number(st.padding_y ?? 2.143)}em`,
     "--pd-feat-w": `${100 / cols}%`,
   };
+  if (st._variant === "stats" && !vertical) {
+    // İstatistik bandı: büyük sayı/başlık (strong_text) + küçük açıklama; ikon varsa sayının üstünde.
+    return (
+      <div data-testid="features-list" className={`pd-feat pd-feat--stats${st.border === false ? "" : " pd-feat--stats-border"}`}
+        style={{ ...style, "--pd-feat-cols": items.length }}>
+        <div className="pd-feat__stats">
+          {items.map((it, i) => {
+            const f = `items.${i}`;
+            return (
+              <SmartLink key={it._id || i} link={it.link} fallback="div" className="pd-feat__stat text-reset">
+                {it.icon && (it.icon.icon || (it.icon.image && it.icon.image.url)) ? <div className="pd-feat__stat-icon"><Icon icon={it.icon} f={f} /></div> : null}
+                {it.strong_text && <span className="pd-feat__stat-num" data-pd-field={`${f}.strong_text`}>{it.strong_text}</span>}
+                {it.text && <span className="pd-feat__stat-txt" data-pd-field={`${f}.text`}>{it.text}</span>}
+              </SmartLink>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
   if (v2 && !vertical) {
     return (
       <div data-testid="features-list" className="pd-feat pd-feat--v2" style={style}>

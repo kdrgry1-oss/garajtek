@@ -35,11 +35,11 @@ SEED_STATE_ID = "legal_pages_seed"
 COMPANY_DEFAULTS = {
     ("brand", "store_name"): "GarajTek",
     ("company", "legal_name"): "USTAELLER TEKNİK YAPI HIRDAVAT SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
-    ("company", "address"): "Mahmutbey Mah. 2453. Sk. No: 46",
-    ("company", "city"): "Bağcılar / İstanbul",
+    ("company", "address"): "Tekstilkent, A16 Blok No: 20",
+    ("company", "city"): "Esenler / İstanbul",
     ("company", "tax_office"): "Güneşli",
     ("company", "tax_number"): "8961050800",
-    ("contact", "phone"): "0543 579 10 56",
+    ("contact", "phone"): "0543 276 89 73",
     ("contact", "email"): "info@garajtek.com",
     ("domains", "storefront_url"): "https://garajtek.com",
 }

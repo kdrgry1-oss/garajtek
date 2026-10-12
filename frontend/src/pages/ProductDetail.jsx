@@ -27,6 +27,7 @@ import { SITE_NAME } from "../lib/brand";
 import ProductSetPanel from "../components/sets/ProductSetPanel";
 import { CodInfoRow } from "../components/electro/CodInfo";
 import CodQuickOrder from "../components/cod/CodQuickOrder";
+import WhatsAppOrderButton from "../components/cod/WhatsAppOrderButton";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -438,20 +439,20 @@ export default function ProductDetail() {
   const handleAddToCart = () => {
     if (product.variants?.length > 0 && !selectedVariant) {
       toast.error(`Lütfen ${(product.variant_labels?.size || "seçenek").toLocaleLowerCase("tr")} seçiniz`);
-      return;
+      return false;
     }
 
     // Varyantsız ürünlerde ürün stoğu yoksa engelle (tükendi)
     if (!(product.variants?.length > 0) && (Number(product.stock) || 0) <= 0) {
       toast.error("Bu ürün tükendi");
-      return;
+      return false;
     }
     
     // Check stock for selected variant (string/null/negatif stoğa karşı sağlam)
     const _selStock = Number(selectedVariant?.stock);
     if (selectedVariant && (!Number.isFinite(_selStock) || _selStock < quantity)) {
       toast.error(_selStock > 0 ? `Yetersiz stok! Mevcut stok: ${_selStock}` : "Bu seçenek tükendi");
-      return;
+      return false;
     }
     
     addItem(product, selectedVariant, quantity);
@@ -472,6 +473,12 @@ export default function ProductDetail() {
     );
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1600);
+    return true;
+  };
+
+  // "Hemen Al": sepete ekler ve doğrudan ödeme sayfasına geçer (kart/havale vb. tüm yöntemler).
+  const handleBuyNow = () => {
+    if (handleAddToCart()) navigate("/odeme");
   };
 
   const handleSizeSelect = (variant) => {
@@ -771,29 +778,36 @@ export default function ProductDetail() {
                     <p className="mb-3 font-size-14 font-weight-bold text-red" data-testid="pdp-low-stock"><i className="fas fa-fire mr-1" /> Son {stockNow} ürün!</p>
                   )}
 
-                  {!oosSelected && <CodQuickOrder product={product} variant={selectedVariant} quantity={quantity} />}
-                  <div className="d-md-flex align-items-end mb-3">
-                    {!oosSelected && (
-                      <div className="max-width-150 mb-4 mb-md-0">
-                        <h6 className="font-size-14">Adet</h6>
+                  {!oosSelected && (
+                    <div className="mb-3">
+                      <h6 className="font-size-14">Adet</h6>
+                      <div className="max-width-150">
                         <QuantityInput value={quantity} onChange={setQuantity} min={Math.max(1, Number(product.min_order_qty) || 1)} max={maxQty} testId="pdp-qty" />
                       </div>
-                    )}
-                    <div className={oosSelected ? "" : "ml-md-3"}>
-                      {oosSelected ? (
-                        <button type="button" onClick={() => setNotifyOpen((v) => !v)} data-testid="notify-toggle-btn" className="btn px-5 btn-primary-dark transition-3d-hover">
-                          <i className="ec ec-mail mr-2 font-size-20" /> Gelince Haber Ver
-                        </button>
-                      ) : (
-                        <button type="button" onClick={handleAddToCart} data-testid="add-to-cart-btn" disabled={hasVariants && !selectedVariant}
-                          className={`btn px-5 transition-3d-hover ${justAdded ? "btn-success" : "btn-primary-dark"}`}>
-                          {hasVariants && !selectedVariant ? "Seçenek Seçiniz" : justAdded
-                            ? <><i className="fas fa-check mr-2" /> Sepete Eklendi</>
-                            : <><i className="ec ec-add-to-cart mr-2 font-size-20" /> Sepete Ekle</>}
-                        </button>
-                      )}
                     </div>
-                  </div>
+                  )}
+                  {oosSelected ? (
+                    <div className="mb-3">
+                      <button type="button" onClick={() => setNotifyOpen((v) => !v)} data-testid="notify-toggle-btn" className="btn px-5 btn-primary-dark transition-3d-hover">
+                        <i className="ec ec-mail mr-2 font-size-20" /> Gelince Haber Ver
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="gt-buy-grid mb-3" data-testid="pdp-buy-grid">
+                      <CodQuickOrder product={product} variant={selectedVariant} quantity={quantity} grid />
+                      <WhatsAppOrderButton product={product} variant={selectedVariant} quantity={quantity} />
+                      <button type="button" onClick={handleAddToCart} data-testid="add-to-cart-btn" disabled={hasVariants && !selectedVariant}
+                        className={`btn gt-buy-btn ${justAdded ? "btn-success" : "gt-buy-btn--cart"}`}>
+                        {hasVariants && !selectedVariant ? "Seçenek Seçiniz" : justAdded
+                          ? <><i className="fas fa-check mr-2" /> Sepete Eklendi</>
+                          : <><i className="ec ec-add-to-cart mr-2" /> Sepete Ekle</>}
+                      </button>
+                      <button type="button" onClick={handleBuyNow} data-testid="buy-now-btn" disabled={hasVariants && !selectedVariant}
+                        className="btn gt-buy-btn gt-buy-btn--now">
+                        <i className="fas fa-bolt mr-2" /> Hemen Al
+                      </button>
+                    </div>
+                  )}
 
                   <CodInfoRow product={product} />
 

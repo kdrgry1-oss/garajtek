@@ -243,7 +243,7 @@ function CodOrderModal({ product, variant, initialQty, onClose }) {
 }
 
 /** Buton (+ modal). Kapıda ödeme kapalıysa / ürün uygun değilse / stokta yoksa HİÇ görünmez. */
-export default function CodQuickOrder({ product, variant = null, quantity = 1, compact = false }) {
+export default function CodQuickOrder({ product, variant = null, quantity = 1, compact = false, grid = false }) {
   const info = useCodInfo();
   const [open, setOpen] = useState(false);
   const ids = product?.product_type === "set" ? (product.set_items || []).map((i) => i.product_id) : [product?.id];
@@ -262,7 +262,7 @@ export default function CodQuickOrder({ product, variant = null, quantity = 1, c
           <i className="fas fa-hand-holding-usd mr-1" />Kapıda Öde
         </button>
       ) : (
-        <button type="button" className="btn btn-block el-cod-btn el-cod-btn--main mb-3" onClick={() => setOpen(true)}
+        <button type="button" className={grid ? "btn gt-buy-btn el-cod-btn el-cod-btn--main el-cod-btn--grid" : "btn btn-block el-cod-btn el-cod-btn--main mb-3"} onClick={() => setOpen(true)}
           disabled={needChoice} title={needChoice ? "Önce seçenek seçin" : undefined} data-testid="pdp-cod-order-btn">
           <span className="el-cod-btn-title"><i className="fas fa-hand-holding-usd mr-2" />Kapıda Ödeme ile Hemen Al</span>
           <span className="el-cod-btn-sub">{needChoice ? "Önce seçenek seçin" : "Kargoda nakit veya kartla öde"}</span>

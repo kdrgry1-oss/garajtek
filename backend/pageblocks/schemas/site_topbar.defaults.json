@@ -9,6 +9,19 @@
   },
   "right_items": [
     {
+      "label": "Teknik Destek",
+      "icon": {
+        "icon": "ec ec-support"
+      },
+      "link": {
+        "kind": "url",
+        "url": "/sayfa/garanti-kosullari",
+        "new_tab": false
+      },
+      "special": "",
+      "guest_text": ""
+    },
+    {
       "label": "Mağazamız",
       "icon": {
         "icon": "ec ec-map-pointer"
@@ -61,7 +74,7 @@
       "guest_text": "Üye Ol veya Giriş Yap"
     }
   ],
-  "currency_text": "Türk Lirası (₺)",
+  "currency_text": "",
   "style": "white",
   "hide_below": "xl"
 }

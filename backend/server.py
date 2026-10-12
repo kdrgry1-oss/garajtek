@@ -447,6 +447,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Catalog seed start warning: {e}")
 
+    # Sahibin 12.10.2026 düzeltmeleri (iletişim bilgileri, üst bar, ana sayfa sırası) — bir kez
+    try:
+        import asyncio as _asyncio
+        from site_refresh import run_once as _site_refresh_once
+        _asyncio.create_task(_site_refresh_once())
+    except Exception as e:
+        logger.warning(f"Site refresh start warning: {e}")
+
     # Sahibin talebiyle iki tedarik sitesindeki tüm ürünler (kaynak fiyat × 1,10, yayında):
     # keşif bir kez, kuyruk her açılışta kaldığı yerden sürer. Kapatma: SITE_IMPORT_DISABLED=1
     try:

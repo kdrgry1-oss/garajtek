@@ -126,3 +126,29 @@ def test_recategorize_by_name_rules(db):
     assert get("d")["category_id"] == cats["motor-vincleri"]["id"]
     assert get("e")["category_id"] == ""
     assert _run(SB.recategorize(db)) == 0
+
+
+def test_site_sets_created_once_with_100_items(db):
+    from seed_categories import load_tree, seed_categories
+    from url_import import site_sets as SS
+    _run(seed_categories(db, load_tree()))
+    cats = {c["slug"]: c["id"] for c in _run(db.categories.find({}, {"_id": 0}).to_list(500))}
+    rows = []
+    for i in range(130):
+        slug = ["penseler", "mengeneler", "oto-test-kitleri", "temizleme-ve-bakim-spreyleri", "yer-krikolari"][i % 5]
+        rows.append({"id": f"p{i}", "name": f"Ürün {i}", "seed_source": SB.SEED_SOURCE, "is_active": True,
+                     "stock": 5, "price": 100 + i, "category_id": cats[slug], "category_ids": [cats[slug]]})
+    rows.append({"id": "oos", "name": "Tükendi", "seed_source": SB.SEED_SOURCE, "is_active": True, "stock": 0,
+                 "price": 5, "category_id": cats["penseler"], "category_ids": [cats["penseler"]]})
+    _run(db.products.insert_many(rows))
+    made = []
+
+    async def create_set(d):
+        made.append(d)
+        return {"id": f"s{len(made)}"}
+    res = _run(SS.create_sets_once(db, create_set=create_set))
+    sizes = {d["name"]: len(d["set_items"]) for d in made}
+    assert sizes["Atölye Kurulum Seti — 100 Ürün"] == 100
+    assert all("oos" not in [i["product_id"] for i in d["set_items"]] for d in made)
+    assert len(res["created"]) == len(made) >= 2
+    assert _run(SS.create_sets_once(db, create_set=create_set)) == {"skipped": "done"}

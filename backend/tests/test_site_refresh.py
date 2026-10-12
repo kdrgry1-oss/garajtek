@@ -1,0 +1,60 @@
+"""site_refresh — iletişim, üst bar ve ana sayfa sırası tek seferlik düzeltmesi."""
+import asyncio
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import site_refresh as SR  # noqa: E402
+
+
+@pytest.fixture
+def db(tmp_path):
+    from localdb import AsyncIOMotorClient
+    return AsyncIOMotorClient(path=str(tmp_path / "sr.db"))["test"]
+
+
+def _run(c):
+    return asyncio.run(c)
+
+
+def test_reorder_home_moves_brands_and_adds_stats_once():
+    blocks = [{"type": t} for t in ("hero_slider", "ads_block", "deals_tabs", "product_slider", "brands_carousel")]
+    out = SR.reorder_home(blocks)
+    assert [b["type"] for b in out] == ["hero_slider", "features_list", "ads_block", "brands_carousel",
+                                        "deals_tabs", "product_slider"]
+    st = out[1]["settings"]
+    assert st["_variant"] == "stats" and [i["strong_text"] for i in st["items"]][:2] == ["1.000+", "81 İl"]
+    again = SR.reorder_home(out)
+    assert [b["type"] for b in again] == [b["type"] for b in out]
+
+
+def test_patch_global_topbar_and_contact():
+    g = SR.patch_global({"site_topbar": {"right_items": [{"label": "Mağazamız"}], "currency_text": "Türk Lirası (₺)"}})
+    assert [i["label"] for i in g["site_topbar"]["right_items"]] == ["Teknik Destek", "Mağazamız"]
+    assert g["site_topbar"]["currency_text"] == ""
+    assert g["site_contact"]["phone"] == "0543 276 89 73"
+    assert "Tekstilkent" in g["site_contact"]["address"]
+    assert len(SR.patch_global(g)["site_topbar"]["right_items"]) == 2
+
+
+def test_run_once_live_data(db):
+    from pageblocks import store
+    _run(store.ensure(db, "home"))
+    _run(db.settings.update_one({"id": "tenant_config"}, {"$set": {"company": {"address": "Mahmutbey"},
+                                                                    "contact": {"phone": "0543 579 10 56"}}},
+                                upsert=True))
+    assert _run(SR.run_once(db)) is True
+    pub = _run(store.ensure(db, "home"))
+    types = [b["type"] for b in pub["blocks"]]
+    assert types.index("brands_carousel") == types.index("ads_block") + 1
+    assert types[1] == "features_list"
+    g = _run(store.get_global(db))
+    assert g["site_topbar"]["currency_text"] == ""
+    assert g["site_topbar"]["right_items"][0]["label"] == "Teknik Destek"
+    tc = _run(db.settings.find_one({"id": "tenant_config"}, {"_id": 0}))
+    assert tc["company"]["address"] == SR.ADDRESS and tc["contact"]["phone"] == SR.PHONE
+    br = _run(db.settings.find_one({"id": "business_rules"}, {"_id": 0}))
+    assert br["values"]["storefront.whatsapp_number"] == "905432768973"
+    assert _run(SR.run_once(db)) is False  # bir kez
