@@ -44,12 +44,12 @@
   border-radius: .714em; font-weight: 300; text-align: center; white-space: nowrap; border: 0; transition: all .2s ease-in-out;
 }
 .electro .pd-hero__btn:hover, .electro .pd-hero__btn:focus { text-decoration: none; }
-.electro .pd-hero__btn--primary { background-color: var(--electro-primary, #fed700); color: #333e48; }
+.electro .pd-hero__btn--primary { background-color: var(--electro-primary, #fed700); color: var(--pd-on-primary, #333e48); }
 .electro .pd-hero__btn--primary:hover { background-color: #333e48; color: #fff; }
 .electro .pd-hero__btn--dark { background-color: #333e48; color: #fff; }
-.electro .pd-hero__btn--dark:hover { background-color: var(--electro-primary, #fed700); color: #333e48; }
+.electro .pd-hero__btn--dark:hover { background-color: var(--electro-primary, #fed700); color: var(--pd-on-primary, #333e48); }
 .electro .pd-hero__btn--outline { background-color: transparent; color: inherit; box-shadow: inset 0 0 0 2px currentColor; }
-.electro .pd-hero__btn--outline:hover { background-color: var(--electro-primary, #fed700); color: #333e48; box-shadow: none; }
+.electro .pd-hero__btn--outline:hover { background-color: var(--electro-primary, #fed700); color: var(--pd-on-primary, #333e48); box-shadow: none; }
 .electro .pd-hero__hit { position: absolute; inset: 0; z-index: 1; }
 
 /* Owl noktaları (v1): etkin 30×8 r3 ana renk, diğerleri 8×8 #bcbcbc, aralık 14px, alttan 20px */

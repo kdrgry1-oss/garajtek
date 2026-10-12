@@ -242,6 +242,7 @@ async def process_host(db, host: str, job) -> Dict[str, int]:
         if st in ("imported", "updated"):
             if item.get("product_id"):
                 await recategorize(db, only_ids=[item["product_id"]])
+                await clean_texts(db, only_ids=[item["product_id"]])
             upd["status"] = "done"
             counts[st] += 1
         elif st == "skipped":
@@ -256,6 +257,42 @@ async def process_host(db, host: str, job) -> Dict[str, int]:
             if job.counters.get("failed", 0) > before.get("failed", 0) and "HTTP 429" in upd["error"]:
                 await asyncio.sleep(60)
         await db.site_import_queue.update_one({"url": row["url"]}, {"$set": upd})
+
+
+# Kaynak site adları → kendi alan adımız (sahip talebi 12.10.2026): "… uygun fiyatıyla Grayzer.net' de!" →
+# "… uygun fiyatıyla GarajTek.com'da!". Marka adları (Grayzer, ALG ürün markası) korunur; yalnız SİTE adları değişir.
+_SITE_RX = r"(?:https?://)?(?:www\.)?(?:grayzer\.(?:net|com(?:\.tr)?)|alg[iı]kitelli\.com(?:\.tr)?)"
+_SITE_SUFFIX = re.compile(_SITE_RX + r"\s*['’`´]?\s*(?:de|da|te|ta)\b", re.I)
+_SITE_BARE = re.compile(_SITE_RX + r"(?:/[^\s<\"']*)?", re.I)
+_SITE_HREF = re.compile(r"(href\s*=\s*[\"'])" + _SITE_RX + r"[^\"']*([\"'])", re.I)
+TEXT_FIELDS = ("description", "short_description", "meta_description", "meta_title", "name")
+
+
+def clean_site_names(text: str) -> str:
+    if not text:
+        return text
+    out = _SITE_HREF.sub(r'\1https://garajtek.com\2', text)
+    out = _SITE_SUFFIX.sub("GarajTek.com'da", out)
+    return _SITE_BARE.sub("GarajTek.com", out)
+
+
+async def clean_texts(db, only_ids: Optional[List[str]] = None) -> int:
+    q: Dict = {"seed_source": SEED_SOURCE}
+    if only_ids is not None:
+        q["id"] = {"$in": only_ids}
+    changed = 0
+    async for p in db.products.find(q, {"_id": 0, "id": 1, **{f: 1 for f in TEXT_FIELDS}}):
+        upd = {}
+        for f in TEXT_FIELDS:
+            v = p.get(f)
+            if isinstance(v, str) and v:
+                nv = clean_site_names(v)
+                if nv != v:
+                    upd[f] = nv
+        if upd:
+            await db.products.update_one({"id": p["id"]}, {"$set": {**upd, "updated_at": _now()}})
+            changed += 1
+    return changed
 
 
 async def recategorize(db, only_ids: Optional[List[str]] = None) -> int:
@@ -340,6 +377,9 @@ async def run(db, *, create_product, store_image, delete_file, sites: Optional[L
         logger.warning("[%s] %s: %s ile %d adres bulundu", SEED_SOURCE, host, method, len(urls))
 
     recat = await recategorize(db)
+    cleaned_txt = await clean_texts(db)
+    if cleaned_txt:
+        logger.warning("[%s] açıklamalardaki site adları temizlendi: %d ürün", SEED_SOURCE, cleaned_txt)
     if recat:
         logger.warning("[%s] ürün adına göre kategori düzeltildi: %d", SEED_SOURCE, recat)
     cleaned = await cleanup_non_products(db, delete_file)

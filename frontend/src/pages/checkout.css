@@ -2,11 +2,11 @@
    Checkout (Shopify tarzı tek sayfa ödeme) — TAMAMEN `.gt-checkout` kapsamında.
    Tailwind preflight / Bootstrap reboot / Electro tema stillerinden bağımsız olacak şekilde
    tüm temel özellikler (box-sizing, margin, font, line-height, renk) burada açıkça verilir.
-   Marka rengi: --gt-primary (varsayılan Electro sarısı #fed700) + koyu metin #333e48.
+   Marka rengi: --gt-primary (varsayılan Electro sarısı var(--electro-primary, #fed700)) + koyu metin #333e48.
    ========================================================================== */
 
 .gt-checkout {
-  --gt-primary: #fed700;
+  --gt-primary: var(--electro-primary, #fed700);
   --gt-primary-ink: #333e48;
   --gt-primary-hover: #f0cb00;
   --gt-primary-tint: #fffbe6;
@@ -118,7 +118,7 @@
 .gt-checkout .gt-input::placeholder { color: transparent; }
 .gt-checkout .gt-input:focus {
   border-color: var(--gt-ink);
-  box-shadow: 0 0 0 1px var(--gt-ink), 0 0 0 4px rgba(254, 215, 0, .45);
+  box-shadow: 0 0 0 1px var(--gt-ink), 0 0 0 4px color-mix(in srgb, var(--electro-primary, #fed700) 45%, transparent);
 }
 .gt-checkout .gt-input:disabled { background: #fafafa; color: var(--gt-muted); cursor: not-allowed; }
 .gt-checkout .gt-float-label {
@@ -182,7 +182,7 @@
 }
 .gt-checkout .gt-check-box svg { width: 11px; height: 9px; }
 .gt-checkout .gt-check input:checked + .gt-check-box { background: var(--gt-ink); border-color: var(--gt-ink); color: #fff; }
-.gt-checkout .gt-check input:focus-visible + .gt-check-box { box-shadow: 0 0 0 3px rgba(254, 215, 0, .6); border-color: var(--gt-ink); }
+.gt-checkout .gt-check input:focus-visible + .gt-check-box { box-shadow: 0 0 0 3px color-mix(in srgb, var(--electro-primary, #fed700) 60%, transparent); border-color: var(--gt-ink); }
 .gt-checkout .gt-check input[aria-invalid="true"] + .gt-check-box { border-color: var(--gt-error); box-shadow: 0 0 0 1px var(--gt-error); }
 .gt-checkout .gt-check-label { line-height: 1.45; }
 .gt-checkout .gt-check-wrap + .gt-check-wrap { margin-top: 10px; }
@@ -203,7 +203,7 @@
 .gt-checkout .gt-radio-item:first-child.is-selected > .gt-radio-row { border-radius: var(--gt-radius) var(--gt-radius) 0 0; }
 .gt-checkout .gt-radio-item:last-child.is-selected:not(:has(.gt-radio-content)) > .gt-radio-row { border-radius: 0 0 var(--gt-radius) var(--gt-radius); }
 .gt-checkout .gt-radio-item.is-selected .gt-radio-dot { border: 6px solid var(--gt-ink); }
-.gt-checkout .gt-radio-row input:focus-visible + .gt-radio-dot { box-shadow: 0 0 0 3px rgba(254, 215, 0, .7); }
+.gt-checkout .gt-radio-row input:focus-visible + .gt-radio-dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--electro-primary, #fed700) 70%, transparent); }
 .gt-checkout .gt-radio-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .gt-checkout .gt-radio-label { font-size: 14px; font-weight: 500; color: var(--gt-text); }
 .gt-checkout .gt-radio-desc { font-size: 13px; color: var(--gt-muted); }

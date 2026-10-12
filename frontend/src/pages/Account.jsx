@@ -367,7 +367,7 @@ export default function Account() {
                     className="flex-1 bg-gray-50 border border-gray-200 px-4 py-3 text-sm text-gray-700 focus:outline-none" />
                   <button onClick={() => {
                     try { navigator.clipboard.writeText(refData.share_url || ""); setRefCopied(true); setTimeout(() => setRefCopied(false), 1800); } catch { /* yok */ }
-                  }} className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
+                  }} className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
                     <Copy size={14} /> {refCopied ? "Kopyalandı" : "Kopyala"}
                   </button>
                 </div>
@@ -427,7 +427,7 @@ function ProfilePane({ user, editing, setEditing, form, setForm, onSubmit }) {
             <p className="text-xs text-gray-400 -mt-2">Boy/kilo, ürün sayfasında size en uygun bedeni önermek için kullanılır.</p>
             <div className="flex gap-3 pt-2">
               <button type="submit" data-testid="save-profile-btn"
-                className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
+                className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
                 Kaydet
               </button>
               <button type="button" onClick={() => setEditing(false)}
@@ -456,7 +456,7 @@ function ProfilePane({ user, editing, setEditing, form, setForm, onSubmit }) {
             İzin VERİLERİ değişmedi; yalnız bu ekrandaki aç/kapa kaldırıldı. */}
       </div>
 
-      <aside className="bg-[#fed700] text-[#333e48] rounded-lg p-6 md:p-8 flex flex-col justify-between">
+      <aside className="bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-lg p-6 md:p-8 flex flex-col justify-between">
         <div>
           <p className="text-xs text-[#333e48]/70 mb-3">{SITE_NAME} Üye Avantajı</p>
           <h3 className="text-lg font-light leading-snug mb-4">
@@ -528,7 +528,7 @@ function OrdersPane({ loading, orders, expandedOrder, setExpandedOrder, onChange
           <ShoppingBag size={20} className="text-gray-400" />
         </div>
         <p className="text-sm text-gray-500 mb-6 tracking-wide">Henüz siparişiniz bulunmuyor</p>
-        <a href="/" className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
+        <a href="/" className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
           Alışverişe Başla
         </a>
       </div>
@@ -725,7 +725,7 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
           ) : canReturn ? (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
               <span className="text-lg font-semibold text-[#333e48] border-b border-gray-200 pb-2">Üründe sorun mu var? 14 gün içinde iade edebilirsiniz.</span>
-              <a href={`/iade/${order.order_number}`} className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">İade Talebi</a>
+              <a href={`/iade/${order.order_number}`} className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">İade Talebi</a>
             </div>
           ) : null}
           {canCancel && (
@@ -889,7 +889,7 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
         </h2>
         {editing === null && (
           <button onClick={startNew} data-testid="add-address-btn"
-            className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
+            className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
             <Plus size={14} /> Yeni Adres
           </button>
         )}
@@ -957,7 +957,7 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
 
             <div className="flex gap-3 pt-2">
               <button type="submit" data-testid="save-address-btn"
-                className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
+                className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
                 Kaydet
               </button>
               <button type="button" onClick={() => setEditing(null)}
@@ -980,7 +980,7 @@ function AddressesPane({ loading, addresses, editing, setEditing, form, setForm,
             <MapPin size={20} className="text-gray-400" />
           </div>
           <p className="text-sm text-gray-500 mb-6">Henüz kayıtlı adresiniz yok</p>
-          <button onClick={startNew} className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
+          <button onClick={startNew} className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
             <Plus size={14} /> İlk Adresi Ekle
           </button>
         </div>
@@ -1062,7 +1062,7 @@ function FavoritesPane() {
         </div>
         <p className="text-sm text-gray-500 mb-1 tracking-wide">Henüz kaydedilen ürününüz yok</p>
         <p className="text-xs text-gray-400 mb-6">Beğendiğiniz ürünleri kaydet ikonu ile listenize ekleyin.</p>
-        <a href="/" className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
+        <a href="/" className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
           Ürünleri Keşfet
         </a>
       </div>
@@ -1121,7 +1121,7 @@ function SecurityPane() {
         <Field label="Yeni Şifre" type="password" value={form.new_password} onChange={(v) => setForm({ ...form, new_password: v })} />
         <Field label="Yeni Şifre (Tekrar)" type="password" value={form.confirm} onChange={(v) => setForm({ ...form, confirm: v })} />
         <button type="submit" disabled={busy} data-testid="change-password-btn"
-          className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
+          className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50">
           {busy ? "Güncelleniyor..." : "Şifreyi Güncelle"}
         </button>
       </form>

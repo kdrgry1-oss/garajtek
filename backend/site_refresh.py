@@ -134,12 +134,50 @@ async def _layout(db):
     return True
 
 
+THEME_MARKER = "site_theme_red_2026_10_12_v1"
+RED_THEME = {"preset": "custom", "primary_color": "#d71920", "primary_dark": "#b9141a", "text_on_primary": "white"}
+
+
+async def apply_red_theme_once(db=None) -> bool:
+    """Sahip talebi: sarı olan her şey kırmızı — Sayfa Tasarımı › Tema ana rengi bir kez kırmızıya çekilir
+    (yeni yayın sürümü; panelden geri alınabilir / değiştirilebilir)."""
+    try:
+        if db is None:
+            from routes.deps import db as _db
+            db = _db
+        if await db.settings.find_one({"id": THEME_MARKER}, {"_id": 1}):
+            return False
+        from pageblocks import store
+        pub = await store.ensure(db, "home")
+        draft = await store.get_draft(db, "home")
+        g = copy.deepcopy(await store.get_global(db))
+        g["site_theme"] = {**(g.get("site_theme") or {}), **RED_THEME}
+        doc, errors, _ = await store.publish(db, "home", user="sistem (kırmızı tema)", blocks=pub.get("blocks") or [],
+                                             global_=g)
+        if errors:
+            logger.error("[%s] yayın hatası: %s", THEME_MARKER, errors)
+            return False
+        if draft:
+            draft = dict(draft)
+            dg = dict(draft.get("global") or g)
+            dg["site_theme"] = {**(dg.get("site_theme") or {}), **RED_THEME}
+            draft["global"], draft["rev"] = dg, doc.get("rev")
+            await db.page_layouts.replace_one({"id": "home:draft"}, draft, upsert=True)
+        await db.settings.update_one({"id": THEME_MARKER}, {"$set": {"id": THEME_MARKER, "applied_at": _now()}},
+                                     upsert=True)
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[%s] hata: %s", THEME_MARKER, e)
+        return False
+
+
 async def run_once(db=None) -> bool:
     try:
         if db is None:
             from routes.deps import db as _db
             db = _db
         if await db.settings.find_one({"id": MARKER}, {"_id": 1}):
+            await apply_red_theme_once(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -147,6 +185,7 @@ async def run_once(db=None) -> bool:
         await db.settings.update_one({"id": MARKER}, {"$set": {"id": MARKER, "done": True, "applied_at": _now()}},
                                      upsert=True)
         logger.warning("[%s] uygulandı", MARKER)
+        await apply_red_theme_once(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)

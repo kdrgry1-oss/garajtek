@@ -1,8 +1,8 @@
 {
-  "preset": "yellow",
-  "primary_color": "#fed700",
-  "primary_dark": "#e7c400",
-  "text_on_primary": "dark",
+  "preset": "custom",
+  "primary_color": "#d71920",
+  "primary_dark": "#b9141a",
+  "text_on_primary": "white",
   "body_text": "#333e48",
   "sale_color": "#df3737",
   "link_color": "#0077d0",

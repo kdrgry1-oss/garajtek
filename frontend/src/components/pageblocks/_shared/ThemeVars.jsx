@@ -24,6 +24,7 @@ export function themeCss(t) {
   const cw = String(t.container_width) === "1430" ? 1430 : 0;
   const card = t.card || {};
   const r = [];
+  r.push(`:root{--gt-primary:${primary};--gt-primary-dark:${dark};--gt-on-primary:${on}}`);
   r.push(`.electro{--electro-primary:${primary};--primary:${primary};--primary-dark:${dark};--pd-on-primary:${on};--body-text:${col(t.body_text, "#333e48")};--sale-color:${col(t.sale_color, "#df3737")};--link-color:${col(t.link_color, "#0077d0")}}`);
   if (primary.toLowerCase() !== "#fed700" || t.text_on_primary === "white") {
     r.push(`.electro .btn-primary,.electro .bg-primary,.electro .btn-primary:not(:disabled):not(.disabled):active{background-color:${primary}!important;border-color:${primary}!important;color:${on}}`);

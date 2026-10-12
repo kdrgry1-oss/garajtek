@@ -31,7 +31,7 @@ function MaintenanceScreen({ title, message, logoUrl, siteName }) {
       className="fixed inset-0 z-[9999] overflow-y-auto bg-white text-[#333e48]"
       style={{ fontFamily: "'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}
     >
-      <div className="h-1.5 w-full bg-[#fed700]" />
+      <div className="h-1.5 w-full bg-[var(--gt-primary,#fed700)]" />
       <div className="min-h-[calc(100%-6px)] flex items-center justify-center px-5 py-12">
         <div className="max-w-xl w-full text-center">
           {logoUrl ? (
@@ -47,7 +47,7 @@ function MaintenanceScreen({ title, message, logoUrl, siteName }) {
               data-testid="maintenance-sitename"
             >
               {siteName}
-              <span className="text-[#fed700]">.</span>
+              <span className="text-[var(--gt-primary,#fed700)]">.</span>
             </div>
           )}
 
@@ -56,7 +56,7 @@ function MaintenanceScreen({ title, message, logoUrl, siteName }) {
               <circle cx="60" cy="48" r="44" fill="#fff7c2" />
               <rect x="22" y="14" width="8" height="70" rx="2" fill="#333e48" />
               <rect x="90" y="14" width="8" height="70" rx="2" fill="#333e48" />
-              <rect x="30" y="52" width="60" height="5" rx="2" fill="#fed700" />
+              <rect x="30" y="52" width="60" height="5" rx="2" fill="var(--gt-primary,#fed700)" />
               <path d="M38 52l6-12h32l6 12z" fill="#333e48" />
               <circle cx="46" cy="58" r="5" fill="#333e48" />
               <circle cx="74" cy="58" r="5" fill="#333e48" />
@@ -102,13 +102,13 @@ function MaintenanceScreen({ title, message, logoUrl, siteName }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="E-posta adresiniz"
-                  className="flex-1 bg-white border-2 border-[#fed700] rounded-full px-5 py-3 text-sm focus:outline-none focus:border-[#e6c200] placeholder:text-[#9aa3ab]"
+                  className="flex-1 bg-white border-2 border-[var(--gt-primary,#fed700)] rounded-full px-5 py-3 text-sm focus:outline-none focus:border-[#e6c200] placeholder:text-[#9aa3ab]"
                   data-testid="maintenance-notify-input"
                 />
                 <button
                   type="submit"
                   disabled={status === "sending"}
-                  className="bg-[#fed700] text-[#333e48] font-bold rounded-full px-7 py-3 text-sm hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50"
+                  className="bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] font-bold rounded-full px-7 py-3 text-sm hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50"
                   data-testid="maintenance-notify-submit"
                 >
                   {status === "sending" ? "Gönderiliyor..." : "Haber Ver"}

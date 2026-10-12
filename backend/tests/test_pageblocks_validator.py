@@ -115,12 +115,12 @@ def test_singleton_and_layout_validation():
     clean, g, errors, _w = pb.validate_layout(blocks, {})
     assert [b["sort_order"] for b in clean] == [1, 2, 3]
     assert any("yalnız bir tane" in e["message"] for e in errors)
-    assert set(g) >= {"site_theme", "site_header"} and g["site_theme"]["primary_color"] == "#fed700"
+    assert set(g) >= {"site_theme", "site_header"} and g["site_theme"]["primary_color"] == "#d71920"
 
 
 def test_global_color_validation():
     g, errors, _w = pb.validate_global({"site_theme": {"primary_color": "url(javascript:1)"}})
-    assert errors and g["site_theme"]["primary_color"] == "#fed700"
+    assert errors and g["site_theme"]["primary_color"] == "#d71920"
 
 
 def test_with_defaults_fills_new_fields_into_old_items():

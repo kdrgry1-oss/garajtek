@@ -152,3 +152,17 @@ def test_site_sets_created_once_with_100_items(db):
     assert all("oos" not in [i["product_id"] for i in d["set_items"]] for d in made)
     assert len(res["created"]) == len(made) >= 2
     assert _run(SS.create_sets_once(db, create_set=create_set)) == {"skipped": "done"}
+
+
+def test_clean_site_names_in_texts(db):
+    _run(db.products.insert_many([
+        {"id": "a", "seed_source": SB.SEED_SOURCE, "name": "Grayzer Silikon Sprey",
+         "description": "<p>Sprey uygun fiyatıyla Grayzer.net' de!</p>", "meta_description": "bkz www.algikitelli.com.tr"},
+        {"id": "b", "seed_source": "baska", "description": "Grayzer.net' de"},
+    ]))
+    assert _run(SB.clean_texts(db)) == 1
+    a = _run(db.products.find_one({"id": "a"}, {"_id": 0}))
+    assert a["description"] == "<p>Sprey uygun fiyatıyla GarajTek.com'da!</p>"
+    assert a["meta_description"] == "bkz GarajTek.com" and a["name"] == "Grayzer Silikon Sprey"
+    assert _run(db.products.find_one({"id": "b"}, {"_id": 0}))["description"] == "Grayzer.net' de"
+    assert _run(SB.clean_texts(db)) == 0

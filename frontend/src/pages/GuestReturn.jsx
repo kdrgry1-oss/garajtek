@@ -103,7 +103,7 @@ function GuestReturnBody() {
             </p>
             <button
               onClick={() => { setRet(null); setStep("form"); }}
-              className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
+              className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
             >
               Yeni İade Kodu Oluştur
             </button>
@@ -264,7 +264,7 @@ function GuestReturnBody() {
             <button
               onClick={submit}
               disabled={submitting || !reasonCode || (isHavale && (!ibanValid || !refundName.trim()))}
-              className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
+              className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
             >
               {submitting ? "Oluşturuluyor…" : "İade Talebi Oluştur"}
             </button>
@@ -327,7 +327,7 @@ function GuestReturnBody() {
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex items-center justify-center gap-2 bg-[#fed700] text-[#333e48] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
+          className="inline-flex items-center justify-center gap-2 bg-[var(--gt-primary,#fed700)] text-[var(--gt-on-primary,#333e48)] rounded-full px-6 py-2.5 text-sm font-semibold hover:bg-[#333e48] hover:text-white transition-colors disabled:opacity-50 w-full"
         >
           <Search size={15} />
           {loading ? "Sorgulanıyor…" : "Siparişi Getir"}

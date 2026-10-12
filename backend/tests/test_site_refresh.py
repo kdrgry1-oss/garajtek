@@ -58,3 +58,12 @@ def test_run_once_live_data(db):
     br = _run(db.settings.find_one({"id": "business_rules"}, {"_id": 0}))
     assert br["values"]["storefront.whatsapp_number"] == "905432768973"
     assert _run(SR.run_once(db)) is False  # bir kez
+
+
+def test_red_theme_applied_once(db):
+    from pageblocks import store
+    _run(store.ensure(db, "home"))
+    assert _run(SR.apply_red_theme_once(db)) is True
+    g = _run(store.get_global(db))
+    assert g["site_theme"]["primary_color"] == "#d71920" and g["site_theme"]["text_on_primary"] == "white"
+    assert _run(SR.apply_red_theme_once(db)) is False

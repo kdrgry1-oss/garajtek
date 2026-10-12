@@ -69,9 +69,9 @@ html.pd-no-anim .electro .pd-layer { animation: none !important; }
 
 /* ---- önizleme (iframe): seç, + ekle ---- */
 .pd-preview .electro .pd-block { cursor: pointer; }
-.pd-preview:not(.pd-no-anim) .electro .pd-block:hover { outline: 2px dashed rgba(254, 215, 0, .9); outline-offset: -2px; }
-.pd-preview .electro .pd-block.pd-selected { outline: 3px solid #fed700; outline-offset: -3px; }
-.pd-preview .pd-block__label { position: absolute; top: 0; left: 0; z-index: 30; background: #fed700; color: #333e48; font: 600 12px/1 system-ui, sans-serif; padding: 5px 8px; border-bottom-right-radius: 6px; pointer-events: none; }
+.pd-preview:not(.pd-no-anim) .electro .pd-block:hover { outline: 2px dashed color-mix(in srgb, var(--electro-primary, #fed700) 90%, transparent); outline-offset: -2px; }
+.pd-preview .electro .pd-block.pd-selected { outline: 3px solid var(--electro-primary, #fed700); outline-offset: -3px; }
+.pd-preview .pd-block__label { position: absolute; top: 0; left: 0; z-index: 30; background: var(--electro-primary, #fed700); color: var(--pd-on-primary, #333e48); font: 600 12px/1 system-ui, sans-serif; padding: 5px 8px; border-bottom-right-radius: 6px; pointer-events: none; }
 .pd-preview .pd-insert { position: relative; height: 0; z-index: 25; }
 .pd-preview .pd-insert button { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); opacity: 0; transition: opacity .15s; background: #333e48; color: #fff; border: 0; border-radius: 14px; font: 600 12px/1 system-ui, sans-serif; padding: 7px 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
 .pd-preview .pd-insert:hover button, .pd-preview .pd-insert button:focus { opacity: 1; }
