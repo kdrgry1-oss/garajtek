@@ -291,6 +291,66 @@ async def remove_brand_logo_once(db) -> int:
         return 0
 
 
+REAL_BRANDS_MARKER = "brands_real_2026_10_12_v1"
+DEMO_BRAND_NAMES = {"liftmax", "airpro", "torkmatik", "balanstek", "voltix", "weldon", "diagnox", "teknolift",
+                    "atölye pro", "atolye pro", "grayzer"}
+REAL_BRANDS = [("Rico", "rico"), ("NT Tools", "nt-tools"), ("İzeltaş", "izeltas"), ("Ponis Metal", "ponis-metal"),
+               ("DHT", "dht"), ("Demiriz", "demiriz"), ("Bosch", "bosch"), ("Catpower", "catpower")]
+
+
+def real_brand_items() -> list:
+    from urllib.parse import quote
+    return [{"_id": uuid.uuid4().hex[:10], "name": n,
+             "logo": {"url": f"/brands/{slug}.svg", "alt": n},
+             "link": {"kind": "search", "url": f"/arama?q={quote(n)}", "new_tab": False}} for n, slug in REAL_BRANDS]
+
+
+def swap_demo_brands(blocks: list) -> tuple:
+    """Markalar bandındaki örnek (uydurma) markalar → mağazada satılan gerçek markalar. Panelden eklenmiş başka bir
+    marka varsa korunur ve listenin sonuna eklenir."""
+    out, changed = [], False
+    for b in blocks or []:
+        b = copy.deepcopy(b)
+        if _type(b) == "brands_carousel":
+            st = b.get("settings") or {}
+            cur = [x for x in (st.get("brands") or []) if isinstance(x, dict)]
+            others = [x for x in cur if str(x.get("name") or "").strip().lower() not in DEMO_BRAND_NAMES]
+            if len(others) != len(cur) or not cur:
+                have = {str(x.get("name") or "").strip().lower() for x in others}
+                st["brands"] = [x for x in real_brand_items() if x["name"].lower() not in have] + others
+                b["settings"] = st
+                changed = True
+        out.append(b)
+    return out, changed
+
+
+async def real_brands_once(db) -> bool:
+    try:
+        if await db.settings.find_one({"id": REAL_BRANDS_MARKER}, {"_id": 1}):
+            return False
+        from pageblocks import store
+        pub = await store.ensure(db, "home")
+        blocks, changed = swap_demo_brands(pub.get("blocks") or [])
+        if changed:
+            draft = await store.get_draft(db, "home")
+            doc, errors, _ = await store.publish(db, "home", user="sistem (gerçek markalar)", blocks=blocks,
+                                                 global_=await store.get_global(db))
+            if errors:
+                logger.error("[%s] yayın hatası: %s", REAL_BRANDS_MARKER, errors)
+                return False
+            if draft:
+                draft = dict(draft)
+                draft["blocks"], _c = swap_demo_brands(draft.get("blocks") or [])
+                draft["rev"] = doc.get("rev")
+                await db.page_layouts.replace_one({"id": "home:draft"}, draft, upsert=True)
+        await db.settings.update_one({"id": REAL_BRANDS_MARKER}, {"$set": {"id": REAL_BRANDS_MARKER, "changed": changed,
+                                                                          "applied_at": _now()}}, upsert=True)
+        return changed
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[%s] hata: %s", REAL_BRANDS_MARKER, e)
+        return False
+
+
 async def deactivate_broken_sets(db) -> int:
     """Bileşeni 2'nin altına düşen (ör. tüm ürünleri satıştan kaldırılmış) aktif setleri pasife alır. Her açılışta,
     tekrarlanabilir."""
@@ -316,6 +376,7 @@ async def run_once(db=None) -> bool:
             await hide_grayzer_once(db)
             await deactivate_broken_sets(db)
             await remove_brand_logo_once(db)
+            await real_brands_once(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -327,6 +388,7 @@ async def run_once(db=None) -> bool:
         await hide_grayzer_once(db)
         await deactivate_broken_sets(db)
         await remove_brand_logo_once(db)
+        await real_brands_once(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)

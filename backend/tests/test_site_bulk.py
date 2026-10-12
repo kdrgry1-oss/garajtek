@@ -166,3 +166,34 @@ def test_clean_site_names_in_texts(db):
     assert a["meta_description"] == "bkz GarajTek.com" and a["name"] == "Grayzer Silikon Sprey"
     assert _run(db.products.find_one({"id": "b"}, {"_id": 0}))["description"] == "Grayzer.net' de"
     assert _run(SB.clean_texts(db)) == 0
+
+
+def test_site_sets_v2_affordable_and_retire(db):
+    from seed_categories import load_tree, seed_categories
+    from url_import import site_sets as SS
+    _run(seed_categories(db, load_tree()))
+    cats = {c["slug"]: c["id"] for c in _run(db.categories.find({}, {"_id": 0}).to_list(500))}
+    rows = []
+    for i in range(160):
+        slug = ["penseler", "tornavidalar", "allen-ve-torx", "cekic-ve-keskiler"][i % 4]
+        rows.append({"id": f"p{i}", "name": f"Ürün {i}", "is_active": True, "stock": 3,
+                     "price": 500 + i * 10, "category_id": cats[slug], "category_ids": [cats[slug]]})
+    rows.append({"id": "pahali", "name": "Pahalı pense", "is_active": True, "stock": 3, "price": 99999,
+                 "category_id": cats["penseler"], "category_ids": [cats["penseler"]]})
+    rows += [{"id": "big", "product_type": "set", "name": SS.BIG_SET[0], "set_items": [], "is_active": True},
+             {"id": "old", "product_type": "set", "name": "Lastikçi Açılış Seti", "set_seed": SS.MARKER, "is_active": True}]
+    _run(db.products.insert_many(rows))
+    made = []
+
+    async def create_set(d):
+        made.append(d)
+        return {"id": f"s{len(made)}"}
+    assert _run(SS.create_sets_v2_once(db, create_set=create_set)) == {"skipped": "v1_not_done"}
+    _run(db.settings.insert_one({"id": SS.MARKER}))
+    res = _run(SS.create_sets_v2_once(db, create_set=create_set))
+    assert res["retired"] == ["Lastikçi Açılış Seti"] and res["updated"] == ["big"]
+    big = _run(db.products.find_one({"id": "big"}, {"_id": 0}))
+    assert len(big["set_items"]) == 100 and "pahali" not in [i["product_id"] for i in big["set_items"]]
+    assert all("pahali" not in [i["product_id"] for i in d["set_items"]] for d in made)
+    assert _run(db.products.find_one({"id": "old"}, {"_id": 0}))["is_active"] is False
+    assert _run(SS.create_sets_v2_once(db, create_set=create_set)) == {"skipped": "done"}

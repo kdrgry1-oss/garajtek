@@ -448,6 +448,9 @@ async def run_startup(db=None) -> None:
             from .site_sets import create_sets_once
             sets = await create_sets_once(db, create_set=lambda d: create_set_product(d, req, user))
             logger.warning("[%s] ürün setleri: %s", SEED_SOURCE, sets)
+            from .site_sets import create_sets_v2_once
+            sets2 = await create_sets_v2_once(db, create_set=lambda d: create_set_product(d, req, user))
+            logger.warning("[%s] uygun fiyatlı setler: %s", SEED_SOURCE, sets2)
         except Exception as e:  # noqa: BLE001
             logger.exception("[%s] set oluşturma hatası: %s", SEED_SOURCE, e)
     except Exception as e:  # noqa: BLE001

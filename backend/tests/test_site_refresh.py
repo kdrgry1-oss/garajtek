@@ -122,3 +122,13 @@ def test_remove_brand_logo_once(db):
     bc = [b for b in pub["blocks"] if b["type"] == "brands_carousel"][0]
     assert [x["name"] for x in bc["settings"]["brands"]] == ["Liftmax"]
     assert _run(SR.remove_brand_logo_once(db)) == 0
+
+
+def test_swap_demo_brands_keeps_admin_brands():
+    blocks = [{"type": "brands_carousel", "settings": {"brands": [{"name": "Liftmax"}, {"name": "Airpro"}, {"name": "Kendi Markam"}]}}]
+    out, ch = SR.swap_demo_brands(blocks)
+    names = [b["name"] for b in out[0]["settings"]["brands"]]
+    assert ch and names[0] == "Rico" and names[-1] == "Kendi Markam" and "Liftmax" not in names
+    assert out[0]["settings"]["brands"][0]["logo"]["url"] == "/brands/rico.svg"
+    out2, ch2 = SR.swap_demo_brands(out)
+    assert not ch2
