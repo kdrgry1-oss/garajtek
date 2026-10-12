@@ -67,3 +67,24 @@ def test_red_theme_applied_once(db):
     g = _run(store.get_global(db))
     assert g["site_theme"]["primary_color"] == "#d71920" and g["site_theme"]["text_on_primary"] == "white"
     assert _run(SR.apply_red_theme_once(db)) is False
+
+
+def test_hide_grayzer_and_repair_sets(db):
+    _run(db.products.insert_many([
+        {"id": "g1", "name": "Grayzer Silikon Sprey", "brand": "GRAYZER", "is_active": True, "stock": 5, "price": 10,
+         "category_id": "c1"},
+        {"id": "g2", "name": "Grayzer ROCK271 Takım Arabası", "brand": "ROCKFORCE", "is_active": True, "stock": 5,
+         "price": 10, "category_id": "c2"},
+        {"id": "r1", "name": "Rico Pense", "brand": "Rico", "is_active": True, "stock": 5, "price": 10, "category_id": "c1"},
+        {"id": "a1", "name": "Başka sprey", "brand": "DHT", "is_active": True, "stock": 5, "price": 12, "category_id": "c1"},
+        {"id": "s1", "name": "Set", "product_type": "set", "is_active": True, "set_discount_pct": 5,
+         "set_items": [{"product_id": "g1", "quantity": 1}, {"product_id": "g2", "quantity": 1},
+                       {"product_id": "r1", "quantity": 1}]},
+    ]))
+    res = _run(SR.hide_grayzer_once(db))
+    assert res["hidden"] == 2
+    get = lambda i: _run(db.products.find_one({"id": i}, {"_id": 0}))  # noqa: E731
+    assert get("g1")["is_active"] is False and get("g2")["is_active"] is False and get("r1")["is_active"] is True
+    items = [i["product_id"] for i in get("s1")["set_items"]]
+    assert items == ["a1", "r1"]  # g1 → aynı kategoriden a1; g2 için yedek yok → çıkarıldı
+    assert _run(SR.hide_grayzer_once(db)) == {"skipped": "done"}

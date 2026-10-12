@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -171,6 +172,80 @@ async def apply_red_theme_once(db=None) -> bool:
         return False
 
 
+HIDE_BRAND_MARKER = "hide_grayzer_brand_2026_10_12_v1"
+HIDDEN_BRAND_RX = r"\bgrayzer\b"
+
+
+def brand_query() -> dict:
+    rx = {"$regex": HIDDEN_BRAND_RX, "$options": "i"}
+    return {"product_type": {"$ne": "set"}, "$or": [{"brand": rx}, {"name": rx}]}
+
+
+async def hide_grayzer_once(db) -> dict:
+    """Sahip talebi: Grayzer markalı ürünler sitede pasif. Bir kez çalışır (panelden yeniden açılan ürüne
+    dokunmaz); bu ürünleri içeren hazır setlerde bileşen aynı kategoriden aktif bir ürünle değiştirilir."""
+    if await db.settings.find_one({"id": HIDE_BRAND_MARKER}, {"_id": 1}):
+        return {"skipped": "done"}
+    ids = [p["id"] async for p in db.products.find({**brand_query(), "is_active": {"$ne": False}}, {"_id": 0, "id": 1})]
+    if ids:
+        await db.products.update_many({"id": {"$in": ids}}, {"$set": {
+            "is_active": False, "deactivated_reason": "Sahip talebi: Grayzer markası satıştan kaldırıldı",
+            "deactivated_at": _now()}})
+    repaired = await repair_sets(db, set(ids))
+    await db.settings.update_one({"id": HIDE_BRAND_MARKER}, {"$set": {
+        "id": HIDE_BRAND_MARKER, "count": len(ids), "product_ids": ids, "sets": repaired, "applied_at": _now()}},
+        upsert=True)
+    logger.warning("[%s] %d ürün pasif, set onarımı: %s", HIDE_BRAND_MARKER, len(ids), repaired)
+    return {"hidden": len(ids), "sets": repaired}
+
+
+async def repair_sets(db, removed: set) -> list:
+    """Hazır setlerde (set_seed alanlı) çıkarılan bileşeni aynı kategoriden aktif, stoklu bir ürünle değiştirir;
+    bulunamazsa bileşeni setten çıkarır."""
+    import product_sets as ps
+    out = []
+    if not removed:
+        return out
+    async for st in db.products.find({"product_type": "set", "set_items.product_id": {"$in": list(removed)}},
+                                     {"_id": 0}):
+        items = list(st.get("set_items") or [])
+        used = {i.get("product_id") for i in items}
+        new_items, swapped, dropped = [], 0, 0
+        for it in items:
+            pid = it.get("product_id")
+            if pid not in removed:
+                new_items.append(it)
+                continue
+            old = await db.products.find_one({"id": pid}, {"_id": 0, "category_id": 1}) or {}
+            q = {"is_active": True, "stock": {"$gt": 0}, "product_type": {"$ne": "set"}, "is_deleted": {"$ne": True},
+                 "price": {"$gt": 0}, "id": {"$nin": list(used | removed)}}
+            if old.get("category_id"):
+                q["category_id"] = old["category_id"]
+            alt = None
+            tries = [q]
+            if len(items) >= 100:  # 100 ürünlük set 100'de kalsın: kategoride yoksa herhangi bir aktif ürün
+                tries.append({k: v for k, v in q.items() if k != "category_id"})
+            for qq in tries:
+                async for c in db.products.find(qq, {"_id": 0, "id": 1, "name": 1, "brand": 1, "variants": 1}).limit(200):
+                    if c.get("variants") or re.search(HIDDEN_BRAND_RX, f"{c.get('brand') or ''} {c.get('name') or ''}", re.I):
+                        continue
+                    alt = c
+                    break
+                if alt:
+                    break
+            if alt:
+                new_items.append({**it, "product_id": alt["id"]})
+                used.add(alt["id"])
+                swapped += 1
+            else:
+                dropped += 1
+        await db.products.update_one({"id": st["id"]}, {"$set": {"set_items": new_items, "updated_at": _now()}})
+        doc = await db.products.find_one({"id": st["id"]}, {"_id": 0})
+        await ps.refresh_set(db, doc)
+        out.append({"set": st.get("name"), "swapped": swapped, "dropped": dropped, "items": len(new_items)})
+    return out
+
+
 async def run_once(db=None) -> bool:
     try:
         if db is None:
@@ -178,6 +253,7 @@ async def run_once(db=None) -> bool:
             db = _db
         if await db.settings.find_one({"id": MARKER}, {"_id": 1}):
             await apply_red_theme_once(db)
+            await hide_grayzer_once(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -186,6 +262,7 @@ async def run_once(db=None) -> bool:
                                      upsert=True)
         logger.warning("[%s] uygulandı", MARKER)
         await apply_red_theme_once(db)
+        await hide_grayzer_once(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)

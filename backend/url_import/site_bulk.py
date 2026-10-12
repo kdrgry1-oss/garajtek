@@ -243,6 +243,7 @@ async def process_host(db, host: str, job) -> Dict[str, int]:
             if item.get("product_id"):
                 await recategorize(db, only_ids=[item["product_id"]])
                 await clean_texts(db, only_ids=[item["product_id"]])
+                await hide_blocked_brands(db, item["product_id"])
             upd["status"] = "done"
             counts[st] += 1
         elif st == "skipped":
@@ -293,6 +294,17 @@ async def clean_texts(db, only_ids: Optional[List[str]] = None) -> int:
             await db.products.update_one({"id": p["id"]}, {"$set": {**upd, "updated_at": _now()}})
             changed += 1
     return changed
+
+
+async def hide_blocked_brands(db, pid: str) -> bool:
+    """Sahibin satıştan kaldırdığı markalar (site_refresh.HIDDEN_BRAND_RX) yeni aktarımda da pasif kalır."""
+    from site_refresh import HIDDEN_BRAND_RX
+    p = await db.products.find_one({"id": pid}, {"_id": 0, "brand": 1, "name": 1, "is_active": 1})
+    if p and p.get("is_active") is not False and re.search(HIDDEN_BRAND_RX, f"{p.get('brand') or ''} {p.get('name') or ''}", re.I):
+        await db.products.update_one({"id": pid}, {"$set": {"is_active": False, "deactivated_at": _now(),
+                                                            "deactivated_reason": "Satıştan kaldırılan marka"}})
+        return True
+    return False
 
 
 async def recategorize(db, only_ids: Optional[List[str]] = None) -> int:
