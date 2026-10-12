@@ -246,6 +246,21 @@ async def repair_sets(db, removed: set) -> list:
     return out
 
 
+async def deactivate_broken_sets(db) -> int:
+    """Bileşeni 2'nin altına düşen (ör. tüm ürünleri satıştan kaldırılmış) aktif setleri pasife alır. Her açılışta,
+    tekrarlanabilir."""
+    n = 0
+    async for st in db.products.find({"product_type": "set", "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "set_items": 1}):
+        ids = [i.get("product_id") for i in (st.get("set_items") or [])]
+        active = await db.products.count_documents({"id": {"$in": ids}, "is_active": {"$ne": False}}) if ids else 0
+        if active < 2:
+            await db.products.update_one({"id": st["id"]}, {"$set": {
+                "is_active": False, "deactivated_at": _now(),
+                "deactivated_reason": "Setin aktif bileşeni kalmadı (2'den az)"}})
+            n += 1
+    return n
+
+
 async def run_once(db=None) -> bool:
     try:
         if db is None:
@@ -254,6 +269,7 @@ async def run_once(db=None) -> bool:
         if await db.settings.find_one({"id": MARKER}, {"_id": 1}):
             await apply_red_theme_once(db)
             await hide_grayzer_once(db)
+            await deactivate_broken_sets(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -263,6 +279,7 @@ async def run_once(db=None) -> bool:
         logger.warning("[%s] uygulandı", MARKER)
         await apply_red_theme_once(db)
         await hide_grayzer_once(db)
+        await deactivate_broken_sets(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)

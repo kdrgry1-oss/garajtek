@@ -88,3 +88,15 @@ def test_hide_grayzer_and_repair_sets(db):
     items = [i["product_id"] for i in get("s1")["set_items"]]
     assert items == ["a1", "r1"]  # g1 → aynı kategoriden a1; g2 için yedek yok → çıkarıldı
     assert _run(SR.hide_grayzer_once(db)) == {"skipped": "done"}
+
+
+def test_deactivate_broken_sets(db):
+    _run(db.products.insert_many([
+        {"id": "a", "is_active": False}, {"id": "b", "is_active": True}, {"id": "c", "is_active": True},
+        {"id": "s1", "product_type": "set", "is_active": True, "set_items": []},
+        {"id": "s2", "product_type": "set", "is_active": True, "set_items": [{"product_id": "a"}, {"product_id": "b"}]},
+        {"id": "s3", "product_type": "set", "is_active": True, "set_items": [{"product_id": "b"}, {"product_id": "c"}]},
+    ]))
+    assert _run(SR.deactivate_broken_sets(db)) == 2
+    act = {p["id"]: p["is_active"] for p in _run(db.products.find({"product_type": "set"}, {"_id": 0}).to_list(9))}
+    assert act == {"s1": False, "s2": False, "s3": True}
