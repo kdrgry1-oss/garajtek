@@ -45,6 +45,9 @@ BASE_HEADERS = {
     "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.6",
 }
 HTML_ACCEPT = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5"
+XML_TYPES = ("application/xml", "text/xml", "text/plain", "application/x-gzip", "application/gzip",
+             "application/octet-stream", "text/html")
+XML_ACCEPT = "application/xml,text/xml;q=0.9,*/*;q=0.5"
 IMAGE_ACCEPT = "image/webp,image/png,image/jpeg;q=0.9,*/*;q=0.3"
 
 Resolver = Callable[[str, int], Awaitable[List[str]]]
@@ -232,8 +235,8 @@ class Fetcher:
                     headers: Optional[Dict[str, str]] = None) -> FetchResult:
         """GET; yönlendirmeleri elle izler. kind: "html" | "image". headers: yalnız Referer kabul
         edilir (görsel sıcak-bağlantı korumalı CDN'ler için ürün sayfası adresi)."""
-        limit = max_bytes or (MAX_HTML_BYTES if kind == "html" else MAX_IMAGE_BYTES)
-        accept = HTML_ACCEPT if kind == "html" else IMAGE_ACCEPT
+        limit = max_bytes or (MAX_IMAGE_BYTES if kind == "image" else MAX_HTML_BYTES)
+        accept = {"html": HTML_ACCEPT, "xml": XML_ACCEPT}.get(kind, IMAGE_ACCEPT)
         cur = str(url or "").strip()
         for _hop in range(MAX_REDIRECTS + 1):
             _scheme, host, port = check_url_syntax(cur)
@@ -263,6 +266,8 @@ class Fetcher:
                             charset = v.strip().strip('"\'')
                     if kind == "html" and ctype and ctype not in ("text/html", "application/xhtml+xml", "text/plain"):
                         raise FetchError(f"HTML sayfası değil ({ctype})")
+                    if kind == "xml" and ctype and ctype not in XML_TYPES:
+                        raise FetchError(f"XML değil ({ctype})")
                     try:
                         declared = int(r.headers.get("content-length") or 0)
                     except ValueError:

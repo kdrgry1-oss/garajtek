@@ -64,3 +64,18 @@ gücü, voltaj…) eşlenir; eşlenemeyenler "Ek Teknik Özellikler"e yazılır.
   Sunucu yeniden başlarsa yarım iş "Yarım kaldı" görünür; tekrar başlatmak güvenlidir (dedupe).
 - `URL_IMPORT_ALLOW_PRIVATE=1` **yalnız yerel test içindir** (loopback/özel IP ve standart dışı porta
   izin verir). Üretimde **asla** ayarlamayın; varsayılan kapalıdır.
+
+## Toplu site aktarımı (algikitelli.com.tr + grayzer.net)
+
+Sahibin talebiyle (12.10.2026; ürünlerin aynılarını sattığını ve içerik sorumluluğunu üstlendiğini
+belirterek) iki sitedeki **tüm** ürünler sunucuda otomatik aktarılır — `backend/url_import/site_bulk.py`.
+
+- Keşif site başına **bir kez**: robots.txt → sitemap (ürün sitemap'i varsa yalnız o); sitemap yoksa
+  ana sayfadan sınırlı tarama. Adresler `db.site_import_queue`'ya yazılır.
+- Her ürün: fiyat **kaynak × 1,10**, yayında, demo DEĞİL, arama motorlarına açık, en çok 4 görsel
+  kendi depomuza (WebP). `seed_source: "site_import_v1"`, `source_url` ile tekilleşir.
+- Host başına ≤1 istek/sn → binlerce ürün saatler sürer. Servis yeniden başlarsa (deploy) kalan
+  adreslerden devam eder; başarısız adres en çok 3 açılışta denenir.
+- Durum: `GET /api/admin/url-import/status` → `site_bulk` (host başına done/pending/skipped/failed).
+- Kapatma: `SITE_IMPORT_DISABLED=1` (backend/.env) + servis yeniden başlatma.
+- Panel aracındaki "İçe aktarılanları sil" bu ürünlere **dokunmaz** (yalnız `url_import_v1`).

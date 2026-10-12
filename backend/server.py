@@ -447,6 +447,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Catalog seed start warning: {e}")
 
+    # Sahibin talebiyle iki tedarik sitesindeki tüm ürünler (kaynak fiyat × 1,10, yayında):
+    # keşif bir kez, kuyruk her açılışta kaldığı yerden sürer. Kapatma: SITE_IMPORT_DISABLED=1
+    try:
+        import asyncio as _asyncio
+        from url_import.site_bulk import run_startup as _site_bulk_startup
+        _asyncio.create_task(_site_bulk_startup())
+    except Exception as e:
+        logger.warning(f"Site import start warning: {e}")
+
     # Kapıda ödeme varsayılanı: yönetici hiç değiştirmediyse BİR KEZ açılır (cod_rules.ensure_cod_default).
     try:
         await ensure_cod_default_once()

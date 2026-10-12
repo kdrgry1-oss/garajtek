@@ -165,6 +165,10 @@ class ImportJob:
         self.mapper: Optional[CategoryMapper] = None
         self.spec_cfg: Optional[dict] = None
         self._last_save = 0.0
+        # Toplu site aktarımı (site_bulk) demo olmayan, yayında/indekslenen kayıt yazar
+        self.seed_source = opts.get("seed_source") or SEED_SOURCE
+        self.demo = opts.get("demo", True) is not False
+        self.max_images = int(opts.get("max_images") or MAX_IMAGES)
 
     # ilerleme kaydı
     async def save(self, *, status: Optional[str] = None, force: bool = True, **extra):
@@ -310,7 +314,7 @@ class ImportJob:
             return out
         errors = 0
         for n, img_url in enumerate(pd.images):
-            if len(out) >= MAX_IMAGES or errors >= 6:
+            if len(out) >= self.max_images or errors >= 6:
                 break
             try:
                 r = await self.fetcher.fetch(img_url, kind="image")
@@ -322,7 +326,7 @@ class ImportJob:
                 continue
             res = await self.store_image(
                 webp, "image/webp", "webp", f"import-{host}-{len(out) + 1}.webp",
-                extra={"demo": True, "seed_source": SEED_SOURCE, "source_page": source_url, "source_image": img_url,
+                extra={"demo": self.demo, "seed_source": self.seed_source, "source_page": source_url, "source_image": img_url,
                        "import_job_id": self.id})
             out.append({"url": res.get("url"), "path": res.get("path")})
         return out
@@ -375,7 +379,7 @@ class ImportJob:
         stock = 0 if pd.availability == "out" else DEFAULT_STOCK
         active = bool(o["publish"]) and price is not None
 
-        existing = await self.db.products.find_one({"source_url": source_url, "seed_source": SEED_SOURCE},
+        existing = await self.db.products.find_one({"source_url": source_url, "seed_source": self.seed_source},
                                                    {"_id": 0, "id": 1, "slug": 1})
         images = await self._download_images(pd, source_url, host_disp, item)
         if self.opts["import_images"] and not images:
@@ -392,8 +396,9 @@ class ImportJob:
             "vat_rate": 20,
         }
         tag = {
-            "demo": True, "seed_source": SEED_SOURCE, "noindex": True,
-            "source_url": source_url, "source_host": host_disp, "image_credit": f"Görsel: {host_disp}",
+            "demo": self.demo, "seed_source": self.seed_source, "noindex": self.demo,
+            "source_url": source_url, "source_host": host_disp,
+            "image_credit": f"Görsel: {host_disp}" if self.demo else "",
             "source_platform": pd.platform, "import_job_id": self.id, "imported_at": _now(),
             "category_ids": cat_ids, "specs": specs, "extra_specs": extras, "gtin": gtin,
             "meta_title": pd.name[:70], "meta_description": plain[:155],
@@ -414,7 +419,7 @@ class ImportJob:
             self.counters["imported"] += 1
         # aynı sayfanın eski görselleri (yeniden aktarım) → sil
         new_paths = {x.get("path") for x in images}
-        old = await self.db.files.find({"seed_source": SEED_SOURCE, "source_page": source_url},
+        old = await self.db.files.find({"seed_source": self.seed_source, "source_page": source_url},
                                        {"_id": 0}).to_list(200)
         for rec in old:
             if rec.get("storage_path") not in new_paths and rec.get("import_job_id") != self.id:
@@ -471,8 +476,13 @@ async def import_status(db) -> dict:
     async for p in db.products.find(q, {"_id": 0, "source_host": 1}):
         h = p.get("source_host") or "?"
         hosts[h] = hosts.get(h, 0) + 1
+    try:
+        from .site_bulk import status as _bulk_status
+        bulk = await _bulk_status(db)
+    except Exception:  # noqa: BLE001
+        bulk = {}
     return {"products": sum(hosts.values()), "files": await db.files.count_documents(q), "hosts": hosts,
-            "running_job": running_job_id()}
+            "running_job": running_job_id(), "site_bulk": bulk}
 
 
 async def remove_imports(db, delete_file: DeleteFile) -> dict:
