@@ -246,6 +246,51 @@ async def repair_sets(db, removed: set) -> list:
     return out
 
 
+BRAND_LOGO_MARKER = "brand_logo_grayzer_removed_2026_10_12_v1"
+
+
+def strip_brand_logos(blocks: list) -> tuple:
+    out, removed = [], 0
+    for b in blocks or []:
+        b = copy.deepcopy(b)
+        if _type(b) == "brands_carousel":
+            st = b.get("settings") or {}
+            keep = [x for x in (st.get("brands") or []) if not re.search(HIDDEN_BRAND_RX, str((x or {}).get("name") or ""), re.I)]
+            removed += len(st.get("brands") or []) - len(keep)
+            st["brands"] = keep
+            b["settings"] = st
+        out.append(b)
+    return out, removed
+
+
+async def remove_brand_logo_once(db) -> int:
+    """Sahip talebi: ana sayfa Markalar bandından Grayzer logosu kaldırılır (yeni yayın sürümü; bir kez)."""
+    try:
+        if await db.settings.find_one({"id": BRAND_LOGO_MARKER}, {"_id": 1}):
+            return 0
+        from pageblocks import store
+        pub = await store.ensure(db, "home")
+        blocks, removed = strip_brand_logos(pub.get("blocks") or [])
+        if removed:
+            draft = await store.get_draft(db, "home")
+            doc, errors, _ = await store.publish(db, "home", user="sistem (marka logosu)", blocks=blocks,
+                                                 global_=await store.get_global(db))
+            if errors:
+                logger.error("[%s] yayın hatası: %s", BRAND_LOGO_MARKER, errors)
+                return 0
+            if draft:
+                draft = dict(draft)
+                draft["blocks"], _r = strip_brand_logos(draft.get("blocks") or [])
+                draft["rev"] = doc.get("rev")
+                await db.page_layouts.replace_one({"id": "home:draft"}, draft, upsert=True)
+        await db.settings.update_one({"id": BRAND_LOGO_MARKER}, {"$set": {"id": BRAND_LOGO_MARKER, "removed": removed,
+                                                                         "applied_at": _now()}}, upsert=True)
+        return removed
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[%s] hata: %s", BRAND_LOGO_MARKER, e)
+        return 0
+
+
 async def deactivate_broken_sets(db) -> int:
     """Bileşeni 2'nin altına düşen (ör. tüm ürünleri satıştan kaldırılmış) aktif setleri pasife alır. Her açılışta,
     tekrarlanabilir."""
@@ -270,6 +315,7 @@ async def run_once(db=None) -> bool:
             await apply_red_theme_once(db)
             await hide_grayzer_once(db)
             await deactivate_broken_sets(db)
+            await remove_brand_logo_once(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -280,6 +326,7 @@ async def run_once(db=None) -> bool:
         await apply_red_theme_once(db)
         await hide_grayzer_once(db)
         await deactivate_broken_sets(db)
+        await remove_brand_logo_once(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)

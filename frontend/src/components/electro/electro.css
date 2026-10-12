@@ -120,6 +120,11 @@
 @media (min-width: 1480px) { .electro .el-carousel { --el-n: var(--el-n-wd); } }
 .electro .el-carousel__viewport { overflow: hidden; }
 .electro .u-slick-overflow-visble .el-carousel__viewport { overflow: hidden; padding: 0 1px; }
+/* Ürün kaydırıcılarında kartın üzerine gelince açılan alt satır (Karşılaştır / Favori) kesilmesin: görünüm alanı
+   aşağı doğru 90px büyür (negatif marj ile yerleşim değişmez), dış sarmalayıcı dikeyde taşmaya izin verir. */
+.electro .el-carousel.u-slick-overflow-visble { overflow-x: clip !important; overflow-y: visible !important; }
+.electro .u-slick-overflow-visble .el-carousel__viewport { padding-bottom: 90px; margin-bottom: -90px; }
+.electro .u-slick-overflow-visble .el-carousel__slide:hover { position: relative; z-index: 3; }
 .electro .el-carousel__track { display: flex; touch-action: pan-y pinch-zoom; margin-left: calc(var(--el-gutter) * -1); }
 .electro .el-carousel__slide { flex: 0 0 calc(100% / var(--el-n)); min-width: 0; padding-left: var(--el-gutter); }
 .electro .el-carousel .slick-arrow { border: 0; background: transparent; cursor: pointer; z-index: 3; }
@@ -334,3 +339,14 @@
 .electro .el-topbar .text-gray-110, .electro .el-topbar .u-header-topbar__nav-link { color: #fff !important; }
 .electro .el-topbar .u-header-topbar__nav-link:hover { color: rgba(255, 255, 255, .8) !important; }
 .electro .el-topbar .u-header-topbar__nav-item-border { border-color: var(--gt-header-line) !important; }
+/* Mini sepet: tüm kalemler kaydırılabilir liste, kalem başına sil / favori, "Sepeti Temizle" */
+.electro .cart-dropdown .el-mini-scroll { max-height: min(60vh, 460px); overflow-y: auto; overscroll-behavior: contain; }
+.electro .cart-dropdown .el-mini-head { border-bottom: 1px solid #eee; padding-bottom: 6px; }
+.electro .el-mini-actions { gap: 2px; }
+.electro .el-mini-act { font-size: 15px; line-height: 1; color: #6b7280; }
+.electro .el-mini-act:hover { color: var(--electro-primary, #d71920); }
+.electro .el-mini-act.is-fav { color: var(--electro-primary, #d71920); }
+.electro .cart-dropdown .text-gray-90, .electro .cart-dropdown .text-gray-90 * { color: #333e48 !important; }
+.electro .cart-dropdown .el-mini-act { color: #6b7280 !important; }
+.electro .cart-dropdown .el-mini-act:hover, .electro .cart-dropdown .el-mini-act.is-fav { color: var(--electro-primary, #d71920) !important; }
+.electro .cart-dropdown .text-red { color: var(--electro-primary, #d71920) !important; }

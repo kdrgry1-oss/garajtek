@@ -100,3 +100,25 @@ def test_deactivate_broken_sets(db):
     assert _run(SR.deactivate_broken_sets(db)) == 2
     act = {p["id"]: p["is_active"] for p in _run(db.products.find({"product_type": "set"}, {"_id": 0}).to_list(9))}
     assert act == {"s1": False, "s2": False, "s3": True}
+
+
+def test_strip_brand_logos():
+    blocks = [{"type": "hero_slider"}, {"type": "brands_carousel", "settings": {"brands": [
+        {"name": "Grayzer"}, {"name": "Liftmax"}, {"name": "GRAYZER Pro"}]}}]
+    out, n = SR.strip_brand_logos(blocks)
+    assert n == 2 and [b["name"] for b in out[1]["settings"]["brands"]] == ["Liftmax"]
+    assert blocks[1]["settings"]["brands"][0]["name"] == "Grayzer"  # girdi değişmez
+
+
+def test_remove_brand_logo_once(db):
+    from pageblocks import store
+    pub = _run(store.ensure(db, "home"))
+    for b in pub["blocks"]:
+        if b["type"] == "brands_carousel":
+            b["settings"]["brands"] = [{"name": "Grayzer", "logo": {"url": ""}}, {"name": "Liftmax", "logo": {"url": ""}}]
+    _run(db.page_layouts.replace_one({"id": "home:published"}, pub))
+    assert _run(SR.remove_brand_logo_once(db)) == 1
+    pub = _run(store.ensure(db, "home"))
+    bc = [b for b in pub["blocks"] if b["type"] == "brands_carousel"][0]
+    assert [x["name"] for x in bc["settings"]["brands"]] == ["Liftmax"]
+    assert _run(SR.remove_brand_logo_once(db)) == 0

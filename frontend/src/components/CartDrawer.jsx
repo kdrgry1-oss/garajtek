@@ -8,6 +8,7 @@ import axios from "axios";
 import { shippingQuote } from "../lib/shippingRules";
 import { useShipping } from "../lib/shipping";
 import { useCart } from "../context/CartContext";
+import { useFavorites } from "../context/FavoritesContext";
 import { cartLineView, cartSummary } from "../lib/price";
 import { trackRemoveFromCart } from "../lib/dataLayer";
 import { shareCart } from "../lib/shareCart";
@@ -30,6 +31,7 @@ export function trackRemove(item) {
 
 /** Sepet kalemleri listesi — mini sepet (dropdown) ve panel ortak kullanır. */
 export function MiniCartList({ items, onNavigate, removeItem, updateQuantity, compact = false }) {
+  const fav = useFavorites();
   return (
     <ul className="list-unstyled px-3 pt-3 mb-0">
       {items.map((item, idx) => {
@@ -65,10 +67,19 @@ export function MiniCartList({ items, onNavigate, removeItem, updateQuantity, co
                   </div>
                 )}
               </li>
-              <li className="px-2 col-auto">
-                <button type="button" className="btn btn-link p-0 text-gray-90" onClick={() => { trackRemove(item); removeItem(item.id); }} data-testid={`remove-${item.id}`} aria-label="Kaldır">
-                  <i className="ec ec-close-remove" />
+              <li className="px-2 col-auto d-flex flex-column align-items-center el-mini-actions">
+                <button type="button" className="btn btn-link p-1 text-gray-90 el-mini-act" title="Sepetten çıkar"
+                  onClick={() => { trackRemove(item); removeItem(item.id); }} data-testid={`remove-${item.id}`} aria-label="Sepetten çıkar">
+                  <i className="far fa-trash-alt" />
                 </button>
+                {fav && item.productId && (
+                  <button type="button" className={`btn btn-link p-1 el-mini-act${fav.isFavorite(item.productId) ? " is-fav" : ""}`}
+                    title={fav.isFavorite(item.productId) ? "Favorilerden çıkar" : "Favorilere ekle"}
+                    onClick={() => fav.toggleFavorite(item.productId)} data-testid={`fav-${item.id}`}
+                    aria-label={fav.isFavorite(item.productId) ? "Favorilerden çıkar" : "Favorilere ekle"}>
+                    <i className={fav.isFavorite(item.productId) ? "fas fa-heart" : "far fa-heart"} />
+                  </button>
+                )}
               </li>
             </ul>
           </li>

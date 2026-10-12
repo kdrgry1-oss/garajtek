@@ -426,12 +426,14 @@ function SearchBar({ roots, variant = "home", inputId = "searchproduct-item", cf
 /* Header ikonları + mini sepet                                         */
 /* ------------------------------------------------------------------ */
 function HeaderIcons({ variant, onMobileSearch, mobileSearchOpen, cfg = {} }) {
-  const { items, itemCount, total, setIsOpen, removeItem, updateQuantity } = useCart();
+  const { items, itemCount, total, setIsOpen, removeItem, updateQuantity, clearCart } = useCart();
   const { user } = useAuth();
   const { count: favCount } = useFavorites();
   const compare = useCompare();
   const [miniOpen, setMiniOpen] = useState(false);
   const ref = useRef(null);
+  const hoverT = useRef(null);
+  useEffect(() => () => clearTimeout(hoverT.current), []);
   const location = useLocation();
   useEffect(() => { setMiniOpen(false); }, [location.pathname]);
   useEffect(() => {
@@ -481,7 +483,9 @@ function HeaderIcons({ variant, onMobileSearch, mobileSearchOpen, cfg = {} }) {
         </button>
       </li>
       {/* Masaüstü: mini sepet açılır menüsü */}
-      <li className="col pr-xl-0 px-2 px-sm-3 d-none d-xl-block position-relative" ref={ref}>
+      <li className="col pr-xl-0 px-2 px-sm-3 d-none d-xl-block position-relative" ref={ref}
+        onMouseEnter={() => { clearTimeout(hoverT.current); setMiniOpen(true); }}
+        onMouseLeave={() => { clearTimeout(hoverT.current); hoverT.current = setTimeout(() => setMiniOpen(false), 350); }}>
         <button type="button" onClick={() => setMiniOpen((v) => !v)} className="btn btn-link p-0 text-gray-90 position-relative d-flex align-items-center" title="Sepet" aria-haspopup="true" aria-expanded={miniOpen} data-testid="cart-btn">
           <i className="font-size-22 ec ec-shopping-bag" />
           <span className={badgeCls}>{itemCount}</span>
@@ -493,8 +497,16 @@ function HeaderIcons({ variant, onMobileSearch, mobileSearchOpen, cfg = {} }) {
               <div className="px-3 py-4 text-center font-size-14">{tx.empty || "Sepetinizde ürün bulunmuyor."}</div>
             ) : (
               <>
-                <MiniCartList items={items.slice(0, 5)} onNavigate={() => setMiniOpen(false)} removeItem={removeItem} updateQuantity={updateQuantity} compact />
-                {items.length > 5 && <div className="px-3 pb-2 font-size-13 text-gray-90">+{items.length - 5} ürün daha</div>}
+                <div className="el-mini-head flex-center-between px-3 pt-2">
+                  <span className="font-size-13 text-gray-90">{items.length} kalem</span>
+                  <button type="button" className="btn btn-link p-0 font-size-13 text-red" data-testid="mini-cart-clear"
+                    onClick={() => { if (window.confirm("Sepetteki tüm ürünler silinsin mi?")) clearCart(); }}>
+                    <i className="far fa-trash-alt mr-1" />Sepeti Temizle
+                  </button>
+                </div>
+                <div className="el-mini-scroll" data-testid="mini-cart-scroll">
+                  <MiniCartList items={items} onNavigate={() => setMiniOpen(false)} removeItem={removeItem} updateQuantity={updateQuantity} compact />
+                </div>
                 <div className="flex-center-between px-4 pt-2">
                   <Link to="/sepet" className="btn btn-soft-secondary mb-3 font-weight-normal px-4 text-nowrap flex-grow-1" onClick={() => setMiniOpen(false)}>{tx.view_cart || "Sepeti Gör"}</Link>
                   <Link to="/odeme" className="btn btn-primary-dark-w mb-3 ml-2 px-4 text-nowrap flex-grow-1" onClick={() => setMiniOpen(false)}>{tx.checkout || "Ödemeye Geç"}</Link>
