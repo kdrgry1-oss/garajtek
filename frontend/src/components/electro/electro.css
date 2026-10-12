@@ -326,39 +326,11 @@
 .electro .el-devcredit:hover { opacity: 1; color: #333e48; }
 .electro .el-devcredit img { height: 16px; width: auto; }
 
-/* GarajTek kırmızı header (sahip talebi 12.10.2026): üst bar + logo/arama alanı kırmızı, yazılar beyaz.
-   Renk: --gt-header-bg (varsayılan #d71920). Arama kutusu ve açılır menüler beyaz kalır. */
+/* GarajTek kırmızı üst bar (sahip talebi 12.10.2026): yalnız en üst bar kırmızı, yazılar beyaz.
+   Renk: --gt-header-bg (varsayılan #d71920). Logo/arama alanı Electro varsayılanında kalır. */
 .electro { --gt-header-bg: #d71920; --gt-header-line: rgba(255, 255, 255, .22); }
-.electro .el-topbar,
-.electro .el-masthead { background-color: var(--gt-header-bg) !important; color: #fff; }
-.electro .el-topbar { border-bottom: 1px solid var(--gt-header-line) !important; }
+.electro .el-topbar { background-color: var(--gt-header-bg) !important; color: #fff; border-bottom: 1px solid var(--gt-header-line) !important; }
 .electro .el-topbar a, .electro .el-topbar span, .electro .el-topbar i,
 .electro .el-topbar .text-gray-110, .electro .el-topbar .u-header-topbar__nav-link { color: #fff !important; }
 .electro .el-topbar .u-header-topbar__nav-link:hover { color: rgba(255, 255, 255, .8) !important; }
 .electro .el-topbar .u-header-topbar__nav-item-border { border-color: var(--gt-header-line) !important; }
-.electro .el-masthead .el-logo { color: #fff; }
-.electro .el-masthead .el-logo__dot { background: var(--electro-primary, #fed700) !important; }
-.electro .el-masthead .u-hamburger__inner,
-.electro .el-masthead .u-hamburger__inner::before,
-.electro .el-masthead .u-hamburger__inner::after { background-color: #fff !important; }
-.electro .el-masthead [data-testid="header-support"] i,
-.electro .el-masthead [data-testid="header-support"] .phone,
-.electro .el-masthead [data-testid="header-support"] .email,
-.electro .el-masthead [data-testid="header-support"] a { color: #fff !important; }
-.electro .el-masthead .el-hnav .u-header__nav-link,
-.electro .el-masthead .el-hnav .u-header__nav-link-toggle,
-.electro .el-masthead .el-hnav .u-header__nav-last-item,
-.electro .el-masthead .el-hnav .u-header__nav-last-item .text-gray-90 { color: #fff !important; }
-.electro .el-masthead .el-hnav .u-header__nav-link-toggle::after { border-color: #fff !important; color: #fff !important; }
-.electro .el-masthead .el-hnav .u-header__sub-menu .nav-link,
-.electro .el-masthead .el-hnav .u-header__sub-menu .u-header__sub-menu-title { color: #333e48 !important; }
-.electro .el-masthead .el-hnav .u-header__nav-item:first-child .u-header__nav-link { color: var(--electro-primary, #fed700) !important; }
-/* ikonlar (karşılaştır, favori, sepet) ve sepet tutarı */
-.electro .el-masthead .text-gray-90:not(.u-header__sub-menu *):not(.dropdown-menu *):not(.u-unfold *),
-.electro .el-masthead .font-size-22,
-.electro .el-masthead .ec-compare, .electro .el-masthead .ec-favorites, .electro .el-masthead .ec-shopping-bag,
-.electro .el-masthead .ec-user, .electro .el-masthead .ec-search { color: #fff !important; }
-.electro .el-masthead .u-unfold *, .electro .el-masthead .dropdown-menu * { color: inherit; }
-.electro .el-masthead .text-red, .electro .el-masthead .text-danger { color: var(--electro-primary, #fed700) !important; }
-.electro .el-masthead form .text-gray-90, .electro .el-masthead form select, .electro .el-masthead form .dropdown-toggle,
-.electro .el-masthead form .btn:not(.btn-primary), .electro .el-masthead form input { color: #333e48 !important; }
