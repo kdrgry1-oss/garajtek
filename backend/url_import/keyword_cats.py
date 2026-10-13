@@ -15,6 +15,10 @@ from .specs_map import tr_norm
 
 # (kalıp, kategori slug'ı, override)
 RULES: List[Tuple[str, str, bool]] = [
+    # "makas" kelimesi yüzünden Makaslı Liftler'e düşen el aletleri / kriko — her zaman düzelt
+    (r"bag makas|makas ve testere|teleskopik uzatma|budama", "elektrikli-ve-sarjli-el-aletleri", True),
+    (r"makasli kriko", "yer-krikolari", True),
+    (r"sac kesme makas|kablo makas", "el-aletleri", True),
     # kimyasallar ve araç koruma — her zaman öncelikli
     (r"\b(sprey|spreyi|kopugu)\b|\bpas sokucu", "temizleme-ve-bakim-spreyleri", True),
     (r"(enjektor|yakit sistemi|motor ic|radyator) (temizleyici|sizinti)|partikul temizleme sivisi|"

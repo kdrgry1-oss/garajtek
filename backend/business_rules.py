@@ -83,7 +83,7 @@ RULE_CATALOG = [
      "type": "number", "default": 0, "unit": "₺", "options": [0, 250, 500, 1000],
      "help": "Bu tutarın altındaki siparişlerde kapıda ödeme sunulmaz (ürün sayfasında da belirtilir). 0 = sınır yok."},
     {"group": "Kargo & Teslimat", "key": "shipping.cod_max_total", "label": "Kapıda ödeme üst sipariş tutarı",
-     "type": "number", "default": 0, "unit": "₺", "options": [0, 10000, 25000, 50000],
+     "type": "number", "default": 25000, "unit": "₺", "options": [0, 10000, 25000, 50000],
      "help": "Bu tutarın üstündeki siparişlerde kapıda ödeme sunulmaz (yüksek tutarlı ekipmanlar için). 0 = sınır yok."},
     {"group": "Kargo & Teslimat", "key": "storefront.cod_card_badge", "label": "Ürün kartlarında 'Kapıda Ödeme' rozeti",
      "type": "toggle", "default": True, "options": [True, False],

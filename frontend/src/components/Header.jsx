@@ -19,6 +19,7 @@ import CountdownBar from "./CountdownBar";
 import RotatingText from "./RotatingText";
 import { optimizeImg, firstImage } from "../lib/img";
 import { fetchHeaderMenu, fetchTopBars, fetchSaleMenu, getCachedMenu, getCachedBars, DEFAULT_MENU_TABS } from "../lib/headerMenu";
+import { useCartPromo } from "../lib/cartPromo";
 import { cartSummary } from "../lib/price";
 import { useStoreInfo } from "../lib/storeInfo";
 import { SITE_NAME } from "../lib/brand";
@@ -443,7 +444,8 @@ function HeaderIcons({ variant, onMobileSearch, mobileSearchOpen, cfg = {} }) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [miniOpen]);
   const shop = variant === "shop";
-  const sum = cartSummary(items, 0).effSum || total;
+  const promo = useCartPromo(items, total);
+  const sum = items.length ? cartSummary(items, promo).grand : 0;
   const badge = cfg.badge_style === "dark" ? "bg-dark text-white" : cfg.badge_style === "white" ? "bg-white text-gray-90" : null;
   const badgeCls = shop
     ? `width-22 height-22 ${badge || "bg-dark text-white"} position-absolute d-flex align-items-center justify-content-center rounded-circle left-12 top-8 font-weight-bold font-size-12`

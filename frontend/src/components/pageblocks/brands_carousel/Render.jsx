@@ -39,11 +39,21 @@ export function useCatalogBrands(on) {
   return on ? rows : [];
 }
 
+/** Elle girilen markanın bağlantısı. "Arama" türünde (ya da boş) bağlantı her zaman markanın ADINDAN üretilir —
+ *  panelde marka adı değiştirilip bağlantı unutulursa yanlış aramaya gitmesin. Kategori/ürün/URL bağlantısı korunur. */
+export function brandLink(b) {
+  const l = b && b.link;
+  const name = String((b && b.name) || "").trim();
+  const isSearch = !l || !l.kind || l.kind === "search" || (l.kind !== "none" && !l.url && !l.slug && !l.id);
+  if (isSearch && name) return { ...(l || {}), kind: "search", label: name, url: `/arama?q=${encodeURIComponent(name)}` };
+  return l;
+}
+
 /** Ayarlar → çizilecek öğe listesi ({key, link, logo, name, field?, data?}). */
 export function brandItems(st, catalog, limit) {
   if (st.source === "manual" || st.brands_source === "manual") {
     return (st.brands || []).filter((b) => b && ((b.logo && b.logo.url) || b.name))
-      .map((b, i) => ({ key: b._id || `m${i}`, link: b.link, logo: b.logo && b.logo.url ? b.logo : null, name: b.name || "", field: `brands.${i}` }));
+      .map((b, i) => ({ key: b._id || `m${i}`, link: brandLink(b), logo: b.logo && b.logo.url ? b.logo : null, name: b.name || "", field: `brands.${i}` }));
   }
   return (catalog || []).slice(0, limit || 30).map((b) => ({
     key: `c-${b.name}`, link: { kind: "search", url: b.url || `/arama?q=${encodeURIComponent(b.name)}`, label: b.name },

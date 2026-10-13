@@ -65,3 +65,11 @@ test("katalog kaynağı: /page-blocks/brands logoları data-pd-data ile; önizle
   expect(r.container.querySelectorAll("[data-pd-placeholder]").length).toBe(5);
   r.unmount();
 });
+
+test("elle girilen markada arama bağlantısı her zaman marka adından üretilir", () => {
+  const { brandLink } = require("./Render");
+  expect(brandLink({ name: "SwissTron", link: { kind: "search", url: "/arama?q=%C4%B0zelta%C5%9F" } }).url).toBe("/arama?q=SwissTron");
+  expect(brandLink({ name: "ARM", link: { kind: "none" } })).toEqual({ kind: "none" });
+  expect(brandLink({ name: "ARM" }).url).toBe("/arama?q=ARM");
+  expect(brandLink({ name: "X", link: { kind: "category", url: "/liftler" } }).url).toBe("/liftler");
+});

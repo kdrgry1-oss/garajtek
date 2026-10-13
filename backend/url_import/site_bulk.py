@@ -288,6 +288,9 @@ async def clean_texts(db, only_ids: Optional[List[str]] = None) -> int:
             v = p.get(f)
             if isinstance(v, str) and v:
                 nv = clean_site_names(v)
+                if f in ("name", "meta_title"):
+                    from .name_fix import fix_name
+                    nv = fix_name(nv)
                 if nv != v:
                     upd[f] = nv
         if upd:
@@ -298,8 +301,12 @@ async def clean_texts(db, only_ids: Optional[List[str]] = None) -> int:
 
 async def hide_blocked_brands(db, pid: str) -> bool:
     """Sahibin satıştan kaldırdığı markalar (site_refresh.HIDDEN_BRAND_RX) yeni aktarımda da pasif kalır."""
-    from site_refresh import HIDDEN_BRAND_RX
-    p = await db.products.find_one({"id": pid}, {"_id": 0, "brand": 1, "name": 1, "is_active": 1})
+    from site_refresh import HIDDEN_BRAND_RX, PLACEHOLDER_PRICES
+    p = await db.products.find_one({"id": pid}, {"_id": 0, "brand": 1, "name": 1, "is_active": 1, "price": 1})
+    if p and p.get("is_active") is not False and float(p.get("price") or 0) in PLACEHOLDER_PRICES:
+        await db.products.update_one({"id": pid}, {"$set": {"is_active": False, "deactivated_at": _now(),
+                                                            "deactivated_reason": "Kaynakta fiyat yer tutucu"}})
+        return True
     if p and p.get("is_active") is not False and re.search(HIDDEN_BRAND_RX, f"{p.get('brand') or ''} {p.get('name') or ''}", re.I):
         await db.products.update_one({"id": pid}, {"$set": {"is_active": False, "deactivated_at": _now(),
                                                             "deactivated_reason": "Satıştan kaldırılan marka"}})

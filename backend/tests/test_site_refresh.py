@@ -132,3 +132,23 @@ def test_swap_demo_brands_keeps_admin_brands():
     assert out[0]["settings"]["brands"][0]["logo"]["url"] == "/brands/rico.svg"
     out2, ch2 = SR.swap_demo_brands(out)
     assert not ch2
+
+
+def test_placeholder_cod_footer(db):
+    from pageblocks import store
+    _run(store.ensure(db, "home"))
+    _run(db.products.insert_many([
+        {"id": "a", "seed_source": "site_import_v1", "price": 396000.0, "is_active": True},
+        {"id": "b", "seed_source": "site_import_v1", "price": 3960.0, "is_active": True},
+    ]))
+    assert _run(SR.hide_placeholder_prices_once(db)) == 1
+    assert _run(db.products.find_one({"id": "a"}))["is_active"] is False
+    assert _run(SR.cod_max_once(db)) is True
+    br = _run(db.settings.find_one({"id": "business_rules"}, {"_id": 0}))
+    assert br["values"]["shipping.cod_max_total"] == 25000
+    g = _run(store.get_global(db))
+    if "7/24" in g["site_footer_contact"].get("call_us_text", ""):
+        assert _run(SR.footer_hours_once(db)) is True
+    else:
+        _run(SR.footer_hours_once(db))
+    assert "7/24" not in _run(store.get_global(db))["site_footer_contact"]["call_us_text"]

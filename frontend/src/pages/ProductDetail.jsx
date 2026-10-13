@@ -157,7 +157,7 @@ export default function ProductDetail() {
   const [pdpTab, setPdpTab] = useState("description");
   const touchX = useRef(0);
   const { isFavorite, toggleFavorite } = useFavorites();
-  const { freeShippingThreshold } = useShipping();
+  const { freeShippingThreshold, shippingFee } = useShipping();
   const { user } = useAuth();
   // A5: kargo geri sayım kuralları (kesim saati / çalışma günleri / resmî tatiller) İşletme
   // Kuralları'ndan gelir — kodda sabit değil. Her dakika yeniden hesaplanır.
@@ -222,12 +222,19 @@ export default function ProductDetail() {
                 ...it,
                 price: info.price, sale_price: info.sale_price,
                 campaign_discount_percent: info.campaign_discount_percent,
+                // Stok da canlı: anlık görüntüde stok yoktu → kart "Tükendi" sanıyordu
+                ...(info.stock !== undefined ? { stock: info.stock } : {}),
+                ...(info.product_type ? { product_type: info.product_type } : {}),
+                ...(info.variants && Object.keys(info.variants).length
+                  ? { variants: (it.variants || []).length ? it.variants.map((v) => ({ ...v, stock: info.variants[v.id]?.stock ?? v.stock })) : Object.entries(info.variants).map(([id, v]) => ({ id, stock: v.stock })) }
+                  : {}),
               };
             });
           // Değişiklik yoksa aynı referansı koru (gereksiz render/döngü olmasın)
           const unchanged = next.length === prev.length && next.every((it, i) =>
             it.id === prev[i].id
             && Number(it.price) === Number(prev[i].price)
+            && Number(it.stock) === Number(prev[i].stock)
             && Number(it.sale_price || 0) === Number(prev[i].sale_price || 0)
             && Number(it.campaign_discount_percent || 0) === Number(prev[i].campaign_discount_percent || 0));
           if (unchanged) return prev;
@@ -362,6 +369,8 @@ export default function ProductDetail() {
             image: _rvImg,
             price: _p.price,
             sale_price: _p.sale_price,
+            stock: _p.stock,
+            product_type: _p.product_type,
             // Kampanya olmadan kaydedilirse kartta indirim görünmüyordu
             campaign_discount_percent: _p.campaign_discount_percent,
           });
@@ -897,8 +906,11 @@ export default function ProductDetail() {
                     <div className="row">
                       <div className="col-md-6 mb-4">
                         <h3 className="font-size-18 mb-3">Kargo ve Teslimat</h3>
-                        <p><strong>Ücretsiz Kargo:</strong> {(freeShippingThreshold != null ? Number(freeShippingThreshold) : 4000).toLocaleString("tr-TR")} ₺ ve üzeri siparişlerde kargo ücretsizdir.</p>
-                        <p><strong>Hazırlık:</strong> Siparişiniz ödeme onayının ardından 1–2 iş günü içinde kargoya teslim edilir. Büyük hacimli ekipmanlar (lift, kompresör vb.) anlaşmalı nakliye ile gönderilir.</p>
+                        {freeShippingThreshold != null && Number(freeShippingThreshold) > 0
+                          ? <p><strong>Ücretsiz Kargo:</strong> {Number(freeShippingThreshold).toLocaleString("tr-TR")} ₺ ve üzeri siparişlerde kargo ücretsizdir.</p>
+                          : shippingFee > 0 && <p><strong>Kargo Ücreti:</strong> {fmtPrice(shippingFee)} (sepette ve ödeme adımında gösterilir).</p>}
+                        <p><strong>Kargoya Veriliş:</strong> Stoktaki ürünler, sayaçta gösterilen saate kadar verilen siparişlerde aynı gün, sonrasında en geç bir sonraki iş günü kargoya verilir.</p>
+                        <p><strong>Teslimat:</strong> Kargoya verildikten sonra genellikle 1–3 iş günü. Büyük hacimli ekipmanlar (lift, kompresör vb.) anlaşmalı nakliye ile gönderilir; teslim günü telefonla planlanır.</p>
                         <p><strong>Takip:</strong> Kargo takip numaranız SMS ve/veya e-posta ile iletilir.</p>
                       </div>
                       <div className="col-md-6 mb-4">

@@ -310,7 +310,7 @@ Adres: {{sirket.adres}} · Telefon: {{sirket.telefon}} · E-posta: {{sirket.epos
 <h3>4. Teslimat</h3>
 <ul>
 <li>Ürünler, ALICI'nın bildirdiği teslimat adresine, anlaşmalı kargo firmaları (ör. Aras Kargo, PTT Kargo) veya büyük hacimli/ağır ürünlerde anlaşmalı ambar/nakliye firmaları aracılığıyla gönderilir.</li>
-<li>Stokta bulunan ürünler genellikle 1–3 iş günü içinde kargoya verilir; tahmini süre ürün sayfasında belirtilir. Teslim süresi, her halükârda sipariş tarihinden itibaren yasal azami süre olan <strong>30 günü</strong> aşamaz.</li>
+<li>Stokta bulunan ürünler, ürün sayfasındaki saate kadar verilen siparişlerde aynı gün, sonrasında en geç bir sonraki iş günü kargoya verilir; kargoya verildikten sonra teslimat genellikle 1–3 iş günü sürer. Teslim süresi, her halükârda sipariş tarihinden itibaren yasal azami süre olan <strong>30 günü</strong> aşamaz.</li>
 <li>Teslimat masrafları, ödeme ekranında ve yukarıdaki tabloda gösterilmiştir. Paletli/ağır ürünlerin araçtan indirilmesi ve kat/iç mekâna taşınması, aksi açıkça belirtilmedikçe teslimat bedeline dahil değildir.</li>
 <li>Kurulum hizmeti, ürün sayfasında belirtilmişse veya ayrıca satın alınmışsa verilir; kurulum şartları <a href="/sayfa/garanti-kosullari">Garanti ve Teknik Servis</a> sayfasında açıklanmıştır.</li>
 </ul>
@@ -433,7 +433,7 @@ Adres: {{sirket.adres}} · Telefon: {{sirket.telefon}} · E-posta: {{sirket.epos
         "content": """<p class="lead">Siparişlerinizi Türkiye'nin her yerine, ürünün ölçü ve ağırlığına uygun taşıma yöntemiyle gönderiyoruz.</p>
 <h3>Gönderim Süresi</h3>
 <ul>
-<li>Stokta bulunan ürünler, ödeme onayından sonra genellikle <strong>1–3 iş günü</strong> içinde kargoya verilir. Hafta sonu ve resmî tatillerde verilen siparişler takip eden ilk iş günü işleme alınır.</li>
+<li>Stokta bulunan ürünler, ürün sayfasındaki saate kadar verilen siparişlerde <strong>aynı gün</strong>, sonrasında en geç <strong>bir sonraki iş günü</strong> kargoya verilir. Kargoya verildikten sonra teslimat genellikle <strong>1–3 iş günü</strong> sürer. Hafta sonu ve resmî tatillerde verilen siparişler takip eden ilk iş günü işleme alınır.</li>
 <li>Tedarikli veya siparişe özel ürünlerde tahmini süre ürün sayfasında belirtilir.</li>
 <li>Her durumda teslimat, sipariş tarihinden itibaren yasal azami süre olan <strong>30 gün</strong> içinde yapılır; gecikme öngörülürse sizi bilgilendirir, dilerseniz siparişinizi ücretsiz iptal ederiz.</li>
 </ul>
@@ -625,7 +625,7 @@ Adres: {{sirket.adres}} · Telefon: {{sirket.telefon}} · E-posta: {{sirket.epos
         "content": """<p>Aşağıda en sık sorulan soruların yanıtlarını bulabilirsiniz. Aradığınız yanıtı bulamazsanız <a href="/sayfa/iletisim">bize ulaşın</a>.</p>
 <h3>SİPARİŞ &amp; KARGO</h3>
 <h4>Siparişim ne zaman kargoya verilir?</h4>
-<p>Stoktaki ürünler ödeme onayından sonra genellikle 1–3 iş günü içinde kargoya verilir. Tedarikli ürünlerde tahmini süre ürün sayfasında yazar. Yasal azami teslim süresi 30 gündür.</p>
+<p>Stoktaki ürünler ürün sayfasındaki saate kadar verilen siparişlerde aynı gün, sonrasında en geç bir sonraki iş günü kargoya verilir; teslimat kargoya verildikten sonra genellikle 1–3 iş günü sürer. Tedarikli ürünlerde tahmini süre ürün sayfasında yazar. Yasal azami teslim süresi 30 gündür.</p>
 <h4>Hangi kargo firmalarıyla çalışıyorsunuz?</h4>
 <p>Koliler Aras Kargo veya PTT Kargo ile; lift, büyük kompresör gibi ağır ürünler paletli olarak anlaşmalı ambar/nakliye firmalarıyla gönderilir.</p>
 <h4>Siparişimi nasıl takip ederim?</h4>

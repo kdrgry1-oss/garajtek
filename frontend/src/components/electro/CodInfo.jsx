@@ -1,6 +1,6 @@
 // Kapıda ödeme görünürlüğü — ürün sayfası satırı, ürün kartı rozeti, sepet notu.
 // Kapıda ödeme kapalıysa (ayarlar) hiçbiri görünmez. Kurallar: backend/cod_rules.py
-import { useCodCheck, useCodInfo, productCodAllowed } from "../../lib/cod";
+import { useCodCheck, useCodInfo, productCodAllowed, overCodMax } from "../../lib/cod";
 import { fmtPrice } from "./format";
 import "../sets/sets.css";
 
@@ -27,6 +27,15 @@ export function CodInfoRow({ product }) {
   // ürün sayfasında yalnız bilgi olarak gösteririz; ürün/kategori kapatması ise kesindir.
   const check = useCodCheck(info?.enabled ? ids : [], Math.max(price, Number(info?.min_total) || 0));
   if (!info || !info.enabled || !product) return null;
+  const overMax = product.product_type !== "set" && overCodMax(product, info);
+  if (overMax) {
+    return (
+      <p className="el-cod-row is-off font-size-13 text-gray-90 mb-3" data-testid="pdp-cod-unavailable">
+        <i className="fas fa-hand-holding-usd mr-2" />
+        Kapıda ödeme en fazla {fmtPrice(Number(info.max_total))} tutarındaki siparişlerde geçerlidir; bu ürün kart veya havale/EFT ile ödenebilir.
+      </p>
+    );
+  }
   const blocked = check.available === false && (check.blocked || []).length > 0;
   if (blocked) {
     return (

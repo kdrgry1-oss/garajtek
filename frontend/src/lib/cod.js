@@ -38,9 +38,23 @@ export function useCodInfo() {
 }
 
 /** Ürün (kart verisiyle) kapıda ödemeye uygun mu? Yalnız ürün/kategori kapatmasına bakar. */
+/** Ürünün tek adet birim fiyatı (indirimli varsa o). */
+export function unitPriceOf(product) {
+  const p = Number(product && product.price) || 0;
+  const s = Number(product && product.sale_price) || 0;
+  return s > 0 && s < p ? s : p;
+}
+
+/** Ürün tek başına kapıda ödeme üst sınırını aşıyor mu (ör. 132.000 ₺ lift, sınır 25.000 ₺). */
+export function overCodMax(product, info) {
+  const max = Number(info && info.max_total) || 0;
+  return max > 0 && unitPriceOf(product) > max;
+}
+
 export function productCodAllowed(product, info) {
   if (!info || !info.enabled || !product) return false;
   if (product.cod_disabled) return false;
+  if (overCodMax(product, info)) return false;
   const ex = new Set((info.excluded_category_ids || []).map(String));
   if (!ex.size) return true;
   const ids = [...(product.category_ids || []), product.category_id].filter(Boolean).map(String);

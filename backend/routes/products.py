@@ -2145,7 +2145,7 @@ async def cart_pricing(payload: dict):
     prods = await db.products.find(
         {"id": {"$in": ids}},
         {"_id": 0, "id": 1, "price": 1, "sale_price": 1, "category_id": 1,
-         "category_ids": 1, "variants": 1, "is_active": 1}).to_list(200)
+         "category_ids": 1, "variants": 1, "is_active": 1, "stock": 1, "product_type": 1}).to_list(200)
     prods = await _attach_campaign_badges(prods)   # otomatik kampanya yüzdesini ekle
     out = {}
     for p in prods:
@@ -2162,6 +2162,8 @@ async def cart_pricing(payload: dict):
             "campaign_discount_percent": p.get("campaign_discount_percent") or 0,
             "campaign_label": p.get("campaign_label") or "",
             "is_active": p.get("is_active", True),
+            "stock": p.get("stock"),
+            "product_type": p.get("product_type") or "",
             "variants": vmap,
         }
     return {"items": out}

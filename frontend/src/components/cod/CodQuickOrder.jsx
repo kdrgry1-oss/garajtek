@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import ProvinceDistrictSelect from "../ProvinceDistrictSelect";
 import LegalModal from "../checkout/LegalModal";
-import { useCodInfo, useCodCheck } from "../../lib/cod";
+import { useCodInfo, useCodCheck, overCodMax } from "../../lib/cod";
 import { collectClickIds } from "../../lib/dataLayer";
 import { trackPurchase } from "../../utils/pixelEvents";
 import { fmtPrice } from "../electro/format";
@@ -250,6 +250,7 @@ export default function CodQuickOrder({ product, variant = null, quantity = 1, c
   const check = useCodCheck(info?.enabled ? ids : [], Math.max(Number(product?.price) || 0, Number(info?.min_total) || 0));
   if (!product || !info || !info.enabled) return null;
   if (check.available === false && (check.blocked || []).length) return null;
+  if (product.product_type !== "set" && overCodMax(product, info)) return null; // üst sınırı tek başına aşıyor
   const hasVariants = (product.variants || []).length > 0 && product.product_type !== "set";
   const stock = hasVariants ? Number(variant?.stock || 0) : Number(product.stock || 0);
   if (stock <= 0) return null;

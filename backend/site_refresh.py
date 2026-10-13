@@ -351,6 +351,87 @@ async def real_brands_once(db) -> bool:
         return False
 
 
+PLACEHOLDER_PRICE_MARKER = "placeholder_price_hidden_2026_10_13_v1"
+# algikitelli.com.tr fiyatı belirsiz ürünlerde 360.000 ₺ yer tutucu gösteriyor → bizde ×1,10 = 396.000 ₺
+PLACEHOLDER_PRICES = (396000.0,)
+
+
+async def hide_placeholder_prices_once(db) -> int:
+    """Kaynakta gerçek fiyat yerine yer tutucu (aynı 360.000 ₺) olan aktarılmış ürünler pasife alınır; fiyatı girilince
+    panelden yeniden açılabilir. Bir kez çalışır."""
+    if await db.settings.find_one({"id": PLACEHOLDER_PRICE_MARKER}, {"_id": 1}):
+        return 0
+    q = {"seed_source": "site_import_v1", "price": {"$in": list(PLACEHOLDER_PRICES)}, "is_active": {"$ne": False}}
+    ids = [p["id"] async for p in db.products.find(q, {"_id": 0, "id": 1})]
+    if ids:
+        await db.products.update_many({"id": {"$in": ids}}, {"$set": {
+            "is_active": False, "deactivated_at": _now(),
+            "deactivated_reason": "Kaynak sitede fiyat yer tutucu (360.000 ₺) — gerçek fiyat girilince yeniden açın"}})
+    await db.settings.update_one({"id": PLACEHOLDER_PRICE_MARKER}, {"$set": {"id": PLACEHOLDER_PRICE_MARKER,
+                                                                            "product_ids": ids, "applied_at": _now()}},
+                                 upsert=True)
+    return len(ids)
+
+
+FOOTER_HOURS_MARKER = "footer_call_text_hours_2026_10_13_v1"
+FOOTER_CALL_TEXT = "Sorunuz mu var? Pzt–Cmt 09:00–18:00 arayın"
+
+
+async def footer_hours_once(db) -> bool:
+    """Footer'daki "7/24 arayın" metni çalışma saatleriyle (Pzt–Cmt 09:00–18:00) çelişiyordu. Bir kez."""
+    try:
+        if await db.settings.find_one({"id": FOOTER_HOURS_MARKER}, {"_id": 1}):
+            return False
+        from pageblocks import store
+        g = copy.deepcopy(await store.get_global(db))
+        fc = dict(g.get("site_footer_contact") or {})
+        changed = "7/24" in str(fc.get("call_us_text") or "")
+        if changed:
+            fc["call_us_text"] = FOOTER_CALL_TEXT
+            g["site_footer_contact"] = fc
+            pub = await store.ensure(db, "home")
+            draft = await store.get_draft(db, "home")
+            doc, errors, _ = await store.publish(db, "home", user="sistem (footer saatleri)",
+                                                 blocks=pub.get("blocks") or [], global_=g)
+            if errors:
+                logger.error("[%s] yayın hatası: %s", FOOTER_HOURS_MARKER, errors)
+                return False
+            if draft:
+                draft = dict(draft)
+                dg = dict(draft.get("global") or g)
+                dfc = dict(dg.get("site_footer_contact") or {})
+                if "7/24" in str(dfc.get("call_us_text") or "7/24"):
+                    dfc["call_us_text"] = FOOTER_CALL_TEXT
+                dg["site_footer_contact"] = dfc
+                draft["global"], draft["rev"] = dg, doc.get("rev")
+                await db.page_layouts.replace_one({"id": "home:draft"}, draft, upsert=True)
+        await db.settings.update_one({"id": FOOTER_HOURS_MARKER}, {"$set": {"id": FOOTER_HOURS_MARKER,
+                                                                           "changed": changed, "applied_at": _now()}},
+                                     upsert=True)
+        return changed
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[%s] hata: %s", FOOTER_HOURS_MARKER, e)
+        return False
+
+
+COD_MAX_MARKER = "cod_max_total_25000_2026_10_13_v1"
+
+
+async def cod_max_once(db) -> bool:
+    """Kapıda ödeme üst sınırı 25.000 ₺ (yönetici daha önce bir değer kaydetmediyse ya da 0 = sınırsız ise). Bir kez."""
+    if await db.settings.find_one({"id": COD_MAX_MARKER}, {"_id": 1}):
+        return False
+    cur = (await db.settings.find_one({"id": "business_rules"}, {"_id": 0, "values": 1}) or {}).get("values") or {}
+    changed = False
+    if float(cur.get("shipping.cod_max_total") or 0) <= 0:
+        import business_rules as br
+        await br.save_rules(db, {"shipping.cod_max_total": 25000})
+        changed = True
+    await db.settings.update_one({"id": COD_MAX_MARKER}, {"$set": {"id": COD_MAX_MARKER, "changed": changed,
+                                                                  "applied_at": _now()}}, upsert=True)
+    return changed
+
+
 async def deactivate_broken_sets(db) -> int:
     """Bileşeni 2'nin altına düşen (ör. tüm ürünleri satıştan kaldırılmış) aktif setleri pasife alır. Her açılışta,
     tekrarlanabilir."""
@@ -377,6 +458,10 @@ async def run_once(db=None) -> bool:
             await deactivate_broken_sets(db)
             await remove_brand_logo_once(db)
             await real_brands_once(db)
+            await hide_placeholder_prices_once(db)
+            await deactivate_broken_sets(db)
+            await cod_max_once(db)
+            await footer_hours_once(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -389,6 +474,10 @@ async def run_once(db=None) -> bool:
         await deactivate_broken_sets(db)
         await remove_brand_logo_once(db)
         await real_brands_once(db)
+        await hide_placeholder_prices_once(db)
+        await deactivate_broken_sets(db)
+        await cod_max_once(db)
+        await footer_hours_once(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)
