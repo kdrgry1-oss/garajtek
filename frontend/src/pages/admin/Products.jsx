@@ -956,11 +956,7 @@ export default function AdminProducts() {
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Alış ve Satış fiyatı zorunlu (kullanıcı isteği)
-    if (!(Number(formData.purchase_price) > 0)) {
-      toast.error("Alış Fiyatı zorunlu — Fiyat sekmesinden girin");
-      return;
-    }
+    // Satış fiyatı zorunlu; alış fiyatı isteğe bağlı (sahip talebi 13.10.2026 — boşken de kaydedilir)
     if (!(Number(formData.price) > 0)) {
       toast.error("Satış Fiyatı zorunlu — Fiyat sekmesinden girin");
       return;
@@ -2412,7 +2408,7 @@ export default function AdminProducts() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Alış Fiyatı (TL) <span className="text-red-500">*</span></label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Alış Fiyatı (TL) <span className="text-gray-400 normal-case font-normal">(isteğe bağlı)</span></label>
                         <input
                           type="number"
                           value={formData.purchase_price || ""}
