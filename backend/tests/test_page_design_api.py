@@ -40,7 +40,8 @@ def _layout(c):
 def test_initial_layout_is_template_default(client):
     d = _layout(client)
     assert d["draft"] is None and d["published"]["rev"] == 1
-    assert [b["type"] for b in d["published"]["blocks"]][:3] == ["hero_slider", "ads_block", "deals_tabs"]
+    # Marka bandı reklam kutularının hemen altında (sahip talebi 12.10.2026)
+    assert [b["type"] for b in d["published"]["blocks"]][:4] == ["hero_slider", "ads_block", "brands_carousel", "deals_tabs"]
     assert d["published"]["global"]["site_header"]["variant"] == "v1"
     pub = client.get("/api/page-blocks?page=home").json()
     assert len(pub) == 9 and pub[0]["settings"]["slides"][0]["title"].startswith("YENİ NESİL")
@@ -96,10 +97,11 @@ def test_unknown_type_rejected(client):
 def test_revisions_and_restore(client):
     d = _layout(client)
     blocks = d["published"]["blocks"]
-    blocks[5]["settings"]["link"] = {"kind": "url", "url": "/ilk"}
+    i = next(k for k, b in enumerate(blocks) if b["type"] == "full_banner")   # sıra değişse de bağlantılı blok
+    blocks[i]["settings"]["link"] = {"kind": "url", "url": "/ilk"}
     client.put("/api/page-design/home/draft", json={"blocks": blocks})
     client.post("/api/page-design/home/publish")
-    blocks[5]["settings"]["link"] = {"kind": "url", "url": "/ikinci"}
+    blocks[i]["settings"]["link"] = {"kind": "url", "url": "/ikinci"}
     client.put("/api/page-design/home/draft", json={"blocks": blocks}, headers={"If-Match": "0"})
     r = client.get("/api/page-design/home")
     client.put("/api/page-design/home/draft", json={"blocks": blocks}, headers={"If-Match": str((r.json()["draft"] or {}).get("rev", 0))})
@@ -108,10 +110,10 @@ def test_revisions_and_restore(client):
     assert [x["rev"] for x in revs][:3] == [3, 2, 0] or [x["rev"] for x in revs][:2] == [3, 2]
     assert "değişti" in revs[0]["summary"]
     one = client.get("/api/page-design/home/revisions/2").json()
-    assert one["blocks"][5]["settings"]["link"]["url"] == "/ilk"
+    assert one["blocks"][i]["settings"]["link"]["url"] == "/ilk"
     r = client.post("/api/page-design/home/revisions/2/restore")
     assert r.status_code == 200 and r.json()["draft"]["restored_from"] == 2
-    assert _layout(client)["draft"]["blocks"][5]["settings"]["link"]["url"] == "/ilk"
+    assert _layout(client)["draft"]["blocks"][i]["settings"]["link"]["url"] == "/ilk"
     assert client.delete("/api/page-design/home/draft").json()["deleted"] is True
 
 
@@ -121,7 +123,7 @@ def test_global_draft_publish_site_design(client):
     g["site_theme"]["primary_color"] = "#0787ea"
     g["site_newsletter"]["title"] = "Fırsat Bülteni"
     client.put("/api/page-design/home/draft", json={"blocks": d["published"]["blocks"], "global": g})
-    assert client.get("/api/site-design").json()["site_theme"]["primary_color"] == "#fed700"
+    assert client.get("/api/site-design").json()["site_theme"]["primary_color"] == "#d71920"   # kırmızı tema (12.10.2026)
     client.post("/api/page-design/home/publish")
     sd = client.get("/api/site-design").json()
     assert sd["site_theme"]["primary_color"] == "#0787ea" and sd["site_newsletter"]["title"] == "Fırsat Bülteni"
