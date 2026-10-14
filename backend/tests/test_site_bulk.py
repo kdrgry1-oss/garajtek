@@ -197,3 +197,20 @@ def test_site_sets_v2_affordable_and_retire(db):
     assert all("pahali" not in [i["product_id"] for i in d["set_items"]] for d in made)
     assert _run(db.products.find_one({"id": "old"}, {"_id": 0}))["is_active"] is False
     assert _run(SS.create_sets_v2_once(db, create_set=create_set)) == {"skipped": "done"}
+
+
+def test_restore_sets_once_resets_markers_when_no_sets(tmp_path):
+    import asyncio
+    from localdb import AsyncIOMotorClient
+    from url_import import site_sets as SS
+    db = AsyncIOMotorClient(path=str(tmp_path / "r.db"))["test"]
+
+    async def run():
+        await db.settings.insert_one({"id": SS.MARKER, "sets": []})
+        await db.settings.insert_one({"id": SS.MARKER_V2, "sets": []})
+        r = await SS.restore_sets_once(db)
+        assert r == {"existing_sets": 0, "reset": True}
+        assert await db.settings.find_one({"id": SS.MARKER}) is None
+        assert await db.settings.find_one({"id": SS.MARKER_V2}) is None
+        assert (await SS.restore_sets_once(db)) == {"skipped": "done"}
+    asyncio.run(run())

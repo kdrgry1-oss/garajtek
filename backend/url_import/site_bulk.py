@@ -452,7 +452,8 @@ async def run_startup(db=None) -> None:
         logger.warning("[%s] bitti: %s", SEED_SOURCE, res)
         try:
             from routes.product_sets import create_set_product
-            from .site_sets import create_sets_once
+            from .site_sets import create_sets_once, restore_sets_once
+            logger.warning("[%s] set geri kurma: %s", SEED_SOURCE, await restore_sets_once(db))
             sets = await create_sets_once(db, create_set=lambda d: create_set_product(d, req, user))
             logger.warning("[%s] ürün setleri: %s", SEED_SOURCE, sets)
             from .site_sets import create_sets_v2_once

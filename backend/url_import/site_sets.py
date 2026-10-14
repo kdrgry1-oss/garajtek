@@ -266,3 +266,20 @@ async def create_sets_v2_once(db, *, create_set) -> Dict:
     await db.settings.update_one({"id": MARKER_V2}, {"$set": {"id": MARKER_V2, "created": made, "updated": updated,
                                                              "retired": retired, "applied_at": _now()}}, upsert=True)
     return {"created": made, "updated": updated, "retired": retired}
+
+
+RESTORE_MARKER = "site_sets_restore_2026_10_14_v1"
+
+
+async def restore_sets_once(db) -> Dict:
+    """Canlıda tüm setler kaybolmuştu (12-14.10.2026; iz bırakmadan silinmiş). Hiç set yoksa v1/v2 işaretleri
+    temizlenir → create_sets_once / create_sets_v2_once setleri yeniden kurar. Bir kez."""
+    if await db.settings.find_one({"id": RESTORE_MARKER}, {"_id": 1}):
+        return {"skipped": "done"}
+    n = await db.products.count_documents({"product_type": "set", "is_deleted": {"$ne": True}})
+    if n == 0:
+        await db.settings.delete_one({"id": MARKER})
+        await db.settings.delete_one({"id": MARKER_V2})
+    await db.settings.update_one({"id": RESTORE_MARKER}, {"$set": {"id": RESTORE_MARKER, "existing_sets": n,
+                                                                  "reset": n == 0, "applied_at": _now()}}, upsert=True)
+    return {"existing_sets": n, "reset": n == 0}

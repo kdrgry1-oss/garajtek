@@ -389,9 +389,18 @@ async def admin_update_set(sid: str, payload: dict, current_user: dict = Depends
 
 
 @router.delete("/admin/product-sets/{sid}")
-async def admin_delete_set(sid: str, current_user: dict = Depends(require_permission("products.delete"))):
+async def admin_delete_set(sid: str, request: Request, current_user: dict = Depends(require_permission("products.delete"))):
     doc = await _find_set(sid)
     if not doc:
         raise HTTPException(status_code=404, detail="Set bulunamadı")
     await db.products.delete_one({"id": doc["id"], "product_type": "set"})
+    # Setler iz bırakmadan kayboluyordu (14.10.2026) → silme artık denetim kaydına yazılır.
+    try:
+        from activity_audit import record_admin_audit
+        await record_admin_audit(db, action="product_set.delete", entity_type="product", entity_id=doc["id"],
+                                 before={"name": doc.get("name"), "set_items": doc.get("set_items")}, after=None,
+                                 current_user=current_user, request=request, source="product_sets")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"set delete audit failed: {e}")
+    logger.warning(f"product set deleted: {doc['id']} {doc.get('name')} by {(current_user or {}).get('email')}")
     return {"deleted": doc["id"]}
