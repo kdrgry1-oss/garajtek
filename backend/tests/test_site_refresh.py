@@ -164,3 +164,11 @@ def test_search_category_select_off_once(db):
     assert _run(SR.search_cats_off_once(db)) is True
     assert _run(store.get_global(db))["site_header"]["search"]["show_category_select"] is False
     assert _run(SR.search_cats_off_once(db)) is False      # bir kez
+
+
+def test_bimi_logo_once(db):
+    from routes.mail_logo import DOC_ID
+    assert _run(SR.bimi_logo_once(db)) is True
+    doc = _run(db.settings.find_one({"id": DOC_ID}))
+    assert 'baseProfile="tiny-ps"' in doc["svg"]
+    assert _run(SR.bimi_logo_once(db)) is False

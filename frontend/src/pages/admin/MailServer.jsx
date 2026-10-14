@@ -7,7 +7,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import {
   AlertTriangle, CheckCircle2, Copy, ExternalLink, Forward, Globe, HardDrive, Inbox, KeyRound,
-  ListOrdered, Mail, Plus, RefreshCw, Send, Server, ShieldCheck, Trash2, XCircle,
+  Image as ImageIcon, ListOrdered, Mail, Plus, RefreshCw, Send, Server, ShieldCheck, Trash2, Upload, XCircle,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api/admin/mail`;
@@ -19,6 +19,7 @@ const TABS = [
   { key: "yonlendirmeler", label: "Yönlendirmeler", icon: Forward },
   { key: "dns", label: "DNS & Teslim Edilebilirlik", icon: Globe },
   { key: "kuyruk", label: "Kuyruk", icon: ListOrdered },
+  { key: "logo", label: "Gönderen Logosu", icon: ImageIcon },
 ];
 
 const QUOTAS = [
@@ -448,6 +449,74 @@ function DnsTab() {
   );
 }
 
+// ───────────────────────────── Gönderen logosu (BIMI) ─────────────────────────────
+const LOGO_API = `${process.env.REACT_APP_BACKEND_URL}/api/admin/mail-logo`;
+
+function LogoTab() {
+  const [info, setInfo] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [ver, setVer] = useState(0);
+  const load = useCallback(async () => {
+    try { const r = await axios.get(LOGO_API, auth()); setInfo(r.data); } catch (e) { toast.error(errText(e, "Logo bilgisi alınamadı")); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const upload = async (file) => {
+    if (!file) return;
+    if (!/\.svg$/i.test(file.name) && file.type !== "image/svg+xml") { toast.error("Yalnız SVG dosyası yüklenebilir"); return; }
+    setBusy(true);
+    try {
+      const svg = await file.text();
+      await axios.post(LOGO_API, { svg, title: "GarajTek" }, auth());
+      toast.success("Logo kaydedildi"); setVer((v) => v + 1); await load();
+    } catch (e) { toast.error(errText(e, "Logo yüklenemedi")); } finally { setBusy(false); }
+  };
+  const remove = async () => {
+    if (!window.confirm("Gönderen logosu kaldırılsın mı?")) return;
+    try { await axios.delete(LOGO_API, auth()); toast.success("Logo kaldırıldı"); await load(); } catch (e) { toast.error(errText(e, "Kaldırılamadı")); }
+  };
+  const rec = info?.record;
+  const recText = rec ? rec.value : "";
+  return (
+    <div className="space-y-4" data-testid="mail-logo-tab">
+      <Card title="Gönderen Logosu (BIMI)" icon={ImageIcon}>
+        <p className="text-sm text-gray-600">Gelen kutusunda mailinizin yanında görünen marka logosu. Destekleyen servisler: Yahoo, Apple Mail (iCloud), Fastmail, Zoho ve diğerleri. <b>Gmail</b> ayrıca ücretli marka sertifikası (VMC) ister; Gmail için aşağıdaki ipucuna bakın.</p>
+        <div className="flex flex-wrap items-center gap-4 mt-4">
+          <div className="w-24 h-24 rounded-full border bg-white overflow-hidden flex items-center justify-center">
+            {info?.has_logo ? <img src={`${info.url}?v=${ver}`} alt="Gönderen logosu" className="w-full h-full object-contain" data-testid="mail-logo-preview" /> : <span className="text-xs text-gray-400 text-center px-2">Logo yok</span>}
+          </div>
+          <div className="space-y-2">
+            <label className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm cursor-pointer ${busy ? "bg-gray-300" : "bg-gray-900 text-white"}`}>
+              <Upload className="w-4 h-4" /> {busy ? "Yükleniyor…" : (info?.has_logo ? "Logoyu değiştir (SVG)" : "Logo yükle (SVG)")}
+              <input type="file" accept=".svg,image/svg+xml" className="hidden" disabled={busy} data-testid="mail-logo-input" onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ""; }} />
+            </label>
+            {info?.has_logo && <button type="button" onClick={remove} className="block text-sm text-red-600 underline">Logoyu kaldır</button>}
+            <div className="text-xs text-gray-500">Kare SVG (ör. 512×512), en fazla 32 KB; betik ve dış bağlantı içermemeli. Sistem BIMI "SVG Tiny PS" biçimine otomatik uyarlar.</div>
+          </div>
+        </div>
+      </Card>
+      {info?.has_logo && rec && (
+        <Card title="DNS kaydı (Cloudflare › DNS › Add record)" icon={Globe}>
+          <div className="bg-gray-50 border rounded-md p-3 text-xs space-y-1">
+            <div className="flex flex-wrap gap-x-4 text-gray-600"><span>Tür: <b>{rec.type}</b></span><span>Ad: <b className="font-mono">{rec.name}</b></span></div>
+            <div className="flex items-start gap-2"><code className="flex-1 font-mono break-all">{recText}</code><CopyBtn text={recText} testid="mail-logo-copy" /></div>
+          </div>
+          <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1 mt-3">
+            <li>BIMI'nin çalışması için DMARC kaydınız <span className="font-mono">p=quarantine</span> (veya <span className="font-mono">reject</span>) olmalı. Şu an <span className="font-mono">p=none</span> ise önce 2-3 hafta sorunsuz gönderim yapın, sonra yükseltin.</li>
+            <li>Logo adresi: <a className="underline break-all" href={info.url} target="_blank" rel="noreferrer">{info.url}</a></li>
+          </ul>
+        </Card>
+      )}
+      <Card title="Gmail'de logo (ücretsiz yol)" icon={AlertTriangle}>
+        <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+          <li><a className="underline" href="https://accounts.google.com/signup" target="_blank" rel="noreferrer">accounts.google.com/signup</a> → "Mevcut e-posta adresimi kullan" seçip <b>info@garajtek.com</b> ile bir Google hesabı açın (doğrulama kodu bu kutuya gelir).</li>
+          <li>Hesabın profil fotoğrafını GarajTek logosu yapın. Gmail kullanıcıları bu adresten gelen maillerde logoyu görür (aynısını noreply@ için de yapabilirsiniz).</li>
+          <li>Resmî Gmail BIMI rozeti için marka tescili + VMC sertifikası (DigiCert/Entrust, yıllık ücretli) gerekir.</li>
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
 // ───────────────────────────── Kuyruk ─────────────────────────────
 function QueueTab() {
   const [data, setData] = useState(null);
@@ -600,6 +669,7 @@ export default function MailServer() {
           {tab === "yonlendirmeler" && <AliasesTab domain={domain} />}
           {tab === "dns" && <DnsTab />}
           {tab === "kuyruk" && <QueueTab />}
+          {tab === "logo" && <LogoTab />}
         </>
       )}
     </div>

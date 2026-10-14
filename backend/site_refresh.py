@@ -12,6 +12,7 @@ Sonradan panelden yapılan değişikliklere dokunmaz (bir kez çalışır).
 from __future__ import annotations
 
 import copy
+import os
 import logging
 import re
 import uuid
@@ -477,6 +478,31 @@ async def search_cats_off_once(db) -> bool:
         return False
 
 
+BIMI_MARKER = "bimi_logo_default_2026_10_14_v1"
+
+
+async def bimi_logo_once(db) -> bool:
+    """Gönderen logosu (BIMI) boşsa varsayılan GarajTek logosunu yükler. Bir kez; panelden değiştirilebilir."""
+    try:
+        if await db.settings.find_one({"id": BIMI_MARKER}, {"_id": 1}):
+            return False
+        from routes.mail_logo import DOC_ID, sanitize_svg
+        changed = False
+        if not (await db.settings.find_one({"id": DOC_ID}, {"_id": 0, "svg": 1}) or {}).get("svg"):
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "brand", "garajtek-bimi.svg")
+            with open(path, encoding="utf-8") as fh:
+                svg = sanitize_svg(fh.read(), "GarajTek")
+            await db.settings.update_one({"id": DOC_ID}, {"$set": {"id": DOC_ID, "svg": svg, "updated_at": _now()}},
+                                         upsert=True)
+            changed = True
+        await db.settings.update_one({"id": BIMI_MARKER}, {"$set": {"id": BIMI_MARKER, "changed": changed,
+                                                                   "applied_at": _now()}}, upsert=True)
+        return changed
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[%s] hata: %s", BIMI_MARKER, e)
+        return False
+
+
 async def deactivate_broken_sets(db) -> int:
     """Bileşeni 2'nin altına düşen (ör. tüm ürünleri satıştan kaldırılmış) aktif setleri pasife alır. Her açılışta,
     tekrarlanabilir."""
@@ -508,6 +534,7 @@ async def run_once(db=None) -> bool:
             await cod_max_once(db)
             await footer_hours_once(db)
             await search_cats_off_once(db)
+            await bimi_logo_once(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -525,6 +552,7 @@ async def run_once(db=None) -> bool:
         await cod_max_once(db)
         await footer_hours_once(db)
         await search_cats_off_once(db)
+        await bimi_logo_once(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)
