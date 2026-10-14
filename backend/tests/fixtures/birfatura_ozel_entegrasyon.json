@@ -1,0 +1,1370 @@
+{
+ "source": "https://developers.birfatura.com/dokuman/ozel-entegrasyon-api (developers-api.birfatura.com/api/portal/dokumanlar/ozel-entegrasyon-api, 14.10.2026)",
+ "endpoints": [
+  {
+   "method": "POST",
+   "path": "/api/orderStatus",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "token",
+     "required": true,
+     "type": "string (guid)",
+     "description": "Erişim Anahtarı"
+    }
+   ],
+   "request": null,
+   "responses": [
+    {
+     "code": "200",
+     "description": "Başarılı yanıt",
+     "contentType": "application/json",
+     "schemaName": "OrderStatusSchema",
+     "example": {
+      "OrderStatus": [
+       {
+        "Id": 1,
+        "Value": "Onaylandı"
+       },
+       {
+        "Id": 2,
+        "Value": "Kargolandı"
+       },
+       {
+        "Id": 3,
+        "Value": "İptal Edildi"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/paymentMethods",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "token",
+     "required": true,
+     "type": "string (guid)",
+     "description": "Erişim Anahtarı"
+    }
+   ],
+   "request": null,
+   "responses": [
+    {
+     "code": "200",
+     "description": "Başarılı yanıt",
+     "contentType": "application/json",
+     "schemaName": "PaymentMethodsSchema",
+     "example": {
+      "PaymentMethods": [
+       {
+        "Id": 1,
+        "Value": "Kredi Kartı"
+       },
+       {
+        "Id": 2,
+        "Value": "Banka EFT-Havale"
+       },
+       {
+        "Id": 3,
+        "Value": "Kapıda Ödeme Nakit"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/orders",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "token",
+     "required": true,
+     "type": "string (guid)",
+     "description": "Erişim Anahtarı"
+    }
+   ],
+   "request": {
+    "required": true,
+    "description": "İstek gövdesi",
+    "contentType": "application/json",
+    "schemaName": "OrdersRequestSchema",
+    "schemaType": "OrdersRequestSchema",
+    "example": {
+     "orderStatusId": 1,
+     "startDateTime": "01.07.2026 00:00:00",
+     "endDateTime": "16.07.2026 23:59:59"
+    }
+   },
+   "responses": [
+    {
+     "code": "200",
+     "description": "Başarılı yanıt",
+     "contentType": "application/json",
+     "schemaName": "OrdersSchema",
+     "example": {
+      "Orders": [
+       {
+        "OrderId": 41591,
+        "OrderCode": "ORD202607160001",
+        "OrderDate": "16.07.2026 10:30:00",
+        "BillingName": "Örnek Müşteri",
+        "BillingAddress": "Örnek Mah. Örnek Cad. No:1",
+        "BillingTown": "Çankaya",
+        "BillingCity": "Ankara",
+        "BillingMobilePhone": "05000000000",
+        "ShippingName": "Örnek Müşteri",
+        "ShippingAddress": "Örnek Mah. Örnek Cad. No:1",
+        "ShippingTown": "Çankaya",
+        "ShippingCity": "Ankara",
+        "PaymentTypeId": 1,
+        "Currency": "TRY",
+        "TotalPaidTaxExcluding": 1000,
+        "TotalPaidTaxIncluding": 1200,
+        "ProductsTotalTaxExcluding": 1000,
+        "ProductsTotalTaxIncluding": 1200,
+        "DiscountTotalTaxExcluding": 0,
+        "DiscountTotalTaxIncluding": 0,
+        "OrderDetails": [
+         {
+          "ProductId": 101,
+          "ProductCode": "URN-001",
+          "ProductName": "Örnek Ürün",
+          "ProductQuantityType": "Adet",
+          "ProductQuantity": 1,
+          "VatRate": 20,
+          "ProductUnitPriceTaxExcluding": 1000,
+          "ProductUnitPriceTaxIncluding": 1200
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/orderCargoUpdate",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "token",
+     "required": true,
+     "type": "string (guid)",
+     "description": "Erişim Anahtarı"
+    }
+   ],
+   "request": {
+    "required": true,
+    "description": "İstek gövdesi",
+    "contentType": "application/json",
+    "schemaName": "OrderCargoUpdateRequestSchema",
+    "schemaType": "OrderCargoUpdateRequestSchema",
+    "example": {
+     "orderId": 14948,
+     "orderStatusId": 3,
+     "cargoTrackingCode": "AT27NN805",
+     "updateDateTime": "16.07.2026 14:27:09",
+     "cargoTrackingCodeUrl": "https://kargotakip.example/AT27NN805",
+     "cargoCompany": "Aras"
+    }
+   },
+   "responses": [
+    {
+     "code": "200",
+     "description": "İşlemin alındığını gösteren örnek HTTP 200 yanıtı",
+     "contentType": "application/json",
+     "schemaName": null,
+     "example": {
+      "Success": true,
+      "Message": "Kargo bilgisi güncellendi."
+     }
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/invoiceLinkUpdate",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "token",
+     "required": true,
+     "type": "string (guid)",
+     "description": "Erişim Anahtarı"
+    }
+   ],
+   "request": {
+    "required": true,
+    "description": "İstek gövdesi",
+    "contentType": "application/json",
+    "schemaName": "invoiceLinkUpdateRequestSchema",
+    "schemaType": "invoiceLinkUpdateRequestSchema",
+    "example": {
+     "faturaUrl": "https://uygulama.birfatura.com/dosyagetir?tur=1&guid=ornek.pdf",
+     "orderId": 14948,
+     "faturaTarihi": "16.07.2026 14:27:09",
+     "faturaNo": "ARS2026000000001"
+    }
+   },
+   "responses": [
+    {
+     "code": "200",
+     "description": "İşlemin alındığını gösteren örnek HTTP 200 yanıtı",
+     "contentType": "application/json",
+     "schemaName": null,
+     "example": {
+      "Success": true,
+      "Message": "Fatura bağlantısı güncellendi."
+     }
+    }
+   ]
+  }
+ ],
+ "schemas": {
+  "OrderStatusSchema_OrderStatus_Item": {
+   "name": "OrderStatusSchema_OrderStatus_Item",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "Id",
+     "type": "integer",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Value",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "Value",
+    "Id"
+   ]
+  },
+  "OrderStatusSchema": {
+   "name": "OrderStatusSchema",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "OrderStatus",
+     "type": "object[]",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": "OrderStatusSchema_OrderStatus_Item",
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "DeliveryFeeTypeSchema_DeliveryFeeType_Item": {
+   "name": "DeliveryFeeTypeSchema_DeliveryFeeType_Item",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "Id",
+     "type": "integer",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Value",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "Value",
+    "Id"
+   ]
+  },
+  "DeliveryFeeTypeSchema": {
+   "name": "DeliveryFeeTypeSchema",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "DeliveryFeeType",
+     "type": "object[]",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": "DeliveryFeeTypeSchema_DeliveryFeeType_Item",
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "PaymentMethodsSchema_PaymentMethods_Item": {
+   "name": "PaymentMethodsSchema_PaymentMethods_Item",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "Id",
+     "type": "integer",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Value",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "Value",
+    "Id"
+   ]
+  },
+  "PaymentMethodsSchema": {
+   "name": "PaymentMethodsSchema",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "PaymentMethods",
+     "type": "object[]",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": "PaymentMethodsSchema_PaymentMethods_Item",
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "OrdersRequestSchema": {
+   "name": "OrdersRequestSchema",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "orderStatusId",
+     "type": "integer",
+     "required": true,
+     "description": "Sipariş Durumu Id",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "startDateTime",
+     "type": "string (dd.MM.yyyy HH:mm:ss)",
+     "required": true,
+     "description": "Sipariş Başlangıç Tarihi",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "endDateTime",
+     "type": "string (dd.MM.yyyy HH:mm:ss)",
+     "required": true,
+     "description": "Sipariş Bitiş Tarihi",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "startDateTime",
+    "endDateTime",
+    "orderStatusId"
+   ]
+  },
+  "OrdersSchema_Orders_Item_ExtraFees_Item": {
+   "name": "OrdersSchema_Orders_Item_ExtraFees_Item",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "NameCode",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Name",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "VatRate",
+     "type": "integer",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "FeeTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "FeeTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "OrdersSchema_Orders_Item_OrderDetails_Item_Variants_Item": {
+   "name": "OrdersSchema_Orders_Item_OrderDetails_Item_Variants_Item",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "Type",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Value",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "OrdersSchema_Orders_Item_OrderDetails_Item_ExtraFeesUnit_Item": {
+   "name": "OrdersSchema_Orders_Item_OrderDetails_Item_ExtraFeesUnit_Item",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "NameCode",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Name",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "VatRate",
+     "type": "integer",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "FeeUnitTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "FeeUnitTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "OrdersSchema_Orders_Item_OrderDetails_Item": {
+   "name": "OrdersSchema_Orders_Item_OrderDetails_Item",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "ProductId",
+     "type": "integer (long)",
+     "required": true,
+     "description": "Ürün id",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductCode",
+     "type": "string",
+     "required": true,
+     "description": "Ürün stok kodu",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Barcode",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductBrand",
+     "type": "string",
+     "required": false,
+     "description": "Ürün markası",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductName",
+     "type": "string",
+     "required": true,
+     "description": "Ürün adı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductNote",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductImage",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Variants",
+     "type": "object[]",
+     "required": false,
+     "description": "Ürünün varyantları",
+     "ref": null,
+     "itemsRef": "OrdersSchema_Orders_Item_OrderDetails_Item_Variants_Item",
+     "enum": null
+    },
+    {
+     "name": "ProductQuantityType",
+     "type": "string",
+     "required": true,
+     "description": "Siparişteki ürün adet tipi (Adet, kg gibi)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductQuantity",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Siparişteki ürün adeti",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "VatRate",
+     "type": "integer",
+     "required": true,
+     "description": "Ürün yüzdelik kdv oranı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductUnitPriceTaxExcluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Kdv hariç birim ürün tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductUnitPriceTaxIncluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Kdv dahil birim ürün tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "CommissionUnitTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv hariç birim ürün kommisyon tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "CommissionUnitTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv dahil birim ürün kommisyon tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "DiscountUnitTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv hariç birim ürün iskonto tutarı (satır iskontosu)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "DiscountUnitTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv dahil birim ürün iskonto tutarı (satır iskontosu)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ExtraFeesUnit",
+     "type": "object[]",
+     "required": false,
+     "description": "Satın alınmış ürünün herhangi bir ekstra ücreti",
+     "ref": null,
+     "itemsRef": "OrdersSchema_Orders_Item_OrderDetails_Item_ExtraFeesUnit_Item",
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "ProductName",
+    "ProductUnitPriceTaxExcluding",
+    "ProductUnitPriceTaxIncluding",
+    "ProductQuantity",
+    "ProductId",
+    "VatRate",
+    "ProductCode",
+    "ProductQuantityType"
+   ]
+  },
+  "OrdersSchema_Orders_Item": {
+   "name": "OrdersSchema_Orders_Item",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "OrderId",
+     "type": "integer (long)",
+     "required": true,
+     "description": "Sipariş id",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "OrderCode",
+     "type": "string",
+     "required": true,
+     "description": "Sipariş numarası",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "OrderDate",
+     "type": "string (dd.MM.yyyy HH:mm:ss)",
+     "required": true,
+     "description": "Sipariş tarihi",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "InvoiceTypeId",
+     "type": "integer",
+     "required": false,
+     "description": "...",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "InvoiceDate",
+     "type": "string (dd.MM.yyyy HH:mm:SS)",
+     "required": false,
+     "description": "...",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "InvoiceExplanation",
+     "type": "string",
+     "required": false,
+     "description": "Siparişe özel fatura açıklaması",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "EInvoiceProfileId",
+     "type": "integer",
+     "required": false,
+     "description": "...",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "EInvoiceId",
+     "type": "string (guid)",
+     "required": false,
+     "description": "...",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ETTN",
+     "type": "string (ABC2019123456789)",
+     "required": false,
+     "description": "...",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "CustomerId",
+     "type": "integer (long)",
+     "required": false,
+     "description": "Müşteri id",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "BillingName",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "BillingAddress",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "BillingTown",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "BillingCity",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "BillingMobilePhone",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "BillingPhone",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "TaxOffice",
+     "type": "string",
+     "required": false,
+     "description": "Kurumsal müşterinin vergi dairesi",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "TaxNo",
+     "type": "string",
+     "required": false,
+     "description": "Kurumsal müşterinin vergi numarası",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "SSNTCNo",
+     "type": "string",
+     "required": false,
+     "description": "Kurumsal olmayan müşterinin kimlik numarası",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Email",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingId",
+     "type": "integer (long)",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingName",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingAddress",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingTown",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingCity",
+     "type": "string",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingCountry",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingZipCode",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingPhone",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShipCompany",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "CargoCampaignCode",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "SalesChannelWebSite",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "PaymentTypeId",
+     "type": "integer",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "PaymentType",
+     "type": "string",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "Currency",
+     "type": "string",
+     "required": true,
+     "description": "Siparişin uluslararası para birimi sembolü (TRY, USD gibi)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "CurrencyRate",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Dövizli siparişler için ₺'ye dönüştürülmüş döviz kuru",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "TotalPaidTaxExcluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Kdv hariç ödenecek toplam tutar",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "TotalPaidTaxIncluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Kdv dahil ödenecek toplam tutar",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductsTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Kdv hariç ürünlerin toplam tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ProductsTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Kdv dahil ürünlerin toplam tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "CommissionTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv hariç komisyon toplam tutarı (pazar yerleri için geçerli)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "CommissionTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv dahil komisyon toplam tutarı (pazar yerleri için geçerli)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingChargeTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv hariç kargo tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ShippingChargeTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv dahil kargo tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "PayingAtTheDoorChargeTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv hariç kapıda ödeme tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "PayingAtTheDoorChargeTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv dahil kapıda ödeme tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "DiscountTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv hariç iskonto tutarı (matrah iskontosu)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "DiscountTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv dahil iskonto tutarı (matrah iskontosu)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "InstallmentChargeTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv hariç vade tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "InstallmentChargeTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv dahil vade tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "BankTransferDiscountTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv hariç eft-havale iskonto tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "BankTransferDiscountTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kdv dahil eft-havale iskonto tutarı",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "ExtraFees",
+     "type": "object[]",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": "OrdersSchema_Orders_Item_ExtraFees_Item",
+     "enum": null
+    },
+    {
+     "name": "OrderDetails",
+     "type": "object[]",
+     "required": true,
+     "description": "",
+     "ref": null,
+     "itemsRef": "OrdersSchema_Orders_Item_OrderDetails_Item",
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "ShippingName",
+    "OrderCode",
+    "BillingTown",
+    "ShippingCity",
+    "OrderId",
+    "TotalPaidTaxExcluding",
+    "BillingName",
+    "BillingMobilePhone",
+    "ProductsTotalTaxIncluding",
+    "BillingAddress",
+    "ProductsTotalTaxExcluding",
+    "Currency",
+    "OrderDate",
+    "ShippingAddress",
+    "PaymentTypeId",
+    "OrderDetails",
+    "TotalPaidTaxIncluding",
+    "BillingCity",
+    "ShippingTown"
+   ]
+  },
+  "OrdersSchema": {
+   "name": "OrdersSchema",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "Orders",
+     "type": "object[]",
+     "required": false,
+     "description": "",
+     "ref": null,
+     "itemsRef": "OrdersSchema_Orders_Item",
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "OrderCargoUpdateRequestSchema": {
+   "name": "OrderCargoUpdateRequestSchema",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "orderId",
+     "type": "integer (long)",
+     "required": true,
+     "description": "Sipariş Id",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "orderStatusId",
+     "type": "integer",
+     "required": true,
+     "description": "Sipariş Durumu Id (Sipariş durumunu \"Kargolandı\" durumuna getirmek için)",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "cargoTrackingCode",
+     "type": "string",
+     "required": true,
+     "description": "Kargo Takip Kodu",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "updateDateTime",
+     "type": "string (dd.MM.yyyy HH:mm:ss)",
+     "required": false,
+     "description": "Güncellenme Tarihi",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "cargoTrackingCodeUrl",
+     "type": "string",
+     "required": false,
+     "description": "Kargo Takip Kodu Url'i",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "cargoCompany",
+     "type": "string",
+     "required": false,
+     "description": "Kargo Firması",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "cargoTrackingCode",
+    "orderStatusId",
+    "orderId"
+   ]
+  },
+  "invoiceLinkUpdateRequestSchema": {
+   "name": "invoiceLinkUpdateRequestSchema",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "faturaUrl",
+     "type": "string",
+     "required": true,
+     "description": "Siparişe ait oluşturulan faturanın bulunduğu adres",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "orderId",
+     "type": "integer (long)",
+     "required": true,
+     "description": "Sipariş Id",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "faturaTarihi",
+     "type": "string (dd.MM.yyyy HH:mm:ss)",
+     "required": false,
+     "description": "Fatura Tarihi",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    },
+    {
+     "name": "faturaNo",
+     "type": "string",
+     "required": false,
+     "description": "Fatura Numarası",
+     "ref": null,
+     "itemsRef": null,
+     "enum": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "faturaUrl",
+    "orderId"
+   ]
+  }
+ }
+}

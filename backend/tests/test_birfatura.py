@@ -3,6 +3,8 @@
 routes paketinin __init__'i (tüm uygulama) yüklenmez: routes.deps taklit edilir, veritabanı
 geçici dosyada GERÇEK localdb'dir (Motor uyumlu)."""
 import importlib
+import json
+import re
 import os
 import sys
 import types
@@ -399,3 +401,84 @@ def test_pure_helpers():
     assert bf.numeric_order_id({"order_number": "W10500"}) == 10500
     assert bf.numeric_product_id({"product_id": "abc"}) == bf.numeric_product_id({"product_id": "abc"})
     assert bf.numeric_product_id({"product_id": "abc"}) < 2 ** 53
+
+
+# --------------------------------------------------------------------------- resmî şema uyumu
+_SPEC = json.loads((Path(__file__).parent / "fixtures" / "birfatura_ozel_entegrasyon.json").read_text("utf-8"))
+
+
+def _schema(name):
+    s = _SPEC["schemas"][name]
+    return {p["name"]: p for p in s["properties"]}, set(s.get("required") or [])
+
+
+def _check(obj, name, path, errors):
+    props, req = _schema(name)
+    for k in req:
+        if obj.get(k) in (None, "") and obj.get(k) != 0:
+            errors.append(f"{path}.{k}: zorunlu alan boş/eksik")
+    for k, v in obj.items():
+        if k not in props:
+            errors.append(f"{path}.{k}: resmî şemada yok")
+            continue
+        t = props[k]["type"]
+        if v is None:
+            continue
+        if t.startswith("integer") and not (isinstance(v, int) and not isinstance(v, bool)):
+            errors.append(f"{path}.{k}: integer bekleniyor, {type(v).__name__}")
+        elif t.startswith("number") and not isinstance(v, (int, float)):
+            errors.append(f"{path}.{k}: number bekleniyor, {type(v).__name__}")
+        elif t.startswith("string") and not isinstance(v, str):
+            errors.append(f"{path}.{k}: string bekleniyor, {type(v).__name__}")
+        if "dd.MM.yyyy" in t and isinstance(v, str):
+            assert re.fullmatch(r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}", v), f"{path}.{k} tarih biçimi: {v}"
+    sub = {"OrderDetails": "OrdersSchema_Orders_Item_OrderDetails_Item",
+           "ExtraFees": "OrdersSchema_Orders_Item_ExtraFees_Item",
+           "Variants": "OrdersSchema_Orders_Item_OrderDetails_Item_Variants_Item",
+           "ExtraFeesUnit": "OrdersSchema_Orders_Item_OrderDetails_Item_ExtraFeesUnit_Item"}
+    for k, sname in sub.items():
+        for i, it in enumerate(obj.get(k) or []):
+            _check(it, sname, f"{path}.{k}[{i}]", errors)
+
+
+def test_orders_match_official_schema(env):
+    """Çeşitli siparişlerin /api/orders çıktısı BirFatura resmî şemasına birebir uymalı."""
+    orders = [
+        order("W20001"),
+        order("W20002", payment_method="cash_on_delivery", cod_fee=30.0, shipping_cost=60.0, discount=50.0,
+              total=1100.0 + 30 + 60 - 50),
+        order("W20003", payment_method="bank_transfer",
+              billing_info={"is_corporate": True, "company_name": "Örnek A.Ş.", "tax_office": "Çankaya",
+                            "tax_number": "1234567890"}),
+        order("W20004", iyzico_retrieve_response={"installment": 3, "paidPrice": "1155.00"}),
+        order("W20005", gift_wrap=True, gift_wrap_price=24.0, total=1124.0),
+    ]
+    token = setup(env, orders=orders)
+    body = pull(env, token).json()
+    assert set(body) == {"Orders"}
+    assert len(body["Orders"]) == len(orders)
+    errors = []
+    for o in body["Orders"]:
+        _check(o, "OrdersSchema_Orders_Item", o.get("OrderCode", "?"), errors)
+    assert not errors, "\n".join(errors)
+
+
+def test_dictionaries_match_official_schema(env):
+    token = setup(env)
+    for path, root, item in (("orderStatus", "OrderStatus", "OrderStatusSchema_OrderStatus_Item"),
+                             ("paymentMethods", "PaymentMethods", "PaymentMethodsSchema_PaymentMethods_Item")):
+        body = env.c.post(f"/api/birfatura/api/{path}", headers={"token": token}).json()
+        assert set(body) == {root} and body[root]
+        errors = []
+        for i, x in enumerate(body[root]):
+            _check(x, item, f"{root}[{i}]", errors)
+        assert not errors, "\n".join(errors)
+
+
+def test_postback_request_fields_match_official_schema():
+    """Bizim kabul ettiğimiz geri yazım alanları resmî istek şemalarındakiyle aynı."""
+    inv, _ = _schema("invoiceLinkUpdateRequestSchema")
+    cargo, _ = _schema("OrderCargoUpdateRequestSchema")
+    assert set(inv) == {"faturaUrl", "orderId", "faturaTarihi", "faturaNo"}
+    assert set(cargo) >= {"orderId", "orderStatusId", "cargoTrackingCode", "updateDateTime",
+                          "cargoTrackingCodeUrl", "cargoCompany"}
