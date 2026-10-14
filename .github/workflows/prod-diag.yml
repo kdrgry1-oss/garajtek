@@ -1,0 +1,52 @@
+# Canlı veritabanında SALT OKUNUR tanı betikleri (deploy/diag/*.py). Hiçbir şey yazmaz.
+name: Canlı tanı (salt okunur)
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: "deploy/diag altındaki betik"
+        required: true
+        default: sets_diag.py
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+          VDS_USER: ${{ secrets.VDS_USER }}
+          VDS_SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
+          VDS_SSH_PORT: ${{ secrets.VDS_SSH_PORT }}
+          VDS_KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VDS_SSH_KEY" > ~/.ssh/id_deploy; chmod 600 ~/.ssh/id_deploy
+          PORT="${VDS_SSH_PORT:-22}"
+          if [ -n "$VDS_KNOWN_HOSTS" ]; then printf '%s\n' "$VDS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else ssh-keyscan -p "$PORT" -H "$VDS_HOST" > ~/.ssh/known_hosts 2>/dev/null; fi
+          cat > ~/.ssh/config <<CFG
+          Host vds
+            HostName $VDS_HOST
+            User ${VDS_USER:-root}
+            Port $PORT
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+          CFG
+      - name: Run
+        env:
+          VDS_USER: ${{ secrets.VDS_USER }}
+          SCRIPT: ${{ inputs.script }}
+        run: |
+          case "$SCRIPT" in *[!A-Za-z0-9_.-]*|"") echo "geçersiz betik adı"; exit 1;; esac
+          test -f "deploy/diag/$SCRIPT"
+          SUDO=""; [ -n "$VDS_USER" ] && [ "$VDS_USER" != "root" ] && SUDO="sudo -n"
+          scp -q "deploy/diag/$SCRIPT" vds:/tmp/gt-diag.py
+          ssh vds "$SUDO /opt/garajtek/venv/bin/python /tmp/gt-diag.py; rm -f /tmp/gt-diag.py"
