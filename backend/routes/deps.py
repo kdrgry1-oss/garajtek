@@ -399,6 +399,26 @@ def create_token(user_id: str, is_admin: bool = False, token_version: int = 0) -
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+# GÜVENLİK: Oturum kullanıcısı (current_user) birçok uçta — /auth/me dahil — olduğu gibi
+# yanıta dönüyor. Parola geçmişi (bcrypt hash'leri), MFA sırları ve kilit/sayaç alanları
+# DB'den HİÇ okunmaz; token_version yalnız iptal kontrolü için okunur, sonra atılır.
+_USER_SESSION_PROJECTION = {
+    "_id": 0, "password": 0, "password_history": 0,
+    "mfa_secret_enc": 0, "mfa_pending_secret_enc": 0,
+    "mfa_phone_enc": 0, "mfa_pending_phone_enc": 0,
+    "mfa_fail_count": 0, "mfa_fail_window": 0,
+    "failed_attempts": 0, "first_failed_at": 0, "locked_until": 0,
+}
+_USER_SESSION_STRIP = ("token_version",)
+
+
+def _strip_session_user(user: dict) -> dict:
+    """İptal kontrolünden sonra iç güvenlik alanlarını oturum kullanıcısından çıkar."""
+    for _k in _USER_SESSION_STRIP:
+        user.pop(_k, None)
+    return user
+
+
 def _token_revoked(payload: dict, user: dict) -> bool:
     """Token iptal edilmiş mi? Kullanıcının token_version'ı, token'daki tv'den büyükse
     (parola değişikliği/sıfırlama sonrası) eski token GEÇERSİZ. Grandfathering: ikisi de
@@ -433,12 +453,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         return None
     try:
         payload = _decode_jwt_strict(credentials.credentials)
-        user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password": 0})
+        user = await db.users.find_one({"id": payload["user_id"]}, _USER_SESSION_PROJECTION)
         if user and user.get("is_active") is False:
             return None
         if user and _token_revoked(payload, user):
             return None  # parola değişikliği/sıfırlama sonrası eski token
-        return user
+        return _strip_session_user(user) if user else user
     except Exception:
         return None
 
@@ -463,7 +483,7 @@ async def require_admin(credentials: HTTPAuthorizationCredentials = Depends(secu
         raise HTTPException(status_code=401, detail="Geçersiz token")
     if not payload.get("is_admin"):
         raise HTTPException(status_code=403, detail="Admin yetkisi gerekli")
-    user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password": 0})
+    user = await db.users.find_one({"id": payload["user_id"]}, _USER_SESSION_PROJECTION)
     if not user or user.get("is_active") is False:
         raise HTTPException(status_code=401, detail="Hesap devre dışı")
     # GÜVENLİK: Yalnız GERÇEK panel personeli admin erişebilir. Panel personeli
@@ -480,7 +500,7 @@ async def require_admin(credentials: HTTPAuthorizationCredentials = Depends(secu
         raise HTTPException(status_code=403, detail="Geçerli bir personel rolü atanmalı")
     if _token_revoked(payload, user):
         raise HTTPException(status_code=401, detail="Oturum sonlandırıldı, tekrar giriş yapın")
-    return user
+    return _strip_session_user(user)
 
 
 async def get_effective_permissions(user: dict) -> list:

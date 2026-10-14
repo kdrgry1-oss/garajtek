@@ -203,7 +203,9 @@ def test_admin_gate_rechecks_database_role_and_admin_flag(user, allowed):
     scope = {"db": db, "Depends": Depends, "security": None, "HTTPException": HTTPException,
              "HTTPAuthorizationCredentials": HTTPAuthorizationCredentials,
              "_decode_jwt_strict": lambda _: {"is_admin": True, "user_id": "test"},
-             "_token_revoked": lambda *_: False}
+             "_token_revoked": lambda *_: False,
+             "_USER_SESSION_PROJECTION": {"_id": 0, "password": 0},
+             "_strip_session_user": lambda u: u}
     load_functions("routes/deps.py", ["require_admin", "get_effective_permissions"], scope)
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="synthetic-test")
     if allowed:

@@ -242,7 +242,9 @@ async def register(request: Request):
     phone_norm = normalize_phone_tr(safe_str(phone, 32) or "") if phone else ""
     _last10 = phone_norm[-10:]
     if len(_last10) == 10 and _last10.isdigit():
-        dup_phone = await db.users.find_one({"phone": {"$regex": _last10}}, {"_id": 0, "id": 1})
+        # Çapalı + ayraç toleranslı eşleşme: '0544 084 25 85' gibi boşluklu kayıtları da yakalar.
+        dup_phone = await db.users.find_one({"phone": {"$regex": _phone_exact_regex(phone_norm)}},
+                                            {"_id": 0, "id": 1})
         if dup_phone:
             raise HTTPException(status_code=400, detail="Bu telefon numarası zaten kayıtlı")
 
@@ -667,6 +669,10 @@ async def convert_guest_order(payload: dict, request: Request):
                 {"_id": 0, "id": 1})
             if dup:
                 return
+            # Üye adres sınırı doluysa otomatik kayıt sessizce atlanır (sipariş etkilenmez).
+            from .customer import MAX_ADDRESSES_PER_USER
+            if await db.addresses.count_documents({"user_id": uid}) >= MAX_ADDRESSES_PER_USER:
+                return
             has_any = await db.addresses.find_one({"user_id": uid}, {"_id": 0, "id": 1})
             await db.addresses.insert_one({
                 "id": generate_id(), "user_id": uid,
@@ -1002,7 +1008,11 @@ async def forgot_password_reset(req: OTPResetReq):
                   "password_updated_at": _pw_now_iso,
                   "password_changed_at": _pw_now_iso,
                   "password_history": _next_pw_history(_u)},
-         "$inc": {"token_version": 1}},  # GÜVENLİK: sıfırlama tüm eski oturumları geçersiz kılar
+         "$inc": {"token_version": 1},  # GÜVENLİK: sıfırlama tüm eski oturumları geçersiz kılar
+         # Başarılı sıfırlama hesap sahipliğini kanıtlar → hatalı-giriş kilidi de kalkar
+         # (aksi halde "Şimdi giriş yapabilirsiniz" denip yeni şifreyle 15 dk 429 alınıyordu).
+         # IP düzeyindeki blok listesi (ip_blocklist) bilerek korunur.
+         "$unset": {"failed_attempts": "", "first_failed_at": "", "locked_until": ""}},
     )
     await db.password_reset_otps.delete_one({"_id": rec["_id"]})
     return {"success": True, "message": "Şifreniz güncellendi"}

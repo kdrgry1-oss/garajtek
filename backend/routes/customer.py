@@ -92,6 +92,15 @@ async def cancel_my_order(order_id: str, payload: dict = Body(default={}), curre
     cur = order.get("status") or "pending"
     if cur == "cancelled":
         return {"success": True, "status": "cancelled", "message": "Sipariş zaten iptal edilmiş."}
+    # İptal talebi ZATEN alınmışsa (ör. eski sekmeden tekrar basıldı) idempotent bilgi dönülür.
+    # DB'ye YAZILMAZ: ilk talepteki IBAN/cancel_requested_at ezilmez, ikinci olay kaydı düşmez.
+    # Eskiden bu durum genel 409 "hazırlanmaya başladı" mesajına düşüp müşteriyi yanıltıyordu.
+    if cur == "cancel_requested":
+        _paid = (order.get("payment_status") or "").lower() == "paid"
+        return {"success": True, "status": "cancel_requested",
+                "message": ("İptal talebiniz zaten alındı. Ödemeniz en kısa sürede iade edilecektir."
+                            if _paid else
+                            "İptal talebiniz zaten alındı. En kısa sürede işleme alınacaktır.")}
     if cur not in _CUSTOMER_CANCELLABLE:
         raise HTTPException(
             status_code=409,
@@ -210,9 +219,11 @@ async def public_order_tracking(tracking_code: str):
     if not code:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
 
+    # Sipariş numaraları BÜYÜK harfle saklanır (W10001) → 'w10001' de bulunsun. Kargo takip
+    # numaraları firmaya göre büyük/küçük harf duyarlı olabileceğinden ham hâliyle aranır.
     order = await db.orders.find_one(
         {"$or": [
-            {"order_number": code},
+            {"order_number": code.upper()},
             {"cargo_tracking_number": code},
             {"cargo.tracking_number": code},
         ]},
@@ -316,6 +327,29 @@ async def update_my_profile(
             if not _v:
                 raise HTTPException(status_code=400, detail=f"{_lbl} alanı boş bırakılamaz.")
             update_data[_k] = _v[:100]
+    # TELEFON: kayıttaki kuralın aynısı — normalize (905XXXXXXXXX), yalnız TR cep, ve
+    # "bir numara = bir hesap". Eskiden ham metin ('abc<script>', '0544 777 88 99') kaydediliyor,
+    # başka hesabın numarası alınabiliyordu → telefonla şifre sıfırlama yanlış hesabı bulabiliyordu.
+    if "phone" in update_data:
+        _raw = str(update_data.get("phone") or "").strip()[:32]
+        if not _raw:
+            update_data["phone"] = ""  # boş → telefon temizlenir
+        else:
+            from notification_service import normalize_phone_tr
+            from .auth import _phone_exact_regex
+            _norm = normalize_phone_tr(_raw)
+            if not (len(_norm) == 12 and _norm.startswith("905") and _norm.isdigit()):
+                raise HTTPException(status_code=400, detail="Geçerli bir cep telefonu girin")
+            # Numara değişmediyse (ad/soyad düzenlemesi) mükerrer kontrolü atlanır: eski
+            # verideki bir çakışma, üyenin diğer alanları kaydetmesini engellemesin.
+            _same = normalize_phone_tr(str(current_user.get("phone") or "")) == _norm
+            _dup = None if _same else await db.users.find_one(
+                {"phone": {"$regex": _phone_exact_regex(_norm)}, "id": {"$ne": current_user.get("id")}},
+                {"_id": 0, "id": 1},
+            )
+            if _dup:
+                raise HTTPException(status_code=400, detail="Bu telefon numarası zaten kayıtlı")
+            update_data["phone"] = _norm
     # Boy/kilo — beden önerisi için (doğrulanmış aralık; boş bırakılırsa temizlenir).
     def _num_or_none(v, lo, hi):
         if v in (None, ""):
@@ -338,14 +372,23 @@ async def update_my_profile(
     
     return {"success": True, "message": "Profil güncellendi"}
 
+# Üye başına kayıtlı adres sınırı (yeni ekleme bu sayıda reddedilir). Liste ucu bunun
+# üzerini de okur: sınırdan önce birikmiş eski adresler de görünür ve silinebilir kalır.
+MAX_ADDRESSES_PER_USER = 20
+_MAX_LIST_ADDRESSES = 200
+
+
 @router.get("/my-addresses")
 async def get_my_addresses(current_user: dict = Depends(require_auth)):
     """Get current user's addresses"""
+    # Sıralı + üst sınırın üzerinde okunur: eskiden sırasız to_list(20) idi → 20'den fazla
+    # adresi olan üyede fazlası listede/ödeme adımında hiç görünmüyor, yönetilemiyordu.
+    # Varsayılan adres ve en yeniler başta.
     addresses = await db.addresses.find(
-        {"user_id": current_user.get("id")}, 
+        {"user_id": current_user.get("id")},
         {"_id": 0}
-    ).to_list(20)
-    
+    ).sort([("is_default", -1), ("created_at", -1)]).to_list(_MAX_LIST_ADDRESSES)
+
     return {"addresses": addresses}
 
 @router.post("/addresses")
@@ -354,6 +397,12 @@ async def create_address(
     current_user: dict = Depends(require_auth)
 ):
     """Create new address"""
+    # Üye başına adres sınırı: sınırsız kabul edilip listede gösterilemeyen adres birikmesin.
+    if await db.addresses.count_documents({"user_id": current_user.get("id")}) >= MAX_ADDRESSES_PER_USER:
+        raise HTTPException(
+            status_code=400,
+            detail=f"En fazla {MAX_ADDRESSES_PER_USER} adres kaydedebilirsiniz. Lütfen önce bir adres silin.",
+        )
     address = {
         "id": generate_id(),
         "user_id": current_user.get("id"),
