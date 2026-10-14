@@ -237,6 +237,23 @@ export default function AdminProducts() {
       toast.error("Fiyat güncellenemedi");
     }
   };
+  // Listedeki stok hücresinden hızlı düzenleme (varyantsız ürün): {id, stock, stock0}
+  const [stockEdit, setStockEdit] = useState(null);
+  const saveStockEdit = async () => {
+    if (!stockEdit) return;
+    const stock = parseInt(stockEdit.stock, 10);
+    if (!Number.isFinite(stock) || stock < 0) { toast.error("Stok 0 veya daha büyük bir sayı olmalı"); return; }
+    if (stock === stockEdit.stock0) { setStockEdit(null); return; }
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(`${API}/products/${stockEdit.id}`, { stock }, { headers: { Authorization: `Bearer ${token}` } });
+      setProducts((prev) => prev.map((p) => (p.id === stockEdit.id ? { ...p, stock } : p)));
+      setStockEdit(null);
+      toast.success("Stok güncellendi");
+    } catch {
+      toast.error("Stok güncellenemedi");
+    }
+  };
   // technicalDetails: XML/eski altyapı description'dan parse edilen teknik özellikler.
   // Shape: { kumas: {label, value}, kalip: {label, value}, ... } VEYA boş obj
   const [technicalDetails, setTechnicalDetails] = useState({});
@@ -1539,11 +1556,26 @@ export default function AdminProducts() {
   };
 
   const handleSaveVariants = async () => {
+    const sp = selectedProductForVariants;
+    const price = parseFloat(sp.price) || 0;
+    const sale_price = sp.sale_price === "" || sp.sale_price === null || sp.sale_price === undefined
+      ? null : (parseFloat(sp.sale_price) || null);
+    if (price <= 0) { toast.error("Satış fiyatı 0'dan büyük olmalı"); return; }
+    if (sale_price && sale_price >= price) { toast.error("İndirimli fiyat, satış fiyatından küçük olmalı"); return; }
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      
-      await axios.put(`${API}/products/${selectedProductForVariants.id}`, selectedProductForVariants, { headers });
+      const variants = (sp.variants || []).map(({ _priceInput, ...v }) => {
+        // Varyant fiyatı elle girildiyse fark, KAYIT anındaki ana fiyata göre hesaplanır.
+        const typed = parseFloat(_priceInput);
+        const adj = _priceInput !== undefined && Number.isFinite(typed)
+          ? typed - price : (parseFloat(v.price_adjustment ?? v.price_diff) || 0);
+        const rounded = Math.round(adj * 100) / 100;
+        const out = { ...v, stock: Math.max(0, parseInt(v.stock, 10) || 0), price_adjustment: rounded };
+        if ("price_diff" in v) out.price_diff = rounded;   // eski alias — vitrin önce bunu okur
+        return out;
+      });
+      await axios.put(`${API}/products/${sp.id}`, { price, sale_price, variants }, { headers });
       
       toast.success("Varyantlar başarıyla güncellendi");
       setVariantsModalOpen(false);
@@ -2001,9 +2033,39 @@ export default function AdminProducts() {
                     )}
                   </td>
                   <td>
-                    <div className={`text-sm font-bold ${(product.variants?.length > 0 ? product.variants.reduce((s, v) => s + (v.stock || 0), 0) : product.stock || 0) < 5 ? 'text-red-600' : 'text-gray-700'}`}>
-                      {product.variants?.length > 0 ? product.variants.reduce((s, v) => s + (v.stock || 0), 0) : (product.stock || 0)}
-                    </div>
+                    {(() => {
+                      const hasV = product.variants?.length > 0;
+                      const total = hasV ? product.variants.reduce((s, v) => s + (v.stock || 0), 0) : (product.stock || 0);
+                      if (!hasV && stockEdit?.id === product.id) {
+                        return (
+                          <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="number" min="0" step="1" autoFocus
+                              value={stockEdit.stock}
+                              onChange={(e) => setStockEdit((se) => ({ ...se, stock: e.target.value }))}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveStockEdit(); if (e.key === 'Escape') setStockEdit(null); }}
+                              className="w-20 border border-gray-300 rounded px-2 py-1 text-sm font-bold text-center focus:border-black outline-none"
+                              data-testid={`product-stock-input-${product.id}`}
+                            />
+                            <div className="flex gap-1">
+                              <button onClick={saveStockEdit} className="px-2 py-0.5 text-xs font-bold bg-black text-white rounded hover:bg-gray-800">✓</button>
+                              <button onClick={() => setStockEdit(null)} className="px-2 py-0.5 text-xs font-bold bg-gray-200 text-gray-600 rounded hover:bg-gray-300">✕</button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <button
+                          onClick={() => (hasV ? openVariantsModal(product) : setStockEdit({ id: product.id, stock: total, stock0: total }))}
+                          title={hasV ? "Tüm varyantların stok ve fiyatını düzenle" : "Stoğu düzenle"}
+                          className={`text-sm font-bold hover:bg-orange-50 rounded px-1 -mx-1 cursor-pointer ${total < 5 ? 'text-red-600' : 'text-gray-700'}`}
+                          data-testid={`product-stock-edit-${product.id}`}
+                        >
+                          {total}
+                          {hasV && <span className="block text-[10px] font-medium text-orange-600">{product.variants.length} varyant ▾</span>}
+                        </button>
+                      );
+                    })()}
                   </td>
                   <td>
                     <div className="flex gap-1 items-center">
@@ -3202,6 +3264,58 @@ export default function AdminProducts() {
           
           {selectedProductForVariants && (
             <div>
+              {/* Ana fiyat — varyant fiyatları bunun üzerine fark olarak eklenir */}
+              <div className="flex flex-wrap items-end gap-4 mb-4 p-4 bg-orange-50 border border-orange-100 rounded-lg">
+                <label className="flex flex-col text-xs font-bold text-gray-500 uppercase">
+                  Satış Fiyatı (TL)
+                  <input
+                    type="number" step="0.01" min="0"
+                    value={selectedProductForVariants.price ?? ''}
+                    onChange={(e) => setSelectedProductForVariants({ ...selectedProductForVariants, price: e.target.value })}
+                    className="mt-1 w-32 border border-gray-300 rounded px-2 py-1.5 text-sm font-bold text-gray-900 bg-white focus:border-black outline-none"
+                    data-testid="variants-modal-price"
+                  />
+                </label>
+                <label className="flex flex-col text-xs font-bold text-gray-500 uppercase">
+                  İndirimli Fiyat (boş = yok)
+                  <input
+                    type="number" step="0.01" min="0"
+                    value={selectedProductForVariants.sale_price ?? ''}
+                    onChange={(e) => setSelectedProductForVariants({ ...selectedProductForVariants, sale_price: e.target.value })}
+                    className="mt-1 w-32 border border-gray-300 rounded px-2 py-1.5 text-sm font-bold text-red-600 bg-white focus:border-black outline-none"
+                    data-testid="variants-modal-sale-price"
+                  />
+                </label>
+                <label className="flex flex-col text-xs font-bold text-gray-500 uppercase">
+                  Tüm varyantlara stok
+                  <div className="mt-1 flex gap-1">
+                    <input
+                      type="number" min="0" step="1" id="variants-bulk-stock"
+                      placeholder="ör. 10"
+                      className="w-20 border border-gray-300 rounded px-2 py-1.5 text-sm bg-white focus:border-black outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById('variants-bulk-stock');
+                        const n = parseInt(el?.value, 10);
+                        if (!Number.isFinite(n) || n < 0) { toast.error("Geçerli bir stok girin"); return; }
+                        setSelectedProductForVariants({
+                          ...selectedProductForVariants,
+                          variants: (selectedProductForVariants.variants || []).map((v) => ({ ...v, stock: n })),
+                        });
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold bg-gray-900 text-white rounded hover:bg-black"
+                    >
+                      Uygula
+                    </button>
+                  </div>
+                </label>
+                <p className="text-xs text-gray-500 flex-1 min-w-[200px]">
+                  Varyant fiyatı boş/aynı bırakılırsa ana fiyat geçerlidir; farklı fiyat girerseniz aradaki fark varyanta yazılır.
+                </p>
+              </div>
+
               {/* Summary */}
               <div className="grid grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
                 <div>
@@ -3282,10 +3396,36 @@ export default function AdminProducts() {
                           className={`w-20 border-gray-200 border px-2 py-1.5 rounded text-center font-bold bg-white focus:border-black outline-none ${variant.stock < 5 ? 'text-red-600 border-red-200' : 'text-gray-900'}`}
                         />
                       </td>
-                      <td className="px-4 py-3 text-right" title="Fiyat ürün kartındaki Satış / İndirimli fiyat alanlarından gelir — listeden veya ürün düzenleden değiştirin">
-                        <span className="font-bold text-red-600">
-                          {Number(selectedProductForVariants.sale_price || selectedProductForVariants.price || 0).toFixed(2)}
-                        </span>
+                      <td className="px-4 py-3 text-right" title="Varyantın satış fiyatı = ana satış fiyatı + varyant farkı">
+                        {(() => {
+                          const base = parseFloat(selectedProductForVariants.price) || 0;
+                          const adj = parseFloat(variant.price_adjustment ?? variant.price_diff) || 0;
+                          const sale = parseFloat(selectedProductForVariants.sale_price) || 0;
+                          return (
+                            <div className="flex flex-col items-end gap-0.5">
+                              <input
+                                type="number" step="0.01" min="0"
+                                value={variant._priceInput ?? (base + adj).toFixed(2)}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const val = parseFloat(raw);
+                                  const newVariants = [...selectedProductForVariants.variants];
+                                  newVariants[idx] = {
+                                    ...variant,
+                                    _priceInput: raw,
+                                    price_adjustment: Number.isFinite(val) ? Math.round((val - base) * 100) / 100 : 0,
+                                  };
+                                  setSelectedProductForVariants({ ...selectedProductForVariants, variants: newVariants });
+                                }}
+                                className="w-28 border-gray-200 border px-2 py-1.5 rounded text-right font-bold bg-white focus:border-black outline-none"
+                                data-testid={`variant-price-${idx}`}
+                              />
+                              {sale > 0 && sale < base && (
+                                <span className="text-[11px] text-red-600 font-semibold">İndirimli: {(sale + adj).toFixed(2)}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
