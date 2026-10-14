@@ -446,7 +446,7 @@ function autoMenuItems(group, d, refs) {
   const quickLinks = new Set(quick.map((q) => (q.link || "").split("?")[0]));
   const tabs = (refs.tabs || []).filter((t) => t.active !== false).filter((t) => {
     const l = (t.link || "").split("?")[0];
-    return !quickLinks.has(l) && !roots.some((r) => `/${r.slug}` === l || r.name.toLocaleLowerCase("tr") === String(t.label || "").toLocaleLowerCase("tr"));
+    return !quickLinks.has(l);
   }).map((t) => ({ id: nid(), label: t.label, link: t.link || "/", style: t.style === "sale" ? "sale" : "bold" }));
   return [...quick, ...tabs, ...roots.map((c) => catNode(c, 1, 3))];
 }

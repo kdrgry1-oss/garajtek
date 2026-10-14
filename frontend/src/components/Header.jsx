@@ -601,10 +601,10 @@ function MobileSidebar({ open, onClose, roots, tabs, menus, highlight }) {
                     {quick.map((q) => (
                       <li key={q.id || q.label}><Link className={`u-header-collapse__nav-link${q.style === "normal" ? "" : " font-weight-bold"}${q.style === "sale" ? " text-sale" : ""}`} to={q.link || "/"} onClick={onClose}>{q.label}</Link></li>
                     ))}
-                    {tabs.filter((t) => {
-                      const l = (t.link || "").split("?")[0];
-                      // kategori ağacında zaten olan sekmeleri tekrar listeleme
-                      return !quickLinks.has(l) && !roots.some((r) => `/${r.slug}` === l || r.name.toLocaleLowerCase("tr") === String(t.label || "").toLocaleLowerCase("tr"));
+                    {tabs.filter((t) => t.active !== false).filter((t) => {
+                      // Orta menü sekmelerinin HEPSİ üstte (sahip talebi 14.10.2026); yalnız hızlı
+                      // bağlantılarla aynı adrese gidenler (ör. Kampanyalar=/sale) tekrar edilmez.
+                      return !quickLinks.has((t.link || "").split("?")[0]);
                     }).map((t) => (
                       <li key={`tab-${t.id}`}><Link className={`u-header-collapse__nav-link font-weight-bold${t.style === "sale" ? " text-sale" : ""}`} to={t.link || "/"} onClick={onClose}>{t.label}</Link></li>
                     ))}
