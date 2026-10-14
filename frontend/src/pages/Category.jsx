@@ -21,6 +21,7 @@ import { resolveColor, MULTI_GRADIENT } from "../lib/colorMap";
 import { optimizeImg, firstImage } from "../lib/img";
 import { fmtPrice, priceOf, productHref } from "../components/electro/format";
 import SpecFacets, { specQueryString, specFilterCount } from "../components/catalog/SpecFacets";
+import NotFound from "./NotFound";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const VIRTUAL = { "en-yeniler": "Yeni Ürünler", sale: "İndirimdeki Ürünler", "tum-urunler": "Tüm Ürünler", tumu: "Tüm Ürünler", all: "Tüm Ürünler" };
@@ -84,13 +85,18 @@ export default function Category() {
   const tree = useCategoryTree();
 
   // ÜYELERE ÖZEL kategori: misafir doğrudan URL ile gelirse giriş sayfasına yönlendir.
+  // PASİF kategori (panelde is_active=false): vitrinde 404 (sitemap/page-meta ile tutarlı).
+  const [inactive, setInactive] = useState(false);
   useEffect(() => {
-    if (!slug || slug === "all" || token) return undefined;
+    setInactive(false);
+    if (!slug || slug === "all") return undefined;
     let cancel = false;
     (async () => {
       try {
         const r = await axios.get(`${API}/categories/${encodeURIComponent(slug)}`);
-        if (!cancel && (r.data?.members_only || r.data?.members_only_effective)) navigate(`/giris?redirect=${encodeURIComponent("/" + slug)}`, { replace: true });
+        if (cancel) return;
+        if (r.data?.is_active === false) { setInactive(true); return; }
+        if (!token && (r.data?.members_only || r.data?.members_only_effective)) navigate(`/giris?redirect=${encodeURIComponent("/" + slug)}`, { replace: true });
       } catch { /* kategori yoksa normal akış */ }
     })();
     return () => { cancel = true; };
@@ -341,6 +347,8 @@ export default function Category() {
     for (let i = Math.max(1, e - 4); i <= e; i++) out.push(i);
     return out;
   })();
+
+  if (inactive) return <NotFound message="Aradığınız kategori bulunamadı veya artık yayında değil." />;
 
   return (
     <div className="sf-page" data-testid="category-page">

@@ -60,15 +60,19 @@ export function setPageSeo(opts = {}) {
       document.title = title;
       _setMeta("property", "og:title", title);
     }
-    _setMeta("name", "description", description || "");
-    _setMeta("property", "og:description", description || "");
+    // Boş değer mevcut (varsayılan) etiketi BOŞALTMASIN — rota değişiminde
+    // resetSeoDefaults zaten varsayılana döndürür (panel alanı boşsa başlık/açıklama korunur).
+    if (description) {
+      _setMeta("name", "description", description);
+      _setMeta("property", "og:description", description);
+    }
     let canon = canonical;
     if (canon && !/^https?:\/\//i.test(canon)) canon = _origin() + (canon.startsWith("/") ? "" : "/") + canon;
     if (canon) {
       _setCanonical(canon);
       _setMeta("property", "og:url", canon);
     }
-    _setMeta("property", "og:image", ogImage || "");
+    if (ogImage) _setMeta("property", "og:image", ogImage);
     if (ogType) _setMeta("property", "og:type", ogType);
     if (robots) _setMeta("name", "robots", robots);
   } catch (_) {
@@ -89,9 +93,9 @@ export async function applyRuntimeSeo(path, fallback, { signal } = {}) {
       title: meta.title, description: meta.description, canonical: meta.canonical,
       ogImage: meta.og_image, ogType: meta.og_type, robots: meta.robots,
     });
-    _setMeta("name", "twitter:title", meta.title || "");
-    _setMeta("name", "twitter:description", meta.description || "");
-    _setMeta("name", "twitter:image", meta.og_image || "");
+    if (meta.title) _setMeta("name", "twitter:title", meta.title);
+    if (meta.description) _setMeta("name", "twitter:description", meta.description);
+    if (meta.og_image) _setMeta("name", "twitter:image", meta.og_image);
     if (typeof document !== "undefined") {
       // Edge JSON-LD belongs to the initial URL. SPA navigation must replace
       // it, otherwise a second product can inherit the first product schema.
@@ -110,6 +114,62 @@ export async function applyRuntimeSeo(path, fallback, { signal } = {}) {
   } catch (_) {
     if (!signal?.aborted && typeof fallback === "function") fallback();
     return null;
+  }
+}
+
+// Bu rotaların sayfa bileşeni meta'yı KENDİSİ uygular (ProductDetail, Category, StaticPage —
+// API hatasında kendi fallback'leriyle); SeoManager bunlarda page-meta çağırmaz. Admin SEO dışı.
+export function routeOwnsSeo(path) {
+  return /^\/(urun|kategori|sayfa)\//i.test(path || "") || /^\/admin(\/|$)/i.test(path || "");
+}
+
+// index.html varsayılanlarıyla AYNI (build sabitleri). Edge middleware ilk HTML'i ilk URL'e
+// göre değiştirdiğinden DOM'dan anlık görüntü almak güvenilmez → sabitlerden kurulur.
+const DEFAULT_ROBOTS = "index, follow, max-image-preview:large";
+function _defaults() {
+  const name = process.env.REACT_APP_SITE_NAME || "Mağaza";
+  return {
+    title: name,
+    description: `${name} — online alışveriş. Yeni sezon ürünler, hızlı kargo, güvenli ödeme, kolay iade.`,
+    ogImage: process.env.REACT_APP_DEFAULT_OG_IMAGE || "",
+  };
+}
+
+/**
+ * SPA rota değişiminde önceki sayfanın title/description/canonical/robots/OG/JSON-LD
+ * değerlerini SİLİP varsayılana döndürür (SeoManager her gezinmede çağırır). Ardından
+ * sayfa/rota kendi meta'sını (applyRuntimeSeo) uygular. Böylece ürün → ana sayfa veya
+ * noindex override'lı sayfa → başka sayfa geçişinde meta SIZMAZ.
+ */
+export function resetSeoDefaults(pathname = "/") {
+  if (typeof document === "undefined") return;
+  try {
+    const d = _defaults();
+    const canon = _origin() + (pathname || "/");
+    document.title = d.title;
+    _setMeta("name", "description", d.description);
+    _setMeta("property", "og:title", d.title);
+    _setMeta("property", "og:description", d.description);
+    _setMeta("property", "og:url", canon);
+    _setMeta("property", "og:type", "website");
+    _setMeta("property", "og:image", d.ogImage);
+    _setMeta("name", "twitter:title", d.title);
+    _setMeta("name", "twitter:description", d.description);
+    _setMeta("name", "twitter:image", d.ogImage);
+    // robots: index.html etiketi işaretsizdir → içeriği açıkça varsayılana çek (silme değil)
+    let robots = document.head.querySelector('meta[name="robots"]');
+    if (!robots) {
+      robots = document.createElement("meta");
+      robots.setAttribute("name", "robots");
+      document.head.appendChild(robots);
+    }
+    robots.setAttribute("content", DEFAULT_ROBOTS);
+    _setCanonical(canon);
+    document.querySelectorAll(
+      'script[data-seo="runtime"], script[type="application/ld+json"][data-seo="edge"]'
+    ).forEach((el) => el.remove());
+  } catch (_) {
+    /* sessiz */
   }
 }
 

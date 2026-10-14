@@ -15,6 +15,7 @@ from fastapi.responses import Response
 from datetime import datetime, timezone
 import os
 import html
+from urllib.parse import quote
 
 from .deps import db, logger
 from tenant_config import get_tenant_config
@@ -26,6 +27,11 @@ _FRONTEND = (os.environ.get("FRONTEND_PUBLIC_URL") or "").rstrip("/")
 
 def _esc(u: str) -> str:
     return html.escape(u or "", quote=True)
+
+
+def _seg(slug: str) -> str:
+    """URL yol parçası: boşluk/Türkçe karakter vb. yüzde-kodlanır (sitemap geçerli URL ister)."""
+    return quote(str(slug or "").strip(), safe="-_.~")
 
 
 def _url_block(loc: str, lastmod: str = "", changefreq: str = "weekly", priority: str = "0.6") -> str:
@@ -54,6 +60,15 @@ async def sitemap_xml():
         _mo_ids = await _members_only_cat_ids()          # işaretli + TÜM alt kategoriler
         _mo_list = list(_mo_ids)
 
+        # Panel > SEO Meta'da noindex verilmiş yollar sitemap'e GİRMEZ (page-meta noindex basıyor)
+        _noindex_paths = {(d.get("path") or "").lower()
+                          async for d in db.seo_meta.find({"noindex": True}, {"_id": 0, "path": 1})}
+
+        def _add(path: str, lastmod: str, freq: str, prio: str):
+            if path.lower() in _noindex_paths:
+                return
+            urls.append(_url_block(f"{storefront}{path}", lastmod, freq, prio))
+
         # Kategoriler (üyelere-özel ve alt kategorileri hariç)
         async for c in db.categories.find(
             {"is_active": {"$ne": False}, "members_only": {"$ne": True}}, {"_id": 0, "slug": 1, "id": 1}
@@ -62,19 +77,21 @@ async def sitemap_xml():
             if str(c.get("id")) in _mo_ids:
                 continue
             if slug:
-                urls.append(_url_block(f"{storefront}/kategori/{slug}", today, "weekly", "0.8"))
+                _add(f"/kategori/{_seg(slug)}", today, "weekly", "0.8")
 
         # Statik sayfalar (CMS)
         async for p in db.pages.find(
             {"is_active": {"$ne": False}}, {"_id": 0, "slug": 1}
         ):
-            slug = p.get("slug")
+            slug = (p.get("slug") or "").strip()
             if slug:
-                urls.append(_url_block(f"{storefront}/sayfa/{slug}", today, "monthly", "0.4"))
+                _add(f"/sayfa/{_seg(slug)}", today, "monthly", "0.4")
 
         # Ürünler (yalnızca aktif; üyelere-özel kategori ürünleri HARİÇ) — lastmod = updated_at
-        # noindex ürünler (ör. URL'den Ürün Aktar demo ürünleri) sitemap'e girmez
-        _prod_q = {"is_active": {"$ne": False}, "noindex": {"$ne": True}}
+        # noindex ürünler (ör. URL'den Ürün Aktar demo ürünleri) sitemap'e girmez.
+        # Vitrin listeleriyle AYNI küme: silinmiş ve GÖRSELSİZ ürünler (vitrinde images.0 şartı) hariç.
+        _prod_q = {"is_active": {"$ne": False}, "noindex": {"$ne": True},
+                   "is_deleted": {"$ne": True}, "images.0": {"$exists": True}}
         if _mo_list:
             _prod_q["$and"] = members_only_exclusion(_mo_list)
         async for prod in db.products.find(
@@ -85,7 +102,7 @@ async def sitemap_xml():
             if not slug:
                 continue
             lm = (prod.get("updated_at") or "")[:10] or today
-            urls.append(_url_block(f"{storefront}/urun/{slug}", lm, "weekly", "0.7"))
+            _add(f"/urun/{_seg(slug)}", lm, "weekly", "0.7")
     except Exception as e:
         logger.warning(f"[seo] sitemap üretim hatası: {e}")
 

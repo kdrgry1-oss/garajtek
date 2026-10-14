@@ -200,3 +200,42 @@ def resolve_category(category: dict, config: dict, *, override: dict | None = No
                                  "itemListElement": [{"@type": "ListItem", "position": i + 1, **c}
                                                      for i, c in enumerate(crumbs)]})
     return _apply_override(result, override)
+
+
+def resolve_page(page: dict, config: dict, *, site: str = "", override: dict | None = None) -> dict:
+    """CMS/yasal içerik sayfası (/sayfa/{slug}) meta'sı.
+    Panel > Sayfalar 'SEO Başlık/SEO Açıklama' (meta_title/meta_description) önceliklidir.
+    {{site.*}}/{{sirket.*}} yer tutucuları çağıran tarafta (legal_pages.render_page) ÇÖZÜLMÜŞ gelir."""
+    seo = config["seo_geo"]
+    site = (site or config["domains"].get("storefront_url") or "").rstrip("/")
+    slug = page.get("slug")
+    name = clean_text(page.get("title"), 200)
+    store = clean_text(config["brand"].get("store_name"), 200)
+    # site boşsa (yapılandırılmamış) page-meta'nın diğer dalları gibi göreli yol
+    canonical = f"{site}/sayfa/{slug}" if slug else ""
+    manual_title = clean_text(page.get("meta_title"), 200)
+    manual_desc = clean_text(page.get("meta_description"), 400)
+    title = manual_title or (f"{name} | {store}" if name and store else (name or store))
+    content_desc = clean_text(page.get("content"), 160)
+    description = manual_desc or content_desc or clean_text(seo.get("default_description"), 400)
+    og_image = _absolute_image(seo.get("default_og_image_url"))
+    result = {
+        "found": True, "type": "page", "title": title, "description": description,
+        "canonical": canonical, "og_title": title, "og_description": description,
+        "og_url": canonical, "og_image": og_image, "og_type": "website",
+        "og_site_name": config["brand"].get("store_name") or "",
+        "og_locale": seo.get("locale") or "",
+        "robots": seo.get("default_robots") or "index,follow",
+        "sources": {"title": "entity_manual" if manual_title else "fact",
+                    "description": ("entity_manual" if manual_desc else
+                                    ("entity_content" if content_desc else ("global" if description else "missing"))),
+                    "og_image": "global" if og_image else "missing"},
+        "jsonld": [],
+    }
+    result = _apply_override(result, override)
+    # Boş değerler edge middleware'de mevcut etiketleri SİLMESİN → anahtar hiç gönderilmez
+    for k in ("title", "description", "og_title", "og_description", "og_image",
+              "og_locale", "og_site_name", "canonical", "og_url"):
+        if not result.get(k):
+            result.pop(k, None)
+    return result

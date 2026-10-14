@@ -581,9 +581,11 @@ def test_noindex_products_excluded_from_sitemap_feeds_and_get_robots(db, monkeyp
     from tenant_config import get_tenant_config
     for m in (seo, rp, ax):
         monkeypatch.setattr(m, "db", db)
-    _run(db.products.insert_one({"id": "a", "slug": "gercek-urun", "name": "Gerçek", "is_active": True, "price": 10}))
+    _run(db.products.insert_one({"id": "a", "slug": "gercek-urun", "name": "Gerçek", "is_active": True, "price": 10,
+                                 "images": ["https://cdn.example/a.jpg"]}))
     _run(db.products.insert_one({"id": "b", "slug": "demo-aktarilan", "name": "Demo", "is_active": True, "price": 10,
-                                 "noindex": True, "seed_source": SEED_SOURCE}))
+                                 "noindex": True, "seed_source": SEED_SOURCE,
+                                 "images": ["https://cdn.example/b.jpg"]}))
     body = _run(seo.sitemap_xml()).body.decode()
     assert "/urun/gercek-urun" in body and "demo-aktarilan" not in body
     _site, _shop, prods = _run(rp._feed_site_shop_prods())

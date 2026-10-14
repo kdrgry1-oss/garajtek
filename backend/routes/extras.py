@@ -541,7 +541,10 @@ _FRONT_URL = (os.environ.get("FRONTEND_PUBLIC_URL") or "").rstrip("/")
 _SEO_NONINDEX_PREFIXES = ("/sepet", "/odeme", "/checkout", "/hesabim", "/account", "/admin",
                           "/giris", "/login", "/kayit", "/register", "/order-success",
                           "/siparis", "/sifremi", "/reset", "/iade", "/return")
-_SEO_KNOWN_STATIC = {"/", "/hakkimizda", "/iletisim", "/sss", "/kvkk", "/gizlilik"}
+# Yalnız SPA'da GERÇEKTEN var olan statik kök rotalar. /hakkimizda, /kvkk, /iletisim vb.
+# kökte rota DEĞİL (içerik /sayfa/* altında) → burada index,follow almamalı.
+_SEO_KNOWN_STATIC = {"/", "/sss"}
+_SEO_PAGE_RX = _re.compile(r"^/sayfa/([^/]+)$", _re.I)
 
 
 @seo_public_router.get("/page-meta")
@@ -609,7 +612,33 @@ async def seo_page_meta(path: str = Query("/", max_length=512)):
                     m["og_image"] = override["og_image"]
                 if override.get("noindex"):
                     m["robots"] = "noindex,nofollow"
+            # Boş panel değeri ("") edge middleware'de mevcut <title>/description'ı SİLMESİN:
+            # boş anahtarlar hiç gönderilmez → ilk HTML'deki değer korunur.
+            for k in ("title", "description", "og_title", "og_description", "og_image",
+                      "og_site_name", "og_locale"):
+                if not m.get(k):
+                    m.pop(k, None)
             return m
+
+        # CMS/yasal içerik sayfası: /sayfa/{slug} → Panel > Sayfalar meta_title/meta_description
+        mpage = _SEO_PAGE_RX.match(p)
+        if mpage:
+            from legal_pages import canonical_slug, render_page
+            from seo_runtime import resolve_page
+            pslug = mpage.group(1)
+            page = await db.pages.find_one({"slug": pslug, "is_active": {"$ne": False}}, {"_id": 0})
+            if not page:
+                alt = canonical_slug(pslug)
+                if alt != pslug:
+                    page = await db.pages.find_one({"slug": alt, "is_active": {"$ne": False}}, {"_id": 0})
+            if not page:
+                # Var olmayan sayfa → soft-404: noindex
+                return {"found": True, "robots": "noindex,follow", "canonical": f"{site}{p}"}
+            page = await render_page(db, page)  # {{site.*}}/{{sirket.*}} çözülür
+            # Override sayfanın kanonik yoluna (veya istenen yola) bağlı olabilir
+            if not override and page.get("slug"):
+                override = await db.seo_meta.find_one({"path": f"/sayfa/{page['slug']}".lower()}, {"_id": 0})
+            return resolve_page(page, cfg, site=site, override=override)
 
         # Slug çöz: /urun/{slug} veya /{slug}
         slug = None
@@ -645,9 +674,10 @@ async def seo_page_meta(path: str = Query("/", max_length=512)):
         if prod and not prod.get("members_only") and not product_is_members_only(prod, _mo_meta):
             return resolve_product(prod, cfg, override=override)
 
-        # 2) KATEGORİ dene
+        # 2) KATEGORİ dene (PASİF kategori → soft-404/noindex; sitemap ile tutarlı)
         cat = await db.categories.find_one(
-            {"$or": [{"slug": slug_l}, {"slug": slug}, {"slug_aliases": slug_l}]},
+            {"$or": [{"slug": slug_l}, {"slug": slug}, {"slug_aliases": slug_l}],
+             "is_active": {"$ne": False}},
             {"_id": 0, "name": 1, "slug": 1, "description": 1, "meta_title": 1,
              "meta_description": 1, "image": 1, "members_only": 1, "id": 1})
         if cat and not cat.get("members_only") and str(cat.get("id")) not in _mo_meta:

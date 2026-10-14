@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Breadcrumb from "../components/electro/Breadcrumb";
 import IconDocPage from "./IconDocPage";
+import { applyRuntimeSeo, setPageSeo } from "../lib/seo";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -22,8 +23,28 @@ export default function StaticPage() {
     fetchPage();
   }, [slug]);
 
+  // SEO: Panel > Sayfalar 'SEO Başlık/SEO Açıklama' + canonical /sayfa/{slug} (sunucu page-meta;
+  // hata olursa sayfa verisinden). Var olmayan sayfa (soft-404) → noindex.
+  useEffect(() => {
+    if (loading) return undefined;
+    const controller = new AbortController();
+    if (page) {
+      const canonicalSlug = page.slug || slug;
+      applyRuntimeSeo(`/sayfa/${canonicalSlug}`, () => setPageSeo({
+        title: page.meta_title || page.title,
+        description: page.meta_description,
+        canonical: `/sayfa/${canonicalSlug}`,
+        ogType: "website",
+      }), { signal: controller.signal });
+    } else {
+      setPageSeo({ title: "Sayfa bulunamadı (404)", robots: "noindex,follow" });
+    }
+    return () => controller.abort();
+  }, [page, loading, slug]);
+
   const fetchPage = async () => {
     setLoading(true);
+    setPage(null);
     try {
       const res = await axios.get(`${API}/pages/${slug}`);
       setPage(res.data);

@@ -78,14 +78,15 @@ export async function onRequest(context) {
     // 4) HTMLRewriter ile <head>'i güncelle
     const rw = new HTMLRewriter();
 
-    if (Object.prototype.hasOwnProperty.call(meta, "title")) {
+    // Boş değer ("") mevcut <title>/description'ı SİLMESİN → yalnız dolu değer yazılır
+    if (meta.title) {
       rw.on("title", {
-        element(el) { el.setInnerContent(meta.title || ""); },
+        element(el) { el.setInnerContent(meta.title); },
       });
     }
-    if (Object.prototype.hasOwnProperty.call(meta, "description")) {
+    if (meta.description) {
       rw.on('meta[name="description"]', {
-        element(el) { el.setAttribute("content", meta.description || ""); },
+        element(el) { el.setAttribute("content", meta.description); },
       });
     }
     if (meta.canonical) {
@@ -104,7 +105,7 @@ export async function onRequest(context) {
       "og:locale": meta.og_locale,
     };
     for (const [prop, val] of Object.entries(ogMap)) {
-      if (val == null) continue;
+      if (!val) continue;
       rw.on(`meta[property="${prop}"]`, {
         element(el) { el.setAttribute("content", val || ""); },
       });
@@ -116,7 +117,7 @@ export async function onRequest(context) {
       "twitter:image": meta.og_image,
     };
     for (const [name, val] of Object.entries(twitterMap)) {
-      if (val == null) continue;
+      if (!val) continue;
       rw.on(`meta[name="${name}"]`, {
         element(el) { el.setAttribute("content", val || ""); },
       });

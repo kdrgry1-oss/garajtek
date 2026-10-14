@@ -84,9 +84,36 @@ async def get_page(slug: str, order_fields: bool = False):
     return await render_page(db, page, keep_order_fields=order_fields)
 
 
+def _norm_slug(raw) -> str:
+    """CMS sayfa slug'ı: küçük harf, Türkçe→ASCII, yalnız [a-z0-9-] (kategori slug'ı ile aynı kural).
+    Boşluklu/Türkçe karakterli serbest metin sitemap'e GEÇERSİZ URL yazıyordu."""
+    from .categories import generate_slug
+    return generate_slug(str(raw or "").strip())
+
+
+async def _redirect_old_page_slug(old_slug: str, new_slug: str):
+    """Slug değişince eski /sayfa/<eski> adresi 301 ile yenisine yönlenir (ürün slug_aliases gibi).
+    Yeni yol için eski bir yönlendirme varsa silinir → döngü oluşmaz."""
+    old_path = f"/sayfa/{old_slug}".lower()
+    new_path = f"/sayfa/{new_slug}"
+    if not old_slug or old_path == new_path.lower():
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    await db.seo_redirects.delete_many({"from_path": new_path.lower()})
+    # Eskiden eski yola yönlenen kayıtlar zincir yapmasın → doğrudan yeni yola
+    await db.seo_redirects.update_many({"to_path": old_path}, {"$set": {"to_path": new_path}})
+    await db.seo_redirects.update_one(
+        {"from_path": old_path},
+        {"$set": {"from_path": old_path, "to_path": new_path, "status_code": 301, "is_active": True,
+                  "created_at": now},
+         "$setOnInsert": {"id": generate_id(), "hits": 0}},
+        upsert=True,
+    )
+
+
 @router.post("")
 async def create_page(payload: dict, request: Request, current_user: dict = Depends(require_admin)):
-    slug = (payload.get("slug") or "").strip()
+    slug = _norm_slug(payload.get("slug"))
     if not slug:
         raise HTTPException(status_code=400, detail="slug zorunlu")
     if await db.pages.find_one({"slug": slug}):
@@ -116,14 +143,23 @@ async def update_page(page_id: str, payload: dict, request: Request,
         raise HTTPException(status_code=404, detail="Sayfa bulunamadı")
     allowed = ("title", "slug", "content", "meta_title", "meta_description", "is_active")
     update_set = {k: payload[k] for k in allowed if k in payload}
+    _old_slug = existing.get("slug") or ""
+    _new_slug = ""
+    if "slug" in update_set:
+        _new_slug = _norm_slug(update_set["slug"])
+        if not _new_slug:
+            raise HTTPException(status_code=400, detail="slug zorunlu")
+        update_set["slug"] = _new_slug
     # DENETİM FIX: slug değişiyorsa benzersizlik kontrolü — çakışan slug ulaşılamayan sayfa yapar.
-    _new_slug = (update_set.get("slug") or "").strip()
-    if _new_slug and _new_slug != (existing.get("slug") or ""):
+    if _new_slug and _new_slug != _old_slug:
         _clash = await db.pages.find_one({"slug": _new_slug, "id": {"$ne": existing["id"]}}, {"_id": 0, "id": 1})
         if _clash:
             raise HTTPException(status_code=400, detail="Bu slug zaten kullanılıyor")
     update_set["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.pages.update_one({"id": existing["id"]}, {"$set": update_set})
+    if _new_slug and _new_slug != _old_slug:
+        # Eski adres soft-404 olmasın → otomatik 301 (/sayfa/<eski> → /sayfa/<yeni>)
+        await _redirect_old_page_slug(_old_slug, _new_slug)
     await record_admin_audit(
         db, action="page.update", entity_type="page", entity_id=existing["id"],
         before=existing, after={**existing, **update_set}, current_user=current_user,

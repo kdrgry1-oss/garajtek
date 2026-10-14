@@ -144,11 +144,18 @@ def _build_merchant_xml(prods, site, shop, target="google", in_stock_only=False,
         slug = pr.get("slug") or pid
         link = f"{site}/urun/{slug}"
         img = abs_url(first_image(pr))
+        if not img:
+            # Merchant'ta image_link ZORUNLU → görselsiz satır reddedilir; vitrin listeleri de
+            # görselsiz ürünü göstermez (images.0 şartı) → feed'e hiç yazılmaz.
+            continue
         price = fnum(pr.get("price"))
         sale = pr.get("sale_price")
         sale = fnum(sale) if sale not in (None, "", 0) else None
-        name = (pr.get("name") or "")[:150]
+        # Ad/açıklama HTML-kaçışlı saklanabilir (&#x27; &amp; &nbsp;) → önce çöz, sonra esc() ile
+        # TEK kez kaçışla (aksi halde Merchant'ta "Bosch&#x27;un" literal görünür).
+        name = _html.unescape(str(pr.get("name") or "")).replace("\xa0", " ")[:150]
         desc = re.sub(r"<[^>]+>", " ", str(pr.get("description") or pr.get("short_description") or pr.get("name") or ""))
+        desc = _html.unescape(desc).replace("\xa0", " ")
         desc = re.sub(r"\s+", " ", desc).strip()[:4500] or name
         brand = pr.get("brand") or shop
         cat = pr.get("category_name") or ""
@@ -284,7 +291,9 @@ async def _feed_site_shop_prods():
     site = (_co.get("site_url") or main.get("site_url") or "").rstrip("/")
     shop = _co.get("store_name") or main.get("site_name") or "Mağaza"
     # noindex ürünler (URL'den Ürün Aktar demo ürünleri vb.) hiçbir ürün feed'ine girmez
-    _q = {"is_active": True, "is_deleted": {"$ne": True}, "noindex": {"$ne": True}}
+    # Görselsiz ürünler vitrin listelerinde gizli (images.0 şartı) → feed'lerde de yok (tutarlı küme)
+    _q = {"is_active": True, "is_deleted": {"$ne": True}, "noindex": {"$ne": True},
+          "images.0": {"$exists": True}}
     # ÜYELERE ÖZEL: feed'ler ANONİM (üye kavramı yok) → members_only ürünleri HER ZAMAN hariç.
     _mo_ids = await _members_only_cat_ids()
     if _mo_ids:

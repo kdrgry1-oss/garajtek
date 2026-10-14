@@ -291,7 +291,8 @@
         <meta name="twitter:image" content="%REACT_APP_DEFAULT_OG_IMAGE%" />
 
         <!-- Yapısal veri: Organization + WebSite (Google sitelinks arama kutusu) -->
-        <script type="application/ld+json">
+        <!-- data-seo="edge": çalışma anında panel Organization verisi (page-meta) ile değiştirilir -->
+        <script type="application/ld+json" data-seo="edge">
         {"@context":"https://schema.org","@type":"Organization","name":"%REACT_APP_SITE_NAME%","url":"%REACT_APP_SITE_URL%/","logo":"%REACT_APP_SITE_URL%/logo.png"}
         </script>
         <script type="application/ld+json">
