@@ -83,6 +83,10 @@ CARGO_PROVIDERS = {
             _f("query_username", "Sorgulama Servisi Kullanıcı Adı",
                help="Boş bırakılırsa sevkiyat kullanıcısı kullanılır (genelde farklıdır)."),
             _f("query_password", "Sorgulama Servisi Şifresi", type="password"),
+            _f("query_url", "Sorgulama Servis Adresi (opsiyonel)",
+               placeholder="https://customerservices.araskargo.com.tr/ArasCargoCustomerIntegrationService/ArasCargoIntegrationService.svc",
+               help="esasweb > Entegrasyon > XML Servisleri > Kayıt Ol ekranındaki 'Kullanılacak Link'. "
+                    "Boşsa Aras'ın standart canlı/test adresi kullanılır."),
             _f("env", "Ortam", type="select", required=True,
                options=[{"value": "test", "label": "Test"}, {"value": "prod", "label": "Canlı"}]),
             _f("payor_type", "Kargo Ücretini Kim Öder", type="select",
