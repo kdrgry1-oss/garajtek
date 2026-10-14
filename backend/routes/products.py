@@ -851,12 +851,12 @@ async def _build_products_query(
                 if _sl in EN_YENILER or generate_slug(_nm) in EN_YENILER:
                     _en_id = _c.get("id")
                     break
+            # Ürün kartındaki "Yeni Ürün Etiketi" (is_new) de Yeni Ürünler'e ekler — panelden
+            # ürün eklemenin asıl yolu budur (kategori yoksa sayfa hep boş kalıyordu).
             if _en_id:
-                and_clauses.append({"category_ids": _en_id})
+                and_clauses.append({"$or": [{"category_ids": _en_id}, {"is_new": True}]})
             else:
-                # Yerel "En Yeniler" kategorisi yoksa: yanlışlıkla tüm ürünleri
-                # göstermek yerine boş döndür (eşleşmeyen sentinel).
-                and_clauses.append({"id": "__en_yeniler_category_missing__"})
+                and_clauses.append({"is_new": True})
         elif cat_slug == "sale":
             # İndirimli fiyatlılar VE elle "İndirim/Sale" kategorisine eklenen ürünler (manuel etiket).
             _sale_or = [

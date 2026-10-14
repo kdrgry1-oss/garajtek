@@ -1584,6 +1584,20 @@ export default function AdminProducts() {
     }
   };
 
+  // Seçili ürünleri vitrindeki "Yeni Ürünler" (/en-yeniler) sayfasına ekle/çıkar (is_new etiketi).
+  const bulkSetNew = async (value) => {
+    const ids = [...selectedProducts];
+    if (!ids.length) return;
+    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+    let ok = 0;
+    for (const id of ids) {
+      try { await axios.put(`${API}/products/${id}`, { is_new: value }, { headers }); ok += 1; } catch { /* devam */ }
+    }
+    setProducts((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, is_new: value } : p)));
+    if (ok === ids.length) toast.success(value ? `${ok} ürün Yeni Ürünler'e eklendi` : `${ok} ürün Yeni Ürünler'den çıkarıldı`);
+    else toast.error(`${ids.length - ok} ürün güncellenemedi (${ok} başarılı)`);
+  };
+
   const openVariantsModal = (product) => {
     // Düzenleme modalıyla AYNI koruma: yüklenen stok temel olarak damgalanır.
     setSelectedProductForVariants({
@@ -1881,6 +1895,21 @@ export default function AdminProducts() {
             >
               <Printer size={16} />
               Seçili Barkod Kartlarını Yazdır
+            </button>
+            <button
+              onClick={() => bulkSetNew(true)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-white text-sm rounded hover:bg-black"
+              data-testid="products-bulk-new-add"
+              title="Seçili ürünler vitrindeki Yeni Ürünler sayfasında listelenir"
+            >
+              Yeni Ürünler'e Ekle
+            </button>
+            <button
+              onClick={() => bulkSetNew(false)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border text-sm rounded hover:bg-gray-50"
+              data-testid="products-bulk-new-remove"
+            >
+              Yeni Ürünler'den Çıkar
             </button>
             <button
               onClick={handleBulkDeleteProducts}
