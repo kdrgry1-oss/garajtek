@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { DEFAULT_MENU_TABS } from "../../lib/headerMenu";
 import { uploadImageFile } from "../../lib/uploadImage";
+import { buildTree } from "../../components/electro/useCategoryTree";
+import { MENU_DEFAULTS } from "../../lib/siteMenus";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -427,14 +429,38 @@ function TreePreview({ items, title, quick = [] }) {
   );
 }
 
+/** Otomatik modun vitrinde ürettiği menüyü düzenlenebilir öğe listesine çevirir
+ *  (Elle moda geçince her şey listelenir; istenen silinir/eklenir/sıralanır). */
+function catNode(c, depth, maxDepth) {
+  const node = { id: nid(), label: c.name, link: `/${c.slug}` };
+  if (depth < maxDepth && (c.children || []).length) node.children = c.children.map((k) => catNode(k, depth + 1, maxDepth));
+  return node;
+}
+function autoMenuItems(group, d, refs) {
+  const tree = buildTree(refs.cats || []);
+  const roots = tree.menuRoots || tree.roots;
+  if (group === "departments") {
+    return roots.slice(0, d.max_roots || 14).map((c) => catNode(c, 1, 3));
+  }
+  const quick = (d.quick || []).map((q) => ({ ...q, id: nid() }));
+  const quickLinks = new Set(quick.map((q) => (q.link || "").split("?")[0]));
+  const tabs = (refs.tabs || []).filter((t) => t.active !== false).filter((t) => {
+    const l = (t.link || "").split("?")[0];
+    return !quickLinks.has(l) && !roots.some((r) => `/${r.slug}` === l || r.name.toLocaleLowerCase("tr") === String(t.label || "").toLocaleLowerCase("tr"));
+  }).map((t) => ({ id: nid(), label: t.label, link: t.link || "/", style: t.style === "sale" ? "sale" : "bold" }));
+  return [...quick, ...tabs, ...roots.map((c) => catNode(c, 1, 3))];
+}
+
 function useMenuRefs() {
   const [cats, setCats] = useState([]);
   const [pages, setPages] = useState([]);
+  const [tabs, setTabs] = useState([]);
   useEffect(() => {
     axios.get(`${API}/categories`).then((r) => setCats(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    axios.get(`${API}/page-blocks/header-menu`).then((r) => setTabs(Array.isArray(r.data?.tabs) && r.data.tabs.length ? r.data.tabs : DEFAULT_MENU_TABS)).catch(() => setTabs(DEFAULT_MENU_TABS));
     axios.get(`${API}/pages`, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).then((r) => setPages(Array.isArray(r.data) ? r.data : (r.data?.pages || []))).catch(() => {});
   }, []);
-  return { cats, pages };
+  return { cats, pages, tabs };
 }
 
 function GroupEditor({ group, data, onSave, onReset, refs }) {
@@ -453,9 +479,22 @@ function GroupEditor({ group, data, onSave, onReset, refs }) {
   const modeSwitch = (labels) => (
     <div className="flex gap-4 text-sm">
       {labels.map(([v, l]) => (
-        <label key={v} className="flex items-center gap-1"><input type="radio" checked={(d.mode || labels[0][0]) === v} onChange={() => setD({ ...d, mode: v })} /> {l}</label>
+        <label key={v} className="flex items-center gap-1"><input type="radio" checked={(d.mode || labels[0][0]) === v} onChange={() => {
+          // Elle moda ilk geçişte liste boşsa otomatik menünün TAMAMI aktarılır → hepsi düzenlenebilir.
+          if (v === "manual" && !(d.items || []).length && (group === "hamburger" || group === "departments" || group === "mobile")) {
+            setD({ ...d, mode: v, items: autoMenuItems(group === "mobile" ? "hamburger" : group, group === "mobile" ? (refs.hamburger || {}) : d, refs) });
+          } else setD({ ...d, mode: v });
+        }} /> {l}</label>
       ))}
     </div>
+  );
+  const reloadAuto = (
+    <button type="button" data-testid="menu-load-auto"
+      onClick={async () => {
+        const ok = window.appConfirm ? await window.appConfirm("Liste, sitedeki otomatik menünün tamamıyla (kategoriler dahil) değiştirilsin mi?") : window.confirm("Liste, otomatik menüyle değiştirilsin mi?");
+        if (ok) setD({ ...d, items: autoMenuItems(group === "mobile" ? "hamburger" : group, group === "mobile" ? (refs.hamburger || {}) : d, refs) });
+      }}
+      className="flex items-center gap-1 text-xs border rounded px-2 py-1 hover:bg-gray-50"><RotateCcw size={12} /> Otomatik menüyü listeye aktar (tüm kategoriler)</button>
   );
   let body = null; let preview = null;
   if (group === "topbar") {
@@ -476,7 +515,7 @@ function GroupEditor({ group, data, onSave, onReset, refs }) {
           <input type="number" min={4} max={30} value={d.max_roots || 14} onChange={(e) => setD({ ...d, max_roots: Number(e.target.value) || 14 })} className="ml-2 w-20 border rounded px-2 py-1 text-sm" /></label>
         <div><div className="text-sm font-semibold mb-1">Üste sabitlenen hızlı bağlantılar</div>
           <MenuTreeEditor items={d.quick} onChange={(v) => setD({ ...d, quick: v })} {...refs} maxDepth={1} /></div>
-        {d.mode === "manual" && <div><div className="text-sm font-semibold mb-1">Menü öğeleri (alt öğeler sağda açılan panelde sütun olur)</div>
+        {d.mode === "manual" && <div><div className="text-sm font-semibold mb-1 flex items-center justify-between gap-2">Menü öğeleri (alt öğeler sağda açılan panelde sütun olur) {reloadAuto}</div>
           <MenuTreeEditor items={d.items} onChange={(v) => setD({ ...d, items: v })} {...refs} allowIcon allowImage /></div>}
         {d.mode !== "manual" && <p className="text-xs text-gray-500">Kategoriler <a className="underline" href="/admin/kategoriler">Kategoriler</a> ekranındaki sıra ve “menüde göster” ayarına göre listelenir.</p>}
       </div>
@@ -488,6 +527,8 @@ function GroupEditor({ group, data, onSave, onReset, refs }) {
         {modeSwitch([["auto", "Otomatik — hızlı bağlantılar + orta menü sekmeleri + kategoriler"], ["manual", "Elle oluşturulan menü"]])}
         {d.mode !== "manual" && <div><div className="text-sm font-semibold mb-1">Üstteki hızlı bağlantılar</div>
           <MenuTreeEditor items={d.quick} onChange={(v) => setD({ ...d, quick: v })} {...refs} maxDepth={1} /></div>}
+        {d.mode !== "manual" && <p className="text-xs text-gray-500">Altındaki orta menü sekmeleri ve kategoriler otomatik eklenir. Tek tek silmek/eklemek/sıralamak için <b>“Elle oluşturulan menü”</b>yü seçin — mevcut menünün tamamı listeye aktarılır.</p>}
+        {d.mode === "manual" && <div className="flex justify-end">{reloadAuto}</div>}
         {d.mode === "manual" && <MenuTreeEditor items={d.items} onChange={(v) => setD({ ...d, items: v })} {...refs} allowIcon />}
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={d.show_account_links !== false} onChange={(e) => setD({ ...d, show_account_links: e.target.checked })} /> Alta hesap bağlantılarını ekle (Hesabım, Favoriler, Sipariş Takibi, İade, İletişim)</label>
       </div>
@@ -497,6 +538,7 @@ function GroupEditor({ group, data, onSave, onReset, refs }) {
     body = (
       <div className="space-y-3">
         {modeSwitch([["same", "Hamburger menüyle aynı (önerilen)"], ["manual", "Mobil için ayrı menü"]])}
+        {d.mode === "manual" && <div className="flex justify-end">{reloadAuto}</div>}
         {d.mode === "manual" && <MenuTreeEditor items={d.items} onChange={(v) => setD({ ...d, items: v })} {...refs} allowIcon />}
       </div>
     );
@@ -579,7 +621,7 @@ export default function SiteMenusPage() {
         ))}
       </div>
       {!menus ? <div className="p-6 text-center text-sm text-gray-500">Yükleniyor…</div> : (
-        <GroupEditor key={group} group={group} data={clean(group)} refs={refs} onSave={(d) => save(group, d)} onReset={() => reset(group)} />
+        <GroupEditor key={group} group={group} data={clean(group)} refs={{ ...refs, hamburger: { quick: MENU_DEFAULTS.hamburger.quick, ...clean("hamburger") } }} onSave={(d) => save(group, d)} onReset={() => reset(group)} />
       )}
     </div>
   );

@@ -26,7 +26,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const PLACEHOLDER = "/placeholder.jpg";
 
 export default function Cart() {
-  const { items, addItem, removeItem, updateQuantity, total, itemCount } = useCart();
+  const { items, addItem, removeItem, updateQuantity, total, itemCount, clearCart } = useCart();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -203,7 +203,14 @@ export default function Cart() {
       <main id="content" role="main" className="electro el-page cart-page">
         <Breadcrumb items={[{ label: "Sepetim" }]} />
         <div className="container">
-          <div className="mb-4"><h1 className="text-center">Sepetim <span className="font-size-20 text-gray-90">({itemCount} ürün)</span></h1></div>
+          <div className="mb-4"><h1 className="text-center">Sepetim <span className="font-size-20 text-gray-90">({itemCount} ürün)</span></h1>
+            <div className="text-center">
+              <button type="button" className="btn btn-link font-size-14 text-gray-90" data-testid="cart-clear-all"
+                onClick={() => { if (window.confirm("Sepetteki tüm ürünler silinsin mi?")) clearCart(); }}>
+                <i className="far fa-trash-alt mr-1" />Sepeti Temizle
+              </button>
+            </div>
+          </div>
 
           {freeShippingThreshold != null && (
             <div className="mb-5 mx-auto" style={{ maxWidth: 640 }} data-testid="cart-free-shipping">

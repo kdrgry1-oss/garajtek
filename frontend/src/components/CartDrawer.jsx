@@ -93,7 +93,7 @@ export function MiniCartList({ items, onNavigate, removeItem, updateQuantity, co
 }
 
 export default function CartDrawer() {
-  const { items, isOpen, setIsOpen, removeItem, updateQuantity, total, itemCount } = useCart();
+  const { items, isOpen, setIsOpen, removeItem, updateQuantity, total, itemCount, clearCart } = useCart();
   const { shippingFee, freeShippingThreshold } = useShipping();
   const freeShippingLimit = freeShippingThreshold || 0;
   const [promoDiscount, setPromoDiscount] = useState(0);
@@ -133,6 +133,12 @@ export default function CartDrawer() {
           <div className="u-sidebar__container d-flex flex-column">
             <div className="d-flex align-items-center justify-content-between pt-4 px-4 pb-3 border-bottom">
               <h3 className="font-size-18 mb-0">Sepetim ({itemCount})</h3>
+              {items.length > 0 && (
+                <button type="button" className="btn btn-link p-0 ml-auto mr-3 font-size-13 text-gray-90" data-testid="drawer-clear-cart"
+                  onClick={() => { if (window.confirm("Sepetteki tüm ürünler silinsin mi?")) clearCart(); }}>
+                  <i className="far fa-trash-alt mr-1" />Sepeti Temizle
+                </button>
+              )}
               <button type="button" className="close" onClick={close} data-testid="close-cart" aria-label="Kapat">
                 <i className="ec ec-close-remove" />
               </button>
