@@ -28,7 +28,8 @@ export function orderMessage(product, variant, quantity, url) {
   return parts.filter(Boolean).join("\n");
 }
 
-export default function WhatsAppOrderButton({ product, variant = null, quantity = 1 }) {
+/** Mağazanın WhatsApp numarası (İş Kuralları → yoksa site iletişim bilgisi). */
+export function useStoreWhatsApp() {
   const [rules, setRules] = useState(_rulesCache);
   const contact = mergeContact(useSiteDesign().site_contact, useStoreInfo());
   useEffect(() => {
@@ -37,7 +38,36 @@ export default function WhatsAppOrderButton({ product, variant = null, quantity 
     axios.get(`${API}/business-rules`).then((r) => { _rulesCache = r.data || {}; if (alive) setRules(_rulesCache); }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  const num = waNumber((rules && rules["storefront.whatsapp_number"]) || contact.whatsapp || contact.phone);
+  return waNumber((rules && rules["storefront.whatsapp_number"]) || contact.whatsapp || contact.phone);
+}
+
+const fmtTL = (n) => `${(Number(n) || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`;
+
+export function cartMessage(items, grand) {
+  const lines = ["Merhaba, sepetimdeki ürünleri sipariş vermek istiyorum:"];
+  (items || []).forEach((it) => {
+    const opt = it.size || it.variant || "";
+    lines.push(`• ${it.name || "Ürün"}${opt ? ` (${opt})` : ""} × ${Math.max(1, Number(it.quantity) || 1)}`);
+  });
+  if (grand != null) lines.push(`Toplam: ${fmtTL(grand)}`);
+  return lines.join("\n");
+}
+
+/** Sepet çekmecesi: tüm sepeti WhatsApp'a hazır mesaj olarak gönderir. Numara yoksa null. */
+export function WhatsAppCartButton({ items, grand, className = "", onClick }) {
+  const num = useStoreWhatsApp();
+  if (!num || !(items || []).length) return null;
+  const href = `https://wa.me/${num}?text=${encodeURIComponent(cartMessage(items, grand))}`;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" onClick={onClick}
+      className={`btn gt-buy-btn--wa ${className}`} style={{ background: "#116b43", color: "#fff" }} data-testid="drawer-whatsapp-order">
+      <i className="fab fa-whatsapp mr-1" /> WhatsApp'tan Sipariş
+    </a>
+  );
+}
+
+export default function WhatsAppOrderButton({ product, variant = null, quantity = 1 }) {
+  const num = useStoreWhatsApp();
   if (!num || !product) return null;
   const url = typeof window !== "undefined" ? window.location.href.split("#")[0] : "";
   const href = `https://wa.me/${num}?text=${encodeURIComponent(orderMessage(product, variant, quantity, url))}`;

@@ -124,3 +124,8 @@
 
 /* Hesabım içerik panelleri (Tailwind) — tema yazı tipi ve rengiyle */
 .el-account-main { font-family: "Open Sans", Helvetica, Arial, sans-serif; color: #333e48; font-size: .875rem; }
+
+/* Sepet çekmecesi açıkken yüzen WhatsApp/iletişim butonu gizlenir — çekmecedeki
+   "WhatsApp'tan Sipariş" butonu onun yerini alır (mobilde Ödemeye Geç'i kapatıyordu). */
+body.gt-cart-drawer-open [data-store-contact-fab="true"],
+body.gt-cart-drawer-open [data-testid="whatsapp-fab"] { display: none !important; }

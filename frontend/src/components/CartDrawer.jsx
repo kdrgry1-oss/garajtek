@@ -12,6 +12,7 @@ import { useFavorites } from "../context/FavoritesContext";
 import { cartLineView, cartSummary } from "../lib/price";
 import { trackRemoveFromCart } from "../lib/dataLayer";
 import { shareCart } from "../lib/shareCart";
+import { WhatsAppCartButton, useStoreWhatsApp } from "./cod/WhatsAppOrderButton";
 import { optimizeImg } from "../lib/img";
 import { fmtPrice } from "./electro/format";
 import { MiniSetHeader, MiniSetPending, SetPendingNotice } from "./sets/SetCartParts";
@@ -114,6 +115,14 @@ export default function CartDrawer() {
     return () => { cancel = true; };
   }, [isOpen, items, total]);
 
+  const waNum = useStoreWhatsApp();
+  // Çekmece açıkken yüzen WhatsApp butonu gizlenir (mobilde Ödemeye Geç'in üstünü kapatıyordu).
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    document.body.classList.add("gt-cart-drawer-open");
+    return () => document.body.classList.remove("gt-cart-drawer-open");
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) return undefined;
     const onKey = (e) => { if (e.key === "Escape") setIsOpen(false); };
@@ -188,7 +197,11 @@ export default function CartDrawer() {
                   <p className="font-size-12 text-green text-center mb-3">Sepetiniz ücretsiz kargo eşiğinde. Kargo, ödeme adımında kesinleşir.</p>
                 )}
                 <div className="d-flex mb-2">
-                  <Link to="/sepet" onClick={close} className="btn btn-soft-secondary mb-3 mb-md-0 font-weight-normal px-4 px-md-5 flex-grow-1 mr-2" data-testid="continue-shopping">Sepeti Gör</Link>
+                  {waNum ? (
+                    <WhatsAppCartButton items={items} grand={grand} className="mb-3 mb-md-0 px-3 flex-grow-1 mr-2 text-nowrap" />
+                  ) : (
+                    <Link to="/sepet" onClick={close} className="btn btn-soft-secondary mb-3 mb-md-0 font-weight-normal px-4 px-md-5 flex-grow-1 mr-2" data-testid="continue-shopping">Sepeti Gör</Link>
+                  )}
                   <Link to="/odeme" onClick={close} className="btn btn-primary-dark-w ml-md-2 px-4 px-md-5 flex-grow-1" data-testid="go-to-checkout">Ödemeye Geç</Link>
                 </div>
                 <button type="button" onClick={() => shareCart(items)} className="btn btn-link btn-block font-size-13 text-gray-90 p-0" data-testid="drawer-share-cart">
