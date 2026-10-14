@@ -31,6 +31,40 @@ export function toggleStatus(group, key) {
   return { ...group, statuses: has ? group.statuses.filter((s) => s !== key) : [...(group.statuses || []), key] };
 }
 
+/** Siparişin fatura bilgisi (hangi yoldan kesilmiş olursa olsun). */
+export function orderInvoiceInfo(order) {
+  const o = order || {};
+  const pdf = o.invoice_pdf_url || o.invoice_link || o.invoice?.pdf_url || "";
+  const number = o.invoice_number || o.invoice?.invoice_number || "";
+  return { pdf, number, issued: !!(pdf || number || o.invoice_issued), type: o.invoice_type || "" };
+}
+
+/**
+ * Sipariş listesindeki fatura ikonunun davranışı:
+ *  - "issued": fatura kesilmiş → yeşil, PDF açılır
+ *  - "direct": doğrudan kesim (OutEBelgeV2) yapılandırılmış → onay penceresi açılır
+ *  - "panel" : yapılandırılmamış → BirFatura paneline bağlantı (eski davranış)
+ */
+export function invoiceIconState(order, directEnabled) {
+  if (orderInvoiceInfo(order).issued) return "issued";
+  return directEnabled ? "direct" : "panel";
+}
+
+/** e-arsiv / e-fatura / EARSIV / EFATURA → ekranda gösterilecek ad. */
+export function invoiceTypeLabel(type) {
+  const t = String(type || "").toLowerCase().replace(/[^a-z]/g, "");
+  if (t === "efatura") return "e-Fatura";
+  if (t === "earsiv") return "e-Arşiv";
+  return "";
+}
+
+/** Para biçimi (tr-TR, 2 hane). */
+export function fmtTL(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "-";
+  return `${v.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`;
+}
+
 /** "birfatura.com, *.birfatura.com" / satır satır → temiz liste. */
 export function parseHosts(text) {
   return String(text || "")

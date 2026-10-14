@@ -39,6 +39,8 @@ import { toast } from "sonner";
 import { sanitizeHtml } from "../../lib/sanitizeHtml";
 import { fetchAdminDocumentTexts, openAdminDocument } from "../../lib/adminDocuments";
 import InvoiceDocument from "../../components/admin/InvoiceDocument";
+import { OrderInvoiceButton, InvoiceIssueDialog, useDirectInvoiceStatus } from "../../components/admin/BirFaturaInvoice";
+import { invoiceTypeLabel } from "../../lib/birfatura";
 import {
   Dialog,
   DialogContent,
@@ -311,6 +313,40 @@ export default function AdminOrders({ unpaidView = false }) {
     } catch (err) {
       toast.error(err.response?.data?.detail || "İade işlenemedi");
       setReturnModal((s) => ({ ...s, busy: false }));
+    }
+  };
+
+  // BirFatura OutEBelgeV2 — panelden doğrudan fatura kesimi (yapılandırılmışsa)
+  const directInvoice = useDirectInvoiceStatus();
+  const [invoiceTarget, setInvoiceTarget] = useState(null);
+  const refreshSelected = async (orderId) => {
+    try {
+      const r = await axios.get(`${API}/orders/${orderId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      if (r.data) setSelectedOrder((cur) => (cur && cur.id === orderId ? r.data : cur));
+    } catch { /* detay tazelenemezse liste yine güncellenir */ }
+  };
+  const handleInvoiceIssued = (orderId) => {
+    fetchOrders();
+    if (selectedOrder?.id === orderId) refreshSelected(orderId);
+  };
+  const [refreshingPdf, setRefreshingPdf] = useState(false);
+  const handleRefreshInvoicePdf = async (orderId) => {
+    setRefreshingPdf(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${API}/integrations/birfatura/invoices/${orderId}/pdf`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) {
+        toast.success("Fatura PDF'i alındı");
+        handleInvoiceIssued(orderId);
+      } else {
+        toast.error(res.data?.detail || "PDF henüz hazır değil");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "PDF linki alınamadı");
+    } finally {
+      setRefreshingPdf(false);
     }
   };
 
@@ -1383,28 +1419,10 @@ export default function AdminOrders({ unpaidView = false }) {
                           <FolderOpen size={15} />
                         </button>
                         {/* 2. (kaldırıldı) Kargoya Ver → üst bar "Toplu Barkod Oluştur" + sipariş detayından yapılır */}
-                        {/* 3. Fatura — BirFatura faturayı KENDİ panelinde keser (siparişi çeker, PDF linkini geri yazar).
-                            Kesilmişse yeşil: PDF açılır; değilse gri: BirFatura paneli açılır. */}
-                        {(() => {
-                          const pdf = order.invoice_pdf_url || order.invoice_link || order.invoice?.pdf_url || "";
-                          const no = order.invoice_number || order.invoice?.invoice_number || "";
-                          if (pdf || no) {
-                            return (
-                              <button type="button" title={`Fatura kesildi${no ? `: ${no}` : ""} — PDF'i aç`} data-testid={`order-invoice-${order.id}`}
-                                onClick={() => (pdf ? window.open(pdf, "_blank", "noopener,noreferrer") : openDetail(order))}
-                                className="tci-btn" style={{ background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }}>
-                                <FileText size={15} />
-                              </button>
-                            );
-                          }
-                          return (
-                            <a href="https://uygulama.birfatura.com" target="_blank" rel="noopener noreferrer" data-testid={`order-invoice-${order.id}`}
-                              title="Fatura henüz kesilmedi — BirFatura panelinde 'Onaylanmış Siparişler'den faturalayın (BirFatura siparişi otomatik çeker; kesilince PDF burada görünür)"
-                              className="tci-btn" style={{ color: "#9ca3af" }}>
-                              <FileText size={15} />
-                            </a>
-                          );
-                        })()}
+                        {/* 3. Fatura — kesilmişse yeşil: PDF açılır. Kesilmemişse: doğrudan kesim (BirFatura
+                            OutEBelgeV2) yapılandırılmışsa onay penceresi; değilse BirFatura paneli (siparişi çeker). */}
+                        <OrderInvoiceButton order={order} directEnabled={directInvoice}
+                          onIssue={(o) => setInvoiceTarget(o)} onOpenDetail={() => openDetail(order)} />
                         {/* 5. (kaldırıldı) Kargo Etiketi → sipariş detayından / üst bardan yapılır */}
                         {/* 5b. (kaldırıldı) Kargo Durum Yenile — kargo verisi artık otomatik
                             çekildiği için manuel yenile butonuna gerek kalmadı. */}
@@ -1576,6 +1594,16 @@ export default function AdminOrders({ unpaidView = false }) {
 
               {/* Action Buttons */}
               <div className="flex gap-2 flex-wrap">
+                {directInvoice && !(selectedOrder.invoice_issued || selectedOrder.invoice_number || selectedOrder.invoice?.invoice_number || selectedOrder.invoice_pdf_url) && (
+                  <button
+                    onClick={() => setInvoiceTarget(selectedOrder)}
+                    data-testid="order-detail-issue-invoice"
+                    className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white text-sm rounded hover:bg-green-800"
+                  >
+                    <FileText size={16} />
+                    Fatura Kes
+                  </button>
+                )}
                 {(selectedOrder.invoice_issued || selectedOrder.invoice_number || selectedOrder.invoice?.invoice_number) && (
                   <button
                     onClick={() => handleResetInvoice(selectedOrder.id)}
@@ -1675,9 +1703,19 @@ export default function AdminOrders({ unpaidView = false }) {
                   <div className="border border-green-200 bg-green-50 rounded p-4">
                     <div className="flex items-center justify-between mb-3 gap-3">
                       <div>
-                        <h3 className="font-medium text-green-800">Fatura</h3>
+                        <h3 className="font-medium text-green-800">
+                          Fatura{invoiceTypeLabel(selectedOrder.invoice_type) ? ` · ${invoiceTypeLabel(selectedOrder.invoice_type)}` : ""}
+                        </h3>
                         {invNo && <p className="text-sm text-gray-700">No: <span className="font-medium">{invNo}</span></p>}
+                        {selectedOrder.invoice_uuid && <p className="text-xs text-gray-500">ETTN: <span className="font-mono">{selectedOrder.invoice_uuid}</span></p>}
                       </div>
+                      {selectedOrder.invoice_provider === "birfatura_outebelgev2" && !rawUrl && (
+                        <button onClick={() => handleRefreshInvoicePdf(selectedOrder.id)} disabled={refreshingPdf}
+                          data-testid="order-invoice-pdf-refresh"
+                          className="px-3 py-1.5 border border-green-300 bg-white text-green-800 text-xs rounded hover:bg-green-100 disabled:opacity-50">
+                          {refreshingPdf ? "Sorgulanıyor…" : "PDF'i yenile"}
+                        </button>
+                      )}
                     </div>
                     <InvoiceDocument orderId={selectedOrder.id} externalUrl={rawUrl} />
                     {/* #20: Faturada kullanılan MATRAH bilgileri (birim fiyat · iskonto · KDV) */}
@@ -2276,6 +2314,15 @@ export default function AdminOrders({ unpaidView = false }) {
       </Dialog>
 
       {/* Manuel (kısmi) iade pop-up — kalem seç → seçilmeyenler siparişte kalır */}
+      {/* BirFatura OutEBelgeV2 — doğrudan fatura kesimi onay penceresi */}
+      {invoiceTarget && (
+        <InvoiceIssueDialog
+          order={invoiceTarget}
+          onClose={() => setInvoiceTarget(null)}
+          onIssued={() => handleInvoiceIssued(invoiceTarget.id)}
+        />
+      )}
+
       <Dialog open={returnModal.open} onOpenChange={(o) => !o && setReturnModal((m) => ({ ...m, open: false }))}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>

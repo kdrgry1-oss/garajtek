@@ -245,6 +245,11 @@ def skip_reason(order: dict, settings: dict) -> Optional[str]:
         return "kalem yok"
     if D(order.get("total")) <= Decimal("0.009"):
         return "tutar 0 (tamamı hediye çeki/puan)"
+    # Panelden OutEBelgeV2 ile doğrudan kesilmiş fatura: ayardan bağımsız ASLA tekrar gönderilmez
+    # (aksi halde BirFatura aynı siparişe ikinci fatura kesebilir).
+    if (str(order.get("invoice_provider") or "") == "birfatura_outebelgev2" or order.get("birfatura_out_lock")
+            or order.get("birfatura_out_maybe_sent")):
+        return "panelden doğrudan faturalanmış/faturalanıyor"
     if (settings.get("skip_invoiced_elsewhere", True) and order.get("invoice_issued")
             and str(order.get("invoice_provider") or "") != "birfatura"):
         return "başka yoldan faturalanmış"

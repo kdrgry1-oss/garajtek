@@ -1,4 +1,23 @@
-import { nextGroupId, validateStatusGroups, toggleStatus, parseHosts } from "./birfatura";
+import { nextGroupId, validateStatusGroups, toggleStatus, parseHosts, invoiceIconState, invoiceTypeLabel,
+  orderInvoiceInfo, fmtTL } from "./birfatura";
+
+test("invoice icon state: issued > direct > panel", () => {
+  expect(invoiceIconState({ invoice_pdf_url: "https://x/y.pdf" }, true)).toBe("issued");
+  expect(invoiceIconState({ invoice_number: "A1" }, false)).toBe("issued");
+  expect(invoiceIconState({ invoice: { invoice_number: "A1" } }, true)).toBe("issued");
+  expect(invoiceIconState({ invoice_issued: true }, true)).toBe("issued");
+  expect(invoiceIconState({}, true)).toBe("direct");
+  expect(invoiceIconState({}, false)).toBe("panel");
+  expect(orderInvoiceInfo({ invoice_link: "https://l" }).pdf).toBe("https://l");
+});
+
+test("invoice type labels and money format", () => {
+  expect(invoiceTypeLabel("e-arsiv")).toBe("e-Arşiv");
+  expect(invoiceTypeLabel("EFATURA")).toBe("e-Fatura");
+  expect(invoiceTypeLabel("manual")).toBe("");
+  expect(fmtTL(1160)).toBe("1.160,00 TL");
+  expect(fmtTL(undefined)).toBe("-");
+});
 
 test("new group ids never reuse an existing id", () => {
   expect(nextGroupId([])).toBe(1);

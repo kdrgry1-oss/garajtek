@@ -4255,6 +4255,9 @@ async def reset_invoice_for_order(order_id: str, current_user: dict = Depends(re
              # tam temiz sayfa, yeniden 'Fatura Kes' engelsiz çalışsın.
              "invoice_last_error": "", "invoice_last_error_at": "",
              "invoice_in_progress": "", "invoice_in_progress_at": "",
+             # BirFatura OutEBelgeV2 doğrudan kesim kilidi / "gitmiş olabilir" işareti
+             # (bekleyen ETTN korunur: aynı ETTN ikinci kez resmîleşemez → mükerrer koruması).
+             "birfatura_out_lock": "", "birfatura_out_maybe_sent": "",
          }},
     )
     return {"success": True, "message": f"Fatura kaydı sıfırlandı ({prev or 'kayıt/deneme izi'} silindi), yeniden kesebilirsiniz"}

@@ -59,6 +59,11 @@ export default function BirFatura() {
   const [testing, setTesting] = useState(false);
   const [testGroup, setTestGroup] = useState("");
   const [testDays, setTestDays] = useState(7);
+  // Doğrudan Fatura Kesme (OutEBelgeV2) — anahtarlar yalnız yazılır, geri okunmaz
+  const [outForm, setOutForm] = useState({ base_url: "", company_vkn: "", api_key: "", secret_key: "", integration_key: "" });
+  const [outSaving, setOutSaving] = useState(false);
+  const [outTest, setOutTest] = useState(null);
+  const [outTesting, setOutTesting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +74,8 @@ export default function BirFatura() {
         trusted_hosts_text: (r.data.trusted_invoice_hosts || []).join("\n"),
         default_vat_rate: r.data.default_vat_rate ?? "",
       });
+      const o = r.data.out || {};
+      setOutForm({ base_url: o.base_url || "", company_vkn: o.company_vkn || "", api_key: "", secret_key: "", integration_key: "" });
     } catch (e) {
       toast.error(e.response?.data?.detail || "BirFatura ayarları yüklenemedi");
     }
@@ -144,12 +151,61 @@ export default function BirFatura() {
     }
   };
 
+  const saveOut = async (patch = {}) => {
+    const body = { company_vkn: outForm.company_vkn, ...patch };
+    if (outForm.base_url) body.base_url = outForm.base_url;
+    ["api_key", "secret_key", "integration_key"].forEach((k) => {
+      if (String(outForm[k] || "").trim()) body[k] = outForm[k].trim();
+    });
+    try {
+      setOutSaving(true);
+      await axios.put(`${BASE}/out/settings`, body, auth());
+      toast.success("Doğrudan fatura kesme ayarları kaydedildi");
+      await load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Kaydedilemedi");
+    } finally {
+      setOutSaving(false);
+    }
+  };
+
+  const clearOutKeys = async () => {
+    const msg = "Kayıtlı BirFatura API anahtarları silinecek ve doğrudan fatura kesme kapatılacak. Devam edilsin mi?";
+    const ok = (await window.appConfirm?.(msg)) ?? window.confirm(msg);
+    if (ok) saveOut({ clear_keys: true });
+  };
+
+  const runOutTest = async () => {
+    try {
+      setOutTesting(true);
+      const r = await axios.post(`${BASE}/out/test`, {}, auth());
+      setOutTest(r.data);
+      loadLogs();
+    } catch (e) {
+      setOutTest({ ok: false, detail: e.response?.data?.detail || "Test çalıştırılamadı" });
+    } finally {
+      setOutTesting(false);
+    }
+  };
+
   if (!form) return <div className="p-6 text-sm text-gray-500">Yükleniyor…</div>;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setGroup = (i, g) => setForm((f) => ({ ...f, status_groups: f.status_groups.map((x, j) => (j === i ? g : x)) }));
   const catalog = s.status_catalog || [];
   const urls = s.urls || {};
+  const out = s.out || {};
+  const outHasKeys = out.has_api_key && out.has_secret_key && out.has_integration_key;
+  const setOut = (k, v) => setOutForm((f) => ({ ...f, [k]: v }));
+  const keyField = (k, label) => (
+    <label className="block" key={k}>
+      <span className="block text-[11px] font-bold text-gray-500 uppercase mb-1">{label}</span>
+      <input type="password" autoComplete="new-password" value={outForm[k]} data-testid={`bf-out-${k}`}
+        onChange={(e) => setOut(k, e.target.value)}
+        placeholder={out[`has_${k}`] ? `Kayıtlı (••••${out[`${k}_hint`] || ""}) — değiştirmek için yazın` : "Girilmedi"}
+        className="w-full border rounded-lg px-3 py-2 font-mono text-xs" />
+    </label>
+  );
 
   return (
     <div className="max-w-5xl" data-testid="admin-birfatura">
@@ -158,7 +214,8 @@ export default function BirFatura() {
         <p className="text-sm text-gray-500 mt-1">
           BirFatura siparişleri bu siteden otomatik çeker, e-Fatura mükellefi müşteriye e-Fatura, diğerlerine
           e-Arşiv keser ve fatura bağlantısını siparişe geri yazar. Fatura, sipariş detayında ve müşterinin
-          hesabındaki siparişte görünür.
+          hesabındaki siparişte görünür. İsterseniz aşağıdaki <b>Doğrudan Fatura Kesme</b> bölümüyle faturayı
+          siparişler ekranından tek tıkla da kesebilirsiniz.
         </p>
       </div>
 
@@ -348,6 +405,70 @@ export default function BirFatura() {
             {test.sample && (
               <pre className="text-xs bg-gray-900 text-green-200 rounded-lg p-3 max-h-96 overflow-auto">{JSON.stringify(test.sample, null, 2)}</pre>
             )}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Doğrudan Fatura Kesme (OutEBelgeV2)"
+        right={
+          <span className={`text-xs font-semibold ${out.configured ? "text-green-700" : "text-gray-500"}`} data-testid="bf-out-state">
+            {out.configured ? "Açık — siparişlerden fatura kesilebilir" : "Kapalı"}
+          </span>
+        }>
+        <p className="text-xs text-gray-500 mb-3">
+          Açıkken Siparişler ekranındaki fatura ikonu ve sipariş detayındaki <b>Fatura Kes</b> butonu faturayı
+          BirFatura API'si ile doğrudan keser: alıcı e-Fatura mükellefiyse (GİB sorgusu) e-Fatura, değilse e-Arşiv.
+          Anahtarlar BirFatura → <b>API Bilgileri</b> → Yeni API Bilgisi (Kendim Kullanacağım, “EFaturaV2 Belge
+          İşlemleri”) sayfasından alınır; şifreli saklanır ve bir daha gösterilmez. Aynı siparişi BirFatura panelinden
+          de faturalamayın (mükerrer fatura).
+        </p>
+        <div className="grid sm:grid-cols-2 gap-4 text-sm">
+          {keyField("api_key", "X-Api-Key")}
+          {keyField("secret_key", "X-Secret-Key")}
+          {keyField("integration_key", "X-Integration-Key")}
+          <label className="block">
+            <span className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Ortam (API adresi)</span>
+            <select value={outForm.base_url} onChange={(e) => setOut("base_url", e.target.value)} data-testid="bf-out-base-url"
+              className="w-full border rounded-lg px-3 py-2">
+              {(out.base_url_choices || []).map((c) => <option key={c.value} value={c.value}>{c.label} · {c.value}</option>)}
+              {outForm.base_url && !(out.base_url_choices || []).some((c) => c.value === outForm.base_url) && (
+                <option value={outForm.base_url}>{outForm.base_url}</option>
+              )}
+            </select>
+          </label>
+          <label className="block">
+            <span className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Firma VKN / TCKN (kontör sorgusu)</span>
+            <input value={outForm.company_vkn} onChange={(e) => setOut("company_vkn", e.target.value)} inputMode="numeric"
+              className="w-full border rounded-lg px-3 py-2 font-mono" placeholder="Gönderici firma VKN" />
+            <span className="text-xs text-gray-500">Fatura numarası BirFatura'da tanımlı seriden otomatik verilir.</span>
+          </label>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button onClick={() => saveOut()} disabled={outSaving} data-testid="bf-out-save"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
+            <Check size={15} /> {outSaving ? "Kaydediliyor…" : "Kaydet"}
+          </button>
+          <button onClick={runOutTest} disabled={outTesting || !outHasKeys} data-testid="bf-out-test"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+            <PlayCircle size={16} /> {outTesting ? "Test ediliyor…" : "Bağlantı Testi"}
+          </button>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={!!out.enabled} data-testid="bf-out-enabled" disabled={outSaving || (!outHasKeys && !out.enabled)}
+              onChange={(e) => saveOut({ enabled: e.target.checked })} />
+            Doğrudan kesim {out.enabled ? "açık" : "kapalı"}
+          </label>
+          {(out.has_api_key || out.has_secret_key || out.has_integration_key) && (
+            <button onClick={clearOutKeys} className="text-xs text-red-600 hover:underline">Anahtarları sil</button>
+          )}
+        </div>
+        {!outHasKeys && <p className="text-xs text-amber-700 mt-2">Açmak için üç anahtarı da girip kaydedin.</p>}
+        {out.last_credits != null && out.last_credits !== "" && (
+          <p className="text-xs text-gray-500 mt-2">Son kontör sorgusu: <b>{out.last_credits}</b> ({fmtDate(out.last_credits_at)})</p>
+        )}
+        {outTest && (
+          <div className={`mt-3 text-sm flex items-start gap-2 ${outTest.ok ? "text-green-700" : "text-red-700"}`} data-testid="bf-out-test-result">
+            {outTest.ok ? <Check size={15} className="mt-0.5" /> : <X size={15} className="mt-0.5" />}
+            <span>{outTest.ok ? <>Bağlantı başarılı — kalan kontör: <b>{outTest.credits}</b></> : outTest.detail}</span>
           </div>
         )}
       </Section>

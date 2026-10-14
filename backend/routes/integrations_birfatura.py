@@ -19,6 +19,14 @@ BirFatura ÇEKME modeliyle çalışır (bkz. services/birfatura.py başlığı �
     POST /api/integrations/birfatura/test         → uçları token ile içeriden çalıştırır
     GET  /api/integrations/birfatura/logs         → son BirFatura çağrıları
 
+  Doğrudan fatura kesimi (OutEBelgeV2 — bkz. services/birfatura_out.py):
+    PUT  /api/integrations/birfatura/out/settings          → anahtarlar (yalnız yazılır), ortam
+    POST /api/integrations/birfatura/out/test              → GetNumberOfCredits (kalan kontör)
+    GET  /api/integrations/birfatura/out/status            → {configured} (sipariş ekranı)
+    GET  /api/integrations/birfatura/invoices/{id}/preview → tutar, alıcı, e-Arşiv/e-Fatura tahmini
+    POST /api/integrations/birfatura/invoices/{id}         → faturayı keser (idempotent; 409)
+    POST /api/integrations/birfatura/invoices/{id}/pdf     → PDF linkini yeniden sorgular
+
 Güvenlik: entegrasyon kapalı ya da token yokken uçlar 404 (varlık sızmaz); token sabit-süreli
 karşılaştırılır (hmac.compare_digest); aynı IP'den dakikada 10 hatalı token → 429. Token
 veritabanında security.crypto ile ŞİFRELİ saklanır, hiçbir yanıta/loga yazılmaz.
@@ -38,6 +46,7 @@ from fastapi.responses import JSONResponse
 
 from .deps import db, logger, require_permission, client_ip_from_request
 from services import birfatura as bf
+from services import birfatura_out as bfo
 
 SETTINGS_ID = "birfatura"
 PERM = "integrations.birfatura"
@@ -198,6 +207,21 @@ async def _default_vat_rate(settings: dict):
     return 10
 
 
+async def _product_meta(orders: list) -> tuple:
+    """Siparişlerdeki ürünlerin KDV oranı + kart bilgileri → (vat_map, meta)."""
+    pids = list({it.get("product_id") for o in orders for it in (o.get("items") or [])
+                 if isinstance(it, dict) and it.get("product_id")})
+    vat_map, meta = {}, {}
+    if pids:
+        async for p in db.products.find({"id": {"$in": pids}}, {
+                "_id": 0, "id": 1, "vat_rate": 1, "brand": 1, "name": 1, "stock_code": 1, "sku": 1,
+                "urun_karti_id": 1, "csv_card_id": 1}):
+            meta[p["id"]] = p
+            if p.get("vat_rate") not in (None, ""):
+                vat_map[p["id"]] = p["vat_rate"]
+    return vat_map, meta
+
+
 async def collect_orders(settings: dict, status_id: int, start: datetime, end: datetime,
                          site_url: str = "") -> tuple:
     """Durum grubu + tarih aralığındaki siparişleri sözleşme biçiminde döndürür.
@@ -225,16 +249,7 @@ async def collect_orders(settings: dict, status_id: int, start: datetime, end: d
         if len(picked) >= MAX_ORDERS_PER_PULL:
             break
 
-    pids = list({it.get("product_id") for o in picked for it in (o.get("items") or [])
-                 if isinstance(it, dict) and it.get("product_id")})
-    vat_map, meta = {}, {}
-    if pids:
-        async for p in db.products.find({"id": {"$in": pids}}, {
-                "_id": 0, "id": 1, "vat_rate": 1, "brand": 1, "name": 1, "stock_code": 1, "sku": 1,
-                "urun_karti_id": 1, "csv_card_id": 1}):
-            meta[p["id"]] = p
-            if p.get("vat_rate") not in (None, ""):
-                vat_map[p["id"]] = p["vat_rate"]
+    vat_map, meta = await _product_meta(picked)
     dflt = await _default_vat_rate(settings)
 
     out = []
@@ -473,6 +488,7 @@ def _public_view(settings: dict, request: Request) -> dict:
         out["status_catalog"] = [{"key": s["key"], "label": s["label"]} for s in ORDER_STATUS_CATALOG]
     except Exception:
         out["status_catalog"] = []
+    out["out"] = _out_public_view(settings)
     return out
 
 
@@ -667,3 +683,381 @@ async def birfatura_logs(limit: int = 50, current_user: dict = Depends(require_p
     limit = max(1, min(int(limit or 50), 200))
     rows = await db[LOG_COLLECTION].find({}, {"_id": 0}).sort("at", -1).to_list(limit)
     return {"logs": rows}
+
+
+# ---------------------------------------------------------------------------
+# Doğrudan fatura kesimi — BirFatura OutEBelgeV2 (services/birfatura_out.py)
+# ---------------------------------------------------------------------------
+INVOICE_PERM = "orders.invoice"
+OUT_SECRETS = (("api_key", "X-Api-Key"), ("secret_key", "X-Secret-Key"), ("integration_key", "X-Integration-Key"))
+OUT_LOCK_STALE_SECONDS = 300
+OUT_TRANSPORT = None   # testler httpx.MockTransport koyar; üretimde gerçek ağ (TLS doğrulamalı)
+
+
+def _out_secret(settings: dict, name: str) -> Optional[str]:
+    enc = settings.get(f"out_{name}_enc")
+    if not enc:
+        return None
+    try:
+        from security.crypto import decrypt
+        return decrypt(enc) or None
+    except Exception:
+        logger.error(f"[birfatura-out] {name} çözülemedi (SECRETS_MASTER_KEY değişmiş olabilir)")
+        return None
+
+
+def _out_base_url(settings: dict) -> str:
+    return bfo.normalize_base_url(settings.get("out_base_url")) or bfo.DEFAULT_BASE_URL
+
+
+def _out_client(settings: dict, require_enabled: bool = True) -> Optional[bfo.OutClient]:
+    if require_enabled and not settings.get("out_enabled"):
+        return None
+    keys = [_out_secret(settings, n) for n, _ in OUT_SECRETS]
+    if not all(keys):
+        return None
+    return bfo.OutClient(_out_base_url(settings), *keys, transport=OUT_TRANSPORT)
+
+
+def _out_public_view(settings: dict) -> dict:
+    """Sırlar ASLA dönmez: yalnız var/yok + son 4 hane ipucu."""
+    v = {
+        "enabled": bool(settings.get("out_enabled")),
+        "base_url": _out_base_url(settings),
+        "base_url_choices": bfo.BASE_URL_CHOICES,
+        "company_vkn": settings.get("out_company_vkn") or "",
+        "last_credits": settings.get("out_last_credits"),
+        "last_credits_at": settings.get("out_last_credits_at") or "",
+        "updated_at": settings.get("out_updated_at") or "",
+    }
+    for n, _ in OUT_SECRETS:
+        v[f"has_{n}"] = bool(settings.get(f"out_{n}_enc"))
+        v[f"{n}_hint"] = settings.get(f"out_{n}_hint") or ""
+    v["configured"] = v["enabled"] and all(v[f"has_{n}"] for n, _ in OUT_SECRETS)
+    return v
+
+
+def _out_audit_view(settings: dict) -> dict:
+    v = _out_public_view(settings)
+    v.pop("base_url_choices", None)
+    return v
+
+
+@admin_router.put("/out/settings")
+async def save_out_settings(payload: dict, request: Request,
+                            current_user: dict = Depends(require_permission(PERM))):
+    """Anahtarlar YALNIZ yazılır: boş/eksik alan = mevcut değer korunur; `clear_keys` hepsini siler."""
+    payload = payload or {}
+    before = await _load_settings()
+    upd: dict = {}
+    if "base_url" in payload:
+        u = bfo.normalize_base_url(payload.get("base_url"))
+        if not u:
+            raise HTTPException(400, "Ortam adresi yalnız https://…edonustur.com ya da https://…birfatura.com olabilir.")
+        upd["out_base_url"] = u
+    if "company_vkn" in payload:
+        v = "".join(ch for ch in str(payload.get("company_vkn") or "") if ch.isdigit())
+        if v and len(v) not in (10, 11):
+            raise HTTPException(400, "Firma VKN/TCKN 10 ya da 11 haneli olmalı.")
+        upd["out_company_vkn"] = v
+    changed = []
+    from security.crypto import encrypt
+    for n, label in OUT_SECRETS:
+        val = payload.get(n)
+        if val is None:
+            continue
+        val = str(val).strip()
+        if not val:
+            continue
+        if len(val) > 512 or any(ord(ch) <= 32 or ord(ch) == 127 for ch in val):
+            raise HTTPException(400, f"{label} geçersiz (boşluk/kontrol karakteri içeremez, en fazla 512 karakter).")
+        upd[f"out_{n}_enc"] = encrypt(val)
+        upd[f"out_{n}_hint"] = bfo.secret_hint(val)
+        changed.append(n)
+    if payload.get("clear_keys"):
+        for n, _ in OUT_SECRETS:
+            upd[f"out_{n}_enc"] = None
+            upd[f"out_{n}_hint"] = ""
+        upd["out_enabled"] = False
+        changed = [n for n, _ in OUT_SECRETS]
+    elif "enabled" in payload:
+        en = bool(payload.get("enabled"))
+        if en:
+            merged = {**before, **upd}
+            if not all(merged.get(f"out_{n}_enc") for n, _ in OUT_SECRETS):
+                raise HTTPException(400, "Açmadan önce X-Api-Key, X-Secret-Key ve X-Integration-Key'in üçünü de girin.")
+        upd["out_enabled"] = en
+    now = datetime.now(timezone.utc).isoformat()
+    upd["out_updated_at"] = now
+    upd["out_updated_by"] = current_user.get("email", "")
+    await db.settings.update_one({"id": SETTINGS_ID}, {"$set": upd}, upsert=True)
+    after = await _load_settings()
+    try:
+        from activity_audit import record_admin_audit
+        await record_admin_audit(db, action="integration.birfatura.out_settings", entity_type="integration",
+                                 entity_id="birfatura", before=_out_audit_view(before),
+                                 after=_out_audit_view(after), current_user=current_user, request=request,
+                                 source="integrations.birfatura", metadata={"keys_changed": changed})
+    except Exception:
+        pass
+    return {"success": True, "out": _out_public_view(after)}
+
+
+@admin_router.post("/out/test")
+async def test_out_connection(request: Request, current_user: dict = Depends(require_permission(PERM))):
+    """Bağlantı testi: GetNumberOfCredits → kalan kontör. Açık olması gerekmez (önce test, sonra aç)."""
+    started = time.monotonic()
+    ip = client_ip_from_request(request)
+    settings = await _load_settings()
+    client = _out_client(settings, require_enabled=False)
+    if not client:
+        return {"ok": False, "detail": "Önce X-Api-Key, X-Secret-Key ve X-Integration-Key'i kaydedin."}
+    try:
+        credits = await client.get_credits(settings.get("out_company_vkn") or "")
+    except bfo.OutError as e:
+        await _log_call("out:GetNumberOfCredits", e.status or 502, ip, started, e.message, source="panel")
+        return {"ok": False, "detail": e.message, "base_url": client.base_url}
+    now = datetime.now(timezone.utc).isoformat()
+    await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"out_last_credits": credits,
+                                                                "out_last_credits_at": now}})
+    await _log_call("out:GetNumberOfCredits", 200, ip, started, f"kalan kontör: {credits}", source="panel")
+    return {"ok": True, "credits": credits, "base_url": client.base_url, "checked_at": now}
+
+
+@admin_router.get("/out/status")
+async def out_status(current_user: dict = Depends(require_permission("orders.view"))):
+    """Sipariş ekranı: doğrudan kesim yapılandırılmış mı? (sır dönmez)"""
+    settings = await _load_settings()
+    return {"configured": bool(_out_client(settings)), "provider": bfo.PROVIDER}
+
+
+async def _prepare_invoice(order: dict, settings: dict, client: bfo.OutClient, ettn: str,
+                           *, tolerate_lookup_errors: bool = False) -> dict:
+    """Fatura modelini kurar ve alıcının e-Fatura mükellefiyetini GetUserPK ile belirler."""
+    vat_map, meta = await _product_meta([order])
+    dflt = await _default_vat_rate(settings)
+    kw = dict(vat_map=vat_map, default_vat_rate=dflt, product_meta=meta)
+    inv = bfo.build_invoice(order, settings, ettn=ettn, **kw)
+    tax_no = inv.get("taxNo") or ""
+    system, tag, source, lookup_error = bfo.SYSTEM_EARSIV, None, "bireysel", None
+    if bfo.should_query_user(tax_no, settings):
+        try:
+            is_e, tag = bfo.pick_receiver(await client.get_user_pk(tax_no))
+            system = bfo.SYSTEM_EFATURA if is_e else bfo.SYSTEM_EARSIV
+            source = "gib"
+        except bfo.OutError as e:
+            if not tolerate_lookup_errors:
+                raise
+            system, source, lookup_error = None, "bilinmiyor", e.message
+    if tag:
+        inv = bfo.build_invoice(order, settings, ettn=ettn, receiver_tag=tag, **kw)
+    problems = [f"Zorunlu alan boş: {f}." for f in bfo.violations(inv)] + bfo.total_problems(order, inv)
+    return {"invoice": inv, "system_type": system, "receiver_tag": tag, "type_source": source,
+            "lookup_error": lookup_error, "problems": problems}
+
+
+def _http_error(status: int, detail: str, **extra) -> JSONResponse:
+    return JSONResponse({"detail": detail, **extra}, status_code=status, headers={"Cache-Control": "no-store"})
+
+
+async def _order_event(order: dict, description: str, current_user: dict, meta: dict):
+    try:
+        await db.order_events.insert_one({
+            "id": str(uuid.uuid4()), "order_id": order["id"],
+            "order_number": order.get("order_number") or "", "event_type": "invoice",
+            "description": description, "actor": (current_user or {}).get("email", ""),
+            "meta": meta, "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
+
+
+async def _order_audit(order: dict, action: str, before: dict, after: dict, current_user: dict,
+                       request: Request, success: bool = True, metadata: Optional[dict] = None):
+    try:
+        from activity_audit import record_admin_audit
+        await record_admin_audit(db, action=action, entity_type="order", entity_id=order["id"],
+                                 before=before, after=after, current_user=current_user, request=request,
+                                 source="integrations.birfatura", success=success,
+                                 metadata={"order_number": order.get("order_number"), **(metadata or {})})
+    except Exception:
+        pass
+
+
+@admin_router.get("/invoices/{order_id}/preview")
+async def preview_out_invoice(order_id: str, current_user: dict = Depends(require_permission(INVOICE_PERM))):
+    """Onay penceresi: tutar, alıcı, e-Arşiv/e-Fatura tahmini, engeller. Fatura KESMEZ."""
+    settings = await _load_settings()
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Sipariş bulunamadı")
+    client = _out_client(settings)
+    res = {"configured": bool(client), "order_number": order.get("order_number") or "",
+           "existing": bfo.existing_invoice(order), "blocked": bfo.block_reason(order),
+           "maybe_sent": bool(order.get("birfatura_out_maybe_sent")),
+           "order_total": bf.num(bfo.expected_total(order))}
+    if not client or res["existing"]:
+        return res
+    try:
+        p = await _prepare_invoice(order, settings, client, order.get("birfatura_out_ettn") or bfo.new_ettn(),
+                                   tolerate_lookup_errors=True)
+    except Exception as e:
+        logger.exception(f"[birfatura-out] önizleme hatası {order.get('order_number')}: {e}")
+        res["problems"] = ["Fatura modeli oluşturulamadı (sipariş verisi eksik/bozuk)."]
+        return res
+    res.update(bfo.summary(p["invoice"], p["system_type"]))
+    res.update({"receiver_tag": p["receiver_tag"], "type_source": p["type_source"],
+                "lookup_error": p["lookup_error"], "problems": p["problems"]})
+    return res
+
+
+@admin_router.post("/invoices/{order_id}")
+async def issue_out_invoice(order_id: str, request: Request,
+                            current_user: dict = Depends(require_permission(INVOICE_PERM))):
+    """Siparişe BirFatura OutEBelgeV2 ile e-Fatura / e-Arşiv keser.
+
+    İdempotent: sipariş zaten faturalıysa 409 + mevcut fatura. Aynı anda iki kesim kilitle
+    engellenir; ETTN siparişe ÖNCE yazılır ve yeniden denemede AYNI ETTN kullanılır (zaman aşımında
+    fatura kesilmiş olabilir — aynı ETTN ikinci kez resmîleşemez)."""
+    started = time.monotonic()
+    ip = client_ip_from_request(request)
+    settings = await _load_settings()
+    client = _out_client(settings)
+    if not client:
+        return _http_error(400, "Doğrudan fatura kesimi yapılandırılmamış (BirFatura → Doğrudan Fatura Kesme).")
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        return _http_error(404, "Sipariş bulunamadı")
+    existing = bfo.existing_invoice(order)
+    if existing:
+        no = existing["invoice_number"]
+        return _http_error(409, f"Bu siparişin faturası zaten kesilmiş{': ' + no if no else ''}.", invoice=existing)
+    reason = bfo.block_reason(order)
+    if reason:
+        return _http_error(400, reason)
+
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
+    stale = (now_dt - timedelta(seconds=OUT_LOCK_STALE_SECONDS)).isoformat()
+    ettn = order.get("birfatura_out_ettn") or bfo.new_ettn()
+    lock = await db.orders.update_one(
+        {"id": order_id, "invoice_issued": {"$ne": True},
+         "$or": [{"birfatura_out_lock": {"$exists": False}}, {"birfatura_out_lock": None},
+                 {"birfatura_out_lock": ""}, {"birfatura_out_lock": {"$lt": stale}}]},
+        {"$set": {"birfatura_out_lock": now, "birfatura_out_ettn": ettn}})
+    if not getattr(lock, "matched_count", 0):
+        return _http_error(409, "Bu sipariş için fatura kesimi zaten sürüyor. Birkaç saniye sonra sayfayı yenileyin.")
+
+    async def fail(status: int, msg: str, *, maybe_sent: bool = False, op: str = "SendBasicInvoiceFromModel"):
+        upd = {"birfatura_out_lock": None, "invoice_last_error": msg,
+               "invoice_last_error_at": datetime.now(timezone.utc).isoformat()}
+        if maybe_sent:
+            upd["birfatura_out_maybe_sent"] = True
+        await db.orders.update_one({"id": order_id}, {"$set": upd})
+        await _log_call(f"out:{op}", status, ip, started, f"{order.get('order_number')}: {msg}", source="panel")
+        await _order_audit(order, "order.invoice.birfatura_out", {"invoice_issued": False},
+                           {"invoice_issued": False}, current_user, request, success=False,
+                           metadata={"error": msg[:300], "maybe_sent": maybe_sent})
+        return _http_error(status, msg, maybe_sent=maybe_sent)
+
+    try:
+        p = await _prepare_invoice(order, settings, client, ettn)
+    except bfo.OutError as e:
+        return await fail(502, f"Alıcının e-Fatura mükellefiyeti sorgulanamadı: {e.message}", op="GetUserPK")
+    except Exception as e:
+        logger.exception(f"[birfatura-out] model hatası {order.get('order_number')}: {e}")
+        return await fail(422, "Fatura modeli oluşturulamadı (sipariş verisi eksik/bozuk).", op="model")
+    if p["problems"]:
+        return await fail(422, "Fatura kesilmedi: " + " ".join(p["problems"]), op="model")
+
+    inv, system = p["invoice"], p["system_type"]
+    try:
+        result = await client.send_basic_invoice(inv)
+    except bfo.OutError as e:
+        msg = e.message
+        if e.maybe_sent:
+            msg += (" Fatura kesilmiş olabilir — BirFatura panelinden kontrol edin. Tekrar denerseniz aynı"
+                    f" ETTN ({ettn}) ile gönderilir.")
+        return await fail(502, msg, maybe_sent=e.maybe_sent)
+
+    inv_no = bf.safe_text(result.get("invoiceNo"), 64) or ""
+    if inv_no == "string":
+        inv_no = ""
+    pdf = None
+    try:
+        pdf = await client.get_pdf_link(ettn, system)
+    except bfo.OutError as e:
+        logger.warning(f"[birfatura-out] PDF linki alınamadı {order.get('order_number')}: {e.message}")
+    pdf = pdf or bfo.safe_link(result.get("pdfLink")) or ""
+    type_label = bfo.TYPE_LABEL[system]
+    done = datetime.now(timezone.utc).isoformat()
+    record = {
+        "ettn": ettn, "system_type": system, "receiver_tag": p["receiver_tag"], "invoice_no": inv_no,
+        "pdf_link": pdf, "pdf_pending": not pdf, "total_incl": inv.get("totalPaidTaxIncluding"),
+        "total_excl": inv.get("totalPaidTaxExcluding"), "base_url": client.base_url,
+        "issued_at": done, "issued_by": current_user.get("email", ""),
+    }
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "invoice_issued": True,
+        "invoice_provider": bfo.PROVIDER,
+        "invoice_uuid": ettn,
+        "invoice_number": inv_no,
+        "invoice_pdf_url": pdf,
+        "invoice_type": type_label,
+        "invoice_issued_at": done,
+        "invoice_issued_by": current_user.get("email", ""),
+        "invoice_last_error": "",
+        "invoice_in_progress": False,
+        "birfatura_out_lock": None,
+        "birfatura_out_maybe_sent": False,
+        "birfatura_out_ettn": None,      # kullanıldı → (fatura sıfırlanırsa) sonraki kesim yeni ETTN alır
+        "birfatura_out": record,
+        "updated_at": done,
+    }})
+    kind = "e-Fatura" if system == bfo.SYSTEM_EFATURA else "e-Arşiv"
+    await _order_event(order, f"BirFatura {kind} kesildi: {inv_no or ettn}", current_user,
+                       {"invoice_number": inv_no, "invoice_uuid": ettn, "invoice_type": type_label,
+                        "provider": bfo.PROVIDER})
+    await _order_audit(order, "order.invoice.birfatura_out", {"invoice_issued": False},
+                       {"invoice_issued": True, "invoice_number": inv_no, "invoice_type": type_label,
+                        "invoice_uuid": ettn, "total": inv.get("totalPaidTaxIncluding")},
+                       current_user, request)
+    await _log_call("out:SendBasicInvoiceFromModel", 200, ip, started,
+                    f"{order.get('order_number')}: {kind} {inv_no or ettn}", count=1, source="panel")
+    invoice = {"invoice_number": inv_no, "invoice_uuid": ettn, "invoice_pdf_url": pdf,
+               "invoice_type": type_label, "invoice_issued_at": done, "invoice_provider": bfo.PROVIDER}
+    msg = f"{kind} kesildi: {inv_no or ettn}."
+    if not pdf:
+        msg += " PDF birkaç dakika içinde hazır olur (sipariş detayından 'PDF'i yenile')."
+    return {"success": True, "invoice": invoice, "message": msg}
+
+
+@admin_router.post("/invoices/{order_id}/pdf")
+async def refresh_out_invoice_pdf(order_id: str, request: Request,
+                                  current_user: dict = Depends(require_permission(INVOICE_PERM))):
+    """Doğrudan kesilmiş faturanın PDF linkini GetPDFLinkByUUID ile yeniden sorgular."""
+    started = time.monotonic()
+    settings = await _load_settings()
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Sipariş bulunamadı")
+    rec = order.get("birfatura_out") if isinstance(order.get("birfatura_out"), dict) else {}
+    if order.get("invoice_provider") != bfo.PROVIDER or not order.get("invoice_uuid"):
+        raise HTTPException(400, "Bu sipariş panelden doğrudan faturalanmamış.")
+    client = _out_client(settings, require_enabled=False)
+    if not client:
+        raise HTTPException(400, "BirFatura API anahtarları kayıtlı değil.")
+    system = rec.get("system_type") or (bfo.SYSTEM_EFATURA if order.get("invoice_type") == "e-fatura"
+                                        else bfo.SYSTEM_EARSIV)
+    try:
+        link = await client.get_pdf_link(order["invoice_uuid"], system)
+    except bfo.OutError as e:
+        await _log_call("out:GetPDFLinkByUUID", e.status or 502, client_ip_from_request(request), started,
+                        e.message, source="panel")
+        return _http_error(502, e.message)
+    if not link:
+        return {"success": False, "detail": "PDF henüz hazır değil; birkaç dakika sonra tekrar deneyin."}
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "invoice_pdf_url": link, "birfatura_out.pdf_link": link, "birfatura_out.pdf_pending": False,
+        "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return {"success": True, "invoice_pdf_url": link}

@@ -1,0 +1,1402 @@
+{
+ "_source": "BirFatura OutEBelgeV2 API resmî dokümanı (JSON dökümü) — yalnız doğrudan fatura kesiminde kullanılan uçlar ve şemalar. Değiştirmeyin; şema uyum testleri buna karşı çalışır.",
+ "title": "OutEBelgeV2 API",
+ "baseUrl": "https://uygulama.edonustur.com",
+ "endpoints": [
+  {
+   "method": "POST",
+   "path": "/api/OutEBelgeV2/SendBasicInvoiceFromModel",
+   "summary": "Model ile satış faturası oluşturma",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "X-Api-Key",
+     "required": true,
+     "type": "string",
+     "description": "Kullanıcıya özel API anahtarı."
+    },
+    {
+     "in": "header",
+     "name": "X-Secret-Key",
+     "required": true,
+     "type": "string",
+     "description": "Kullanıcıya özel gizli anahtar."
+    },
+    {
+     "in": "header",
+     "name": "X-Integration-Key",
+     "required": true,
+     "type": "string",
+     "description": "Entegrasyon anahtarı."
+    }
+   ],
+   "request": {
+    "required": true,
+    "description": "Satış e-Fatura veya satış e-Arşiv faturası oluşturmak için fatura bilgileri ana gövdede `invoice` nesnesi içinde gönderilmelidir.",
+    "contentType": "application/json",
+    "schemaName": "SendBasicInvoiceFromModelRequestData",
+    "schemaType": "SendBasicInvoiceFromModelRequestData",
+    "example": "{\n  \"invoice\": {\n    \"orderCode\": \"SIP-1001\",\n    \"orderDate\": \"2026-02-05\",\n    \"invoiceDate\": \"2026-02-05\",\n    \"invoiceExplanation\": \"E-ticaret siparişi\",\n    \"eInvoiceId\": \"INV2026000000001\",\n    \"isDocumentNoAuto\": true,\n    \"ettn\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"receiverTag\": \"urn:mail:pk@example\",\n    \"billingName\": \"ABC Ltd.\",\n    \"billingAddress\": \"Adres satırı 1\",\n    \"billingTown\": \"Çankaya\",\n    \"billingCity\": \"Ankara\",\n    \"billingMobilePhone\": \"05555555555\",\n    \"billingPhone\": \"03120000000\",\n    \"billingPhone2\": \"\",\n    \"taxOffice\": \"Çankaya\",\n    \"taxNo\": \"1234567801\",\n    \"email\": \"muhasebe@example.com\",\n    \"storeName\": \"Diğer - Gerçek Şube\"\n    \"shipCompany\": \"Kargo Firması\",\n    \"cargoCampaignCode\": \"KMP-001\",\n    \"shippingName\": \"ABC Ltd.\",\n    \"shippingAddress\": \"Teslimat adresi\",\n    \"shippingTown\": \"Çankaya\",\n    \"shippingCity\": \"Ankara\",\n    \"shippingCountry\": \"Türkiye\",\n    \"shippingZipCode\": \"06000\",\n    \"shippingPhone\": \"05555555555\",\n    \"deliveryFeeType\": 3,\n    \"paymentType\": \"Kredi Kartı\",\n    \"currency\": \"TRY\",\n    \"currencyRate\": 1,\n    \"totalPaidTaxExcluding\": 100,\n    \"totalPaidTaxIncluding\": 120,\n    \"productsTotalTaxExcluding\": 100,\n    \"productsTotalTaxIncluding\": 120,\n    \"shippingChargeTotalTaxExcluding\": 0,\n    \"shippingChargeTotalTaxIncluding\": 0,\n    \"installmentChargeTotalTaxExcluding\": 0,\n    \"installmentChargeTotalTaxIncluding\": 0,\n    \"bankTransferDiscountTotalTaxExcluding\": 0,\n    \"bankTransferDiscountTotalTaxIncluding\": 0,\n    \"payingAtTheDoorChargeTotalTaxExcluding\": 0,\n    \"payingAtTheDoorChargeTotalTaxIncluding\": 0,\n    \"discountTotalTaxExcluding\": 0,\n    \"discountTotalTaxIncluding\": 0,\n    \"orderDetails\": [\n      {\n        \"productCode\": \"PRD-01\",\n        \"barcode\": \"8690000000000\",\n        \"productBrand\": \"Marka\",\n        \"productName\": \"Ürün 1\",\n        \"productNote\": \"Ürün açıklaması\",\n        \"productQuantityType\": \"Adet\",\n        \"productQuantity\": 1,\n        \"vatRate\": 20,\n        \"productUnitPriceTaxExcluding\": 100,\n        \"productUnitPriceTaxIncluding\": 120,\n        \"discountIsPercentUnit\": 0,\n        \"discountRateUnit\": 0,\n        \"discountUnitTaxExcluding\": 0,\n        \"discountUnitTaxIncluding\": 0\n      }\n    ]\n  }\n}"
+   },
+   "responses": [
+    {
+     "code": "200",
+     "description": "Başarılı yanıt",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_SendDocumentResponse",
+     "schemaType": "ApiResponse_SendDocumentResponse",
+     "example": {
+      "Success": true,
+      "Message": "string",
+      "Code": "string",
+      "Result": {
+       "invoiceNo": "string",
+       "zipped": "string",
+       "htmlString": "string",
+       "pdfLink": "string"
+      }
+     }
+    },
+    {
+     "code": "400",
+     "description": "Hatalı istek",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": null
+    },
+    {
+     "code": "500",
+     "description": "Sunucu hatası",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": null
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/OutEBelgeV2/GetPDFLinkByUUID",
+   "summary": "UUID ile PDF linki alma",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "X-Api-Key",
+     "required": true,
+     "type": "string",
+     "description": "Kullanıcıya özel API anahtarı."
+    },
+    {
+     "in": "header",
+     "name": "X-Secret-Key",
+     "required": true,
+     "type": "string",
+     "description": "Kullanıcıya özel gizli anahtar."
+    },
+    {
+     "in": "header",
+     "name": "X-Integration-Key",
+     "required": true,
+     "type": "string",
+     "description": "Entegrasyon anahtarı."
+    }
+   ],
+   "request": {
+    "required": true,
+    "description": "Görüntüleme/indirme için body bilgileri",
+    "contentType": "application/json",
+    "schemaName": "GetPDFLinkByUUIDRequestData",
+    "schemaType": "GetPDFLinkByUUIDRequestData",
+    "example": {
+     "uuids": [
+      "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+     ],
+     "systemType": "EFATURA"
+    }
+   },
+   "responses": [
+    {
+     "code": "200",
+     "description": "Başarılı yanıt",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_GetPDFLinkByUUIDResponse",
+     "schemaType": "ApiResponse_GetPDFLinkByUUIDResponse",
+     "example": {
+      "Success": true,
+      "Message": "OK",
+      "Code": "200",
+      "Result": [
+       {
+        "uuid": "string",
+        "pdfLink": "string",
+        "success": "string",
+        "message": "string"
+       }
+      ]
+     }
+    },
+    {
+     "code": "400",
+     "description": "Hatalı istek",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": null
+    },
+    {
+     "code": "500",
+     "description": "Sunucu hatası",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": null
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/OutEBelgeV2/GetUserPK",
+   "summary": "Alıcı PK etiketi sorgulama",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "X-Api-Key",
+     "required": true,
+     "type": "string",
+     "description": "Kullanıcıya özel API anahtarı."
+    },
+    {
+     "in": "header",
+     "name": "X-Secret-Key",
+     "required": true,
+     "type": "string",
+     "description": "Kullanıcıya özel gizli anahtar."
+    },
+    {
+     "in": "header",
+     "name": "X-Integration-Key",
+     "required": true,
+     "type": "string",
+     "description": "Entegrasyon anahtarı."
+    }
+   ],
+   "request": {
+    "required": true,
+    "description": "Etiket/kullanıcı sorgusu için body bilgileri",
+    "contentType": "application/json",
+    "schemaName": "GetUserPKRequestData",
+    "schemaType": "GetUserPKRequestData",
+    "example": {
+     "kn": "1234567890"
+    }
+   },
+   "responses": [
+    {
+     "code": "200",
+     "description": "Başarılı yanıt",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_List_GetUserPKResponse",
+     "schemaType": "ApiResponse_List_GetUserPKResponse",
+     "example": {
+      "Success": true,
+      "Message": "string",
+      "Code": "string",
+      "Result": [
+       {
+        "identifier": "string",
+        "title": "string",
+        "type2": "string",
+        "name": "string",
+        "pkGbTurKod": "string",
+        "firstCreationTime": "2026-02-05T11:19:49.864Z"
+       }
+      ]
+     }
+    },
+    {
+     "code": "400",
+     "description": "Hatalı istek",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": null
+    },
+    {
+     "code": "500",
+     "description": "Sunucu hatası",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": null
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/OutEBelgeV2/GetNumberOfCredits",
+   "summary": "Kalan kontör bilgisini sorgulama",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "X-Api-Key",
+     "required": true,
+     "type": "string",
+     "description": "Kullanıcıya özel API anahtarı."
+    },
+    {
+     "in": "header",
+     "name": "X-Secret-Key",
+     "required": true,
+     "type": "string",
+     "description": "Kullanıcıya özel gizli anahtar."
+    },
+    {
+     "in": "header",
+     "name": "X-Integration-Key",
+     "required": true,
+     "type": "string",
+     "description": "Entegrasyon anahtarı."
+    }
+   ],
+   "request": {
+    "required": true,
+    "description": "Yardımcı servis için body bilgileri",
+    "contentType": "application/json",
+    "schemaName": "GetUserPKRequestData",
+    "schemaType": "GetUserPKRequestData",
+    "example": {
+     "kn": "1234567890"
+    }
+   },
+   "responses": [
+    {
+     "code": "200",
+     "description": "Başarılı yanıt",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": {
+      "Success": true,
+      "Message": "string",
+      "Code": "string",
+      "Result": "string"
+     }
+    },
+    {
+     "code": "400",
+     "description": "Hatalı istek",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": null
+    },
+    {
+     "code": "500",
+     "description": "Sunucu hatası",
+     "contentType": "application/json",
+     "schemaName": "ApiResponse_String",
+     "schemaType": "ApiResponse_String",
+     "example": null
+    }
+   ]
+  }
+ ],
+ "schemas": {
+  "SendBasicInvoiceFromModelRequestData": {
+   "name": "SendBasicInvoiceFromModelRequestData",
+   "type": "object",
+   "description": "Model üzerinden basit satış faturası oluşturma isteğidir.",
+   "properties": [
+    {
+     "name": "invoice",
+     "type": "Invoice",
+     "required": true,
+     "description": "",
+     "enum": null,
+     "example": null,
+     "ref": "Invoice",
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "invoice"
+   ]
+  },
+  "Invoice": {
+   "name": "Invoice",
+   "type": "object",
+   "description": "SendBasicInvoiceFromModel için kullanılan fatura modelidir. Zorunlu alanlar şema üzerinde işaretlenmiştir. `eInvoiceId`, `isDocumentNoAuto`, `receiverTag` ve `deliveryFeeType` kullanıma bağlı alanlardır.",
+   "properties": [
+    {
+     "name": "orderCode",
+     "type": "string",
+     "required": false,
+     "description": "Sipariş numarası",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "orderDate",
+     "type": "string (date)",
+     "required": false,
+     "description": "Sipariş tarihi",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "invoiceDate",
+     "type": "string (date)",
+     "required": true,
+     "description": "Fatura tarihi (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "invoiceExplanation",
+     "type": "string",
+     "required": false,
+     "description": "Fatura açıklaması",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "eInvoiceId",
+     "type": "string",
+     "required": false,
+     "description": "Fatura numarası Kullanıma bağlıdır; `isDocumentNoAuto=false` ise gönderilmelidir.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "isDocumentNoAuto",
+     "type": "boolean",
+     "required": false,
+     "description": "Belge numarası otomatik mi Belge numarasının otomatik atanıp atanmayacağını belirtir.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "ettn",
+     "type": "string",
+     "required": true,
+     "description": "Fatura GUID (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "receiverTag",
+     "type": "string",
+     "required": false,
+     "description": "Fatura alıcı etiketi Yalnızca e-Fatura için kullanılır.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "billingName",
+     "type": "string",
+     "required": true,
+     "description": "Fatura alıcı adı (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "billingAddress",
+     "type": "string",
+     "required": true,
+     "description": "Fatura alıcı adresi (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "billingTown",
+     "type": "string",
+     "required": false,
+     "description": "Fatura alıcı ilçesi",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "billingCity",
+     "type": "string",
+     "required": true,
+     "description": "Fatura alıcı şehri (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "billingMobilePhone",
+     "type": "string",
+     "required": false,
+     "description": "Fatura alıcı telefonu",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "billingPhone",
+     "type": "string",
+     "required": false,
+     "description": "Fatura alıcı telefonu (diğer)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "billingPhone2",
+     "type": "string",
+     "required": false,
+     "description": "Fatura alıcı telefonu (ek)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "taxOffice",
+     "type": "string",
+     "required": false,
+     "description": "Fatura alıcı vergi dairesi",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "taxNo",
+     "type": "string",
+     "required": true,
+     "description": "Fatura alıcı vergi kimlik no (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "email",
+     "type": "string",
+     "required": false,
+     "description": "Fatura alıcı email",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shipCompany",
+     "type": "string",
+     "required": false,
+     "description": "Fatura kargo şirketi",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "cargoCampaignCode",
+     "type": "string",
+     "required": false,
+     "description": "Fatura kargo kodu",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingName",
+     "type": "string",
+     "required": false,
+     "description": "Kargo teslim alacak adı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingAddress",
+     "type": "string",
+     "required": false,
+     "description": "Kargo teslim alacak adres",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingTown",
+     "type": "string",
+     "required": false,
+     "description": "Kargo teslim alacak ilçe",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingCity",
+     "type": "string",
+     "required": false,
+     "description": "Kargo teslim alacak şehir",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingCountry",
+     "type": "string",
+     "required": false,
+     "description": "Kargo teslim alacak ülke",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingZipCode",
+     "type": "string",
+     "required": false,
+     "description": "Kargo teslim alacak posta kodu",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingPhone",
+     "type": "string",
+     "required": false,
+     "description": "Kargo telefonu",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "deliveryFeeType",
+     "type": "integer",
+     "required": false,
+     "description": "Kargo ödeme tipi:\n- 2 = Alıcı öder\n- 3 = Mağaza öder\n- 4 = Şartlı Kargo (Alıcı öder)\n- 5 = Şartlı Kargo Ücretsiz (Mağaza öder)\n Kargo ödeme tipi gönderilecekse 2, 3, 4 veya 5 olmalıdır.",
+     "enum": [
+      2,
+      3,
+      4,
+      5
+     ],
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "paymentType",
+     "type": "string",
+     "required": false,
+     "description": "Fatura ödeme türü (örn: Kredi Kartı, Havale, Kapıda Ödeme)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "currency",
+     "type": "string",
+     "required": false,
+     "description": "Kur",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "currencyRate",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kur oranı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "totalPaidTaxExcluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Ödenecek KDV hariç toplam tutar (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "totalPaidTaxIncluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Ödenecek KDV dahil toplam tutar (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productsTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Ürünlerin KDV hariç toplam tutarı (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productsTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Ürünlerin KDV dahil toplam tutarı (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingChargeTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kargo ücretinin KDV hariç toplam tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "shippingChargeTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kargo ücretinin KDV dahil toplam tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "installmentChargeTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Taksit ücretinin KDV hariç toplam tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "installmentChargeTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Taksit ücretinin KDV dahil toplam tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "bankTransferDiscountTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Havale indiriminin KDV hariç toplam tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "bankTransferDiscountTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Havale indiriminin KDV dahil toplam tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "payingAtTheDoorChargeTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kapıda ödeme ücretinin KDV hariç toplam tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "payingAtTheDoorChargeTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Kapıda ödeme ücretinin KDV dahil toplam tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "discountTotalTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "KDV hariç indirim tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "discountTotalTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "KDV dahil indirim tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "orderDetails",
+     "type": "array<OrderDetail>",
+     "required": true,
+     "description": "Fatura ürün satırları. En az bir ürün satırı gönderilmelidir. (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": "OrderDetail"
+    }
+   ],
+   "enum": null,
+   "required": [
+    "orderDetails",
+    "billingAddress",
+    "taxNo",
+    "totalPaidTaxIncluding",
+    "productsTotalTaxExcluding",
+    "billingName",
+    "billingCity",
+    "ettn",
+    "invoiceDate",
+    "totalPaidTaxExcluding",
+    "productsTotalTaxIncluding"
+   ]
+  },
+  "OrderDetail": {
+   "name": "OrderDetail",
+   "type": "object",
+   "description": "SendBasicInvoiceFromModel içindeki ürün satırı modelidir. Zorunlu alanlar şema üzerinde işaretlenmiştir.",
+   "properties": [
+    {
+     "name": "productCode",
+     "type": "string",
+     "required": true,
+     "description": "Ürün kodu (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "barcode",
+     "type": "string",
+     "required": false,
+     "description": "Ürün barkodu",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productBrand",
+     "type": "string",
+     "required": false,
+     "description": "Ürün markası",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productName",
+     "type": "string",
+     "required": true,
+     "description": "Ürün adı (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productNote",
+     "type": "string",
+     "required": false,
+     "description": "Ürün açıklaması",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productQuantityType",
+     "type": "string",
+     "required": false,
+     "description": "Ürün birim tipi (örn: adet, metre kare, paket)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productQuantity",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Ürün adedi (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "vatRate",
+     "type": "integer",
+     "required": true,
+     "description": "Ürün KDV oranı (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productUnitPriceTaxExcluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Ürün KDV hariç birim fiyatı (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "productUnitPriceTaxIncluding",
+     "type": "number (decimal)",
+     "required": true,
+     "description": "Ürün KDV dahil birim fiyatı (Zorunlu)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "discountIsPercentUnit",
+     "type": "integer",
+     "required": false,
+     "description": "İndirim tipi (1 = yüzde, 0 = sabit miktar)",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "discountRateUnit",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Birim başına indirim oranı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "discountUnitTaxExcluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Vergi hariç birim indirim tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "discountUnitTaxIncluding",
+     "type": "number (decimal)",
+     "required": false,
+     "description": "Vergi dahil birim indirim tutarı",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "productCode",
+    "vatRate",
+    "productQuantity",
+    "productName",
+    "productUnitPriceTaxExcluding",
+    "productUnitPriceTaxIncluding"
+   ]
+  },
+  "ApiResponse_SendDocumentResponse": {
+   "name": "ApiResponse_SendDocumentResponse",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "Success",
+     "type": "boolean",
+     "required": false,
+     "description": "İşlemin başarılı olup olmadığını belirtir.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Message",
+     "type": "string",
+     "required": false,
+     "description": "API yanıt mesajı.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Code",
+     "type": "string",
+     "required": false,
+     "description": "Yanıt kodu.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Result",
+     "type": "SendDocumentResponse",
+     "required": false,
+     "description": "",
+     "enum": null,
+     "example": null,
+     "ref": "SendDocumentResponse",
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "SendDocumentResponse": {
+   "name": "SendDocumentResponse",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "invoiceNo",
+     "type": "string",
+     "required": false,
+     "description": "Atanan belge numarası.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "zipped",
+     "type": "string (byte)",
+     "required": false,
+     "description": "Belgeyi indirmek için lütfen DocumentDownloadByUUIDOut işlemini kullanınız.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "htmlString",
+     "type": "string",
+     "required": false,
+     "description": "HTML formatında belge içeriği.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "pdfLink",
+     "type": "string",
+     "required": false,
+     "description": "Belge pdf linki. Not: PDF linkleri hemen aktif olmamaktadır. Belge resmileştirme yoğunluğuna bağlı olarak birkaç dakika içerisinde aktif olmakta ve pdf görüntülenebilmektedir. ",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "ApiResponse_String": {
+   "name": "ApiResponse_String",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "Success",
+     "type": "boolean",
+     "required": false,
+     "description": "İşlem başarılı mı?",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Message",
+     "type": "string",
+     "required": false,
+     "description": "İşlem sonucu mesajı.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Code",
+     "type": "string",
+     "required": false,
+     "description": "Sonuç kodu.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Result",
+     "type": "string",
+     "required": false,
+     "description": "Hata mesajı veya bilgi.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "SystemTypeCodes": {
+   "name": "SystemTypeCodes",
+   "type": "string",
+   "description": "Enum for system type codes.",
+   "properties": [],
+   "enum": [
+    "EFATURA",
+    "EARSIV",
+    "EIRSALIYE",
+    "EIRSALIYE_YANITI",
+    "EADISYON",
+    "ESMM",
+    "EMM"
+   ],
+   "required": []
+  },
+  "GetPDFLinkByUUIDRequestData": {
+   "name": "GetPDFLinkByUUIDRequestData",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "uuids",
+     "type": "array<string>",
+     "required": true,
+     "description": "Belgelere ait UUID listesi.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "systemType",
+     "type": "SystemTypeCodes",
+     "required": true,
+     "description": "",
+     "enum": null,
+     "example": null,
+     "ref": "SystemTypeCodes",
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "uuids",
+    "systemType"
+   ]
+  },
+  "GetPDFLinkByUUIDResponse": {
+   "name": "GetPDFLinkByUUIDResponse",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "uuid",
+     "type": "string",
+     "required": false,
+     "description": "PDF i verilen belgenin UUID bilgisi.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "pdfLink",
+     "type": "string",
+     "required": false,
+     "description": "Verilen UUID ye ait PDF linki.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "success",
+     "type": "string",
+     "required": false,
+     "description": "Verilen UUID ye ait işlem durumu.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "message",
+     "type": "string",
+     "required": false,
+     "description": "Verilen UUID ye ait işlem mesajı.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "ApiResponse_GetPDFLinkByUUIDResponse": {
+   "name": "ApiResponse_GetPDFLinkByUUIDResponse",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "Success",
+     "type": "boolean",
+     "required": false,
+     "description": "İşlemin başarılı olup olmadığını belirtir.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Message",
+     "type": "string",
+     "required": false,
+     "description": "API yanıt mesajı.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Code",
+     "type": "string",
+     "required": false,
+     "description": "Yanıt kodu.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Result",
+     "type": "array<GetPDFLinkByUUIDResponse>",
+     "required": false,
+     "description": "",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": "GetPDFLinkByUUIDResponse"
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "GetUserPKRequestData": {
+   "name": "GetUserPKRequestData",
+   "type": "object",
+   "description": "",
+   "properties": [
+    {
+     "name": "kn",
+     "type": "string",
+     "required": true,
+     "description": "Etiketleri listelenmesi istenilen mükellefin Vergi numarası.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": [
+    "kn"
+   ]
+  },
+  "GetUserPKResponse": {
+   "name": "GetUserPKResponse",
+   "type": "object",
+   "description": "Kullanıcı etiket bilgilerini içeren yanıt modeli.",
+   "properties": [
+    {
+     "name": "identifier",
+     "type": "string",
+     "required": false,
+     "description": "Mükellefin tanımlayıcı bilgisi.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": false,
+     "description": "Etiketin başlığı.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "type2",
+     "type": "string",
+     "required": false,
+     "description": "Etiketin ikinci tipi.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "required": false,
+     "description": "Mükellefin adı.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "pkGbTurKod",
+     "type": "string",
+     "required": false,
+     "description": "PK tür kodu bilgisi.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "firstCreationTime",
+     "type": "string (date-time)",
+     "required": false,
+     "description": "Etiketin oluşturulma zamanı.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    }
+   ],
+   "enum": null,
+   "required": []
+  },
+  "ApiResponse_List_GetUserPKResponse": {
+   "name": "ApiResponse_List_GetUserPKResponse",
+   "type": "object",
+   "description": "Belge günlükleri listesini içerir.",
+   "properties": [
+    {
+     "name": "Success",
+     "type": "boolean",
+     "required": false,
+     "description": "İşlemin başarılı olup olmadığını belirtir.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Message",
+     "type": "string",
+     "required": false,
+     "description": "API yanıt mesajı.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Code",
+     "type": "string",
+     "required": false,
+     "description": "Yanıt kodu.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": null
+    },
+    {
+     "name": "Result",
+     "type": "array<GetUserPKResponse>",
+     "required": false,
+     "description": "Belge günlüklerini içeren sonuç listesi.",
+     "enum": null,
+     "example": null,
+     "ref": null,
+     "itemsRef": "GetUserPKResponse"
+    }
+   ],
+   "enum": null,
+   "required": []
+  }
+ }
+}
