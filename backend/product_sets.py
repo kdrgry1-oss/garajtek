@@ -228,16 +228,30 @@ async def refresh_set(db, set_doc: dict) -> Dict[str, Any]:
     if any(set_doc.get(k) != v for k, v in upd.items()):
         await db.products.update_one({"id": set_doc["id"]}, {"$set": upd})
         set_doc.update(upd)
+        _clear_block_cache()
     return {"components": comps, "pricing": pr}
 
 
+def _clear_block_cache() -> None:
+    """Sayfa bloğu ürün önbelleği (60 sn) set kartını eski fiyatla tutmasın."""
+    try:
+        from pageblocks.products import clear_cache
+        clear_cache()
+    except Exception:
+        pass
+
+
 async def refresh_sets_containing(db, product_ids) -> int:
-    """Bileşen fiyatı/stoku değişince onu içeren setleri tazeler."""
+    """Bileşen fiyatı/stoku değişince onu içeren setleri tazeler (kart ve ürün sayfasının ana
+    fiyatı saklı alanlardan okunur; set paneli ise anlık hesaplar → ikisi ayrışmasın)."""
     ids = {str(x) for x in (product_ids or []) if x}
     if not ids:
         return 0
+    # Eski içe aktarmalarda product_id sayı olarak saklanmış olabilir → iki biçimle de ara.
+    keys = list(ids) + [int(x) for x in ids if x.isdigit()]
     n = 0
-    for s in await db.products.find({"product_type": "set"}, {"_id": 0}).to_list(2000):
+    for s in await db.products.find({"product_type": "set", "set_items.product_id": {"$in": keys}},
+                                    {"_id": 0}).to_list(2000):
         if any(str(i.get("product_id")) in ids for i in (s.get("set_items") or []) if isinstance(i, dict)):
             await refresh_set(db, s)
             n += 1

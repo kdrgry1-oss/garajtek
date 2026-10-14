@@ -179,7 +179,7 @@ function SetEditor({ initial, onClose, onSaved }) {
                   <input type="file" accept="image/*" className="hidden" onChange={onUpload} />+ Görsel
                 </label>
               </div>
-              {!f.images.length && <p className="mt-1 text-[11px] text-gray-500">Görsel eklenmezse bileşenlerin ilk görselleri kullanılır; set kartı için bir kolaj yüklemeniz önerilir.</p>}
+              {!f.images.length && <p className="mt-1 text-[11px] text-gray-500">Görsel eklenmezse bileşenlerin ilk görselleri kullanılır; set kartı için bir kolaj yüklemeniz önerilir. Bileşenlerde de görsel yoksa set vitrinde listelenmez (aktif set görselsiz kaydedilemez).</p>}
             </div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_active} onChange={(e) => setF({ ...f, is_active: e.target.checked })} /> Vitrinde aktif</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_featured} onChange={(e) => setF({ ...f, is_featured: e.target.checked })} /> Öne çıkan</label>
@@ -260,6 +260,8 @@ export default function ProductSets() {
                 <td className="px-3 py-2 text-right">%{s.set_discount_pct || 0}</td>
                 <td className="px-3 py-2 text-xs">
                   {s.is_active === false ? <span className="text-gray-500">Pasif</span> : <span className="text-green-700">Aktif</span>}
+                  {/* Vitrin listesi görselsiz ürünü göstermez → "Aktif" yanıltmasın */}
+                  {s.is_active !== false && !s.images?.length && <span className="ml-2 text-amber-700" data-testid={`set-no-image-${s.id}`}>Vitrinde listelenmiyor (görsel yok)</span>}
                   {s.pricing?.missing_count > 0 && <span className="ml-2 text-red-600">{s.pricing.missing_count} bileşen tükendi</span>}
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">

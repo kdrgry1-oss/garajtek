@@ -64,7 +64,9 @@ export function fmtTL(n) {
 export function cartLineView(item) {
   const it = item || {};
   const money = Number(it.price || 0);                 // sale_price tabanı (para hesabı)
-  const camp = Number(it.campaignPct || 0);
+  // Set kaleminde otomatik % kampanya motor tarafından set indiriminden SONRA uygulanır;
+  // kalem bazında doğru hesaplanamaz → satırda gösterilmez, özette kendi satırında çıkar.
+  const camp = it.setId ? 0 : Number(it.campaignPct || 0);
   const unit = camp > 0 ? Math.round(money * (1 - camp / 100) * 100) / 100 : money;
   const listUnit = Number(it.listPrice != null ? it.listPrice : money) || unit;
   const hasDiscount = listUnit > unit + 0.001;
@@ -101,4 +103,31 @@ export function cartSummary(items, promoDiscount) {
     extraDisc: r2(extraDisc), totalDisc: r2(productDisc + extraDisc),
     grand: r2(Math.max(0, effSum - extraDisc)),
   };
+}
+
+/**
+ * Sepet özetindeki kampanya satırları — /coupons/evaluate `applied` listesinin her biri ayrı
+ * satır (Kasa ekranıyla aynı: "Set İndirimi (%20)" ve kampanya adı ayrı görünür). Kalemlerde
+ * zaten gösterilen otomatik yüzde tutarı (promoDiscount - extraDisc) önce yüzde satırlarından,
+ * artarsa diğerlerinden mahsup edilir → satırların toplamı daima extraDisc'e eşittir.
+ */
+export function promoSummaryRows(applied, promoDiscount, extraDisc) {
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const rows = (applied || [])
+    .filter((p) => p && Number(p.discount) > 0)
+    .map((p) => ({ title: p.title || p.code || "Kampanya İndirimi", type: p.type, amount: Number(p.discount) }));
+  let shown = Math.max(0, Number(promoDiscount || 0) - Number(extraDisc || 0));
+  for (const pass of [(r) => r.type === "percent", () => true]) {
+    for (const r of rows) {
+      if (shown <= 0.001 || !pass(r)) continue;
+      const cut = Math.min(r.amount, shown);
+      r.amount -= cut;
+      shown -= cut;
+    }
+  }
+  const out = rows.filter((r) => r.amount > 0.001).map((r) => ({ title: r.title, amount: r2(r.amount) }));
+  const sum = out.reduce((s, r) => s + r.amount, 0);
+  const rest = r2(Number(extraDisc || 0) - sum);
+  if (rest > 0.009) out.push({ title: "Kampanya İndirimi", amount: rest });  // evaluate ayrıntısı yoksa
+  return out;
 }

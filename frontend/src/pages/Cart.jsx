@@ -16,7 +16,7 @@ import Carousel from "../components/electro/Carousel";
 import QuantityInput from "../components/electro/QuantityInput";
 import { fmtPrice } from "../components/electro/format";
 import { trackRemove } from "../components/CartDrawer";
-import { cartLineView, cartSummary } from "../lib/price";
+import { cartLineView, cartSummary, promoSummaryRows } from "../lib/price";
 import { trackViewCart } from "../utils/pixelEvents";
 import { SetGroupHeaderRow, SetPendingRows, SetPendingNotice } from "../components/sets/SetCartParts";
 import { CartCodNote } from "../components/electro/CodInfo";
@@ -117,11 +117,9 @@ export default function Cart() {
   // Ürün-seviyesi indirim (sale_price + otomatik kampanya) — satırlarla birebir tutarlı özet.
   const { listSum, productDisc, extraDisc, totalDisc, grand: _grandNoShip } = cartSummary(items, promoDiscount);
   const grandTotal = _grandNoShip + shippingCost;
-  // Sepet-seviyesi kampanya adları (ör. "3 Al 2 Öde — Body"); kalemde zaten gösterilen
-  // otomatik yüzde kampanyaları hariç.
-  const extraTitles = (appliedPromotions || [])
-    .filter((p) => p && Number(p.discount) > 0 && p.type !== "percent")
-    .map((p) => p.title || p.code).filter(Boolean);
+  // Sepet-seviyesi kampanyalar — her biri ayrı satır ("Set İndirimi (%20)", "3 Al 2 Öde"...);
+  // kalemde zaten gösterilen otomatik yüzde tutarı mahsup edilir (bkz. promoSummaryRows).
+  const promoRows = promoSummaryRows(appliedPromotions, promoDiscount, extraDisc);
 
   // Benzer ürün / indirim önerileri
   const [suggestions, setSuggestions] = useState([]);
@@ -307,9 +305,9 @@ export default function Cart() {
                     {productDisc > 0.001 && (
                       <tr data-testid="cart-product-discount"><th>Ürün İndirimleri</th><td data-title="Ürün İndirimleri"><span className="amount text-green">-{fmtPrice(productDisc)}</span></td></tr>
                     )}
-                    {extraDisc > 0.001 && (
-                      <tr data-testid="cart-promo-discount"><th>{extraTitles.length ? extraTitles.join(" + ") : "Kampanya İndirimi"}</th><td data-title="Kampanya"><span className="amount text-green">-{fmtPrice(extraDisc)}</span></td></tr>
-                    )}
+                    {extraDisc > 0.001 && promoRows.map((r, i) => (
+                      <tr key={i} data-testid="cart-promo-discount"><th>{r.title}</th><td data-title="Kampanya"><span className="amount text-green">-{fmtPrice(r.amount)}</span></td></tr>
+                    ))}
                     <tr className="shipping"><th>Kargo</th><td data-title="Kargo">{shippingCost === 0 ? <span className="text-green">Ücretsiz</span> : <span className="amount">{fmtPrice(shippingCost)}</span>}<div className="font-size-12 text-gray-90">Kargo, ödeme adımında kesinleşir.</div></td></tr>
                     <tr className="order-total"><th>Toplam</th><td data-title="Toplam"><strong><span className="amount" data-testid="cart-grand-total">{fmtPrice(grandTotal)}</span></strong></td></tr>
                   </tbody>

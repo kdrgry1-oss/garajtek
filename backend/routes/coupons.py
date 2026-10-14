@@ -1015,6 +1015,9 @@ def _coupon_to_campaign(c: dict) -> dict:
         "buy_quantity": c.get("buy_quantity") or 0,
         "free_quantity": c.get("free_quantity") or 1,
         "get_discount": c.get("get_discount") or 0,
+        # C4 — paket fiyatı okumada da döner; yoksa liste "Paket: 0 TL" gösterir ve
+        # aktif/pasif geçişi ({...c} PUT) değeri None'a ezip paket indirimini sıfırlar.
+        "bundle_price": c.get("bundle_price") or 0,
         "max_discount": c.get("max_discount") or 0,
         "priority": c.get("priority", 0),
         "combinable": bool(c.get("combinable", True)),
@@ -1079,6 +1082,13 @@ def _campaign_to_coupon_fields(payload: dict) -> dict:
     }
 
 
+def _check_bundle_price(fields: dict) -> None:
+    """Ürün paketi kampanyası paket fiyatı olmadan kaydedilemez: aksi halde panelde 'Aktif'
+    görünür ama motor (bp > 0 şartı) hiç indirim uygulamaz."""
+    if fields.get("type") == "bundle" and not float(fields.get("bundle_price") or 0) > 0:
+        raise HTTPException(status_code=400, detail="Ürün paketi için paket fiyatı 0'dan büyük olmalı")
+
+
 async def _excluded_fields_from_payload(payload: dict):
     """Payload'daki 'excluded_products_raw' (admin'in yazdığı metin) alanını çözer.
     Alan HİÇ yoksa None döner (kısmi güncellemede mevcut hariç-listeyi ezme). Boş string
@@ -1129,6 +1139,7 @@ async def create_campaign(payload: dict, current_user: dict = Depends(require_pe
         "created_by": current_user.get("email", ""),
     }
     doc.update(_campaign_to_coupon_fields(payload))
+    _check_bundle_price(doc)
     _exf = await _excluded_fields_from_payload(payload)
     if _exf is not None:
         doc.update(_exf)
@@ -1140,6 +1151,14 @@ async def create_campaign(payload: dict, current_user: dict = Depends(require_pe
 @campaigns_router.put("/{cid}")
 async def update_campaign(cid: str, payload: dict, current_user: dict = Depends(require_admin)):
     update = _campaign_to_coupon_fields(payload)
+    if "bundle_price" not in payload:
+        # Kısmi güncellemede (ör. eski istemciden aktif/pasif) kayıtlı paket fiyatını ezme.
+        update.pop("bundle_price", None)
+        if update.get("type") == "bundle":
+            cur = await db.coupons.find_one({"id": cid}, {"_id": 0, "bundle_price": 1}) or {}
+            _check_bundle_price({**update, "bundle_price": cur.get("bundle_price")})
+    else:
+        _check_bundle_price(update)
     _exf = await _excluded_fields_from_payload(payload)
     if _exf is not None:
         update.update(_exf)

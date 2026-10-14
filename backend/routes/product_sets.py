@@ -337,6 +337,29 @@ async def admin_get_set(sid: str, current_user: dict = Depends(require_admin)):
     return {"set": {**_public_set(doc), "set_items": doc.get("set_items") or []}, **res}
 
 
+async def _component_images(set_items: list) -> list:
+    """Set görseli verilmemişse bileşenlerin ilk görselleri (en çok 4)."""
+    pids = [i["product_id"] for i in set_items or []]
+    if not pids:
+        return []
+    prods = {p["id"]: p for p in await db.products.find({"id": {"$in": pids}}, {"_id": 0, "id": 1, "images": 1}).to_list(ps.MAX_SET_ITEMS + 10)}
+    return [prods[p]["images"][0] for p in pids if (prods.get(p) or {}).get("images")][:4]
+
+
+NO_IMAGE_MSG = ("Set vitrinde listelenmez: ne set görseli ne de bileşen görseli var. "
+                "Bir set görseli (kolaj) yükleyin ya da seti pasif kaydedin.")
+
+
+async def _require_listable_images(images: list, set_items: list, active: bool) -> list:
+    """Vitrin listesi görselsiz ürünü göstermez (products._build_products_query: images.0).
+    Aktif set görselsiz kalacaksa panelde 'Aktif' görünüp vitrinde hiç çıkmaması yerine
+    kayıt açık hatayla reddedilir."""
+    imgs = list(images or []) or await _component_images(set_items)
+    if active and not imgs:
+        raise HTTPException(status_code=400, detail=NO_IMAGE_MSG)
+    return imgs
+
+
 async def create_set_product(data: dict, request: Request, current_user: dict, extra: dict | None = None) -> dict:
     """Seti panelin ürün oluşturma akışıyla açar (slug/kart id aynı kurallarla), sonra set
     alanlarını yazar ve türetilmiş fiyat/stoku hesaplar. Demo yükleyici de bunu kullanır."""
@@ -346,9 +369,7 @@ async def create_set_product(data: dict, request: Request, current_user: dict, e
         raise HTTPException(status_code=400, detail="Set adı gerekli")
     await _validate_items(clean.get("set_items") or [])
     if not clean.get("images"):
-        pids = [i["product_id"] for i in clean["set_items"]]
-        prods = {p["id"]: p for p in await db.products.find({"id": {"$in": pids}}, {"_id": 0, "id": 1, "images": 1}).to_list(50)}
-        clean["images"] = [prods[p]["images"][0] for p in pids if (prods.get(p) or {}).get("images")][:4]
+        clean["images"] = await _component_images(clean["set_items"])
     cat_id = await ps.ensure_set_category(db)
     cats = [cat_id] if cat_id else []
     for c in data.get("extra_categories") or []:
@@ -376,6 +397,9 @@ async def create_set_product(data: dict, request: Request, current_user: dict, e
 @router.post("/admin/product-sets")
 async def admin_create_set(payload: dict, request: Request,
                            current_user: dict = Depends(require_permission("products.edit"))):
+    clean = _clean_payload(payload)
+    await _validate_items(clean.get("set_items") or [])
+    await _require_listable_images(clean.get("images"), clean.get("set_items"), clean.get("is_active", True))
     doc = await create_set_product(payload, request, current_user)
     logger.info(f"product set created: {doc['id']}")
     return {"id": doc["id"], "slug": doc.get("slug")}
@@ -391,6 +415,12 @@ async def admin_update_set(sid: str, payload: dict, current_user: dict = Depends
         await _validate_items(upd["set_items"], doc["id"])
     if not upd:
         return {"ok": True}
+    if "images" in upd or "is_active" in upd or "set_items" in upd:
+        imgs = await _require_listable_images(
+            upd.get("images", doc.get("images")), upd.get("set_items", doc.get("set_items")),
+            upd.get("is_active", doc.get("is_active", True)))
+        if "images" in upd:
+            upd["images"] = imgs  # boşaltılırsa bileşen görsellerine düşülür
     upd["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.products.update_one({"id": doc["id"]}, {"$set": upd})
     doc.update(upd)

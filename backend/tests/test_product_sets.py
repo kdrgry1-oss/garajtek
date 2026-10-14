@@ -352,3 +352,43 @@ def test_cod_default_runs_when_settings_has_neither_field(db):
     run(db.settings.delete_many({}))
     run(db.settings.insert_one({"id": "main"}))
     assert run(cod_rules.cod_config(db))["enabled"] is True
+
+
+# ── #22: bileşen fiyatı/stoku değişince set saklı fiyatı tazelenir ─────────────
+
+def test_refresh_sets_containing_updates_stored_price(db):
+    s = run(db.products.find_one({"id": "S"}, {"_id": 0}))
+    run(ps.refresh_set(db, s))
+    before = run(db.products.find_one({"id": "S"}))["price"]
+    run(db.products.update_one({"id": "B"}, {"$set": {"sale_price": None, "price": 2000}}))
+    # Eski içe aktarmada product_id sayı saklanmış başka bir set de bulunmalı
+    run(db.products.insert_one({"id": "T", "product_type": "set", "price": 1, "stock": 0, "set_discount_pct": 0,
+                                "set_items": [{"product_id": "C", "quantity": 1}, {"product_id": 7, "quantity": 1}]}))
+    run(db.products.insert_one({"id": "7", "name": "Sayı id", "price": 50, "stock": 2}))
+    assert run(ps.refresh_sets_containing(db, ["B", "7"])) == 2
+    after = run(db.products.find_one({"id": "S"}))
+    assert after["price"] == before - 400 + 2000
+    assert run(db.products.find_one({"id": "T"}))["price"] == 950
+
+
+def test_product_update_and_detail_refresh_sets():
+    src = (ROOT / "routes" / "products.py").read_text()
+    tree = ast.parse(src)
+    fns = {n.name: ast.get_source_segment(src, n) for n in tree.body if isinstance(n, ast.AsyncFunctionDef)}
+    assert "refresh_sets_containing" in fns["update_product"]
+    assert "refresh_set(" in fns["get_product"]
+
+
+# ── #26: görselsiz aktif set panelde 'Aktif' görünüp vitrinde çıkmamalı ─────────
+
+def test_active_set_without_any_image_rejected(client, db):
+    r = client.post("/api/admin/product-sets", json={"name": "Görselsiz", "set_items": [
+        {"product_id": "C", "quantity": 1}, {"product_id": "E", "quantity": 1}]})
+    assert r.status_code == 400 and "listelenmez" in r.json()["detail"]
+    # Mevcut set: görsel temizlenip aktif bırakılamaz; pasif kaydedilebilir
+    assert client.put("/api/admin/product-sets/S", json={"images": [], "is_active": True}).status_code == 400
+    assert client.put("/api/admin/product-sets/S", json={"is_active": False}).status_code == 200
+    # Bileşende görsel varsa set görseli boşaltıldığında bileşen görseline düşülür
+    run(db.products.update_one({"id": "B"}, {"$set": {"images": ["b.jpg"]}}))
+    assert client.put("/api/admin/product-sets/S", json={"images": [], "is_active": True}).status_code == 200
+    assert run(db.products.find_one({"id": "S"}))["images"] == ["b.jpg"]

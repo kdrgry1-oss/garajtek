@@ -1767,6 +1767,14 @@ async def get_product(product_id: str, request: Request):
             if product_is_members_only(product, _mo_ids):
                 # 404 kalır (içerik sızmaz); vitrin 'members_only' koduyla girişe yönlendirir.
                 raise HTTPException(status_code=404, detail="members_only")
+    # Set ürünü: ana fiyat/stok bileşenlerden anlık hesaplanır → aynı sayfadaki set paneliyle
+    # (GET /product-sets) aynı değer görünür; bayat saklı alan da düzelir.
+    if product.get("product_type") == "set":
+        try:
+            import product_sets as _ps
+            await _ps.refresh_set(db, product)
+        except Exception as _e:
+            logger.warning(f"[set] fiyat tazelenemedi: {_e}")
     # Varyantları global Beden Havuzu (variant_options) sırasına göre diz —
     # böylece storefront'ta XS, S, M, L, XL... admin'in tanımladığı sırayla görünür.
     product["variants"] = await _sort_variants_by_pool(product.get("variants") or [])
@@ -3157,6 +3165,14 @@ async def update_product(
 
     await _apply_spec_fields(product_data, product_data)
     await db.products.update_one({"id": product_id}, {"$set": product_data})
+    # Bileşen fiyatı/stoku değişti → onu içeren setlerin saklı fiyat/stoku tazelenir.
+    if existing.get("product_type") != "set" and any(
+            k in product_data for k in ("price", "sale_price", "stock", "variants", "is_active")):
+        try:
+            import product_sets as _ps
+            await _ps.refresh_sets_containing(db, [product_id])
+        except Exception as _e:
+            logger.warning(f"[set] bileşen değişimi sonrası set tazelenemedi: {_e}")
 
     if _pre is not None:
         await _log_manual_stock_change(
