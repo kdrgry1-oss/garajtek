@@ -43,13 +43,16 @@ export function useStoreWhatsApp() {
 
 const fmtTL = (n) => `${(Number(n) || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`;
 
+/** Sepet mesajı. `grand` sepet sayfasındaki "Toplam" ile AYNI tanımdır: ürünler − indirimler + kargo
+ *  (CartDrawer, Cart.jsx ile aynı shippingQuote hesabını geçirir). Mesajda da kargo dahil olduğu yazılır ki
+ *  müşteri / satıcı iki farklı "Toplam" görmesin. */
 export function cartMessage(items, grand) {
   const lines = ["Merhaba, sepetimdeki ürünleri sipariş vermek istiyorum:"];
   (items || []).forEach((it) => {
     const opt = it.size || it.variant || "";
     lines.push(`• ${it.name || "Ürün"}${opt ? ` (${opt})` : ""} × ${Math.max(1, Number(it.quantity) || 1)}`);
   });
-  if (grand != null) lines.push(`Toplam: ${fmtTL(grand)}`);
+  if (grand != null) lines.push(`Toplam (kargo dahil): ${fmtTL(grand)}`);
   return lines.join("\n");
 }
 

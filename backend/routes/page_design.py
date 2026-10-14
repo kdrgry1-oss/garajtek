@@ -120,7 +120,8 @@ async def put_draft(page: str, payload: dict, request: Request, if_match: str | 
     try:
         doc, conflict, errors, warnings = await store.save_draft(
             db, page, store.normalize_client_blocks(blocks), payload.get("global"),
-            if_match=if_match if if_match is not None else payload.get("rev"), user=_user(current_user))
+            if_match=if_match if if_match is not None else payload.get("rev"), user=_user(current_user),
+            global_keys=payload.get("global_keys"))
     except pb.UnknownBlockType as e:
         raise HTTPException(status_code=422, detail=f"Bilinmeyen blok tipi: {e}") from e
     if conflict is not None:

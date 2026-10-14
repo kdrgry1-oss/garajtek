@@ -9,6 +9,7 @@ import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Breadcrumb from "../components/electro/Breadcrumb";
+import { PASSWORD_MIN_LENGTH, passwordTooShort } from "../lib/password";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -31,8 +32,9 @@ export default function ResetPassword() {
       toast.error("Bağlantı geçersiz. Lütfen yeni bir sıfırlama bağlantısı isteyin.");
       return;
     }
-    if (pw.length < 6) {
-      toast.error("Şifre en az 6 karakter olmalı");
+    // Sunucu (auth.py forgot-password/reset) ile aynı kural — ortak sabit (lib/password)
+    if (passwordTooShort(pw)) {
+      toast.error(`Şifre en az ${PASSWORD_MIN_LENGTH} karakter olmalı`);
       return;
     }
     if (pw !== pw2) {
@@ -72,7 +74,7 @@ export default function ResetPassword() {
             </div>
           ) : (
             <>
-              <p className="font-size-14 text-gray-90 mb-4">Yeni şifrenizi belirleyin (en az 6 karakter).</p>
+              <p className="font-size-14 text-gray-90 mb-4">Yeni şifrenizi belirleyin (en az {PASSWORD_MIN_LENGTH} karakter).</p>
               <input
                 type="password"
                 value={pw}

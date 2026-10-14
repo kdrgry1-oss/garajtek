@@ -63,14 +63,26 @@ async def get_draft(db, page: str):
     return await db.page_layouts.find_one({"id": f"{page}:draft"}, {"_id": 0})
 
 
-async def save_draft(db, page: str, blocks: list, global_: dict | None, *, if_match, user: str):
-    """Taslağı yazar. Dönüş: (doküman | None, çakışma_dokümanı | None, hatalar, uyarılar)."""
+async def save_draft(db, page: str, blocks: list, global_: dict | None, *, if_match, user: str,
+                     global_keys: list | None = None):
+    """Taslağı yazar. Dönüş: (doküman | None, çakışma_dokümanı | None, hatalar, uyarılar).
+
+    global_keys: düzenleyicinin yüklemeden bu yana GERÇEKTEN değiştirdiği global anahtarlar. Verilirse yalnız
+    bunlar istemciden alınır; diğerleri sunucudaki güncel değerden (taslak, yoksa yayın) gelir. Böylece başka
+    ekrandan (Menü Yönetimi › üst bar / orta menü) yapılan yayın, açık kalmış düzenleyicinin bayat kopyasıyla
+    sessizce ezilmez."""
     pub = await ensure(db, page)
     cur = await get_draft(db, page)
     if cur is not None and str(if_match or "") != str(cur.get("rev")):
         return None, cur, [], []
-    clean, g, errors, warnings = validate_layout(blocks, global_ if global_ is not None else
-                                                 (cur or {}).get("global") or await get_global(db))
+    server_g = (cur or {}).get("global") or await get_global(db)
+    if global_ is not None and isinstance(global_keys, list):
+        merged = dict(server_g or {})
+        for k in global_keys:
+            if isinstance(k, str) and k in global_:
+                merged[k] = global_[k]
+        global_ = merged
+    clean, g, errors, warnings = validate_layout(blocks, global_ if global_ is not None else server_g)
     rev = int((cur or {}).get("rev") or 0) + 1
     doc = {"id": f"{page}:draft", "page": page, "rev": rev,
            "base_rev": (cur or {}).get("base_rev", pub.get("rev", 0)), "blocks": clean, "global": g,

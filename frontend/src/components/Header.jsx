@@ -30,12 +30,50 @@ import Logo from "./electro/Logo";
 import { fmtPrice, priceOf } from "./electro/format";
 import { useCompare } from "./electro/compare";
 import { fetchSiteMenus, getCachedSiteMenus } from "../lib/siteMenus";
-import { useSiteDesign, mergeContact } from "../lib/siteDesign";
+import { useSiteDesign, mergeContact, applyLazyImages } from "../lib/siteDesign";
+import { applyRuntimeSiteName } from "../lib/storeInfo";
 import { usePreviewState } from "../lib/pagePreview";
 import SmartLink, { linkHref } from "./pageblocks/_shared/SmartLink";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const MAX_VERTICAL = 14; // dikey menüde gösterilecek en fazla kök kategori (fazlası "Tüm Kategoriler" bağlantısında)
+const DEFAULT_HIGHLIGHT = "#df3737"; // site_secondary_menu.highlight_color varsayılanı (= tema indirim rengi)
+
+/** Sayfa Tasarımı › Dikey Menü › Başlık stili → "Tüm Kategoriler" düğmesi sınıfları. */
+export function deptBtnClass(headerStyle) {
+  const base = "btn-link btn-remove-focus btn-block d-flex card-btn py-3 text-lh-1 px-4 shadow-none border-0 font-weight-bold text-gray-90";
+  if (headerStyle === "primary_square") return `${base} btn-primary rounded-0`;
+  if (headerStyle === "transparent_topline") return `${base} bg-transparent rounded-0 el-dept-btn--topline`;
+  return `${base} btn-primary rounded-top-lg`; // primary_rounded (varsayılan)
+}
+const TOPLINE_STYLE = { background: "transparent", borderTop: "3px solid var(--primary, #fed700)" };
+
+/** Sayfa Tasarımı › Header › Arama › Görünüm → giriş/kategori/düğme sınıfları.
+ *  pill_bordered (varsayılan): ana sayfada çerçeveli hap, iç sayfalarda şerit üstü hap (eski davranış);
+ *  pill_on_band: her yerde şerit üstü hap; underline: alt çizgili, köşesiz. */
+export function searchLook(style, shop) {
+  if (style === "underline") {
+    return {
+      input: "form-control py-2 pl-5 font-size-15 height-40 rounded-0 border-0 bg-transparent",
+      inputStyle: { borderBottom: "2px solid currentColor" },
+      cat: "btn dropdown-toggle height-40 text-gray-60 font-weight-normal border-0 rounded-0 bg-transparent px-5 py-2",
+      catStyle: { borderBottom: "2px solid currentColor" },
+      btn: "rounded-0", look: "underline",
+    };
+  }
+  if (style === "pill_on_band" || shop) {
+    return {
+      input: "form-control py-2 pl-5 font-size-15 border-0 height-40 rounded-left-pill",
+      cat: "btn dropdown-toggle height-40 text-gray-60 font-weight-normal border-0 rounded-0 bg-white px-5 py-2",
+      btn: "rounded-right-pill", look: "band",
+    };
+  }
+  return {
+    input: "form-control py-2 pl-5 font-size-15 border-right-0 height-40 border-width-2 rounded-left-pill border-primary",
+    cat: "btn dropdown-toggle height-40 text-gray-60 font-weight-normal border-top border-bottom border-left-0 rounded-0 border-primary border-width-2 pl-0 pr-5 py-2",
+    btn: "rounded-right-pill", look: "bordered",
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /* Dikey "Tüm Kategoriler" menüsü (hs-mega-menu, 3 seviye)              */
@@ -161,7 +199,12 @@ function megaColumnsOf(tab) {
 export const NAV_MAX_HOME = 7;
 export const NAV_MAX_SHOP = 6;
 
-function HorizontalNav({ tabs, saleMenu, freeShippingText, freeShippingLink = "/sayfa/kargo-ve-teslimat", showLast, maxVisible = NAV_MAX_HOME, moreLabel = "Daha Fazla" }) {
+function HorizontalNav({ tabs, saleMenu, freeShippingText, freeShippingLink = "/sayfa/kargo-ve-teslimat", showLast, maxVisible = NAV_MAX_HOME, moreLabel = "Daha Fazla", highlightColor }) {
+  // Sayfa Tasarımı › İkincil Menü › Vurgu rengi: "Vurgulu" (accent) sekmeler her zaman bu renkte; "İndirim" (sale)
+  // sekmeler yalnız renk varsayılandan farklıysa (aksi halde tema indirim rengi geçerli kalır).
+  const hlColor = /^#[0-9a-f]{3,8}$/i.test(String(highlightColor || "")) ? highlightColor : DEFAULT_HIGHLIGHT;
+  const tabStyle = (tab) => (tab.style === "accent" || (tab.style === "sale" && hlColor.toLowerCase() !== DEFAULT_HIGHLIGHT)
+    ? { color: hlColor } : undefined);
   const [open, setOpen] = useState(null);
   const timer = useRef(null);
   const enter = (id) => { clearTimeout(timer.current); setOpen(id); };
@@ -227,7 +270,7 @@ function HorizontalNav({ tabs, saleMenu, freeShippingText, freeShippingLink = "/
       return (
         <li key={tab.id} className={`nav-item hs-has-mega-menu u-header__nav-item${open === tab.id ? " hs-mega-menu-opened" : ""}`}
           onMouseEnter={() => enter(tab.id)} onMouseLeave={leave}>
-          <Link to={tab.link || "#"} className={`${cls} u-header__nav-link-toggle`} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
+          <Link to={tab.link || "#"} className={`${cls} u-header__nav-link-toggle`} style={tabStyle(tab)} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
           <div className="hs-mega-menu w-100 u-header__sub-menu el-anim-up">
             <div className="row u-header__mega-menu-wrapper">
               {cols.map((col) => (
@@ -249,7 +292,7 @@ function HorizontalNav({ tabs, saleMenu, freeShippingText, freeShippingLink = "/
       return (
         <li key={tab.id} className={`nav-item hs-has-sub-menu u-header__nav-item${open === tab.id ? " hs-sub-menu-opened" : ""}`}
           onMouseEnter={() => enter(tab.id)} onMouseLeave={leave} data-testid="sale-menu">
-          <Link to={tab.link || "/sale"} className={`${cls} u-header__nav-link-toggle`} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
+          <Link to={tab.link || "/sale"} className={`${cls} u-header__nav-link-toggle`} style={tabStyle(tab)} data-testid={`nav-tab-${tab.id}`} onClick={close}>{tab.label}</Link>
           <ul className="hs-sub-menu u-header__sub-menu el-anim-up" style={{ minWidth: 230 }}>
             {saleMenu.map((it) => (
               <li key={`${it.url}-${it.label}`}><Link className="nav-link u-header__sub-menu-nav-link" to={it.url} onClick={close}>{it.label}</Link></li>
@@ -261,7 +304,7 @@ function HorizontalNav({ tabs, saleMenu, freeShippingText, freeShippingLink = "/
     }
     return (
       <li key={tab.id} className="nav-item u-header__nav-item">
-        <Link to={tab.link || "#"} className={cls} data-testid={`nav-tab-${tab.id}`}>{tab.label}</Link>
+        <Link to={tab.link || "#"} className={cls} style={tabStyle(tab)} data-testid={`nav-tab-${tab.id}`}>{tab.label}</Link>
       </li>
     );
   };
@@ -284,7 +327,7 @@ function HorizontalNav({ tabs, saleMenu, freeShippingText, freeShippingLink = "/
                     const cols = tab.type === "mega" ? megaColumnsOf(tab) : [];
                     return (
                       <div className="col-md-3" key={tab.id}>
-                        <Link to={tab.link || "/"} className={`u-header__sub-menu-title d-block${tab.style === "sale" ? " text-sale" : ""}`} onClick={close}>{tab.label}</Link>
+                        <Link to={tab.link || "/"} className={`u-header__sub-menu-title d-block${tab.style === "sale" ? " text-sale" : ""}`} style={tabStyle(tab)} onClick={close}>{tab.label}</Link>
                         {cols.length > 0 && (
                           <ul className="u-header__sub-menu-nav-group mb-3">
                             {cols.slice(0, 8).map((c) => (
@@ -362,21 +405,18 @@ function SearchBar({ roots, variant = "home", inputId = "searchproduct-item", cf
   const showCats = cfg.show_category_select !== false;
   const btnCls = cfg.button_color === "dark" ? "btn-dark" : cfg.button_color === "primary" ? "btn-primary" : null;
   const shop = variant === "shop";
+  const lk = searchLook(cfg.style, shop);
+  const bandBtn = lk.look === "band" && shop;
   return (
-    <form className="js-focus-state position-relative" onSubmit={submit} ref={boxRef} role="search" data-testid="header-search">
+    <form className="js-focus-state position-relative" onSubmit={submit} ref={boxRef} role="search" data-testid="header-search" data-search-style={lk.look}>
       <label className="sr-only" htmlFor={inputId}>{cfg.button_label || "Ara"}</label>
       <div className="input-group">
         <input type="search" id={inputId} value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocus(true)}
-          className={shop
-            ? "form-control py-2 pl-5 font-size-15 border-0 height-40 rounded-left-pill"
-            : "form-control py-2 pl-5 font-size-15 border-right-0 height-40 border-width-2 rounded-left-pill border-primary"}
+          className={lk.input} style={lk.inputStyle}
           placeholder={cfg.placeholder ?? "Ürün, marka veya kategori ara"} aria-label={cfg.placeholder || "Ürün ara"} autoComplete="off" data-testid="search-input" />
         <div className="input-group-append">
           {showCats && <div className="dropdown bootstrap-select js-select dropdown-select custom-search-categories-select el-native-select">
-            <button type="button" tabIndex={-1} aria-hidden="true"
-              className={shop
-                ? "btn dropdown-toggle height-40 text-gray-60 font-weight-normal border-0 rounded-0 bg-white px-5 py-2"
-                : "btn dropdown-toggle height-40 text-gray-60 font-weight-normal border-top border-bottom border-left-0 rounded-0 border-primary border-width-2 pl-0 pr-5 py-2"}>
+            <button type="button" tabIndex={-1} aria-hidden="true" className={lk.cat} style={lk.catStyle}>
               <div className="filter-option"><div className="filter-option-inner"><div className="filter-option-inner-inner">{catLabel}</div></div></div>
             </button>
             <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Kategori seçin" data-testid="search-category">
@@ -384,7 +424,7 @@ function SearchBar({ roots, variant = "home", inputId = "searchproduct-item", cf
               {roots.map((r) => <option key={r.id} value={r.slug}>{r.name}</option>)}
             </select>
           </div>}
-          <button className={`btn ${btnCls && !shop ? btnCls : shop ? "btn-dark" : "btn-primary"} height-40 py-2 px-3 rounded-right-pill`} type="submit" aria-label={cfg.button_label || "Ara"} data-testid="search-btn">
+          <button className={`btn ${btnCls && !bandBtn ? btnCls : shop ? "btn-dark" : "btn-primary"} height-40 py-2 px-3 ${lk.btn}`} type="submit" aria-label={cfg.button_label || "Ara"} data-testid="search-btn">
             <span className="ec ec-search font-size-24" />
           </button>
         </div>
@@ -746,6 +786,17 @@ export default function Header({ announcement, announcementFirst = false, announ
     return () => window.removeEventListener("scroll", onScroll);
   }, [hd.sticky]);
 
+  // Panel › Site Adı: build-time adı taşıyan <title> / og:site_name / JSON-LD'yi çalışma anı adıyla güncelle.
+  // setTimeout(0): sayfanın kendi başlık effect'lerinden SONRA çalışsın (Header sayfanın çocuğudur).
+  useEffect(() => {
+    const t = setTimeout(() => applyRuntimeSiteName(info.name), 0);
+    return () => clearTimeout(t);
+  }, [info.name, location.pathname]);
+
+  // Sayfa Tasarımı › Tema › "Görselleri gerektikçe yükle" kapalıysa lazy görseller hemen yüklenir.
+  const lazyImages = sd.site_theme?.lazy_images !== false;
+  useEffect(() => applyLazyImages(lazyImages), [lazyImages]);
+
   const welcome = tb.welcome_text || menus.topbar?.welcome || `${info.name && info.name !== "Mağaza" ? info.name : SITE_NAME}'e Hoş Geldiniz — Oto Servis & Garaj Ekipmanları`;
   const freeShip = sm.right_text ?? menus.center?.right_text ?? "";
   const freeShipLink = linkHref(sm.right_link) || menus.center?.right_link || "/sayfa/kargo-ve-teslimat";
@@ -759,7 +810,18 @@ export default function Header({ announcement, announcementFirst = false, announ
   const deptIcon = dm.title_icon?.icon || "fa fa-list-ul";
   // Ana sayfada açık dikey menü şablondaki gibi slider'ın ÜSTÜNE biner; sayfa slider ile başlamıyorsa
   // ilk içerik bloğunu örtmesin diye kapalı başlar (tıklayınca açılır).
-  const deptOpenByDefault = home ? dm.open_on_home !== false && heroFirst : !!dm.open_elsewhere;
+  // "Slider üzerine binsin" kapalıysa ana sayfada da kapalı başlar (açılınca kısa süreli açılır menü gibi davranır).
+  const deptOpenByDefault = home ? dm.open_on_home !== false && heroFirst && dm.overlay_hero !== false : !!dm.open_elsewhere;
+  // Dikey menü › Açma = "Üzerine gelince": fareyle açılır / kapanır (tıklama da çalışmaya devam eder).
+  const deptHover = dm.toggle_event === "hover"
+    ? { onMouseEnter: () => setDeptOpen(!deptOpenByDefault), onMouseLeave: () => setDeptOpen(false) } : {};
+  // Header › Görünüm: ana sayfada şeffaf (slider'ın üstüne biner) + alt boşluk
+  const transparentHome = home && hd.transparent_on_home === true;
+  const bottomMargin = Math.max(0, Math.min(120, Number(hd.bottom_margin) || 0));
+  const headerStyle = {
+    ...(bottomMargin ? { marginBottom: bottomMargin } : {}),
+    ...(transparentHome ? { position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, background: "transparent" } : {}),
+  };
   const navMax = home ? Number(sm.max_visible_home) || NAV_MAX_HOME : Number(sm.max_visible_shop) || NAV_MAX_SHOP;
   const closeMobile = () => setMobileOpen(false);
 
@@ -791,8 +853,9 @@ export default function Header({ announcement, announcementFirst = false, announ
   return (
     <>
       <div>{bar}</div>
-      <div className="electro el-header-wrap" data-header-variant={variant}>
-        <header id="header" className="u-header u-header-left-aligned-nav" ref={headerRef} data-testid="site-header">
+      <div className="electro el-header-wrap" data-header-variant={variant} style={transparentHome ? { position: "relative" } : undefined}>
+        <header id="header" className={`u-header u-header-left-aligned-nav${transparentHome ? " el-header--transparent" : ""}`} ref={headerRef} data-testid="site-header"
+          style={Object.keys(headerStyle).length ? headerStyle : undefined}>
           <div className="u-header__section">
             {/* Topbar */}
             {tb.enabled !== false && <div className={`u-header-topbar el-topbar py-2 d-none d-${tb.hide_below === "lg" ? "lg" : "xl"}-block${topCls}${hlCls("topbar")}`} data-menu-group="topbar" data-testid="topbar">
@@ -854,7 +917,7 @@ export default function Header({ announcement, announcementFirst = false, announ
                   ) : (
                     <>
                       <div className={`col d-none d-xl-block el-hnav-col${hlCls("center")}`} data-menu-group="center">
-                        {sm.enabled !== false && <HorizontalNav tabs={tabs} saleMenu={saleMenu} maxVisible={navMax} moreLabel={sm.more_label || "Daha Fazla"} />}
+                        {sm.enabled !== false && <HorizontalNav tabs={tabs} saleMenu={saleMenu} maxVisible={navMax} moreLabel={sm.more_label || "Daha Fazla"} highlightColor={sm.highlight_color} />}
                       </div>
                       {sup.enabled !== false && (
                         <div className="d-none d-xl-block col-md-auto" data-testid="header-support">
@@ -888,7 +951,7 @@ export default function Header({ announcement, announcementFirst = false, announ
               <div className={`d-none d-xl-block ${hv === "v3_full_color" ? "bg-primary border-top border-color-1" : "bg-primary"}`} data-testid="header-v3-band">
                 <div className="container">
                   <div className={`el-hnav-col${hlCls("center")}`} data-menu-group="center">
-                    {sm.enabled !== false && <HorizontalNav tabs={tabs} saleMenu={saleMenu} freeShippingText={freeShip} freeShippingLink={freeShipLink} showLast maxVisible={navMax} moreLabel={sm.more_label || "Daha Fazla"} />}
+                    {sm.enabled !== false && <HorizontalNav tabs={tabs} saleMenu={saleMenu} freeShippingText={freeShip} freeShippingLink={freeShipLink} showLast maxVisible={navMax} moreLabel={sm.more_label || "Daha Fazla"} highlightColor={sm.highlight_color} />}
                   </div>
                 </div>
               </div>
@@ -896,12 +959,12 @@ export default function Header({ announcement, announcementFirst = false, announ
               <div className="d-none d-xl-block container">
                 <div className="row">
                   {dm.enabled !== false && <div className={`col-md-auto d-none d-xl-block${hlCls("departments")}`} data-menu-group="departments">
-                    <div className="max-width-270 min-width-270" style={dm.width && Number(dm.width) !== 270 ? { maxWidth: Number(dm.width), minWidth: Number(dm.width) } : undefined}>
+                    <div className="max-width-270 min-width-270" style={dm.width && Number(dm.width) !== 270 ? { maxWidth: Number(dm.width), minWidth: Number(dm.width) } : undefined} {...deptHover}>
                       <div id="basicsAccordion">
                         <div className="card border-0">
                           <div className="card-header card-collapse border-0" id="basicsHeadingOne">
-                            <button type="button" className="btn-link btn-remove-focus btn-block d-flex card-btn py-3 text-lh-1 px-4 shadow-none btn-primary rounded-top-lg border-0 font-weight-bold text-gray-90"
-                              aria-expanded="true" onClick={() => setDeptOpen((v) => !v)} data-testid="all-departments-btn">
+                            <button type="button" className={deptBtnClass(dm.header_style)} style={dm.header_style === "transparent_topline" ? TOPLINE_STYLE : undefined}
+                              aria-expanded="true" onClick={() => setDeptOpen((v) => !v)} data-testid="all-departments-btn" data-header-style={dm.header_style || "primary_rounded"}>
                               <span className="ml-0 text-gray-90 mr-2"><span className={deptIcon} /></span>
                               <span className="pl-1 text-gray-90" data-pd-field="site_departments_menu.title">{deptTitle}</span>
                             </button>
@@ -912,7 +975,7 @@ export default function Header({ announcement, announcementFirst = false, announ
                     </div>
                   </div>}
                   <div className={`col el-hnav-col${hlCls("center")}`} data-menu-group="center">
-                    {sm.enabled !== false && <HorizontalNav tabs={tabs} saleMenu={saleMenu} freeShippingText={freeShip} freeShippingLink={freeShipLink} showLast maxVisible={navMax} moreLabel={sm.more_label || "Daha Fazla"} />}
+                    {sm.enabled !== false && <HorizontalNav tabs={tabs} saleMenu={saleMenu} freeShippingText={freeShip} freeShippingLink={freeShipLink} showLast maxVisible={navMax} moreLabel={sm.more_label || "Daha Fazla"} highlightColor={sm.highlight_color} />}
                   </div>
                 </div>
               </div>
@@ -959,11 +1022,12 @@ function ShopBar({ roots, deptOpen, setDeptOpen, config, highlight, title = "Kat
       <div className="container">
         <div className="row align-items-stretch min-height-50">
           {enabled && <div className={`col-md-auto d-none d-xl-flex align-items-end${highlight ? " el-menu-hl" : ""}`} data-menu-group="departments">
-            <div className="max-width-270 min-width-270" ref={ref}>
+            <div className="max-width-270 min-width-270" ref={ref}
+              {...(dm.toggle_event === "hover" ? { onMouseEnter: () => setDeptOpen(true), onMouseLeave: () => setDeptOpen(false) } : {})}>
               <div id="basicsAccordion">
                 <div className="card border-0 rounded-0">
                   <div className="card-header bg-primary rounded-0 card-collapse border-0" id="basicsHeadingOne">
-                    <button type="button" className="btn-link btn-remove-focus btn-block d-flex card-btn py-3 text-lh-1 px-4 shadow-none btn-primary rounded-top-lg border-0 font-weight-bold text-gray-90"
+                    <button type="button" className={deptBtnClass(dm.header_style)} style={dm.header_style === "transparent_topline" ? TOPLINE_STYLE : undefined}
                       aria-expanded={deptOpen} onClick={() => setDeptOpen((v) => !v)} data-testid="all-departments-btn">
                       <span className="pl-1 text-gray-90">{title}</span>
                       <span className="text-gray-90 ml-3"><span className="ec ec-arrow-down-search" /></span>

@@ -66,16 +66,42 @@ export function fillTokens(s, { storeName = "" } = {}) {
   return String(s || "").replace(/\{yıl\}|\{year\}/g, String(new Date().getFullYear())).replace(/\{mağaza\}|\{store_name\}/g, storeName);
 }
 
-/** Tek iletişim kaynağı (SPEC §4.7): Genel Alanlar › İletişim Bilgileri; boş alanlar Firma Bilgileri'nden. */
+/** Sayfa Tasarımı › Tema › "Görselleri gerektikçe yükle" (lazy_images). Bileşenler loading="lazy" yazar;
+ *  ayar KAPALIYSA sayfadaki (ve sonradan eklenen) tüm lazy görseller eager'a çevrilir. Açılınca gözlem durur.
+ *  Dönüş: temizleyici. */
+let _lazyObs = null;
+export function applyLazyImages(enabled, root = typeof document !== "undefined" ? document : null) {
+  if (_lazyObs) { _lazyObs.disconnect(); _lazyObs = null; }
+  if (enabled !== false || !root || !root.querySelectorAll) return () => {};
+  const eager = (node) => {
+    if (!node || !node.querySelectorAll) return;
+    if (node.tagName === "IMG" && node.getAttribute("loading") === "lazy") node.setAttribute("loading", "eager");
+    node.querySelectorAll('img[loading="lazy"]').forEach((img) => img.setAttribute("loading", "eager"));
+  };
+  eager(root.documentElement || root);
+  if (typeof MutationObserver !== "undefined") {
+    _lazyObs = new MutationObserver((muts) => muts.forEach((m) => {
+      if (m.type === "attributes") eager(m.target);
+      else m.addedNodes.forEach(eager);
+    }));
+    _lazyObs.observe(root.documentElement || root, { childList: true, subtree: true, attributes: true, attributeFilter: ["loading"] });
+  }
+  return () => { if (_lazyObs) { _lazyObs.disconnect(); _lazyObs = null; } };
+}
+
+/** Tek iletişim kaynağı:Ayarlar › Genel / Firma Bilgileri (tenant_config — yasal sayfalar ve /sayfa/iletisim
+ *  gövdesi de buradan okur). Sayfa Tasarımı › İletişim Bilgileri yalnız orası boşsa kullanılır; ikinci telefon
+ *  ve çalışma saatlerinin karşılığı olmadığından onlar doğrudan buradan gelir. (Önceden site_contact önceydi:
+ *  Genel Ayarlar'da değiştirilen telefon/adres footer'a yansımıyor, aynı sayfada iki farklı iletişim görünüyordu.) */
 export function mergeContact(sc, info) {
   const c = sc || {};
   const i = info || {};
   return {
-    phone: c.phone || i.phone || "",
+    phone: i.phone || c.phone || "",
     phone2: c.phone_2 || "",
-    email: c.email || i.email || "",
-    whatsapp: c.whatsapp || i.whatsapp || "",
-    address: c.address || i.address || "",
+    email: i.email || c.email || "",
+    whatsapp: i.whatsapp || c.whatsapp || "",
+    address: i.address || c.address || "",
     hours: c.working_hours || "",
   };
 }

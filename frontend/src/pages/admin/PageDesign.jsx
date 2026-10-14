@@ -216,6 +216,10 @@ export default function PageDesign() {
   const lastPush = useRef({ t: 0, key: "" });
   const revRef = useRef(null);
   revRef.current = rev;
+  // Yüklemedeki global alanlar: taslak kaydında yalnız GERÇEKTEN değiştirilen global anahtarlar gönderilir
+  // (global_keys); diğerleri sunucudaki güncel değerden gelir → Menü Yönetimi'nden yapılan üst bar / orta menü
+  // değişikliği açık kalmış bu ekrandan "Yayınla" ile sessizce geri alınmaz.
+  const baseGlobal = useRef({});
 
   // ---------------------------------------------------------- yükle
   const load = useCallback(async () => {
@@ -226,7 +230,9 @@ export default function PageDesign() {
       const dr = r.data.draft;
       setPublished(pub);
       const src = dr || pub;
-      setDoc({ blocks: clone(src.blocks || []), global: withGlobalDefaults(src.global || pub.global || {}) });
+      const g0 = withGlobalDefaults(src.global || pub.global || {});
+      baseGlobal.current = clone(g0);
+      setDoc({ blocks: clone(src.blocks || []), global: g0 });
       setRev(dr ? dr.rev : null);
       setPast([]); setFuture([]);
       setSaveState({ status: dr ? "saved" : "idle", at: dr ? Date.parse(dr.updated_at) || Date.now() : 0, changes: 0 });
@@ -290,7 +296,9 @@ export default function PageDesign() {
     if (!dirty.current && !force) return true;
     dirty.current = false;
     setSaveState((s) => ({ ...s, status: "saving" }));
-    const body = { blocks: docRef.current.blocks, global: docRef.current.global };
+    const g = docRef.current.global || {};
+    const globalKeys = Object.keys(g).filter((k) => JSON.stringify(g[k]) !== JSON.stringify(baseGlobal.current[k]));
+    const body = { blocks: docRef.current.blocks, global: g, global_keys: globalKeys };
     const r0 = overrideRev !== undefined ? overrideRev : revRef.current;
     try {
       const r = await axios.put(`${API}/page-design/${PAGE}/draft`, body, { headers: { ...headers(), ...(r0 != null ? { "If-Match": String(r0) } : {}) } });

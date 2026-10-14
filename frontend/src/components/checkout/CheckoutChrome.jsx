@@ -1,7 +1,7 @@
 // Checkout'a özel sade üst bar + alt politika bağlantıları (site menüsü/footer YOK — Shopify).
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { SITE_NAME } from "../../lib/brand";
+import { useStoreInfo } from "../../lib/storeInfo";
 
 export const POLICY_LINKS = [
   { to: "/sayfa/iade-kosullari", label: "İade politikası" },
@@ -20,6 +20,7 @@ const LockIcon = () => (
 
 export function CheckoutHeader() {
   const [logoOk, setLogoOk] = useState(true);
+  const SITE_NAME = useStoreInfo().name; // panel › Site Adı (build-time sabit değil)
   return (
     <header className="gt-co-header" data-testid="checkout-header">
       <div className="gt-co-header-inner">

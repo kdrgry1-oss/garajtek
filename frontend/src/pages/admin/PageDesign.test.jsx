@@ -72,5 +72,8 @@ describe("Sayfa Tasarımı düzenleyicisi", () => {
     expect(puts.length).toBe(1);
     expect(puts[0].url).toMatch(/\/page-design\/home\/draft$/);
     expect(puts[0].body.blocks[2].is_active).toBe(false);
+    // Global alanlara dokunulmadı → hiçbir global anahtar "değişti" sayılmaz; sunucu güncel değerleri korur
+    // (Menü Yönetimi'nden yapılan üst bar / orta menü değişikliği bayat kopyayla ezilmez).
+    expect(puts[0].body.global_keys).toEqual([]);
   });
 });

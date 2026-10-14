@@ -16,7 +16,7 @@ jest.mock("axios", () => {
 });
 jest.mock("embla-carousel-react", () => () => [() => {}, null]);
 jest.mock("../electro/useCategoryTree", () => () => ({ roots: [{ id: "c1", name: "Liftler", slug: "liftler", children: [] }], menuRoots: null, byId: new Map() }));
-jest.mock("../../lib/storeInfo", () => ({ useStoreInfo: () => ({ name: "Test", instagram: "" }) }));
+jest.mock("../../lib/storeInfo", () => ({ useStoreInfo: () => ({ name: "Test", instagram: "" }), applyRuntimeSiteName: () => {} }));
 jest.mock("../../lib/dataLayer", () => ({ trackSelectPromotion: () => {}, trackSelectItem: () => {} }));
 jest.mock("../ProductCard", () => {
   const React = require("react");

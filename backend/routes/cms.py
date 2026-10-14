@@ -6,6 +6,8 @@ Sayfa Tasarımı v2 (docs/page-design/SPEC.md): bloklar `page_layouts` yayın be
 eski uçlar/modüller için yayın AYNASIDIR. Bu dosyadaki eski tekil blok yazma uçları (POST/PUT/DELETE/
 reorder/seed-default-home) 410 döner; install-default-home şablon düzenini TASLAĞA yükler.
 """
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
 
 from .deps import db, logger, require_admin

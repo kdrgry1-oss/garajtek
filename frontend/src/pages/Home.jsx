@@ -11,7 +11,7 @@ import PageRenderer, { hasProductColumns, prepareBlocks } from "../components/pa
 import { PageCtx } from "../components/pageblocks/_shared/PageCtx";
 import { defaultHome, TOP_BAR_TYPES, withDefaults } from "../components/pageblocks/registry";
 import { useSiteDesign } from "../lib/siteDesign";
-import { SITE_NAME } from "../lib/brand";
+import { useStoreInfo } from "../lib/storeInfo";
 import "../components/pageblocks/_shared/pageblocks.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -47,6 +47,7 @@ export function topBarsOf(blocks) {
 /** Header + akış + Footer — vitrin ve önizleme aynı kabuğu kullanır. */
 export function HomeShell({ blocks, loading, ctx, isMember = false }) {
   const sd = useSiteDesign();
+  const storeName = useStoreInfo().name; // panel › Site Adı (build-time SITE_NAME değil)
   const bars = topBarsOf(blocks || []);
   const hideWidgets = useMemo(() => hasProductColumns(blocks || []), [blocks]);
   // İlk görünür akış bloğu bir hero mu? (dikey menü yalnız o zaman slider'ın üstünde açık başlar)
@@ -59,7 +60,7 @@ export function HomeShell({ blocks, loading, ctx, isMember = false }) {
     <div className="sf-page" data-testid="home-page">
       <Header announcement={bars.rotating ? <RotatingText block={bars.rotating} /> : null} announcementFirst={bars.announcementFirst} announcementPosition={bars.position} heroFirst={heroFirst} />
       <main id="content" role="main" className="electro el-page">
-        <h1 className="sr-only">{SITE_NAME} — Oto Servis ve Garaj Ekipmanları</h1>
+        <h1 className="sr-only">{storeName} — Oto Servis ve Garaj Ekipmanları</h1>
         <PageCtx.Provider value={ctx}>
           {loading ? <HomeSkeleton /> : <PageRenderer blocks={blocks} isMember={isMember} layout={sd.site_page_layout?.home_layout === "left_sidebar" ? "left_sidebar" : "full"} revealDefault={sd.site_theme?.reveal_default !== false} />}
         </PageCtx.Provider>

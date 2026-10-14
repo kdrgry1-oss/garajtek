@@ -9,6 +9,7 @@ import { sanitizeHtml } from "../lib/sanitizeHtml";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Breadcrumb from "../components/electro/Breadcrumb";
+import { useCardPaymentAvailable } from "../lib/paymentAvailability";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -100,7 +101,7 @@ const FAQ_DATA = [
     items: [
       { q: "Ürün fiyatlarına KDV dâhil midir?", a: "Sitemizde satılan tüm ürünlerin fiyatlarına KDV dahildir." },
       { q: "Havale yoluyla ödeme yapabiliyor muyum?", a: "Havale/EFT seçeneği aktifse ödeme adımında seçebilirsiniz; banka bilgileri sipariş sonrası paylaşılır." },
-      { q: "Taksit seçeneğiniz var mı?", a: "Kart bilgilerinizi girdikten sonra bankanızın sunduğu taksit seçeneklerini ödeme ekranında görebilirsiniz." },
+      { q: "Taksit seçeneğiniz var mı?", a: "Kart bilgilerinizi girdikten sonra bankanızın sunduğu taksit seçeneklerini ödeme ekranında görebilirsiniz.", card: true },
       { q: "Kart bilgilerim güvende midir?", a: "Tüm veri iletimi SSL ile şifrelenir; kart bilgileriniz sitemizde saklanmaz ve ödemeler 3D Secure ile doğrulanır." },
     ],
   },
@@ -124,8 +125,25 @@ const FAQ_DATA = [
   },
 ];
 
+// Kartla ödeme kapalıyken (ödeme yöntemi kapalı ya da iyzico kurulu değil) gömülü SSS taksit vaat etmesin —
+// kasa (Checkout) ve ürün sayfası rozeti ile aynı karar (lib/paymentAvailability).
+const NO_CARD_ANSWER = "Şu anda kartla ödeme ve taksit seçeneği sunulmamaktadır. Ödeme adımında Havale/EFT veya (aktifse) Kapıda Ödeme seçeneklerini kullanabilirsiniz.";
+const UNKNOWN_CARD_ANSWER = "Kartla ödeme aktifse bankanızın sunduğu taksit seçenekleri ödeme ekranında gösterilir.";
+
+/** `card: true` işaretli (kart/taksit vaadi içeren) gömülü cevapları ödeme durumuna göre uyarlar.
+ *  cardOk: true (kart açık) | false (kapalı) | null (henüz bilinmiyor → vaatsiz nötr metin). */
+export function faqForPayment(data, cardOk) {
+  if (cardOk === true) return data;
+  return data.map((t) => ({
+    ...t,
+    items: t.items.map((it) => (it.card ? { ...it, a: cardOk === false ? NO_CARD_ANSWER : UNKNOWN_CARD_ANSWER } : it)),
+  }));
+}
+
 export default function FAQ() {
-  const [data, setData] = useState(FAQ_DATA);          // panel içeriği gelene kadar gömülü yedek
+  const cardOk = useCardPaymentAvailable();
+  const [rawData, setData] = useState(FAQ_DATA);          // panel içeriği gelene kadar gömülü yedek
+  const data = faqForPayment(rawData, cardOk);
   const [activeTab, setActiveTab] = useState(FAQ_DATA[0].id);
   const [openKey, setOpenKey] = useState(null); // `${tabId}:${index}` — panel başına tek açık
 

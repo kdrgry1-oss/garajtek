@@ -192,29 +192,80 @@ async def _site_design_overlay(out: dict):
         logger.warning(f"[site-menus] site_design okunamadı: {e}")
 
 
-async def _site_design_write(group: str, clean: dict):
-    """Menü Yönetimi'nden üst bar / orta menü kaydı → site_design yayın + varsa taslak (aynı anda)."""
-    if group == "topbar":
-        key, val = "site_topbar", {"welcome_text": clean.get("welcome", ""), "right_items": [
-            {"_id": it.get("id"), "label": it.get("label"), "icon": {"icon": it.get("icon") or ""},
-             "link": {"kind": "url", "url": it.get("link") or "/", "new_tab": False},
-             "special": it.get("special") or "", "guest_text": "Üye Ol veya Giriş Yap" if it.get("special") == "account" else ""}
-            for it in clean.get("items") or []]}
-    elif group == "center":
-        key, val = "site_secondary_menu", {"right_text": clean.get("right_text", ""),
-                                           "right_link": {"kind": "url", "url": clean.get("right_link") or "/", "new_tab": False}}
-    else:
+def _keep_link(old_link, url):
+    """Bağlantı adresi değişmediyse Sayfa Tasarımı'ndaki bağlantı nesnesini (tür / yeni sekme) olduğu gibi korur."""
+    old_link = old_link if isinstance(old_link, dict) else {}
+    if old_link and _link_url(old_link) == url:
+        return dict(old_link)
+    return {"kind": "url", "url": url, "new_tab": bool(old_link.get("new_tab"))}
+
+
+def _merge_topbar_items(old_items, incoming):
+    """Menü Yönetimi'nden gelen üst bar öğelerini site_design'daki mevcut öğelerle `_id` üzerinden birleştirir.
+    Menü Yönetimi yalnız etiket / ikon / bağlantı / özel tipi düzenler; Sayfa Tasarımı'na özgü alanlar (gizli öğeler
+    `_hidden`, Hesabım misafir yazısı `guest_text`, bağlantının türü / yeni sekme bilgisi) KORUNUR.
+    Menü Yönetimi'ne hiç gelmeyen gizli öğeler eski sıralarındaki konuma geri eklenir."""
+    old_items = [it for it in (old_items or []) if isinstance(it, dict)]
+    by_id = {str(it.get("_id")): it for it in old_items if it.get("_id")}
+    out, used = [], set()
+    for it in incoming or []:
+        iid = str(it.get("id") or "")
+        base = by_id.get(iid) or {}
+        special = it.get("special") or ""
+        guest = base.get("guest_text") or ("Üye Ol veya Giriş Yap" if special == "account" else "")
+        icon = base.get("icon") if isinstance(base.get("icon"), dict) else {}
+        node = {**base, "_id": iid or base.get("_id"), "label": it.get("label"),
+                "icon": {**icon, "icon": it.get("icon") or ""},
+                "link": _keep_link(base.get("link"), it.get("link") or "/"),
+                "special": special, "guest_text": guest}
+        node.pop("_hidden", None)  # Menü Yönetimi'nde listelenen öğe görünürdür
+        out.append(node)
+        if iid:
+            used.add(iid)
+    for idx, it in enumerate(old_items):
+        if it.get("_hidden") and str(it.get("_id") or "") not in used:
+            out.insert(min(idx, len(out)), it)
+    return out
+
+
+def _reset_value(key: str) -> dict:
+    """Menü Yönetimi'nin yönettiği alanların Sayfa Tasarımı (blok şeması) varsayılanları."""
+    import pageblocks as pb
+    d = pb.default_settings(key)
+    if key == "site_topbar":
+        pb.assign_item_ids(pb.all_fields(pb.get_schema(key)), d, "site_topbar:reset")
+        return {"welcome_text": d.get("welcome_text", ""), "right_items": d.get("right_items") or []}
+    return {"right_text": d.get("right_text", ""), "right_link": d.get("right_link")}
+
+
+async def _site_design_write(group: str, clean: dict, *, reset: bool = False):
+    """Menü Yönetimi'nden üst bar / orta menü kaydı → site_design yayın + varsa taslak (aynı anda).
+    Mevcut değerlerle BİRLEŞTİRİR (gizli öğeler / misafir yazısı / yeni sekme korunur).
+    reset=True: bu alanları Sayfa Tasarımı varsayılanlarına döndürür ("Varsayılana Dön")."""
+    if group not in ("topbar", "center"):
         return
+    key = "site_topbar" if group == "topbar" else "site_secondary_menu"
+
+    def _val(cur):
+        cur = cur if isinstance(cur, dict) else {}
+        if reset:
+            return _reset_value(key)
+        if key == "site_topbar":
+            return {"welcome_text": clean.get("welcome", ""),
+                    "right_items": _merge_topbar_items(cur.get("right_items"), clean.get("items"))}
+        return {"right_text": clean.get("right_text", ""),
+                "right_link": _keep_link(cur.get("right_link"), clean.get("right_link") or "/")}
+
     try:
         sd = await db.settings.find_one({"id": "site_design"}, {"_id": 0}) or {}
         pub = sd.get("published") if isinstance(sd.get("published"), dict) else {}
-        pub[key] = {**(pub.get(key) or {}), **val}
+        pub[key] = {**(pub.get(key) or {}), **_val(pub.get(key))}
         await db.settings.update_one({"id": "site_design"}, {"$set": {"published": pub}}, upsert=True)
         for lid in ("home:published", "home:draft"):
             doc = await db.page_layouts.find_one({"id": lid}, {"_id": 0, "global": 1})
             if doc is not None:
                 g = doc.get("global") or {}
-                g[key] = {**(g.get(key) or {}), **val}
+                g[key] = {**(g.get(key) or {}), **_val(g.get(key))}
                 await db.page_layouts.update_one({"id": lid}, {"$set": {"global": g}})
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[site-menus] site_design yazılamadı: {e}")
@@ -271,6 +322,11 @@ async def reset_site_menu(group: str, request: Request, current_user: dict = Dep
     if group not in GROUP_KEYS:
         raise HTTPException(status_code=404, detail="Bilinmeyen menü grubu")
     await db.settings.update_one({"id": "site_menus"}, {"$unset": {group: ""}}, upsert=True)
+    # Üst bar / orta menü değerleri site_design'a da yazılır; vitrin ve GET oradan okur. Yalnız site_menus
+    # kaydını silmek vitrini değiştirmez → site_design tarafını da varsayılana döndür.
+    await _site_design_write(group, {}, reset=True)
     await record_admin_audit(db, action="site_menu.reset", entity_type="content", entity_id=f"site_menus.{group}",
                              before={}, after={}, current_user=current_user, request=request, source="content.menu")
-    return {"success": True, group: _clean_group(group, DEFAULTS[group])}
+    out = {k: _clean_group(k, DEFAULTS[k]) for k in GROUP_KEYS}
+    await _site_design_overlay(out)  # panel, vitrinin gerçekten göstereceği değeri alsın
+    return {"success": True, group: out[group]}
