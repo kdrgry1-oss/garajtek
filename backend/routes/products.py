@@ -15,7 +15,31 @@ from fastapi import Response, UploadFile, File, Form
 import pandas as pd
 import io
 
-router = APIRouter(prefix="/products", tags=["Products"])
+# Herkese açık (yazma yapmayan) POST uçları — vitrin önbelleğini boşaltmaz.
+_READONLY_POSTS = ("/cart-pricing", "/cart-suggestions", "/checkout-deals")
+
+
+def invalidate_storefront_caches() -> None:
+    """Ürün yazımından sonra anasayfa blok önbelleğini (pageblocks, 60 sn) boşaltır.
+    Aksi halde pasife alınan/fiyatı değişen ürün anasayfa bloklarında ~1 dk görünmeye
+    devam ediyordu (kategori/arama/ürün sayfası anında güncellenirken)."""
+    try:
+        from pageblocks.products import clear_cache
+        clear_cache()
+    except Exception:  # noqa: BLE001 — önbellek temizliği yazımı asla bozmasın
+        pass
+
+
+async def _storefront_cache_guard(request: Request):
+    """Router geneli: BAŞARILI her ürün yazım ucundan (POST/PUT/PATCH/DELETE) sonra vitrin
+    önbelleğini boşaltır — yeni yazım uçları da kendiliğinden kapsanır."""
+    yield
+    if request.method != "GET" and not request.url.path.endswith(_READONLY_POSTS):
+        invalidate_storefront_caches()
+
+
+router = APIRouter(prefix="/products", tags=["Products"],
+                   dependencies=[Depends(_storefront_cache_guard)])
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +389,12 @@ async def _category_manual_order(cat_id: str) -> list:
         return []
 
 
+def _ORDER_VISIBLE_Q(cat_id) -> dict:
+    """Sıralama ekranı süzgeci = vitrin görünürlük kuralı (aktif, silinmemiş, en az bir görsel)."""
+    return {"category_ids": str(cat_id), "is_active": True, "is_deleted": {"$ne": True},
+            "images.0": {"$exists": True}}
+
+
 @router.get("/category-order/{cat_id}", dependencies=[Depends(require_admin)])
 async def get_category_order(cat_id: str, limit: int = Query(600, ge=1, le=2000)):
     """Panel: kategorideki ürünleri VİTRİNDEKİ SIRAYLA döndürür (sürükle-bırak ekranı için).
@@ -374,7 +404,10 @@ async def get_category_order(cat_id: str, limit: int = Query(600, ge=1, le=2000)
     rows = await db.products.find(
         # PASİF ürünler GÖSTERİLMEZ: vitrin de yalnız is_active=True ürünleri listeler,
         # ekran birebir müşterinin gördüğü listeyi göstermeli (kullanıcı isteği).
-        {"category_ids": str(cat_id), "is_active": True, "is_deleted": {"$ne": True}},
+        # GÖRSELSİZ ürünler de gösterilmez: vitrin (_build_products_query) görseli olmayan
+        # ürünü hiçbir listede göstermiyor; sıralama ekranında 1. sırada görünüp vitrinde
+        # olmaması "birebir müşterinin gördüğü sıra" vaadini bozuyordu.
+        _ORDER_VISIBLE_Q(cat_id),
         {"_id": 0, "id": 1, "name": 1, "images": 1, "image": 1, "price": 1, "sale_price": 1,
          "stock": 1, "variants": 1, "is_active": 1, "urun_karti_id": 1, "stock_code": 1}
     ).to_list(limit)
@@ -426,11 +459,15 @@ async def get_category_order(cat_id: str, limit: int = Query(600, ge=1, le=2000)
     cat = await db.categories.find_one({"id": str(cat_id)}, {"_id": 0, "name": 1, "slug": 1}) or {}
     # Kategoride kaç aktif ürün var: ekran limitle kesildiyse panel bunu SÖYLEMELİ
     # (sessizce eksik liste gösterip "kalanı nerede?" sorusuna yol açmasın).
-    total_all = await db.products.count_documents(
-        {"category_ids": str(cat_id), "is_active": True, "is_deleted": {"$ne": True}})
+    total_all = await db.products.count_documents(_ORDER_VISIBLE_Q(cat_id))
+    # Aktif ama görseli olmadığı için vitrinde HİÇ görünmeyen ürün sayısı (panel uyarısı için).
+    hidden_no_image = await db.products.count_documents(
+        {"category_ids": str(cat_id), "is_active": True, "is_deleted": {"$ne": True},
+         "images.0": {"$exists": False}})
     return {"category": {"id": str(cat_id), "name": cat.get("name") or "", "slug": cat.get("slug") or ""},
             "products": out, "manual_count": len(manual), "total": len(out),
-            "total_all": total_all, "truncated": total_all > len(out)}
+            "total_all": total_all, "truncated": total_all > len(out),
+            "hidden_no_image": hidden_no_image}
 
 
 @router.post("/category-order/{cat_id}", dependencies=[Depends(require_admin)])
@@ -605,8 +642,53 @@ async def _members_only_cat_ids() -> set:
     return ids
 
 
+# Geçerli indirim koşulu (vitrin kartı ile AYNI kural): 0 < sale_price < price. Yalnız
+# sale_price > 0'a bakmak, satış fiyatından YÜKSEK indirimli fiyatı olan ürünü /sale'e alıp
+# kartta indirimsiz gösteriyordu.
+_VALID_SALE_EXPR = {"$expr": {"$and": [{"$gt": [{"$ifNull": ["$sale_price", 0]}, 0]},
+                                       {"$lt": ["$sale_price", "$price"]}]}}
+
+_INACTIVE_CAT_CACHE = {"ids": set(), "ts": 0.0}
+
+
+async def _inactive_cat_ids() -> set:
+    """PASİF kategori id'leri (str): `is_active=False` kategoriler VE tüm ALT kategorileri
+    (pasif üst kategorinin aktif alt kategorisi de vitrinde görünmez — menüde kök gibi
+    çıkıyordu). ~60sn önbellek; kategori yazımlarında invalidate_members_only_cache() tazeler."""
+    import time as _t
+    now = _t.monotonic()
+    if _INACTIVE_CAT_CACHE["ts"] and (now - _INACTIVE_CAT_CACHE["ts"] < 60):
+        return _INACTIVE_CAT_CACHE["ids"]
+    ids: set = set()
+    try:
+        children: dict = {}
+        async for c in db.categories.find({}, {"_id": 0, "id": 1, "parent_id": 1, "is_active": 1}):
+            cid = c.get("id")
+            if cid is None:
+                continue
+            if c.get("parent_id") not in (None, ""):
+                children.setdefault(str(c["parent_id"]), []).append(str(cid))
+            if c.get("is_active") is False:
+                ids.add(str(cid))
+        stack = list(ids)
+        while stack:
+            for ch in children.get(stack.pop(), []):
+                if ch not in ids:
+                    ids.add(ch)
+                    stack.append(ch)
+    except Exception:
+        pass
+    _INACTIVE_CAT_CACHE["ids"] = ids
+    _INACTIVE_CAT_CACHE["ts"] = now
+    return ids
+
+
 def invalidate_members_only_cache():
+    """Kategori kapsam önbelleklerini (üyelere özel + pasif alt ağaç) ve bunlara bağlı
+    anasayfa blok önbelleğini tazeler (kategori oluştur/güncelle/sil sonrası çağrılır)."""
     _MEMBERS_ONLY_CACHE["ts"] = 0.0
+    _INACTIVE_CAT_CACHE["ts"] = 0.0
+    invalidate_storefront_caches()
 
 
 def _mo_forms(mo_ids) -> list:
@@ -780,6 +862,13 @@ async def _build_products_query(
         if _mo_ids:
             and_clauses.extend(members_only_exclusion(_mo_ids))
 
+    # ── PASİF KATEGORİ: birincil kategorisi pasif (ya da pasif bir üstün altında) olan ürün
+    # vitrinde listelenmez/aranmaz. Yalnız BİRİNCİL kategoriye bakılır: ürün ayrıca pasif bir
+    # kampanya kategorisine de ekliyse diğer kategorilerinde görünmeye devam eder.
+    _inactive_ids = await _inactive_cat_ids() if not _admin_view else set()
+    if _inactive_ids:
+        and_clauses.append({"category_id": {"$nin": _mo_forms(_inactive_ids)}})
+
     if brand:
         query["brand"] = {"$regex": re.escape(brand.strip()), "$options": "i"}  # ReDoS/regex-injection koruması
 
@@ -861,7 +950,7 @@ async def _build_products_query(
         elif cat_slug == "sale":
             # İndirimli fiyatlılar VE elle "İndirim/Sale" kategorisine eklenen ürünler (manuel etiket).
             _sale_or = [
-                {"sale_price": {"$gt": 0}},
+                _VALID_SALE_EXPR,   # yalnız GEÇERLİ indirim (0 < sale_price < price)
                 {"discount_price": {"$gt": 0}},
                 {"is_on_sale": True},
                 {"sale_active": True},
@@ -917,6 +1006,9 @@ async def _build_products_query(
                         _slug_cat_ids.append(_c["id"])
             if _slug_cat_ids:
                 cat_or.append({"category_ids": {"$in": _slug_cat_ids}})
+            # Pasif (veya pasif üstün altındaki) kategori vitrinde AÇILMAZ → boş liste.
+            if _inactive_ids and _slug_cat_ids and all(str(x) in _inactive_ids for x in _slug_cat_ids):
+                cat_or = [{"id": "__pasif_kategori__"}]
             and_clauses.append({"$or": cat_or})
     
     if search:
@@ -971,6 +1063,8 @@ async def _build_products_query(
         # category_ids atalar dahil tutulduğu için üst kategori seçilince
         # tüm alt kategori ürünleri de eşleşir (ağaç filtreleme).
         and_clauses.append({"category_ids": category_id})
+        if str(category_id) in _inactive_ids:   # pasif kategori vitrinde boş
+            and_clauses.append({"id": "__pasif_kategori__"})
     if urun_karti_id:
         and_clauses.append({"urun_karti_id": {"$regex": re.escape(urun_karti_id.strip()), "$options": "i"}})
     if varyasyon_id:
@@ -1025,7 +1119,7 @@ async def _build_products_query(
     if discounted is not None and discounted != "":
         if _bool_flag(discounted):
             and_clauses.append({"$or": [
-                {"sale_price": {"$gt": 0}},
+                _VALID_SALE_EXPR,   # yalnız GEÇERLİ indirim (0 < sale_price < price)
                 {"catalog_fields.INDIRIMLIFIYAT": {"$gt": 0}},
             ]})
 
@@ -1348,18 +1442,33 @@ async def get_products(
             # yalnız açıklama/özellikte geçen alakasız ürün üste çıkabiliyordu — "büstiyer"
             # arayınca isimsiz Takım'ın en üstte gelmesi gibi). name > kategori > diğer.
             _rx = _search_tr_regex(search)
+            # Panelde de "Fiyat" sıralaması vitrindeki gibi EFEKTİF fiyata (geçerli indirimli
+            # fiyat, yoksa satış fiyatı) göre yapılır.
+            _eff = sort == "price"
             rel_pipeline = [
                 {"$match": query},
+                *(_EFF_PRICE_STAGES if _eff else []),
                 {"$addFields": {"_rel": {"$add": [
                     {"$cond": [{"$regexMatch": {"input": {"$toString": {"$ifNull": ["$name", ""]}}, "regex": _rx, "options": "i"}}, 100, 0]},
                     {"$cond": [{"$regexMatch": {"input": {"$toString": {"$ifNull": ["$category_name", ""]}}, "regex": _rx, "options": "i"}}, 30, 0]},
                 ]}}},
-                {"$sort": {"_rel": -1, sort: sort_order, "_id": 1}},
+                {"$sort": {"_rel": -1, ("_eff_price" if _eff else sort): sort_order, "_id": 1}},
                 {"$skip": skip},
                 {"$limit": limit},
-                {"$project": {"_id": 0, "_rel": 0}},
+                {"$project": {"_id": 0, "_rel": 0, **({"_p_num": 0, "_s_num": 0, "_eff_price": 0} if _eff else {})}},
             ]
             products = await db.products.aggregate(rel_pipeline, allowDiskUse=True).to_list(limit)
+        elif sort == "price":
+            # Panel "Fiyat" sıralaması = efektif fiyat (vitrinle tutarlı; ham price değil).
+            price_pipeline = [
+                {"$match": query},
+                *_EFF_PRICE_STAGES,
+                {"$sort": {"_eff_price": sort_order, "_id": 1}},
+                {"$skip": skip},
+                {"$limit": limit},
+                {"$project": {"_id": 0, "_p_num": 0, "_s_num": 0, "_eff_price": 0}},
+            ]
+            products = await db.products.aggregate(price_pipeline, allowDiskUse=True).to_list(limit)
         else:
             products = await db.products.find(query, {"_id": 0}).sort(sort, sort_order).skip(skip).limit(limit).to_list(limit)
     total = await db.products.count_documents(query)
@@ -2173,8 +2282,11 @@ async def cart_pricing(payload: dict):
         vmap = {}
         for v in (p.get("variants") or []):
             if v.get("id"):
+                # Panelde PASİF yapılan varyant satılamaz → sepette stok 0 (tükendi) görünür.
+                _v_off = v.get("is_active") is False
                 vmap[str(v["id"])] = {
-                    "stock": v.get("stock"),
+                    "stock": 0 if _v_off else v.get("stock"),
+                    "is_active": not _v_off,
                     "price_diff": v.get("price_diff") or v.get("price_adjustment") or 0,
                 }
         out[str(p["id"])] = {
@@ -2449,6 +2561,24 @@ def _validate_vat(v):
     return int(n) if n.is_integer() else n
 
 
+def _validate_sale_price(price, sale_price) -> None:
+    """İndirimli fiyat verilmişse (>0) satış fiyatından KÜÇÜK olmalı; değilse 400.
+    Panel hızlı düzenleme/varyant modalı bunu reddediyordu ama tam form ve API kabul ediyordu
+    (price=1200, sale_price=1500) → ürün /sale'de listelenip kartta indirimsiz görünüyordu."""
+    try:
+        sp = float(str(sale_price).replace(",", ".")) if sale_price not in (None, "") else 0.0
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="İndirimli fiyat sayısal olmalı")
+    if sp <= 0:
+        return
+    try:
+        pr = float(str(price).replace(",", ".")) if price not in (None, "") else 0.0
+    except (TypeError, ValueError):
+        pr = 0.0
+    if sp >= pr:
+        raise HTTPException(status_code=400, detail="İndirimli fiyat, satış fiyatından küçük olmalı")
+
+
 # Yeni üründe sabit `product` sözlüğüne girmeyen ama admin formunun gönderdiği alanlar.
 # Eskiden create_product bunları sessizce atıyordu (SEO başlığı, Üye Tipi 1 fiyatı vb. ancak
 # ikinci bir düzenle-kaydet ile kalıcı oluyordu); update_product ise hepsini $set ediyor.
@@ -2529,6 +2659,7 @@ async def create_product(
     # Gelen KDV doğrulanır (metin/negatif/100+ → 400); gelmediyse varsayılan.
     vat_rate = (_validate_vat(product_data["vat_rate"])
                 if product_data.get("vat_rate") is not None else default_vat)
+    _validate_sale_price(product_data.get("price", 0), product_data.get("sale_price"))
 
     # Auto-generate barcodes efficiently
     used_barcodes_set = await build_used_barcode_set()
@@ -2840,7 +2971,11 @@ async def update_product(
     # KDV oranı doğrulanır (metin/negatif/100+ kaydedilmez).
     if "vat_rate" in product_data:
         product_data["vat_rate"] = _validate_vat(product_data.get("vat_rate"))
-    
+    # İndirimli fiyat < satış fiyatı (gelmeyen alan mevcut kayıttan alınır).
+    if "price" in product_data or "sale_price" in product_data:
+        _validate_sale_price(product_data.get("price", existing.get("price")),
+                             product_data.get("sale_price", existing.get("sale_price")))
+
     # Update slug if name changed — format: isim-kartid (tüm linkler tek biçim).
     # Eski slug, kırılan link/SEO olmaması için slug_aliases'a eklenir.
     if product_data.get("name") and product_data.get("name") != existing.get("name"):

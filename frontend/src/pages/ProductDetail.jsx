@@ -30,6 +30,7 @@ import ProductSetPanel from "../components/sets/ProductSetPanel";
 import { CodInfoRow } from "../components/electro/CodInfo";
 import CodQuickOrder from "../components/cod/CodQuickOrder";
 import WhatsAppOrderButton from "../components/cod/WhatsAppOrderButton";
+import { withActiveVariants } from "../lib/activeVariants";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -361,6 +362,8 @@ export default function ProductDetail() {
       try {
         const res = await axios.get(`${API}/products/${slug}`, { signal: controller.signal });
         if (cancel) return;   // A→B hızlı geçişte eski ürünün geç dönen verisi yeni sayfayı EZMESİN
+        // Panelde PASİF yapılan varyant seçenek olarak çıkmasın / varsayılan seçilmesin.
+        res.data = withActiveVariants(res.data);
         setProduct(res.data);
 
         // Son gezilenler: önceki listeyi (mevcut ürün hariç) göster, sonra mevcut
@@ -615,6 +618,9 @@ export default function ProductDetail() {
   const isFav = isFavorite(product.id);
   const catNode = product.category_id != null ? catTree.byId.get(String(product.category_id)) : null;
   const catPath = catNode ? categoryPath(catTree, catNode) : [];
+  // Ağaç yüklendiyse ve kategori ağaçta YOKSA (pasif/gizli kategori) addan türetilmiş slug'a
+  // bağlantı verilmez — o sayfa 404 veriyordu. Ağaç henüz yüklenmediyse eski yedek korunur.
+  const catFallbackName = !catNode && !catTree.ready ? product.category_name : "";
   const attrs = Array.isArray(product.attributes)
     ? product.attributes.filter((a) => a && a.name && String(a.value ?? "").trim())
     : product.attributes && typeof product.attributes === "object"
@@ -660,7 +666,7 @@ export default function ProductDetail() {
       <main id="content" role="main" className="electro el-page">
         <Breadcrumb testId="pdp-breadcrumb" items={[
           ...(catPath.length ? catPath.map((c) => ({ label: c.name, to: `/${c.slug}` }))
-            : product.category_name ? [{ label: product.category_name, to: `/${slugify(product.category_name)}` }] : []),
+            : catFallbackName ? [{ label: catFallbackName, to: `/${slugify(catFallbackName)}` }] : []),
           { label: product.name },
         ]} />
 
@@ -737,8 +743,8 @@ export default function ProductDetail() {
               <div className="col-md-7 mb-md-6 mb-lg-0">
                 <div className="mb-2">
                   <div className="border-bottom mb-3 pb-md-1 pb-3">
-                    {(catNode || product.category_name) && (
-                      <Link to={catNode ? `/${catNode.slug}` : `/${slugify(product.category_name)}`} className="font-size-12 text-gray-5 mb-2 d-inline-block">{catNode?.name || product.category_name}</Link>
+                    {(catNode || catFallbackName) && (
+                      <Link to={catNode ? `/${catNode.slug}` : `/${slugify(catFallbackName)}`} className="font-size-12 text-gray-5 mb-2 d-inline-block">{catNode?.name || catFallbackName}</Link>
                     )}
                     {product.promo_badge ? <div className="font-size-14 font-weight-bold text-red text-uppercase mb-1" data-testid="promo-badge">{product.promo_badge}</div> : null}
                     <h1 className="font-size-25 text-lh-1dot2">{product.name}</h1>

@@ -1081,6 +1081,12 @@ export default function AdminProducts() {
       toast.error("Satış Fiyatı zorunlu — Fiyat sekmesinden girin");
       return;
     }
+    // Hızlı düzenleme ve Varyantlar modalıyla AYNI kural: indirimli fiyat satış fiyatından küçük.
+    // (Tam form bunu kabul ediyordu → ürün /sale'de indirimsiz listeleniyordu.)
+    if (Number(formData.sale_price) > 0 && Number(formData.sale_price) >= Number(formData.price)) {
+      toast.error("İndirimli fiyat, satış fiyatından küçük olmalı");
+      return;
+    }
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
@@ -2219,6 +2225,16 @@ export default function AdminProducts() {
                       >
                         P
                       </button>
+                      {/* Vitrin görselsiz ürünü HİÇBİR listede göstermez — Aktif olsa da uyar. */}
+                      {product.is_active && !(product.images || []).length && (
+                        <span
+                          className="text-[10px] font-bold text-amber-700 bg-amber-100 rounded px-1"
+                          title="Görsel yok — vitrinde görünmez"
+                          data-testid={`product-no-image-${product.id}`}
+                        >
+                          Görsel yok
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td>

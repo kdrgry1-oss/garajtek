@@ -2126,13 +2126,19 @@ async def create_order(
             _ipid = _it.get("product_id")
             _ibc = _it.get("barcode") or _it.get("sku") or ""
             _pp = None
+            _pj = {"_id": 0, "is_active": 1, "is_deleted": 1, "name": 1, "variants": 1}
             if _ipid:
-                _pp = await db.products.find_one({"id": _ipid}, {"_id": 0, "is_active": 1, "is_deleted": 1, "name": 1})
+                _pp = await db.products.find_one({"id": _ipid}, _pj)
             elif _ibc:
                 _pp = await db.products.find_one(
-                    {"$or": [{"variants.barcode": _ibc}, {"barcode": _ibc}]},
-                    {"_id": 0, "is_active": 1, "is_deleted": 1, "name": 1})
-            if _pp and (_pp.get("is_deleted") or _pp.get("is_active") is False):
+                    {"$or": [{"variants.barcode": _ibc}, {"barcode": _ibc}]}, _pj)
+            # Panelde PASİF yapılan VARYANT da satılamaz (ürün aktif olsa bile).
+            _ivid = _it.get("variant_id")
+            _var_off = bool(_pp) and any(
+                isinstance(_v, dict) and _v.get("is_active") is False and (
+                    (_ivid and _v.get("id") == _ivid) or (not _ivid and _ibc and _v.get("barcode") == _ibc))
+                for _v in (_pp.get("variants") or []))
+            if _pp and (_pp.get("is_deleted") or _pp.get("is_active") is False or _var_off):
                 _nm = _it.get("name") or _pp.get("name") or "ürün"
                 logger.warning(f"[OVERSELL] pasif/silinmiş ürün siparişi reddedildi: {_nm}")
                 await _release_reservations("pasif_urun")

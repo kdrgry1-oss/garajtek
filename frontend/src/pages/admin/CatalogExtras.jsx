@@ -51,12 +51,23 @@ function SimpleCrudPage({ title, icon: Icon, endpoint, fields, extraColumns = []
   const crud = useCrud(endpoint);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
+  // "Yeni" için boş nesne ({}) kullanılır: eskiden null atanıyordu → modal yalnız
+  // `editing !== null` iken açıldığından Yeni butonu HİÇBİR şey açmıyordu (marka/etiket/
+  // duyuru/popup panelden eklenemiyordu).
   const open = (item = null) => {
-    setEditing(item); setForm(item ? { ...item } : { is_active: true });
+    setEditing(item ? item : {}); setForm(item ? { ...item } : { is_active: true });
   };
   const submit = async () => {
-    if (editing?.id) await crud.update(editing.id, form);
-    else await crud.save(form);
+    const missing = fields.find((f) => f.required && !String(form[f.key] ?? "").trim());
+    if (missing) { toast.error(`${missing.label} zorunlu`); return; }
+    try {
+      if (editing?.id) await crud.update(editing.id, form);
+      else await crud.save(form);
+    } catch (e) {
+      // Kayıt başarısızsa modal AÇIK kalır (girilen veri kaybolmasın).
+      toast.error(e?.response?.data?.detail || "Kaydedilemedi");
+      return;
+    }
     setEditing(null); setForm({});
   };
   return (
@@ -107,7 +118,7 @@ function SimpleCrudPage({ title, icon: Icon, endpoint, fields, extraColumns = []
                   {f.type === "textarea" ? (
                     <textarea rows={3} value={form[f.key] || ""} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} className="w-full mt-1 px-3 py-2 border rounded text-sm" />
                   ) : f.type === "number" ? (
-                    <input type="number" value={form[f.key] || ""} onChange={(e) => setForm({ ...form, [f.key]: parseFloat(e.target.value) || 0 })} className="w-full mt-1 px-3 py-2 border rounded text-sm" />
+                    <input type="number" value={form[f.key] ?? ""} onChange={(e) => setForm({ ...form, [f.key]: parseFloat(e.target.value) || 0 })} className="w-full mt-1 px-3 py-2 border rounded text-sm" />
                   ) : f.type === "checkbox" ? (
                     <label className="flex items-center gap-2 mt-1"><input type="checkbox" checked={!!form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} /> <span className="text-sm">{f.label}</span></label>
                   ) : f.type === "color" ? (

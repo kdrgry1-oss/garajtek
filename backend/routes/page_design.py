@@ -227,25 +227,45 @@ async def resolve_products(payload: dict, request: Request):
 
 @resolve_router.get("/brands")
 async def catalog_brands():
-    """brands_carousel `catalog` kaynağı (public): logosu olan markalar; yoksa aktif ürünlerin marka adları."""
+    """brands_carousel `catalog` kaynağı (public): panelde AKTİF + logolu markalar (panel
+    "Sıra" değerine göre), ardından aktif ürünlerin diğer marka adları (en çok 30).
+    Eskiden pasif marka da gösteriliyor, Sıra yok sayılıyor ve tek logolu marka eklenince
+    ürün markaları banttan tamamen kalkıyordu."""
+    from urllib.parse import quote
     out, seen = [], set()
+
+    def _so(b):
+        try:
+            return float(b.get("sort_order")) if b.get("sort_order") not in (None, "") else 999.0
+        except (TypeError, ValueError):
+            return 999.0
+
     try:
-        async for b in db.brands.find({}, {"_id": 0}):
+        brands = await db.brands.find({"is_active": {"$ne": False}}, {"_id": 0}).to_list(500)
+        brands.sort(key=lambda b: (_so(b), str(b.get("name") or "").lower()))
+        for b in brands:
             name = str(b.get("name") or "").strip()
             logo = b.get("logo") or b.get("logo_url") or b.get("image") or ""
             if name and logo and name.lower() not in seen:
                 seen.add(name.lower())
-                out.append({"name": name, "logo": logo, "url": f"/arama?q={name}"})
+                out.append({"name": name, "logo": logo, "url": f"/arama?q={quote(name)}"})
     except Exception:  # noqa: BLE001
         pass
-    if not out:
+    # Pasif yapılan markanın ürün adı üzerinden banda geri girmemesi için.
+    try:
+        async for b in db.brands.find({"is_active": False}, {"_id": 0, "name": 1}):
+            if str(b.get("name") or "").strip():
+                seen.add(str(b["name"]).strip().lower())
+    except Exception:  # noqa: BLE001
+        pass
+    if len(out) < 30:
         rows = await db.products.find({"is_active": True, "is_deleted": {"$ne": True}, "brand": {"$nin": [None, ""]}},
                                       {"_id": 0, "brand": 1}).sort("created_at", -1).to_list(500)
         for r in rows:
+            if len(out) >= 30:
+                break
             name = str(r.get("brand") or "").strip()
             if name and name.lower() not in seen:
                 seen.add(name.lower())
-                out.append({"name": name, "logo": "", "url": f"/arama?q={name}"})
-            if len(out) >= 30:
-                break
+                out.append({"name": name, "logo": "", "url": f"/arama?q={quote(name)}"})
     return {"items": out}

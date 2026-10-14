@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
+import slugify from "../../lib/slug";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -24,6 +25,7 @@ export default function AdminCategories() {
     image_url: "",
     parent_id: "",
     is_active: true,
+    show_in_menu: true,
     members_only: false,
     sort_order: 0,
   });
@@ -96,10 +98,12 @@ export default function AdminCategories() {
       slug: category.slug || "",
       image_url: category.image_url || "",
       parent_id: category.parent_id || "",
-      is_active: category.is_active,
+      is_active: category.is_active !== false,
+      // Vitrin menüsü show_in_menu=false olan kök kategoriyi gizler — panelde de görünsün/değişsin.
+      show_in_menu: category.show_in_menu !== false,
       members_only: !!category.members_only,
       cod_disabled: !!category.cod_disabled,
-      sort_order: category.sort_order || 0,
+      sort_order: category.sort_order ?? 0,
     });
     setModalOpen(true);
   };
@@ -108,15 +112,17 @@ export default function AdminCategories() {
     setEditingCategory(null);
     setFormData({
       name: "", slug: "", description: "", image_url: "", parent_id: "",
-      is_active: true, members_only: false, sort_order: 0
+      is_active: true, show_in_menu: true, members_only: false, sort_order: 0
     });
   };
 
-  const generateSlug = (name) => {
-    return name.toLowerCase()
-      .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
-      .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
-      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  // Ad yazılırken slug otomatik dolar (backend generate_slug ile AYNI kural: lib/slug —
+  // yerel kopya 'İ'yi "gi-ris" gibi bozuk üretiyordu). Slug elle özelleştirildiyse korunur.
+  const onNameChange = (name) => {
+    setFormData((f) => {
+      const auto = !f.slug || f.slug === slugify(f.name);
+      return { ...f, name, slug: auto ? slugify(name) : f.slug };
+    });
   };
 
   const toggleExpand = (id) => {
@@ -175,9 +181,14 @@ export default function AdminCategories() {
             <td className="py-3 px-4 text-gray-500">{node.slug}</td>
             <td className="py-3 px-4">{node.sort_order}</td>
             <td className="py-3 px-4">
-              <span className={`px-2 py-1 text-xs rounded ${node.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                {node.is_active ? "Aktif" : "Pasif"}
+              <span className={`px-2 py-1 text-xs rounded ${node.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                {node.is_active !== false ? "Aktif" : "Pasif"}
               </span>
+              {level === 0 && node.show_in_menu === false && (
+                <span className="ml-1 px-2 py-1 text-xs rounded bg-amber-100 text-amber-700" title="Vitrin kategori menüsünde gösterilmez (adresinden erişilebilir)">
+                  Menüde gizli
+                </span>
+              )}
             </td>
             <td className="py-3 px-4">
               <div className="flex items-center gap-2">
@@ -300,7 +311,7 @@ export default function AdminCategories() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value) })}
+                onChange={(e) => onNameChange(e.target.value)}
                 required
                 className="w-full border px-3 py-2 rounded text-sm"
               />
@@ -339,6 +350,14 @@ export default function AdminCategories() {
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
               />
               <span className="text-sm">Aktif</span>
+            </label>
+            <label className="flex items-center gap-2" data-testid="cat-show-in-menu">
+              <input
+                type="checkbox"
+                checked={formData.show_in_menu !== false}
+                onChange={(e) => setFormData({ ...formData, show_in_menu: e.target.checked })}
+              />
+              <span className="text-sm">Menüde göster <span className="text-gray-400">(ana kategori ise vitrin kategori menüsünde listelenir)</span></span>
             </label>
             <label className="flex items-center gap-2" data-testid="cat-members-only">
               <input

@@ -81,6 +81,8 @@ def item_stock(prod: dict, variant_id: Optional[str] = None) -> int:
     if variant_id:
         for v in prod.get("variants") or []:
             if isinstance(v, dict) and v.get("id") == variant_id:
+                if v.get("is_active") is False:   # panelde pasif yapılan varyant satılamaz
+                    return 0
                 return max(0, int(_f(v.get("stock"))))
         return 0
     return max(0, int(_f(prod.get("stock"))))

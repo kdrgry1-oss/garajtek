@@ -27,6 +27,25 @@ def clear_cache():
     _CACHE.clear()
 
 
+async def _drop_inactive(db, rows: list) -> list:
+    """Önbellekten dönen satırlarda SONRADAN pasife alınan/silinen ürünleri ayıklar.
+    Ürün yazımları clear_cache() çağırır; bu ek kalkan çok işçili (worker) kurulumda ya da
+    başka bir uçtan yapılan yazımlarda da pasif ürünün anasayfada kalmasını engeller."""
+    ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("id")]
+    if not ids:
+        return rows
+    try:
+        live = set()
+        async for d in db.products.find({"id": {"$in": ids}, "is_active": True, "is_deleted": {"$ne": True}},
+                                        {"_id": 0, "id": 1}):
+            live.add(d.get("id"))
+    except Exception:  # noqa: BLE001
+        return rows
+    if len(live) == len(set(ids)):
+        return rows
+    return [r for r in rows if not (isinstance(r, dict) and r.get("id")) or r.get("id") in live]
+
+
 def _eff_stock(p: dict) -> int:
     vs = p.get("variants") or []
     if vs:
@@ -74,6 +93,15 @@ async def _base_query(db, member: bool) -> dict:
                 q["$and"] = members_only_exclusion(mo)
         except Exception:  # noqa: BLE001
             pass
+    # Birincil kategorisi PASİF (ya da pasif üstün altında) olan ürün vitrin listeleriyle
+    # aynı kuralla anasayfa bloklarında da gösterilmez.
+    try:
+        from routes.products import _inactive_cat_ids, _mo_forms
+        ina = await _inactive_cat_ids()
+        if ina:
+            q.setdefault("$and", []).append({"category_id": {"$nin": _mo_forms(ina)}})
+    except Exception:  # noqa: BLE001
+        pass
     return q
 
 
@@ -204,7 +232,7 @@ async def resolve_source(db, src: dict, *, member: bool = False, use_cache: bool
     k = _key(src, member)
     hit = _CACHE.get(k)
     if use_cache and hit and time.time() - hit[0] < CACHE_TTL:
-        return hit[1]
+        return await _drop_inactive(db, hit[1])
     rows = await _query(db, src, member, limit)
     if src.get("exclude_out_of_stock"):
         rows = [r for r in rows if _eff_stock(r) > 0]

@@ -26,8 +26,10 @@ export function buildTree(list) {
     if (pid && byId.has(pid) && pid !== String(node.id)) byId.get(pid).children.push(node);
     else roots.push(node);
   });
+  // Sıra 0 geçerlidir (panel gibi en önde); yalnız boş/geçersiz değer sona (999) gider.
+  const so = (v) => (v === null || v === undefined || v === "" || Number.isNaN(Number(v)) ? 999 : Number(v));
   const sortRec = (arr) => {
-    arr.sort((a, b) => (Number(a.sort_order) || 999) - (Number(b.sort_order) || 999) || String(a.name).localeCompare(String(b.name), "tr"));
+    arr.sort((a, b) => so(a.sort_order) - so(b.sort_order) || String(a.name).localeCompare(String(b.name), "tr"));
     arr.forEach((n) => sortRec(n.children));
     return arr;
   };
