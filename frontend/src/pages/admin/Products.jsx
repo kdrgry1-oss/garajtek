@@ -89,6 +89,74 @@ const fixImg = (u) => {
   return u;
 };
 
+// Yeni ürün varsayılan KDV oranı (%). Backend model varsayılanı (models.py vat_rate=20) ile aynı.
+export const DEFAULT_VAT_RATE = 20;
+
+/**
+ * KDV oranını normalize et: 0 GEÇERLİ bir orandır (|| ile 10'a dönüyordu → %0 KDV'li ürün
+ * düzenlenip kaydedilince sessizce %10 oluyordu). Yalnız boş/null/geçersiz → fallback.
+ * Ondalıklı oranlar korunur (8.5 → 8.5; parseInt kırpıyordu).
+ */
+export const normalizeVatRate = (value, fallback = DEFAULT_VAT_RATE) => {
+  if (value === null || value === undefined || value === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+};
+
+/**
+ * Kayıt payload'unda varyant stok kodları: varyantın KENDİ kodu önceliklidir; yalnız boşsa
+ * ana ürün kodu kullanılır. (Önceden ana kod doluysa HER varyantın özel kodunu eziyordu.)
+ */
+export const buildVariantsPayload = (variants, parentStockCode) =>
+  (variants || []).map(({ _priceInput, ...v }) => ({
+    ...v,
+    stock_code: String(v.stock_code ?? "").trim() ? v.stock_code : (parentStockCode || ""),
+  }));
+
+/**
+ * Düzenleme formunun kategori seçimini (yaprak + ekstra üyelikler) hesapla.
+ * `categories` = yüklü kategori listesi. Liste boşken yalnız category_name taşıyan ürünlerde
+ * eşleme yapılamaz → [] döner (çağıran taraf bu durumda listeyi önce yüklemeli).
+ */
+export const resolveFormCategories = (product, categories) => {
+  const cats = categories || [];
+  // Yaprak seçim: önce product.categories, yoksa category_id / category_name eşlemesi.
+  const byName = cats.find(c => c.name === product.category_name);
+  const leaf = (Array.isArray(product.categories) && product.categories.length)
+    ? product.categories.map(String)
+    : (product.category_id ? [String(product.category_id)]
+       : (byName?.id ? [String(byName.id)] : []));
+  // Ürünün GERÇEK üyeliği category_ids'te (En Yeniler dâhil). category_ids ataları da
+  // içerir; bu yüzden seçili yaprakların ATALARINI hariç tutup yalnızca "ekstra"
+  // üyelikleri (örn. En Yeniler) ekleriz → form gerçek üyeliği yansıtır, category_name bozulmaz.
+  const all = Array.isArray(product.category_ids) ? product.category_ids.map(String) : [];
+  if (!all.length) return leaf;
+  const byId = new Map(cats.map(c => [String(c.id), c]));
+  const anc = new Set();
+  for (const lid of leaf) {
+    let cur = byId.get(lid), g = 0;
+    while (cur && cur.parent_id && g++ < 20) { anc.add(String(cur.parent_id)); cur = byId.get(String(cur.parent_id)); }
+  }
+  const extras = all.filter(id => !leaf.includes(id) && !anc.has(id) && byId.has(id));
+  return [...leaf, ...extras];
+};
+
+/**
+ * Kategori seçimi ÇÖZÜLEMEDİYSE (categories ve category_id boş ama category_name dolu)
+ * payload'dan categories/category_id anahtarlarını çıkar. Aksi halde backend boş listeyi
+ * "tüm kategoriler çıkarıldı" sayıp category_name/slug/breadcrumb'ı siler ve ürün vitrindeki
+ * kategori sayfasından düşer. Admin tüm kategorileri gerçekten kaldırırsa form
+ * category_name'i de "" yapar → bu koruma devreye girmez.
+ */
+export const stripUnresolvedCategories = (payload) => {
+  const noSel = !(Array.isArray(payload.categories) && payload.categories.length);
+  if (noSel && !payload.category_id && String(payload.category_name || "").trim()) {
+    const { categories: _c, category_id: _ci, ...rest } = payload;
+    return rest;
+  }
+  return payload;
+};
+
 // SearchableAttribute, SeoTab, StockTab artık ayrı dosyalarda:
 //   /app/frontend/src/components/admin/product-form/*
 // (Products.jsx'i kısaltma refactor'unun 1. adımı).
@@ -219,6 +287,10 @@ export default function AdminProducts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  // openEditModal direct-link effect'inde İLK render'ın closure'ı ile çağrılır (categories=[]).
+  // Güncel listeyi ref'ten okuyarak bayat closure kaynaklı kategori kaybı önlenir.
+  const categoriesRef = useRef([]);
+  categoriesRef.current = categories;
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");                 // arama sayfa yenilenince sıfırlanır (localStorage'dan geri YÜKLENMEZ)
   const [debouncedSearch, setDebouncedSearch] = useState(""); // kullanıcı yazmayı bırakınca tek istek atılır
@@ -293,7 +365,7 @@ export default function AdminProducts() {
   const [dragOverImgIdx, setDragOverImgIdx] = useState(null);
   const [variantsModalOpen, setVariantsModalOpen] = useState(false);
   const [selectedProductForVariants, setSelectedProductForVariants] = useState(null);
-  const [globalVatRate, setGlobalVatRate] = useState(10);
+  const [globalVatRate, setGlobalVatRate] = useState(DEFAULT_VAT_RATE);
   const [activeTab, setActiveTab ] = useState("basic");
   const [stockHistory, setStockHistory] = useState([]);
   const [stockHistoryCoverage, setStockHistoryCoverage] = useState("");
@@ -408,7 +480,7 @@ export default function AdminProducts() {
     variation_code: "", gtip_code: "", unit: "ADET", keywords: "",
     supplier: "", manufacturer: DEFAULT_PRODUCT_BRAND, max_installment: 9, purchase_price: 0, member_price_1: null,
     color: "", specs: {}, extra_specs: [], variant_labels: {},
-    vat_rate: 10,
+    vat_rate: DEFAULT_VAT_RATE,
     market_price: 0, vat_included: true, currency: "TRY",
     cargo_weight: 0, product_weight: 0, width: 0, depth: 0, height: 0,
     min_order_qty: 1, max_order_qty: 999, estimated_delivery: "2-3",
@@ -440,7 +512,7 @@ export default function AdminProducts() {
     if (modalOpen && !editingProduct) {
       axios.get(`${API}/settings`)
         .then(res => {
-          if (res.data.default_vat_rate) {
+          if (res.data.default_vat_rate !== undefined && res.data.default_vat_rate !== null && res.data.default_vat_rate !== "") {
             setFormData(prev => ({ ...prev, vat_rate: res.data.default_vat_rate }));
           }
         })
@@ -1044,14 +1116,16 @@ export default function AdminProducts() {
         }
       }
 
-      const payload = {
+      let payload = {
         ...formData,
         attributes: attributesArray,
-        variants: formData.variants?.map(({ _priceInput, ...v }) => ({
-          ...v,
-          stock_code: formData.stock_code || v.stock_code,
-        })) || []
+        // Boş bırakılan KDV alanı → varsayılan; 0 ve ondalıklı oranlar aynen gider.
+        vat_rate: normalizeVatRate(formData.vat_rate),
+        // Varyanta özel stok kodu korunur; yalnız boş olana ana ürün kodu yazılır.
+        variants: buildVariantsPayload(formData.variants, formData.stock_code)
       };
+      // Kategori listesi çözülemediyse boş seçim gönderme (backend kategoriyi silerdi).
+      if (editingProduct) payload = stripUnresolvedCategories(payload);
 
       // Yeni urun(ler): TEK Urun Kart ID. Renkler ayri urune bolunse bile hepsi AYNI id'yi alir
       // (kart id kendi icinde artmaz). Bos ise sistemdeki en buyuk + 1 alinir.
@@ -1338,6 +1412,19 @@ export default function AdminProducts() {
       // Direct link için URL'i güncelle (geri butonu çalışsın diye replace değil push)
       navigate(`/admin/urunler/${product.id}`, { replace: false });
     }
+    // Kategori listesi: closure'daki `categories` direct-link açılışında BAYAT ([]) olabilir →
+    // ref'ten oku; hâlâ boşsa (liste henüz yüklenmedi) burada çek. Aksi halde yalnız
+    // category_name taşıyan ürün "Seçiniz" görünür ve kaydedilince kategorisi silinirdi.
+    let cats = categoriesRef.current;
+    if (!cats || !cats.length) {
+      try {
+        const cr = await axios.get(`${API}/categories`);
+        cats = Array.isArray(cr.data) ? cr.data : [];
+        if (cats.length) setCategories(cats);
+      } catch {
+        cats = [];
+      }
+    }
     setEditingProduct(product);
     setMemberPriceManual(true); // mevcut ürün: üye fiyatı bağımsız, otomatik ezilmez
     // Parse edilmiş teknik detayları (XML import'dan) ayrı state'e al — Özellikler sekmesinin
@@ -1374,27 +1461,7 @@ export default function AdminProducts() {
       price: product.price || 0,
       sale_price: product.sale_price || null,
       category_name: product.category_name || "",
-      categories: (() => {
-        // Yaprak seçim: önce product.categories, yoksa category_id / category_name eşlemesi.
-        const leaf = (Array.isArray(product.categories) && product.categories.length)
-          ? product.categories.map(String)
-          : (product.category_id ? [String(product.category_id)]
-             : (categories.find(c => c.name === product.category_name)?.id
-                ? [String(categories.find(c => c.name === product.category_name).id)] : []));
-        // Ürünün GERÇEK üyeliği category_ids'te (En Yeniler dâhil). category_ids ataları da
-        // içerir; bu yüzden seçili yaprakların ATALARINI hariç tutup yalnızca "ekstra"
-        // üyelikleri (örn. En Yeniler) ekleriz → form gerçek üyeliği yansıtır, category_name bozulmaz.
-        const all = Array.isArray(product.category_ids) ? product.category_ids.map(String) : [];
-        if (!all.length) return leaf;
-        const byId = new Map(categories.map(c => [String(c.id), c]));
-        const anc = new Set();
-        for (const lid of leaf) {
-          let cur = byId.get(lid), g = 0;
-          while (cur && cur.parent_id && g++ < 20) { anc.add(String(cur.parent_id)); cur = byId.get(String(cur.parent_id)); }
-        }
-        const extras = all.filter(id => !leaf.includes(id) && !anc.has(id) && byId.has(id));
-        return [...leaf, ...extras];
-      })(),
+      categories: resolveFormCategories(product, cats),
       brand: product.brand ?? "",   // boş marka boş kalır (kayıtta 'Garajtek' yazılmasın)
       images: product.images || [],
       is_active: product.is_active ?? true,
@@ -1420,7 +1487,7 @@ export default function AdminProducts() {
       extra_specs: Array.isArray(product.extra_specs) ? product.extra_specs : [],
       variant_labels: product.variant_labels || {},
       market_price: product.market_price || 0,
-      vat_rate: product.vat_rate || 10,
+      vat_rate: normalizeVatRate(product.vat_rate),
       vat_included: product.vat_included ?? true,
       currency: product.currency || "TRY",
       cargo_weight: product.cargo_weight || 0,
@@ -1486,7 +1553,7 @@ export default function AdminProducts() {
       variation_code: "", gtip_code: "", unit: "ADET", keywords: "",
       supplier: "", manufacturer: DEFAULT_PRODUCT_BRAND, max_installment: 9, purchase_price: 0, member_price_1: null,
       color: "", specs: {}, extra_specs: [], variant_labels: {},
-      market_price: 0, vat_rate: 10, vat_included: true, currency: "TRY",
+      market_price: 0, vat_rate: DEFAULT_VAT_RATE, vat_included: true, currency: "TRY",
       cargo_weight: 0, product_weight: 0, width: 0, depth: 0, height: 0,
       min_order_qty: 1, max_order_qty: 999, estimated_delivery: "2-3",
       is_free_shipping: false, is_showcase: false,
@@ -2563,10 +2630,12 @@ export default function AdminProducts() {
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1 text-orange-600">KDV ORANI (%)</label>
                         <input
                           type="number"
-                          value={formData.vat_rate || 10}
-                          onChange={(e) => setFormData({ ...formData, vat_rate: parseInt(e.target.value) || 0 })}
+                          min="0"
+                          step="0.01"
+                          value={formData.vat_rate ?? ""}
+                          onChange={(e) => setFormData({ ...formData, vat_rate: e.target.value === "" ? null : parseFloat(e.target.value) })}
                           className="w-full border-orange-200 border-2 px-3 py-2 rounded-lg focus:border-orange-500 outline-none transition-all font-bold text-orange-700"
-                          placeholder="10"
+                          placeholder={String(DEFAULT_VAT_RATE)}
                         />
                       </div>
                     </div>

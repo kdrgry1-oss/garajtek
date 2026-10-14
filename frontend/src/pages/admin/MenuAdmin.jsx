@@ -436,11 +436,15 @@ function catNode(c, depth, maxDepth) {
   if (depth < maxDepth && (c.children || []).length) node.children = c.children.map((k) => catNode(k, depth + 1, maxDepth));
   return node;
 }
-function autoMenuItems(group, d, refs) {
+export function autoMenuItems(group, d, refs) {
   const tree = buildTree(refs.cats || []);
   const roots = tree.menuRoots || tree.roots;
   if (group === "departments") {
-    return roots.slice(0, d.max_roots || 14).map((c) => catNode(c, 1, 3));
+    // TÜM menü kökleri aktarılır (max_roots ile KIRPILMAZ). Vitrin zaten ilk max_roots
+    // kadarını çizer; liste max_roots'tan uzunsa sondaki "Tüm Kategoriler" bağlantısı da
+    // otomatik moddaki gibi görünmeye devam eder. Kırpılınca elle moda ilk geçiş bu
+    // bağlantıyı ve fazladaki kategorileri vitrinden siliyordu.
+    return roots.map((c) => catNode(c, 1, 3));
   }
   const quick = (d.quick || []).map((q) => ({ ...q, id: nid() }));
   const quickLinks = new Set(quick.map((q) => (q.link || "").split("?")[0]));
