@@ -1047,7 +1047,7 @@ export default function AdminProducts() {
       const payload = {
         ...formData,
         attributes: attributesArray,
-        variants: formData.variants?.map(v => ({
+        variants: formData.variants?.map(({ _priceInput, ...v }) => ({
           ...v,
           stock_code: formData.stock_code || v.stock_code,
         })) || []
@@ -2865,6 +2865,7 @@ export default function AdminProducts() {
                             <th className="text-left px-4 py-3 font-bold text-gray-600">Seçenek</th>
                             <th className="text-left px-4 py-3 font-bold text-gray-600">Stok Kodu</th>
                             <th className="text-left px-4 py-3 font-bold text-gray-600">Barkod</th>
+                            <th className="text-right px-4 py-3 font-bold text-gray-600" title="Varyantın satış fiyatı = ana satış fiyatı + varyant farkı">Fiyat (TL)</th>
                             <th className="text-center px-4 py-3 font-bold text-gray-600">Stok</th>
                             <th className="text-center px-4 py-3 font-bold text-gray-600 w-20">Sil</th>
                           </tr>
@@ -2883,7 +2884,17 @@ export default function AdminProducts() {
                             <tr key={v.id || v.originalIdx} className="hover:bg-orange-50/30 transition-colors">
                               <td className="px-4 py-3">
                                 <div className="flex flex-col">
-                                  <span className="font-bold text-gray-900 text-lg">{v.size || "-"}</span>
+                                  <input
+                                    type="text"
+                                    value={v.size || ""}
+                                    onChange={(e) => {
+                                      const updated = [...formData.variants];
+                                      updated[v.originalIdx] = { ...updated[v.originalIdx], size: e.target.value };
+                                      setFormData({...formData, variants: updated});
+                                    }}
+                                    className="w-28 border-gray-200 border px-2 py-1.5 rounded bg-white focus:border-black outline-none font-bold text-gray-900"
+                                    data-testid={`form-variant-size-${v.originalIdx}`}
+                                  />
                                   {v.color && <span className="text-xs text-gray-500">{v.color}</span>}
                                 </div>
                               </td>
@@ -2913,6 +2924,35 @@ export default function AdminProducts() {
                                   placeholder="Barkod girin..."
                                 />
                               </td>
+                              <td className="px-4 py-3 text-right">
+                                {(() => {
+                                  const base = parseFloat(formData.price) || 0;
+                                  const adj = parseFloat(v.price_adjustment ?? v.price_diff) || 0;
+                                  return (
+                                    <input
+                                      type="number" step="0.01" min="0"
+                                      value={v._priceInput ?? (base + adj).toFixed(2)}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        const val = parseFloat(raw);
+                                        const d = Number.isFinite(val) ? Math.round((val - base) * 100) / 100 : 0;
+                                        const updated = [...formData.variants];
+                                        const cur = updated[v.originalIdx];
+                                        updated[v.originalIdx] = { ...cur, _priceInput: raw, price_adjustment: d, ...("price_diff" in cur ? { price_diff: d } : {}) };
+                                        setFormData({...formData, variants: updated});
+                                      }}
+                                      onBlur={() => {
+                                        const updated = [...formData.variants];
+                                        const { _priceInput, ...rest } = updated[v.originalIdx];
+                                        updated[v.originalIdx] = rest;
+                                        setFormData({...formData, variants: updated});
+                                      }}
+                                      className="w-28 border-gray-200 border px-2 py-1.5 rounded text-right font-bold bg-white focus:border-black outline-none"
+                                      data-testid={`form-variant-price-${v.originalIdx}`}
+                                    />
+                                  );
+                                })()}
+                              </td>
                               <td className="px-4 py-3 text-center">
                                 <input
                                   type="number"
@@ -2941,7 +2981,7 @@ export default function AdminProducts() {
                         </tbody>
                         <tfoot className="bg-gray-50 border-t">
                           <tr>
-                            <td colSpan={2} className="px-4 py-3 text-sm font-bold text-gray-500 text-right">Toplam Stok:</td>
+                            <td colSpan={4} className="px-4 py-3 text-sm font-bold text-gray-500 text-right">Toplam Stok:</td>
                             <td className="px-4 py-3 text-center text-lg font-black text-black">
                               {formData.variants.reduce((sum, v) => sum + (v.stock || 0), 0)}
                             </td>
