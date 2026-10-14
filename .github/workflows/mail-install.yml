@@ -103,7 +103,13 @@ jobs:
             printf '%s' "$LE_EMAIL" | grep -Eq '^[^@ ]+@[^@ ]+\.[a-z]{2,}$' || { echo "::error::le_email geçersiz"; exit 1; }
             EXTRA="--le-email $LE_EMAIL"
           fi
-          ssh vds "$SUDO bash $APP/deploy/mail/mail-kur.sh $DOMAIN mail.$DOMAIN $EXTRA"
+          # Betik yeni posta kutusu şifrelerini ekrana yazar — Actions log'una DÜŞMEMELİ.
+          # "adres@alan  şifre" biçimindeki satırlarda şifre maskelenir (sunucudaki
+          # /root/garajtek-mail-credentials.txt dosyasında 0600 olarak durur).
+          set -o pipefail
+          ssh vds "$SUDO bash $APP/deploy/mail/mail-kur.sh $DOMAIN mail.$DOMAIN $EXTRA" 2>&1 \
+            | sed -E 's/^([[:space:]]*[^[:space:]]+@[^[:space:]]+[[:space:]]+)[^[:space:]]{8,}[[:space:]]*$/\1******** (gizlendi; panelden şifre yenileyin)/'
+
 
       - name: DKIM kaydı
         if: inputs.islem == 'kur'
