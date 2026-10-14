@@ -478,6 +478,22 @@ async def search_cats_off_once(db) -> bool:
         return False
 
 
+VAT20_MARKER = "vat_rate_20_all_products_2026_10_14_v1"
+
+
+async def vat20_once(db) -> int:
+    """Sahip talebi (14.10.2026): o an yüklü TÜM ürünlerin KDV oranı %20. Bir kez; sonradan eklenen/panelden
+    değiştirilen ürünlere dokunmaz."""
+    if await db.settings.find_one({"id": VAT20_MARKER}, {"_id": 1}):
+        return 0
+    r = await db.products.update_many({"vat_rate": {"$ne": 20}}, {"$set": {"vat_rate": 20, "updated_at": _now()}})
+    total = await db.products.count_documents({})
+    await db.settings.update_one({"id": VAT20_MARKER}, {"$set": {"id": VAT20_MARKER, "changed": r.modified_count,
+                                                                "total": total, "applied_at": _now()}}, upsert=True)
+    logger.warning("[%s] %s/%s ürünün KDV oranı %%20 yapıldı", VAT20_MARKER, r.modified_count, total)
+    return r.modified_count
+
+
 BIMI_MARKER = "bimi_logo_default_2026_10_14_v1"
 
 
@@ -535,6 +551,7 @@ async def run_once(db=None) -> bool:
             await footer_hours_once(db)
             await search_cats_off_once(db)
             await bimi_logo_once(db)
+            await vat20_once(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -553,6 +570,7 @@ async def run_once(db=None) -> bool:
         await footer_hours_once(db)
         await search_cats_off_once(db)
         await bimi_logo_once(db)
+        await vat20_once(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)

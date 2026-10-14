@@ -172,3 +172,11 @@ def test_bimi_logo_once(db):
     doc = _run(db.settings.find_one({"id": DOC_ID}))
     assert 'baseProfile="tiny-ps"' in doc["svg"]
     assert _run(SR.bimi_logo_once(db)) is False
+
+
+def test_vat20_once(db):
+    _run(db.products.insert_many([{"id": "a", "vat_rate": 10}, {"id": "b", "vat_rate": 20}, {"id": "c"}]))
+    assert _run(SR.vat20_once(db)) == 2
+    assert all(p["vat_rate"] == 20 for p in _run(db.products.find({}).to_list(10)))
+    _run(db.products.update_one({"id": "a"}, {"$set": {"vat_rate": 10}}))
+    assert _run(SR.vat20_once(db)) == 0          # bir kez — sonraki panel değişikliğine dokunmaz
