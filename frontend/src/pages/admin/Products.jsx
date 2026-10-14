@@ -1395,7 +1395,7 @@ export default function AdminProducts() {
         const extras = all.filter(id => !leaf.includes(id) && !anc.has(id) && byId.has(id));
         return [...leaf, ...extras];
       })(),
-      brand: product.brand || DEFAULT_PRODUCT_BRAND,
+      brand: product.brand ?? "",   // boş marka boş kalır (kayıtta 'Garajtek' yazılmasın)
       images: product.images || [],
       is_active: product.is_active ?? true,
       is_featured: product.is_featured ?? false,
@@ -1411,7 +1411,7 @@ export default function AdminProducts() {
       unit: product.unit || "ADET",
       keywords: product.keywords || "",
       supplier: product.supplier || "",
-      manufacturer: product.manufacturer || DEFAULT_PRODUCT_BRAND,
+      manufacturer: product.manufacturer ?? "",
       max_installment: product.max_installment || 9,
       purchase_price: product.purchase_price || 0,
       member_price_1: product.member_price_1 ?? null,

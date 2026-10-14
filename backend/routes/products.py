@@ -2901,7 +2901,9 @@ async def update_product(
     #   • admin stoğu GERÇEKTEN değiştirdiyse (stock != _stock0) → niyet açıktır, mutlak yazılır.
     # Böylece "ürünün adını düzelttim, stok geri geldi" sınıfı kayıplar biter; kasıtlı stok
     # düzeltmesi ise aynen çalışır.
-    if isinstance(product_data.get("variants"), list):
+    # Boş liste = varyantsız ürün → bu blok ÇALIŞMAZ (aksi halde parent stok Σ[] = 0 yazılıyordu:
+    # panelde varyantsız ürünü kaydetmek stoğu sıfırlıyordu, sahip bildirimi 14.10.2026).
+    if isinstance(product_data.get("variants"), list) and product_data["variants"]:
         _live = await db.products.find_one({"id": product_id}, {"_id": 0, "variants": 1})
         _live_map = {}
         for _lv in ((_live or {}).get("variants") or []):
