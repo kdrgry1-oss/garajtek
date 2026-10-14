@@ -213,7 +213,20 @@ export default function Checkout() {
   // Kapıda ödeme: kapalı ürün/kategori ve tutar sınırı (sunucu da aynı kuralla reddeder:
   // backend/cod_rules.py) — uygun değilse seçenek gösterilmez, nedeni ödeme bölümünde yazar.
   const codCheck = useCodCheck(enabledPM.cash_on_delivery ? items.map((it) => it.productId) : [], total);
-  const pmAvail = { ...enabledPM, cash_on_delivery: enabledPM.cash_on_delivery && codCheck.available !== false };
+  // Kartla ödeme yalnız iyzico API anahtarları girilip etkinleştirildiyse sunulur (aksi halde ödeme hata verirdi).
+  const [cardReady, setCardReady] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    axios.get(`${API}/integrations/payment/status`)
+      .then((r) => { if (alive) setCardReady(r.data?.configured === false ? false : true); })
+      .catch(() => { if (alive) setCardReady(true); }); // durum okunamazsa engelleme (sunucu yine doğrular)
+    return () => { alive = false; };
+  }, []);
+  const pmAvail = {
+    ...enabledPM,
+    credit_card: enabledPM.credit_card && cardReady !== false,
+    cash_on_delivery: enabledPM.cash_on_delivery && codCheck.available !== false,
+  };
 
   // İşletme Kuralları (admin panelinden yönetilir) — kodda sabit değil.
   const [bizRules, setBizRules] = useState({});
