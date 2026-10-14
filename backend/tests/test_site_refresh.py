@@ -152,3 +152,15 @@ def test_placeholder_cod_footer(db):
     else:
         _run(SR.footer_hours_once(db))
     assert "7/24" not in _run(store.get_global(db))["site_footer_contact"]["call_us_text"]
+
+
+def test_search_category_select_off_once(db):
+    from pageblocks import store
+    _run(store.ensure(db, "home"))
+    g = _run(store.get_global(db))
+    g.setdefault("site_header", {}).setdefault("search", {})["show_category_select"] = True
+    pub = _run(store.ensure(db, "home"))
+    _run(store.publish(db, "home", user="t", blocks=pub.get("blocks") or [], global_=g))
+    assert _run(SR.search_cats_off_once(db)) is True
+    assert _run(store.get_global(db))["site_header"]["search"]["show_category_select"] is False
+    assert _run(SR.search_cats_off_once(db)) is False      # bir kez

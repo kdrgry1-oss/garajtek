@@ -15,7 +15,7 @@
   },
   "search": {
     "enabled": true,
-    "show_category_select": true,
+    "show_category_select": false,
     "placeholder": "Ürün, marka veya kategori ara…",
     "all_label": "Tüm Kategoriler",
     "button_label": "Ara",

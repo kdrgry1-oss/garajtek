@@ -432,6 +432,51 @@ async def cod_max_once(db) -> bool:
     return changed
 
 
+SEARCH_CATS_MARKER = "search_category_select_off_2026_10_14_v1"
+
+
+def _search_cats_off(g: dict) -> bool:
+    hd = dict(g.get("site_header") or {})
+    sc = dict(hd.get("search") or {})
+    if sc.get("show_category_select") is False:
+        return False
+    sc["show_category_select"] = False
+    hd["search"] = sc
+    g["site_header"] = hd
+    return True
+
+
+async def search_cats_off_once(db) -> bool:
+    """Arama çubuğundaki "Tüm Kategoriler" seçimi kaldırılır (masaüstü + mobil). Bir kez; panelden geri açılabilir."""
+    try:
+        if await db.settings.find_one({"id": SEARCH_CATS_MARKER}, {"_id": 1}):
+            return False
+        from pageblocks import store
+        g = copy.deepcopy(await store.get_global(db))
+        changed = _search_cats_off(g)
+        if changed:
+            pub = await store.ensure(db, "home")
+            draft = await store.get_draft(db, "home")
+            doc, errors, _ = await store.publish(db, "home", user="sistem (arama kategori seçimi)",
+                                                 blocks=pub.get("blocks") or [], global_=g)
+            if errors:
+                logger.error("[%s] yayın hatası: %s", SEARCH_CATS_MARKER, errors)
+                return False
+            if draft:
+                draft = dict(draft)
+                dg = copy.deepcopy(draft.get("global") or g)
+                _search_cats_off(dg)
+                draft["global"], draft["rev"] = dg, doc.get("rev")
+                await db.page_layouts.replace_one({"id": "home:draft"}, draft, upsert=True)
+        await db.settings.update_one({"id": SEARCH_CATS_MARKER}, {"$set": {"id": SEARCH_CATS_MARKER,
+                                                                          "changed": changed, "applied_at": _now()}},
+                                     upsert=True)
+        return changed
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[%s] hata: %s", SEARCH_CATS_MARKER, e)
+        return False
+
+
 async def deactivate_broken_sets(db) -> int:
     """Bileşeni 2'nin altına düşen (ör. tüm ürünleri satıştan kaldırılmış) aktif setleri pasife alır. Her açılışta,
     tekrarlanabilir."""
@@ -462,6 +507,7 @@ async def run_once(db=None) -> bool:
             await deactivate_broken_sets(db)
             await cod_max_once(db)
             await footer_hours_once(db)
+            await search_cats_off_once(db)
             return False
         await _contact(db)
         if not await _layout(db):
@@ -478,6 +524,7 @@ async def run_once(db=None) -> bool:
         await deactivate_broken_sets(db)
         await cod_max_once(db)
         await footer_hours_once(db)
+        await search_cats_off_once(db)
         return True
     except Exception as e:  # noqa: BLE001 — açılışı asla düşürme
         logger.exception("[%s] hata: %s", MARKER, e)
