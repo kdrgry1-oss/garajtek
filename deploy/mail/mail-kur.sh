@@ -786,9 +786,17 @@ setup_roundcube() {
   rm -rf "$RC_DIR/installer"   # kurulum sihirbazı devre dışı
 
   if [ ! -s "$RC_DIR/db/sqlite.db" ]; then
-    runuser -u www-data -- php "$RC_DIR/bin/initdb.sh" --dir="$RC_DIR/SQL" >/dev/null \
-      || die "Roundcube veritabanı oluşturulamadı"
-    ok "Roundcube SQLite veritabanı oluşturuldu"
+    # Roundcube'un sqlite sürücüsü dosya yokken bağlantıda şemayı KENDİSİ kurar; initdb.sh ardından
+    # "table users already exists" ile düşer. Şema mevcutsa (users tablosu) bu başarı sayılır.
+    if ! runuser -u www-data -- php "$RC_DIR/bin/initdb.sh" --dir="$RC_DIR/SQL" >/tmp/rc-initdb.log 2>&1; then
+      if grep -q "already exists" /tmp/rc-initdb.log && [ -s "$RC_DIR/db/sqlite.db" ]; then
+        ok "Roundcube şeması zaten kurulu (sürücü oluşturmuş)"
+      else
+        cat /tmp/rc-initdb.log >&2; die "Roundcube veritabanı oluşturulamadı"
+      fi
+    else
+      ok "Roundcube SQLite veritabanı oluşturuldu"
+    fi
   fi
 
   wfile /etc/logrotate.d/roundcube-garajtek 0644 root:root <<'EOF'
