@@ -17,6 +17,11 @@ from datetime import datetime, timezone
 import uuid
 
 from .deps import db, require_admin, require_super_admin, hash_password, validate_strong_password, get_effective_permissions
+from .deps import _USER_SESSION_PROJECTION
+
+# GÜVENLİK: Admin üye/personel listelerinde yalnız 'password' değil; parola geçmişi (bcrypt
+# hash'leri), MFA sırları, kilit/sayaç alanları ve token_version da yanıta girmez.
+_USER_ADMIN_PROJECTION = {**_USER_SESSION_PROJECTION, "token_version": 0}
 from permissions import PERMISSION_TREE, DEFAULT_ROLES, ALL_PERMISSION_KEYS
 
 router = APIRouter(prefix="/admin", tags=["admin-rbac"])
@@ -134,7 +139,7 @@ async def list_panel_users(current_user: dict = Depends(require_admin)):
     # HİÇBİRİ olmayan is_admin=True hesap = eski/bozuk MÜŞTERİ (register kaydı) → gösterilmez.
     users = await db.users.find(
         {"is_admin": True, "$or": PANEL_STAFF_OR},
-        {"_id": 0, "password": 0}
+        _USER_ADMIN_PROJECTION
     ).to_list(500)
     return {"users": users}
 

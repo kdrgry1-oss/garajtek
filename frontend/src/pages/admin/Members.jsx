@@ -201,6 +201,35 @@ export default function Members() {
     } catch (e) { toast.error(e?.response?.data?.detail || "Eklenemedi"); }
   };
 
+  // Üye DÜZENLEME / PASİFLEŞTİRME — backend PUT /admin/members/{id} (ad, telefon, aktiflik,
+  // izin, yeni şifre). Pasifleştirme ve şifre atama üyenin açık oturumlarını sonlandırır.
+  const [editForm, setEditForm] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const openEdit = (m) => setEditForm({
+    id: m.id, email: m.email || "",
+    first_name: m.first_name || "", last_name: m.last_name || "", phone: m.phone || "",
+    is_active: m.is_active !== false, accepts_marketing: !!m.accepts_marketing, password: "",
+  });
+  const handleUpdate = async () => {
+    if (!editForm) return;
+    if (editForm.password && editForm.password.trim().length < 8) return toast.warning("Yeni şifre en az 8 karakter olmalı");
+    setSavingEdit(true);
+    try {
+      const body = {
+        first_name: editForm.first_name.trim(), last_name: editForm.last_name.trim(), phone: editForm.phone.trim(),
+        is_active: !!editForm.is_active, accepts_marketing: !!editForm.accepts_marketing,
+      };
+      if (editForm.password.trim()) body.password = editForm.password.trim();
+      await axios.put(`${API}/admin/members/${editForm.id}`, body, { headers: authHeaders() });
+      toast.success("Üye güncellendi");
+      const id = editForm.id;
+      setEditForm(null);
+      load(); loadStats();
+      if (detailId === id) openDetail(id);
+    } catch (e) { toast.error(e?.response?.data?.detail || "Güncellenemedi"); }
+    finally { setSavingEdit(false); }
+  };
+
   const handleDelete = async (id) => {
     if (!await window.appConfirm("Bu üye silinsin mi?")) return;
     try {
@@ -339,7 +368,9 @@ export default function Members() {
               <tr key={m.id} onClick={() => openDetail(m.id)} className="border-t hover:bg-gray-50 cursor-pointer" data-testid={`member-row-${m.id}`}>
                 <td className="p-3">
                   <div className="font-medium">{m.first_name || m.last_name ? `${m.first_name || ""} ${m.last_name || ""}`.trim() : "—"}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">#{m.id.slice(0, 8)}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">#{m.id.slice(0, 8)}
+                    {m.is_active === false && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-semibold" data-testid={`member-passive-${m.id}`}>Pasif</span>}
+                  </div>
                 </td>
                 <td className="p-3">
                   <div className="flex items-center gap-1 text-gray-700"><Mail size={12} /> {m.email}</div>
@@ -370,6 +401,7 @@ export default function Members() {
                 </td>
                 <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => openDetail(m.id)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Detay"><Eye size={15} /></button>
+                  <button onClick={() => openEdit(m)} className="p-1.5 text-gray-700 hover:bg-gray-100 rounded" title="Düzenle" data-testid={`member-edit-${m.id}`}><Edit size={15} /></button>
                   <button onClick={() => handleDelete(m.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Sil"><Trash2 size={15} /></button>
                 </td>
               </tr>
@@ -395,7 +427,13 @@ export default function Members() {
           <div className={`w-full ${full360 ? "max-w-full" : "max-w-2xl"} bg-white h-full overflow-y-auto transition-[max-width]`} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b p-4 sticky top-0 bg-white">
               <h3 className="font-bold text-lg">Üye Detayı</h3>
-              <button onClick={() => setDetailId(null)} className="p-1.5 hover:bg-gray-100 rounded"><X size={18} /></button>
+              <div className="flex items-center gap-1">
+                {detail?.member && (
+                  <button onClick={() => openEdit(detail.member)} data-testid="member-detail-edit"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-50"><Edit size={14} /> Düzenle</button>
+                )}
+                <button onClick={() => setDetailId(null)} className="p-1.5 hover:bg-gray-100 rounded"><X size={18} /></button>
+              </div>
             </div>
             {!detail ? (
               <div className="p-8 text-center text-gray-400">Yükleniyor…</div>
@@ -410,6 +448,7 @@ export default function Members() {
                     <div className="text-sm text-gray-500">{detail.member.email} {detail.member.phone && ` · ${detail.member.phone}`}</div>
                     <div className="mt-2 flex gap-2 items-center">
                       <SegmentBadge seg={detail.member.segment} member={detail.member} />
+                      {detail.member.is_active === false && <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">Pasif</span>}
                       <span className="text-xs text-gray-500">Katılım: {new Date(detail.member.created_at).toLocaleDateString("tr-TR")}</span>
                     </div>
                   </div>
@@ -594,6 +633,46 @@ export default function Members() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editForm && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={() => setEditForm(null)}>
+          <div className="bg-white rounded-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()} data-testid="member-edit-modal">
+            <h3 className="text-lg font-bold mb-1">Üyeyi Düzenle</h3>
+            <p className="text-xs text-gray-500 mb-4">{editForm.email}</p>
+            <div className="space-y-3">
+              {[
+                ["first_name", "Ad"],
+                ["last_name", "Soyad"],
+                ["phone", "Telefon"],
+              ].map(([k, lbl]) => (
+                <div key={k}>
+                  <label className="text-xs text-gray-500">{lbl}</label>
+                  <input value={editForm[k]} onChange={(e) => setEditForm({ ...editForm, [k]: e.target.value })} data-testid={`member-edit-${k}`}
+                    className="w-full px-3 py-2 border rounded-lg text-sm mt-1" />
+                </div>
+              ))}
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={editForm.is_active} onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })} data-testid="member-edit-active" />
+                Aktif <span className="text-xs text-gray-400">(kapatılırsa üye giriş yapamaz, açık oturumu sonlanır)</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={editForm.accepts_marketing} onChange={(e) => setEditForm({ ...editForm, accepts_marketing: e.target.checked })} />
+                Ticari ileti izni
+              </label>
+              <div>
+                <label className="text-xs text-gray-500">Yeni Şifre (boş = değişmez, en az 8 karakter — üyenin oturumları sonlanır)</label>
+                <input type="text" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} data-testid="member-edit-password"
+                  className="w-full px-3 py-2 border rounded-lg text-sm mt-1" autoComplete="new-password" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setEditForm(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Vazgeç</button>
+              <button onClick={handleUpdate} disabled={savingEdit} data-testid="member-edit-save" className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium disabled:opacity-50">{savingEdit ? "Kaydediliyor…" : "Kaydet"}</button>
+            </div>
           </div>
         </div>
       )}

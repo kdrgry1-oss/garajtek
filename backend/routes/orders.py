@@ -2248,7 +2248,14 @@ async def create_order(
                 "city": _ci(_sa.get("city")),
                 "district": _ci(_sa.get("district")),
             }, {"_id": 1})
-            if not _dup:
+            # Adres defteri sınırı (customer.MAX_ADDRESSES_PER_USER): dolu ise sessizce atla —
+            # aksi halde liste sınırını aşan adres kaydedilir ama hiç görünmez/yönetilemez.
+            from .customer import MAX_ADDRESSES_PER_USER as _MAX_ADDR
+            _full = (not _dup) and (
+                await db.addresses.count_documents({"user_id": _uid}) >= _MAX_ADDR)
+            if _full:
+                logger.info(f"[adres defteri] sınır dolu ({_MAX_ADDR}); sipariş adresi kaydedilmedi user={_uid}")
+            if not _dup and not _full:
                 _has_any = await db.addresses.find_one({"user_id": _uid}, {"_id": 1})
                 _binfo = order.get("billing_info") or {}
                 await db.addresses.insert_one({
@@ -2686,7 +2693,8 @@ async def update_order_status(
     # DENETİM FIX: reaktivasyon (iptal/iade → aktif fulfillment) stok re-decrement'i için
     # ÖNCEKİ durumu güncellemeden ÖNCE yakala.
     _prev_doc = await db.orders.find_one({"id": order_id}, {"_id": 0, "status": 1,
-                                                            "shipped_at": 1, "delivered_at": 1})
+                                                            "shipped_at": 1, "delivered_at": 1,
+                                                            "confirmed_at": 1, "processing_at": 1})
     _prev_status = (_prev_doc or {}).get("status")
 
     _now = datetime.now(timezone.utc).isoformat()
@@ -2698,6 +2706,17 @@ async def update_order_status(
         _set["shipped_at"] = _now
     if status == "delivered" and not (_prev_doc or {}).get("delivered_at"):
         _set["delivered_at"] = _now
+    # Takip ekranı adım tarihleri: 'Onaylandı' / 'Hazırlanıyor' adımları için ilk geçiş anı
+    # damgalanır (eskiden confirmed_at hiç yazılmadığından onay tarihi = sipariş oluşturma anı
+    # görünüyordu). İleri bir duruma doğrudan atlanırsa önceki adımlar da aynı anla doldurulur.
+    # Mevcut tarih EZİLMEZ.
+    _CONFIRM_STAMP = {"confirmed", "preparing", "processing", "ready_to_ship",
+                      "shipped", "in_transit", "out_for_delivery", "delivered"}
+    _PROCESS_STAMP = _CONFIRM_STAMP - {"confirmed"}
+    if status in _CONFIRM_STAMP and not (_prev_doc or {}).get("confirmed_at"):
+        _set["confirmed_at"] = _now
+    if status in _PROCESS_STAMP and not (_prev_doc or {}).get("processing_at"):
+        _set["processing_at"] = _now
     if status == "return_approved":
         _set["return_approved_at"] = _now
     if status in ("refunded", "partial_refunded"):
@@ -2841,7 +2860,9 @@ async def update_order_status(
                 # event_id = sipariş no → tarayıcı pixel'iyle dedup).
                 await dispatch_purchase_capi(order_id, source="admin_status_confirmed")
                 return
-            elif status == "cancelled" and order_doc.get("payment_status") == "paid":
+            elif status in _CANCEL_ST_FOR_STAMP and order_doc.get("payment_status") == "paid":
+                # 'Ödemeli İptal Onaylandı' da ödenmiş siparişin iptalidir → refund (event_id
+                # sipariş bazlı olduğundan sonradan 'cancelled'a çekilse de tekrarlanmaz).
                 capi_event = "refund"
                 value_multiplier = -1.0
             if not capi_event:
@@ -2908,7 +2929,10 @@ async def update_order_status(
     try:
         order_doc = await db.orders.find_one({"id": order_id}, {"_id": 0})
         prev_status = None  # we don't have a before-value; rely on status flip idempotence
-        if status == "cancelled":
+        # 'Ödemeli İptal Onaylandı' (cancel_refunded) da bir İPTALDİR: stok + hediye çeki + puan
+        # iadesi 'cancelled' ile aynı (eskiden yalnız 'cancelled' tetikliyordu → stok düşük kalıyordu).
+        # _restock_order_once idempotent: sonradan cancelled↔cancel_refunded geçişi çift iade yapmaz.
+        if status in _CANCEL_ST_FOR_STAMP:
             # Y5: Hareket-tipi bağımsız idempotent iade — auto-cancel ya da havale-auto-cancel
             # daha önce iade ettiyse ikinci kez stok EKLENMEZ (önceden yalnızca 'order_cancelled'
             # tipine bakıldığı için çift iade oluyordu).
@@ -5684,15 +5708,17 @@ async def _build_return_for_order(order: dict, payload: dict, actor: dict) -> di
 
     # Havale/EFT iadesinde iade tutarı BANKA HESABINA döner → müşterinin girdiği IBAN + ad soyad
     # kaydedilir (admin iadeyi bu hesaba yapar). Kart ödemesinde saklanmaz (para karta döner).
+    # Kapıda ödeme (nakit tahsil) iadesi de karta dönemez → aynı şekilde banka hesabına yapılır.
     _pm = str(order.get("payment_method") or "").lower()
     refund_bank_info = None
-    if _pm in ("bank_transfer", "havale", "eft", "bank"):
+    from routes.customer import BANK_REFUND_PMS as _BANK_REFUND_PMS
+    if _pm in _BANK_REFUND_PMS:
         _iban = "".join(str(payload.get("refund_iban") or "").split()).upper()[:34]
-        # ZORUNLU (kullanıcı kuralı): havale/EFT ile ödenmiş siparişin iadesinde IBAN + ad soyad
-        # olmadan talep AÇILAMAZ (form gizlense/atlansa bile sunucu reddeder).
+        # ZORUNLU (kullanıcı kuralı): havale/EFT veya kapıda ödemeli siparişin iadesinde IBAN +
+        # ad soyad olmadan talep AÇILAMAZ (form gizlense/atlansa bile sunucu reddeder).
         from routes.customer import valid_tr_iban as _viban
         if not _iban or not _viban(_iban):
-            raise HTTPException(status_code=400, detail="Havale/EFT ile ödenen siparişin iadesi için geçerli bir TR IBAN zorunludur (iade bu hesaba yapılır).")
+            raise HTTPException(status_code=400, detail="Havale/EFT veya kapıda ödemeli siparişin iadesi için geçerli bir TR IBAN zorunludur (iade bu hesaba yapılır).")
         if not str(payload.get("refund_name") or "").strip():
             raise HTTPException(status_code=400, detail="IBAN sahibinin ad soyadı zorunludur.")
         if True:

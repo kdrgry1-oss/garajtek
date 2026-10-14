@@ -72,7 +72,20 @@ const ORDER_STATUS = {
   partial_refunded: { label: "Kısmi İade Yapıldı", cls: "bg-rose-50 text-rose-700 border-rose-200", icon: CheckCircle },
   cancel_requested: { label: "İptal Talebi Alındı", cls: "bg-orange-50 text-orange-800 border-orange-300", icon: Clock },
   cancelled:   { label: "İptal Edildi",   cls: "bg-red-50     text-red-700     border-red-200",     icon: X },
+  cancel_refunded: { label: "İptal Bedeli İade Edildi", cls: "bg-red-50 text-red-700 border-red-200", icon: X },
+  payment_failed: { label: "Ödeme Alınamadı", cls: "bg-red-50 text-red-700 border-red-200", icon: X },
 };
+
+const NEUTRAL_STATUS = { cls: "bg-gray-50 text-gray-700 border-gray-200", icon: Clock };
+
+// Rozet: bilinen durumda kısa vitrin etiketi; panelden değiştirilmiş müşteri etiketi ya da
+// özel durumda backend'in (Ayarlar > Sipariş Durumları) etiketi. Bilinmeyen durum ASLA
+// 'Onay Bekliyor'a düşmez (iptal/ödemesiz siparişi beklemede gösteriyordu).
+function orderStatusBadge(order) {
+  const base = ORDER_STATUS[order?.status];
+  if (base && !order?.status_label_custom) return base;
+  return { ...(base || NEUTRAL_STATUS), label: order?.status_label || base?.label || order?.status || "-" };
+}
 
 const formatDate = (str, opts = { day: "numeric", month: "long", year: "numeric" }) => {
   if (!str) return "-";
@@ -557,7 +570,7 @@ function OrdersPane({ loading, orders, expandedOrder, setExpandedOrder, onChange
 }
 
 function OrderCard({ order, expanded, onToggle, onChanged }) {
-  const status = ORDER_STATUS[order.status] || ORDER_STATUS.pending;
+  const status = orderStatusBadge(order);
   const _deliveredAt = order.delivered_at ? new Date(order.delivered_at) : null;
   const canReturn = order.status === "delivered" && _deliveredAt && (Date.now() - _deliveredAt.getTime()) <= 14 * 24 * 3600 * 1000;
   // Müşteri iptali: yalnızca "Hazırlanıyor" durumuna geçmeden. Backend guard ile birebir aynı set.

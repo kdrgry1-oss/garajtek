@@ -5,6 +5,11 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from datetime import datetime, timezone, timedelta
 
 from .deps import db, require_admin, generate_barcode_from_range, logger, generate_id
+from .deps import _USER_SESSION_PROJECTION
+
+# GÜVENLİK: Admin üye/personel listelerinde yalnız 'password' değil; parola geçmişi (bcrypt
+# hash'leri), MFA sırları, kilit/sayaç alanları ve token_version da yanıta girmez.
+_USER_ADMIN_PROJECTION = {**_USER_SESSION_PROJECTION, "token_version": 0}
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -283,7 +288,7 @@ async def get_users(
             {"last_name": {"$regex": _s, "$options": "i"}},
         ]}]
 
-    users = await db.users.find(query, {"_id": 0, "password": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    users = await db.users.find(query, _USER_ADMIN_PROJECTION).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     total = await db.users.count_documents(query)
     
     return {

@@ -17,6 +17,11 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from .deps import db, require_admin, hash_password, generate_id, logger, require_permission
+from .deps import _USER_SESSION_PROJECTION
+
+# GÜVENLİK: Admin üye/personel listelerinde yalnız 'password' değil; parola geçmişi (bcrypt
+# hash'leri), MFA sırları, kilit/sayaç alanları ve token_version da yanıta girmez.
+_USER_ADMIN_PROJECTION = {**_USER_SESSION_PROJECTION, "token_version": 0}
 
 router = APIRouter(prefix="/admin/members", tags=["admin-members"])
 
@@ -152,7 +157,7 @@ async def list_members(
         "aov": {"$cond": [{"$gt": [{"$ifNull": ["$cached_orders", 0]}, 0]},
                           {"$divide": [{"$ifNull": ["$cached_spent", 0]}, "$cached_orders"]}, 0]},
     }}]
-    _project = {"$project": {"_id": 0, "password": 0}}
+    _project = {"$project": _USER_ADMIN_PROJECTION}
 
     if segment:
         seg_match = ({"$or": [{"cached_segment": "prospect"}, {"cached_segment": {"$exists": False}}]}
@@ -332,7 +337,7 @@ async def export_members_xlsx(
         c.fill = PatternFill("solid", fgColor="111111")
         c.alignment = Alignment(vertical="center")
     n = 0
-    async for u in db.users.find(query, {"_id": 0, "password": 0}).sort([(_sf, _dir), ("_id", 1)]).limit(50000):
+    async for u in db.users.find(query, _USER_ADMIN_PROJECTION).sort([(_sf, _dir), ("_id", 1)]).limit(50000):
         seg = u.get("cached_segment") or "prospect"
         ws.append([
             u.get("first_name") or "", u.get("last_name") or "", u.get("email") or "",
@@ -406,7 +411,7 @@ async def stats(current_user: dict = Depends(require_admin)):
 
 @router.get("/{mid}")
 async def detail(mid: str, current_user: dict = Depends(require_permission("customers.view"))):
-    u = await db.users.find_one({"id": mid, "is_admin": {"$ne": True}}, {"_id": 0, "password": 0})
+    u = await db.users.find_one({"id": mid, "is_admin": {"$ne": True}}, _USER_ADMIN_PROJECTION)
     if not u:
         raise HTTPException(status_code=404, detail="Üye bulunamadı")
 
@@ -645,7 +650,7 @@ async def _member_360_data(u: dict, start=None, end=None):
 async def member_360(mid: str, start: Optional[str] = None, end: Optional[str] = None,
                      current_user: dict = Depends(require_admin)):
     """Müşteri 360 JSON — tarih-bazlı ciro/sipariş/iade/iptal + RFM/CLV/churn/favori beden-renk."""
-    u = await db.users.find_one({"id": mid, "is_admin": {"$ne": True}}, {"_id": 0, "password": 0})
+    u = await db.users.find_one({"id": mid, "is_admin": {"$ne": True}}, _USER_ADMIN_PROJECTION)
     if not u:
         raise HTTPException(status_code=404, detail="Üye bulunamadı")
     return await _member_360_data(u, start, end)
@@ -657,7 +662,7 @@ async def member_360_print(mid: str, start: Optional[str] = None, end: Optional[
     """Müşteri 360 A4 rapor. Authorization başlığı zorunlu; ?print=1 otomatik yazdırır."""
     from fastapi.responses import HTMLResponse
     import html as _h
-    u = await db.users.find_one({"id": mid, "is_admin": {"$ne": True}}, {"_id": 0, "password": 0})
+    u = await db.users.find_one({"id": mid, "is_admin": {"$ne": True}}, _USER_ADMIN_PROJECTION)
     if not u:
         raise HTTPException(status_code=404, detail="Üye bulunamadı")
     d = await _member_360_data(u, start, end)
@@ -772,11 +777,29 @@ async def update_member(mid: str, payload: dict, current_user: dict = Depends(re
     # DENETİM FIX (#41): group_id atanabilir olmalı — Üye Grupları indirimi gruba bağlı üyeye uygulanır.
     allowed = ("first_name", "last_name", "phone", "is_active", "accepts_marketing", "acquisition_source", "notes", "segment_tags", "group_id")
     update = {k: v for k, v in payload.items() if k in allowed}
+    _now_iso = datetime.now(timezone.utc).isoformat()
+    _revoke = False
     if payload.get("password"):
-        update["password"] = hash_password(payload["password"])
-    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+        _pw = str(payload["password"]).strip()
+        if len(_pw) < 8:
+            raise HTTPException(status_code=400, detail="Şifre en az 8 karakter olmalı")
+        update["password"] = hash_password(_pw)
+        update["password_changed_at"] = _now_iso
+        update["must_change_password"] = True  # panelden atanan şifre geçicidir (create ile aynı)
+        _revoke = True
+    if "is_active" in update:
+        update["is_active"] = bool(update["is_active"])
+        if not update["is_active"]:
+            _revoke = True
+    update["updated_at"] = _now_iso
     _before = await db.users.find_one({"id": mid}, {"_id": 0, "accepts_marketing": 1, "email": 1, "phone": 1})
-    res = await db.users.update_one({"id": mid, "is_admin": {"$ne": True}}, {"$set": update})
+    # GÜVENLİK: panelden şifre atanınca / üye pasifleştirilince mevcut oturumlar düşer
+    # (token_version artışı — change-password/reset akışlarıyla aynı). Eskiden eski token
+    # /auth/me'de geçerli kalıyordu (ele geçirilmiş hesapta saldırgan içeride kalırdı).
+    _ops = {"$set": update}
+    if _revoke:
+        _ops["$inc"] = {"token_version": 1}
+    res = await db.users.update_one({"id": mid, "is_admin": {"$ne": True}}, _ops)
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Üye bulunamadı")
     # İzin panelden KAPATILDIYSA İYS'ye RET (günlük toplu bildirilir). Panelden açma İYS'ye

@@ -22,6 +22,13 @@ def valid_tr_iban(iban: str) -> bool:
         return False
 
 
+# İade/iptal bedeli KARTA DÖNEMEYEN ödeme yöntemleri → müşteriden IBAN + ad soyad alınır.
+# Havale/EFT + kapıda ödeme (nakit tahsil; takma adlar cod_rules.py ile aynı).
+# frontend ReturnRequest.jsx / GuestReturn.jsx (needsIban) ile birebir aynı tutulmalıdır.
+BANK_REFUND_PMS = ("bank_transfer", "havale", "eft", "bank",
+                   "cash_on_delivery", "kapida", "kapida_odeme", "cod")
+
+
 def _owner_or_clauses(current_user: dict) -> list:
     """Bir siparişin bu üyeye ait olduğunu gösteren eşleşme koşulları.
     user_id ile birlikte e-postayı da kapsar: misafir (üyesiz) verilen ya da
@@ -61,7 +68,35 @@ async def get_my_orders(
              "iyzico_response": 0}
     orders = await db.orders.find(query, {"_id": 0, **_hide}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     total = await db.orders.count_documents(query)
-    
+
+    # Hesabım rozeti: panel Ayarlar > Sipariş Durumları müşteri etiketi (override + özel durum).
+    # Frontend sabit haritası bilinmeyen durumu 'Onay Bekliyor' gösteriyordu.
+    try:
+        from order_statuses import get_status_config, customer_label_for_cfg, customer_color_for_cfg
+        _cfg = await get_status_config(db)
+        for o in orders:
+            _st = o.get("status") or "pending"
+            o["status_label"] = customer_label_for_cfg(_st, _cfg)
+            o["status_color"] = customer_color_for_cfg(_st, _cfg)
+            # Panelden değiştirilmiş etiket ya da özel durum → vitrin kısa etiketi yerine bu gösterilir
+            o["status_label_custom"] = bool(
+                ((_cfg.get("labels") or {}).get(_st) or {}).get("customer_label")
+                or any(c.get("key") == _st for c in (_cfg.get("custom") or [])))
+    except Exception as _e:
+        logger.warning(f"[my-orders] durum etiketi eklenemedi: {_e}")
+    # Teslim tarihi yazılmamış (eski elle 'Teslim Edildi' / kargo senkronu raporlamamış) siparişte
+    # by-number ile AYNI varsayılan-teslim fallback'i: Hesabım iade butonu bu alana bakıyor.
+    for o in orders:
+        if o.get("status") == "delivered" and not o.get("delivered_at"):
+            try:
+                from routes.orders import _effective_delivered_at
+                _d, _presumed = await _effective_delivered_at(o)
+                if _d:
+                    o["delivered_at"] = _d
+                    o["delivered_at_presumed"] = bool(_presumed)
+            except Exception as _e:
+                logger.warning(f"[my-orders] varsayılan teslim tarihi hesaplanamadı: {_e}")
+
     return {
         "orders": orders,
         "total": total,
@@ -127,7 +162,7 @@ async def cancel_my_order(order_id: str, payload: dict = Body(default={}), curre
         # Havale/EFT ile ödenmiş siparişte para BANKA HESABINA iade edilir → müşterinin girdiği
         # IBAN + ad soyad saklanır (personel iadeyi bu hesaba yapar). Kart iadesinde gerekmez.
         _pm = str(order.get("payment_method") or "").lower()
-        if _pm in ("bank_transfer", "havale", "eft", "bank"):
+        if _pm in BANK_REFUND_PMS:
             _iban = "".join(str((payload or {}).get("refund_iban") or "").split()).upper()[:34]
             _name = str((payload or {}).get("refund_name") or "").strip()[:120]
             # F11: havale iadesinde geçerli TR IBAN + ad soyad ZORUNLU (yanlış hesaba iade engeli)
@@ -245,16 +280,50 @@ async def public_order_tracking(tracking_code: str):
     )
     track_link = _public_track_link(order, tn)
 
-    SHIPPED = {"shipped", "delivered"}
-    PROCESSING = {"processing", "preparing", "shipped", "delivered"}
-    CONFIRMED = {"confirmed", "processing", "preparing", "shipped", "delivered"}
+    # Durum etiketi: Ayarlar > Sipariş Durumları'ndaki müşteri etiketi override'ları ve ÖZEL
+    # durumlar dahil (eskiden katalog-yalnız customer_label_for → override yok sayılıyor,
+    # özel/sistem durumlarında ham anahtar görünüyordu).
+    try:
+        from order_statuses import get_status_config, customer_label_for_cfg
+        _cfg = await get_status_config(db)
+        status_text = customer_label_for_cfg(status, _cfg) or status
+    except Exception:
+        status_text = {
+            "pending": "Beklemede", "awaiting_payment": "Ödeme Bekleniyor",
+            "payment_notified": "Ödeme Bildirildi", "confirmed": "Onaylandı",
+            "processing": "Hazırlanıyor", "shipped": "Kargoda",
+            "delivered": "Teslim Edildi", "cancelled": "İptal Edildi",
+            "cancel_requested": "İptal Talebiniz Alındı",
+        }.get(status, status)
 
-    if status == "cancelled":
-        timeline = [
-            {"status": "placed", "title": "Sipariş Alındı", "date": order.get("created_at"), "completed": True},
-            {"status": "cancelled", "title": "Sipariş İptal Edildi",
-             "date": order.get("cancelled_at"), "completed": True},
-        ]
+    # Teslim SONRASI (iade) durumları: teslim dahil önceki tüm adımlar tamamlanmış sayılır
+    # (eskiden bu kümelerde olmadıkları için iade aşamasındaki sipariş gri/boş görünüyordu).
+    POST_DELIVERY = {"return_requested", "return_approved", "return_rejected",
+                     "return_in_transit", "returned", "refunded", "partial_refunded"}
+    DELIVERED = {"delivered"} | POST_DELIVERY
+    SHIPPED = {"shipped", "in_transit", "out_for_delivery", "undelivered"} | DELIVERED
+    PROCESSING = {"processing", "preparing", "ready_to_ship"} | SHIPPED
+    CONFIRMED = {"confirmed"} | PROCESSING
+    CANCEL_LIKE = {"cancelled", "cancel_requested", "cancel_refunded", "payment_failed"}
+    _placed = {"status": "placed", "title": "Sipariş Alındı", "date": order.get("created_at"), "completed": True}
+
+    if status in CANCEL_LIKE:
+        # İptal akışı: normal hazırlık adımları yerine iptal adımları gösterilir.
+        timeline = [_placed]
+        if status == "payment_failed":
+            timeline.append({"status": "payment_failed", "title": "Ödeme Alınamadı",
+                             "date": order.get("updated_at"), "completed": True})
+        else:
+            if order.get("cancel_requested_at") or status == "cancel_requested":
+                timeline.append({"status": "cancel_requested", "title": "İptal Talebiniz Alındı",
+                                 "date": order.get("cancel_requested_at"), "completed": True})
+            timeline.append({"status": "cancelled", "title": "Sipariş İptal Edildi",
+                             "date": order.get("cancelled_at") if status != "cancel_requested" else None,
+                             "completed": status != "cancel_requested"})
+            if status == "cancel_refunded":
+                timeline.append({"status": "cancel_refunded", "title": "İptal Bedeliniz İade Edildi",
+                                 "date": order.get("refund_paid_at") or order.get("updated_at"),
+                                 "completed": True})
     else:
         shipped_step = {
             "status": "shipped", "title": "Kargoya Verildi",
@@ -262,17 +331,34 @@ async def public_order_tracking(tracking_code: str):
         }
         if status in SHIPPED and tn:
             shipped_step.update({"tracking_number": tn, "tracking_url": track_link, "carrier": carrier})
+        # Onay tarihi: confirmed_at (durum güncellemesi damgalar); eski kayıtlarda ödeme onayı
+        # anı. Sipariş oluşturma anı ONAY tarihi olarak GÖSTERİLMEZ (yanıltıcıydı).
         timeline = [
-            {"status": "placed", "title": "Sipariş Alındı", "date": order.get("created_at"), "completed": True},
+            _placed,
             {"status": "confirmed", "title": "Sipariş Onaylandı",
-             "date": order.get("confirmed_at") or (order.get("created_at") if status in CONFIRMED else None),
+             "date": (order.get("confirmed_at") or order.get("paid_at")) if status in CONFIRMED else None,
              "completed": status in CONFIRMED},
             {"status": "processing", "title": "Hazırlanıyor",
-             "date": order.get("processing_at"), "completed": status in PROCESSING},
+             "date": order.get("processing_at") if status in PROCESSING else None,
+             "completed": status in PROCESSING},
             shipped_step,
             {"status": "delivered", "title": "Teslim Edildi",
-             "date": delivered_at if status == "delivered" else None, "completed": status == "delivered"},
+             "date": delivered_at if status in DELIVERED else None, "completed": status in DELIVERED},
         ]
+        if status == "undelivered":
+            timeline.append({"status": "undelivered", "title": status_text,
+                             "date": order.get("updated_at"), "completed": True})
+        elif status in POST_DELIVERY:
+            # İade süreci adımı (etiket = müşteri etiketi; override'lar dahil)
+            timeline.append({"status": status, "title": status_text,
+                             "date": (order.get("refund_paid_at") if status in ("refunded", "partial_refunded") else None)
+                                     or (order.get("return_approved_at") if status == "return_approved" else None)
+                                     or order.get("updated_at"),
+                             "completed": True})
+        elif status not in CONFIRMED and status not in {"pending", "awaiting_payment", "payment_notified"}:
+            # Ayarlar'da tanımlı ÖZEL durum: kendi etiketiyle son adım olarak görünür.
+            timeline.append({"status": status, "title": status_text,
+                             "date": order.get("updated_at"), "completed": True})
 
     ship = order.get("shipping_address") or {}
 
@@ -286,17 +372,6 @@ async def public_order_tracking(tracking_code: str):
         "city": ship.get("city", ""),
         "district": ship.get("district", ""),
     }
-
-    try:
-        from order_statuses import customer_label_for as _clf
-        status_text = _clf(status) or status
-    except Exception:
-        status_text = {
-            "pending": "Beklemede", "awaiting_payment": "Ödeme Bekleniyor",
-            "payment_notified": "Ödeme Bildirildi", "confirmed": "Onaylandı",
-            "processing": "Hazırlanıyor", "shipped": "Kargoda",
-            "delivered": "Teslim Edildi", "cancelled": "İptal Edildi",
-        }.get(status, status)
 
     return {
         "order_number": order.get("order_number"),

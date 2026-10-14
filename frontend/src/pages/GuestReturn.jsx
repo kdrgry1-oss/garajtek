@@ -28,7 +28,11 @@ function GuestReturnBody() {
   const [refundIban, setRefundIban] = useState("");
   const [refundName, setRefundName] = useState("");
   const [refundBank, setRefundBank] = useState("");
-  const isHavale = !!order && ["bank_transfer", "havale", "eft", "bank"].includes(
+  const isHavale = !!order && ["bank_transfer", "havale", "eft", "bank",
+    // Kapıda ödeme (nakit) iadesi de karta dönemez → banka hesabına (backend BANK_REFUND_PMS)
+    "cash_on_delivery", "kapida", "kapida_odeme", "cod"].includes(
+    String(order.payment_method || "").toLowerCase());
+  const isCodRefund = !!order && ["cash_on_delivery", "kapida", "kapida_odeme", "cod"].includes(
     String(order.payment_method || "").toLowerCase());
   const ibanClean = refundIban.replace(/\s/g, "").toUpperCase();
   const ibanValid = /^TR\d{24}$/.test(ibanClean);
@@ -237,7 +241,7 @@ function GuestReturnBody() {
             {isHavale && (
               <div className="border border-gray-200 bg-gray-50 p-4 mb-4 space-y-3" data-testid="guest-return-refund-bank">
                 <p className="text-[12px] text-gray-600 leading-relaxed">
-                  Ödemenizi <b>Havale/EFT</b> ile yaptığınız için iade tutarı <b>banka hesabınıza</b> gönderilecektir.
+                  Ödemenizi <b>{isCodRefund ? "kapıda ödeme" : "Havale/EFT"}</b> ile yaptığınız için iade tutarı <b>banka hesabınıza</b> gönderilecektir.
                   Lütfen IBAN ve hesap sahibi bilgilerini eksiksiz girin.
                 </p>
                 <div>

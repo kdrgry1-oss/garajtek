@@ -42,6 +42,14 @@ ORDER_STATUS_CATALOG = [
 ]
 
 _BY_KEY = {s["key"]: s for s in ORDER_STATUS_CATALOG}
+
+# Katalog DIŞI sistem ara durumları: Ayarlar'dan yönetilmez (aktif/bildirim yok) ama müşteri
+# akışları siparişe yazar (customer.py cancel_my_order → cancel_requested). Etiketsiz kalınca
+# takip ekranında ham anahtar ('cancel_requested') görünüyordu.
+SYSTEM_EXTRA_STATUSES = {
+    "cancel_requested": {"label": "İptal Talebi Alındı", "customer_label": "İptal Talebiniz Alındı",
+                         "color": "#F97316"},
+}
 CONFIG_ID = "order_status_config"
 # Şablon tohumlama versiyonu — DEFAULT_STATUS_TEMPLATES'e yeni event/email şablonu
 # eklendikçe artır; get_status_config bu sürümü görünce eksikleri yeniden tohumlar.
@@ -58,7 +66,7 @@ def event_for(key):
 
 
 def customer_label_for(key):
-    s = _BY_KEY.get(key)
+    s = _BY_KEY.get(key) or SYSTEM_EXTRA_STATUSES.get(key)
     return s["customer_label"] if s else key
 
 
@@ -188,7 +196,20 @@ def customer_label_for_cfg(key, cfg):
     for c in ((cfg or {}).get("custom") or []):
         if c["key"] == key:
             return c.get("customer_label") or key
+    if key in SYSTEM_EXTRA_STATUSES:
+        return SYSTEM_EXTRA_STATUSES[key]["customer_label"]
     return key
+
+
+def customer_color_for_cfg(key, cfg):
+    """Müşteri rozeti rengi — çekirdek / sistem / özel durum."""
+    s = _BY_KEY.get(key) or SYSTEM_EXTRA_STATUSES.get(key)
+    if s:
+        return s.get("color") or "#6B7280"
+    for c in ((cfg or {}).get("custom") or []):
+        if c["key"] == key:
+            return c.get("color") or "#6B7280"
+    return "#6B7280"
 
 
 # ---- Varsayılan bildirim şablonları (eksikse tohumlanır; admin düzenleyebilir) ----

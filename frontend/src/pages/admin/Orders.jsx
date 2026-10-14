@@ -85,6 +85,39 @@ const statusOptions = [
   { value: "payment_failed", label: "Ödeme Alınamadı (para alınmadı)", class: "status-undelivered" },
 ];
 
+// Ayarlar > Sipariş Durumları'nda eklenen ÖZEL durumlar sabit listede yok → API'den eklenir;
+// aksi halde panel menüsünde seçilemiyor, o durumdaki sipariş 'Onay Bekliyor' görünüyordu.
+const NEUTRAL_STATUS_CLASS = "bg-gray-100 text-gray-700 px-2 py-1 text-xs rounded";
+function buildStatusOptions(apiStatuses) {
+  const known = new Set(statusOptions.map((s) => s.value));
+  const custom = (apiStatuses || [])
+    .filter((s) => s && s.key && !known.has(s.key))
+    .map((s) => ({ value: s.key, label: s.label || s.key, class: NEUTRAL_STATUS_CLASS, is_custom: true }));
+  const all = [...statusOptions, ...custom];
+  const active = (apiStatuses || []).filter((s) => s && s.active).map((s) => s.key);
+  // "Görünür" seçili durumlar (boş ise tüm liste) — durum DEĞİŞTİRME menülerinde kullanılır
+  const visible = active.length ? all.filter((s) => active.includes(s.value)) : all;
+  return { all, visible };
+}
+function statusInfoFor(status, options = statusOptions) {
+  const hit = options.find((s) => s.value === status);
+  if (hit) return hit;
+  // Bilinmeyen durum 'Onay Bekliyor' GÖSTERİLMEZ (yanıltıcı) — ham anahtar nötr rozetle görünür.
+  return { value: status, label: status || "—", class: NEUTRAL_STATUS_CLASS };
+}
+
+// Ödeme tipi etiketi — liste sütunu ve detay özeti AYNI eşlemeyi kullanır (kapıda ödeme takma
+// adları backend cod_rules.py ile aynı: cash_on_delivery/kapida/kapida_odeme/cod).
+const COD_PMS = ["cash_on_delivery", "kapida", "kapida_odeme", "cod"];
+function paymentMethodLabel(order, short = false) {
+  const pm = String(order?.payment_method || "").toLowerCase();
+  if (["transfer", "havale", "bank_transfer", "eft"].includes(pm)) return "Havale/EFT";
+  if (["credit_card", "card", "iyzico", "cc"].includes(pm)) return "Kredi Kartı";
+  if (COD_PMS.includes(pm)) return short ? "Kapıda" : "Kapıda Ödeme";
+  if (order && (isOtherChannelOrder(order) || pm === "marketplace")) return OTHER_LABEL;
+  return "";
+}
+
 // Elle "Kargoya Ver" modalı: yalnız entegre firmalar (Aras / PTT)
 const cargoCompanies = [
   { value: "ARAS", label: "Aras Kargo" },
@@ -146,7 +179,7 @@ export default function AdminOrders({ unpaidView = false }) {
     return () => clearTimeout(_t);
   }, [_filtersSig]);
   const _ordReqSeq = useRef(0); // yarış koruması: yalnız EN SON isteğin yanıtı uygulanır
-  const [activeStatusKeys, setActiveStatusKeys] = useState([]); // Ayarlar > Siparis Durumlari "Gorunur"
+  const [apiStatuses, setApiStatuses] = useState([]); // Ayarlar > Siparis Durumlari (aktiflik + özel durumlar)
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState([]);
@@ -923,20 +956,14 @@ export default function AdminOrders({ unpaidView = false }) {
       try {
         const token = localStorage.getItem('token');
         const r = await axios.get(`${API}/settings/order-statuses`, { headers: { Authorization: `Bearer ${token}` } });
-        const act = (r.data?.statuses || []).filter(s => s.active).map(s => s.key);
-        if (act.length) setActiveStatusKeys(act);
+        setApiStatuses(r.data?.statuses || []);
       } catch (e) { /* tum liste fallback */ }
     })();
   }, []);
 
-  // "Gorunur" secili durumlar (bos ise tum katalog) — durum DEGISTIRME acilir menulerinde kullanilir
-  const visibleStatusOptions = activeStatusKeys.length
-    ? statusOptions.filter(s => activeStatusKeys.includes(s.value))
-    : statusOptions;
+  const { all: allStatusOptions, visible: visibleStatusOptions } = buildStatusOptions(apiStatuses);
 
-  const getStatusInfo = (status) => {
-    return statusOptions.find(s => s.value === status) || statusOptions[0];
-  };
+  const getStatusInfo = (status) => statusInfoFor(status, allStatusOptions);
 
   return (
     <div data-testid="admin-orders">
@@ -988,7 +1015,7 @@ export default function AdminOrders({ unpaidView = false }) {
                 { value: "refunded", label: "İade Edildi" },
               ]} />
             <MultiSelect className="w-44" placeholder="Tüm Sipariş Durumları" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}
-              options={statusOptions.map(s => ({ value: s.value, label: s.label }))} />
+              options={allStatusOptions.map(s => ({ value: s.value, label: s.label }))} />
             <label className="flex items-center gap-2 text-sm border px-3 py-1.5 rounded cursor-pointer">
               <input type="checkbox" className="accent-black" checked={filters.influencer === "1"} onChange={e => setFilters({...filters, influencer: e.target.checked ? "1" : ""})} />
               Influencer ile gelen
@@ -1078,7 +1105,7 @@ export default function AdminOrders({ unpaidView = false }) {
               defaultValue=""
             >
               <option value="" disabled>Toplu Durum Güncelle</option>
-              {statusOptions.map(s => (
+              {allStatusOptions.map(s => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
@@ -1319,11 +1346,7 @@ export default function AdminOrders({ unpaidView = false }) {
                         const pm = (order.payment_method || '').toLowerCase();
                         const paid = order.payment_status === 'paid' ||
                           ['confirmed', 'processing', 'shipped', 'delivered', 'undelivered'].includes(order.status);
-                        let label = '';
-                        if (pm === 'transfer' || pm === 'havale' || pm === 'bank_transfer' || pm === 'eft') label = 'Havale/EFT';
-                        else if (pm === 'credit_card' || pm === 'card' || pm === 'iyzico' || pm === 'cc') label = 'Kredi Kartı';
-                        else if (pm === 'cod' || pm === 'kapida' || pm === 'cash_on_delivery' || pm === 'kapida_odeme') label = 'Kapıda';
-                        else if (isOtherChannelOrder(order) || pm === 'marketplace') label = OTHER_LABEL;
+                        const label = paymentMethodLabel(order, true);
                         if (!label) return <span className="text-sm text-gray-400">—</span>;
                         const isHavale = (pm === 'transfer' || pm === 'havale' || pm === 'bank_transfer' || pm === 'eft');
                         return (
@@ -2095,6 +2118,12 @@ export default function AdminOrders({ unpaidView = false }) {
 
               {/* Totals */}
               <div className="p-4 bg-gray-50 rounded space-y-2">
+                {paymentMethodLabel(selectedOrder) && (
+                  <div className="flex justify-between text-sm" data-testid="order-detail-payment-method">
+                    <span>Ödeme Yöntemi</span>
+                    <span>{paymentMethodLabel(selectedOrder)}</span>
+                  </div>
+                )}
                 {editMode ? (
                   <>
                     <div className="flex justify-between items-center text-sm gap-2"><span>Ara Toplam</span><input type="number" step="0.01" className="border rounded px-2 py-1 text-sm w-32 text-right" value={editData.subtotal} onChange={(e) => setField("subtotal", e.target.value)} /></div>
@@ -2133,6 +2162,13 @@ export default function AdminOrders({ unpaidView = false }) {
                       <div className="flex justify-between text-sm">
                         <span>🎁 Hediye Paketi</span>
                         <span>{Number(selectedOrder.gift_wrap_price).toFixed(2)} TL</span>
+                      </div>
+                    )}
+                    {/* Kapıda ödeme hizmet bedeli toplamın parçası — satır yoksa döküm toplamı tutmuyordu */}
+                    {Number(selectedOrder.cod_fee) > 0 && (
+                      <div className="flex justify-between text-sm" data-testid="order-detail-cod-fee">
+                        <span>Kapıda Ödeme Hizmet Bedeli</span>
+                        <span>{Number(selectedOrder.cod_fee).toFixed(2)} TL</span>
                       </div>
                     )}
                     {Number(selectedOrder.points_used) > 0 && (
