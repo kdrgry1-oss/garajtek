@@ -10,6 +10,7 @@ from .deps import db, logger, get_current_user, require_admin, generate_id, gene
 from stock_audit import record_stock_audit
 from activity_audit import record_admin_audit
 from product_schema import BOOL_COLS as PRODUCT_BOOL_COLS
+from tenant_config import DEFAULT_VAT_RATE
 from fastapi import Response, UploadFile, File, Form
 import pandas as pd
 import io
@@ -1134,6 +1135,20 @@ async def _build_products_query(
     return query, _admin_view
 
 
+# Vitrin fiyat sıralaması için efektif fiyat: sale_price > 0 ve price'tan düşükse o, değilse price.
+# Bozuk/boş değerler 0'a çevrilir (aggregate hata vermesin).
+_EFF_PRICE_STAGES = [
+    {"$addFields": {
+        "_p_num": {"$convert": {"input": "$price", "to": "double", "onError": 0, "onNull": 0}},
+        "_s_num": {"$convert": {"input": "$sale_price", "to": "double", "onError": 0, "onNull": 0}},
+    }},
+    {"$addFields": {"_eff_price": {"$cond": [
+        {"$and": [{"$gt": ["$_s_num", 0]}, {"$lt": ["$_s_num", "$_p_num"]}]},
+        "$_s_num", "$_p_num",
+    ]}}},
+]
+
+
 @router.get("")
 async def get_products(
     request: Request,
@@ -1265,6 +1280,12 @@ async def get_products(
             {"$addFields": {"_in_stock": {"$cond": [{"$gt": ["$_eff_stock", 0]}, 1, 0]}}},
             {"$addFields": {"_card_num": {"$convert": {"input": "$urun_karti_id", "to": "long", "onError": 0, "onNull": 0}}}},
         ]
+        # FİYAT SIRALAMASI: müşterinin gördüğü fiyata göre (indirimli satış fiyatı liste
+        # fiyatından düşükse o). Eskiden ham 'price' ile sıralanıyor, 385 ₺'lik indirimli ürün
+        # 429 ₺'lik üründen sonra geliyordu.
+        if sort == "price":
+            pipeline += _EFF_PRICE_STAGES
+            sort = "_eff_price"
         # ALAKA (E3): arama varken İSİMDE geçen ürün önce gelsin (stoktakiler arasında).
         # Böylece "büstiyer" arayınca yalnız açıklamada geçen alakasız ürün üste çıkmaz.
         if search:
@@ -1292,7 +1313,7 @@ async def get_products(
             {"$skip": skip},
             {"$limit": limit},
             {"$project": {"_id": 0, "_eff_stock": 0, "_in_stock": 0, "_card_num": 0, "_rel": 0,
-                          "_mpos": 0, "_mpos_raw": 0}},
+                          "_mpos": 0, "_mpos_raw": 0, "_p_num": 0, "_s_num": 0, "_eff_price": 0}},
         ]
         products = await db.products.aggregate(pipeline, allowDiskUse=True).to_list(limit)
     else:
@@ -2413,6 +2434,54 @@ def _size_tables_last(images):
 _SPEC_PASSTHRU_NUM = ("width", "depth", "height", "product_weight", "cargo_weight")
 
 
+def _validate_vat(v):
+    """KDV oranını sayıya çevirip 0–100 aralığında doğrular; geçersizse 400.
+    Eskiden 'abc', -5, 250 gibi değerler olduğu gibi kaydediliyor, sipariş/fatura KDV
+    hesabını bozuyordu (siparişteki vat_map float() hatası → tüm kalemler varsayılana düşüyordu)."""
+    if isinstance(v, bool) or v is None or (isinstance(v, str) and not v.strip()):
+        raise HTTPException(status_code=400, detail="KDV oranı sayısal olmalı")
+    try:
+        n = float(v.strip().replace(",", ".")) if isinstance(v, str) else float(v)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="KDV oranı sayısal olmalı")
+    if n != n or n < 0 or n > 100:  # NaN dahil
+        raise HTTPException(status_code=400, detail="Geçersiz KDV oranı (0–100 arası olmalı)")
+    return int(n) if n.is_integer() else n
+
+
+# Yeni üründe sabit `product` sözlüğüne girmeyen ama admin formunun gönderdiği alanlar.
+# Eskiden create_product bunları sessizce atıyordu (SEO başlığı, Üye Tipi 1 fiyatı vb. ancak
+# ikinci bir düzenle-kaydet ile kalıcı oluyordu); update_product ise hepsini $set ediyor.
+_CREATE_PASSTHRU_STR = ("meta_title", "meta_description", "meta_keywords", "keywords", "unit",
+                        "gtip_code", "variation_code", "currency", "estimated_delivery")
+_CREATE_PASSTHRU_FLOAT = ("member_price_1", "member_price_2", "member_price_3", "market_price")
+_CREATE_PASSTHRU_INT = ("min_order_qty", "max_order_qty", "max_installment")
+
+
+def _apply_create_passthru(target: dict, src: dict) -> None:
+    """Form alanlarını yeni ürüne taşır (yalnız src'de GELENLER). Sayısal alanlar çevrilir,
+    boş değer None olarak saklanır; geçersiz sayıda 400."""
+    for k in _CREATE_PASSTHRU_STR:
+        if k in src and src.get(k) is not None:
+            target[k] = src[k] if isinstance(src[k], str) else str(src[k])
+    if "vat_included" in src:
+        target["vat_included"] = bool(src.get("vat_included"))
+    try:
+        for k in _CREATE_PASSTHRU_FLOAT + _CREATE_PASSTHRU_INT:
+            if k not in src:
+                continue
+            v = src.get(k)
+            if v is None or (isinstance(v, str) and not v.strip()):
+                target[k] = None
+                continue
+            n = float(str(v).strip().replace(",", "."))
+            if n != n or n < 0:
+                raise ValueError(f"{k}: negatif/geçersiz olamaz")
+            target[k] = int(n) if k in _CREATE_PASSTHRU_INT else n
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Geçersiz alan değeri — {e}")
+
+
 async def _apply_spec_fields(target: dict, src: dict) -> None:
     """Teknik özellik alanlarını (specs / extra_specs / variant_labels) doğrulayıp target'a yazar.
     Yalnız src'de GELEN anahtarlar işlenir (kısmi güncellemede diğerleri korunur). Paket boyutu /
@@ -2450,9 +2519,16 @@ async def create_product(
     """Create new product (admin only)"""
     variants = product_data.get("variants", [])
     
-    # Fetch settings for default VAT
+    # Varsayılan KDV: ayardaki default_vat_rate; yoksa/bozuksa DEFAULT_VAT_RATE (%20).
     settings = await db.settings.find_one({"id": "main"})
-    default_vat = settings.get("default_vat_rate", 10) if settings else 10
+    _set_vat = (settings or {}).get("default_vat_rate")
+    try:
+        default_vat = _validate_vat(_set_vat) if _set_vat not in (None, "") else DEFAULT_VAT_RATE
+    except HTTPException:
+        default_vat = DEFAULT_VAT_RATE
+    # Gelen KDV doğrulanır (metin/negatif/100+ → 400); gelmediyse varsayılan.
+    vat_rate = (_validate_vat(product_data["vat_rate"])
+                if product_data.get("vat_rate") is not None else default_vat)
 
     # Auto-generate barcodes efficiently
     used_barcodes_set = await build_used_barcode_set()
@@ -2552,14 +2628,15 @@ async def create_product(
         "is_opportunity": product_data.get("is_opportunity", False),
         "is_free_shipping": product_data.get("is_free_shipping", False),
         "cod_disabled": bool(product_data.get("cod_disabled", False)),  # kapıda ödemeye kapalı (cod_rules.py)
-        "vat_rate": product_data.get("vat_rate", default_vat),
+        "vat_rate": vat_rate,
         "use_default_markup": product_data.get("use_default_markup", True),
         "markup_rate": float(product_data.get("markup_rate", 0)),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
+    _apply_create_passthru(product, product_data)
     await _apply_spec_fields(product, product_data)
-    
+
     # Ekipman kataloğu: renkler AYRI ürüne bölünmez — tüm varyantlar tek kartta kalır.
     _all_variants = product.get("variants") or []
     _colors = _distinct_variant_colors(_all_variants)
@@ -2760,6 +2837,9 @@ async def update_product(
     existing = await db.products.find_one({"id": product_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
+    # KDV oranı doğrulanır (metin/negatif/100+ kaydedilmez).
+    if "vat_rate" in product_data:
+        product_data["vat_rate"] = _validate_vat(product_data.get("vat_rate"))
     
     # Update slug if name changed — format: isim-kartid (tüm linkler tek biçim).
     # Eski slug, kırılan link/SEO olmaması için slug_aliases'a eklenir.
@@ -3467,8 +3547,19 @@ async def bulk_update_vat(
     vat_rate = payload.get("vat_rate")
     if vat_rate is None:
         raise HTTPException(status_code=400, detail="VAT rate is required")
-    
-    result = await db.products.update_many({}, {"$set": {"vat_rate": vat_rate}})
+    vat_rate = _validate_vat(vat_rate)
+
+    # Çöp kutusundaki ürünlere dokunulmaz.
+    result = await db.products.update_many({"is_deleted": {"$ne": True}}, {"$set": {"vat_rate": vat_rate}})
+    # Varsayılan KDV ayarı da kalıcı olur: buton yalnız ürünleri güncelliyordu, ayarı kaydetmiyordu
+    # → ürünler %X'e çekilse bile her YENİ ürün eski varsayılanla açılıyordu.
+    await db.settings.update_one({"id": "main"}, {"$set": {"default_vat_rate": vat_rate}})
+    await db.settings.update_one({"id": "tenant_config"}, {"$set": {"commerce.default_vat_rate": vat_rate}})
+    try:
+        from tenant_config import invalidate as _tc_invalidate
+        _tc_invalidate(db)
+    except Exception:
+        pass
     return {"message": f"{result.modified_count} ürünün KDV oranı %{vat_rate} olarak güncellendi."}
 
 

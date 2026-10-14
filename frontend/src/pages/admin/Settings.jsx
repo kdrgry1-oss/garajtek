@@ -4,6 +4,22 @@ import { toast } from "sonner";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Varsayılan KDV (%20) — backend tenant_config.DEFAULT_VAT_RATE ile aynı.
+export const DEFAULT_VAT_RATE = 20;
+
+// Yüzde indirim alanları: boş bırakılırsa "" KAYDEDİLMEZ, varsayılana (5) döner.
+// Aksi halde kasa ""'yi %5, sipariş 0 sayıyor → her havale siparişi 409 alıyordu.
+export const normalizePctSettings = (s) => {
+  const out = { ...s };
+  for (const key of ["bank_transfer_discount_pct", "edu_discount_pct"]) {
+    if (!(key in out)) continue;
+    const v = out[key];
+    if (v === "" || v === null || v === undefined || Number.isNaN(Number(v))) out[key] = 5;
+    else out[key] = Math.min(90, Math.max(0, Number(v)));
+  }
+  return out;
+};
+
 function MaintenanceSubscribers() {
   const [data, setData] = useState({ total: 0, subscribers: [] });
 
@@ -70,7 +86,7 @@ export default function AdminSettings() {
     edu_discount_pct: 5,
     barcode_range_start: "",
     barcode_range_end: "",
-    default_vat_rate: 10,
+    default_vat_rate: DEFAULT_VAT_RATE,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -103,7 +119,9 @@ export default function AdminSettings() {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API}/settings`, settings, {
+      const payload = normalizePctSettings(settings);
+      setSettings(payload);
+      await axios.post(`${API}/settings`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success("Ayarlar kaydedildi");
@@ -253,17 +271,17 @@ export default function AdminSettings() {
               <div className="flex gap-2">
                 <input
                   type="number"
-                  value={tenant.commerce?.default_vat_rate ?? 10}
+                  value={tenant.commerce?.default_vat_rate ?? DEFAULT_VAT_RATE}
                   onChange={(e) => setTenantField("commerce", "default_vat_rate", parseFloat(e.target.value) || 0)}
                   className="flex-1 border px-3 py-2 rounded text-sm"
                 />
                 <button
                   type="button"
                   onClick={async () => {
-                    if (await window.appConfirm(`Tüm ürünlerin KDV oranını %${tenant.commerce?.default_vat_rate ?? 10} olarak güncellemek istediğinize emin misiniz?`)) {
+                    if (await window.appConfirm(`Tüm ürünlerin KDV oranını %${tenant.commerce?.default_vat_rate ?? DEFAULT_VAT_RATE} olarak güncellemek istediğinize emin misiniz?`)) {
                       try {
                         const token = localStorage.getItem('token');
-                        const res = await axios.post(`${API}/products/bulk-update-vat`, { vat_rate: tenant.commerce?.default_vat_rate ?? 10 }, {
+                        const res = await axios.post(`${API}/products/bulk-update-vat`, { vat_rate: tenant.commerce?.default_vat_rate ?? DEFAULT_VAT_RATE }, {
                           headers: { Authorization: `Bearer ${token}` }
                         });
                         toast.success(res.data.message);

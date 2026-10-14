@@ -17,6 +17,9 @@ from typing import Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+# Varsayılan KDV oranı (yedek parça/ekipman için standart %20) — TEK KAYNAK.
+# Ayar (default_vat_rate) yoksa ürün oluşturma ve ilk kurulum buna düşer (models.py ile tutarlı).
+DEFAULT_VAT_RATE = 20.0
 
 class _Section(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -91,7 +94,7 @@ class CommerceConfig(_Section):
     currency_code: str = "TRY"
     currency_symbol: str = "₺"
     locale: str = "tr-TR"
-    default_vat_rate: float = 10.0
+    default_vat_rate: float = DEFAULT_VAT_RATE
     prices_include_vat: bool = True
     order_numbering: OrderNumberingConfig = Field(default_factory=OrderNumberingConfig)
 

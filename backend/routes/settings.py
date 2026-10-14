@@ -5,11 +5,36 @@ from datetime import datetime, timezone
 from .deps import db, require_admin, limiter, require_permission
 from tenant_config import (
     TenantConfig, get_tenant_config, invalidate as invalidate_tenant_config,
-    legacy_write_through,
+    legacy_write_through, DEFAULT_VAT_RATE,
 )
 from activity_audit import record_admin_audit
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
+
+
+# Yüzde indirim ayarları ve boş değerde kullanılacak varsayılanları (kasa ekranıyla aynı: %5).
+_PCT_SETTINGS_DEFAULTS = {"bank_transfer_discount_pct": 5, "edu_discount_pct": 5}
+
+
+def _normalize_pct_settings(data: dict) -> None:
+    """Havale/öğrenci indirim yüzdelerini kaydetmeden önce sayıya çevirir (0–90).
+    KÖK SEBEP: admin alanı temizleyince "" kaydediliyordu; kasa ekranı ""'yi %5 sayarken
+    sipariş oluşturma 0 uyguluyordu → her havale siparişi 409 (tutar uyuşmazlığı).
+    Artık boş/None → varsayılan (5), metin/aralık dışı → 400; DB'ye hiç "" yazılmaz."""
+    for key, dflt in _PCT_SETTINGS_DEFAULTS.items():
+        if key not in data:
+            continue
+        v = data.get(key)
+        if v is None or (isinstance(v, str) and not v.strip()):
+            data[key] = dflt
+            continue
+        try:
+            n = float(str(v).replace(",", ".")) if isinstance(v, str) else float(v)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail=f"{key}: sayısal olmalı")
+        if isinstance(v, bool) or n != n or n < 0 or n > 90:
+            raise HTTPException(status_code=400, detail=f"{key}: 0–90 arası olmalı")
+        data[key] = int(n) if n.is_integer() else n
 
 
 # =============================================================================
@@ -116,6 +141,13 @@ async def get_maintenance_status():
 async def get_settings():
     """Get global settings"""
     settings = await db.settings.find_one({"id": "main"}, {"_id": 0})
+    # Eski sürümün kaydettiği BOŞ indirim yüzdelerini ("") onar → kasa ve sipariş aynı değeri okur.
+    if settings:
+        _bad = {k: d for k, d in _PCT_SETTINGS_DEFAULTS.items()
+                if k in settings and (settings[k] is None or (isinstance(settings[k], str) and not settings[k].strip()))}
+        if _bad:
+            await db.settings.update_one({"id": "main"}, {"$set": _bad})
+            settings.update(_bad)
     if settings and not settings.get("cod_default_applied"):
         # Kapıda ödeme varsayılanı (tek seferlik; yönetici seçimi korunur) — cod_rules.ensure_cod_default
         try:
@@ -140,7 +172,7 @@ async def get_settings():
             "cod_default_applied": True,
             "barcode_range_start": "",
             "barcode_range_end": "",
-            "default_vat_rate": 10,
+            "default_vat_rate": DEFAULT_VAT_RATE,
                 "company_info": {
                 "company_name": "",
                 "tax_office": "",
@@ -171,6 +203,7 @@ async def update_settings(
     before_main = await db.settings.find_one({"id": "main"}, {"_id": 0}) or {}
     before_tenant = await db.settings.find_one({"id": "tenant_config"}, {"_id": 0}) or {}
     settings_data.pop("_id", None)
+    _normalize_pct_settings(settings_data)
     # New admin clients write the canonical nested document. Keep it out of
     # settings.main so there is only one authoritative copy.
     tenant_payload = settings_data.pop("tenant_config", None)
