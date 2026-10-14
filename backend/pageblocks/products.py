@@ -234,6 +234,32 @@ async def resolve_source(db, src: dict, *, member: bool = False, use_cache: bool
     return out
 
 
+# Gerçek satış adedi (Özel Teklif "Satılan" çubuğu): ürünlerde sold_count siparişle güncellenmiyordu → hep 0.
+# İptal/iade/ödenmemiş siparişler hariç kalem adetleri toplanır; 120 sn önbellek.
+_SOLD_EXCLUDE = {"cancelled", "cancel_refunded", "refunded", "returned", "return_completed", "payment_failed",
+                 "pending_payment", "failed", "cancel_requested"}
+_sold_cache = {"at": 0.0, "map": {}}
+
+
+async def sold_counts(db) -> dict:
+    import time  # noqa: PLC0415
+    if time.time() - _sold_cache["at"] < 120:
+        return _sold_cache["map"]
+    m: dict = {}
+    try:
+        async for o in db.orders.find({}, {"_id": 0, "status": 1, "items": 1}):
+            if str(o.get("status") or "").lower() in _SOLD_EXCLUDE:
+                continue
+            for it in (o.get("items") or []):
+                pid = (it or {}).get("product_id")
+                if pid:
+                    m[pid] = m.get(pid, 0) + max(1, int(it.get("quantity") or 1))
+    except Exception:  # noqa: BLE001
+        return _sold_cache["map"]
+    _sold_cache.update(at=time.time(), map=m)
+    return m
+
+
 async def resolve_many(db, sources: list, *, member: bool = False, use_cache: bool = True) -> list:
     from . import _clean_source, _Ctx  # noqa: PLC0415
     ctx = _Ctx(False)
@@ -241,4 +267,7 @@ async def resolve_many(db, sources: list, *, member: bool = False, use_cache: bo
     for i, s in enumerate((sources or [])[:30]):
         norm = _clean_source(s, {"max_limit": 48}, f"sources[{i}]", [], ctx)
         out.append(await resolve_source(db, norm, member=member, use_cache=use_cache))
+    sold = await sold_counts(db)
+    out = [[({**p, "sold_count": max(int(p.get("sold_count") or 0), sold.get(p.get("id"), 0))}
+             if isinstance(p, dict) else p) for p in (rows or [])] for rows in out]
     return out

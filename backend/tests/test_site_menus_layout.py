@@ -22,8 +22,9 @@ def test_clean_group_defaults_roundtrip():
 
 def test_default_home_order_matches_template():
     types = [b["type"] for b in pageblocks.default_home()]
-    assert types[:7] == ["hero_slider", "ads_block", "deals_tabs", "product_grid_212", "best_sellers",
-                         "full_banner", "product_slider"]
+    # Marka bandı reklam kutularının hemen altında (sahip talebi 12.10.2026)
+    assert types[:8] == ["hero_slider", "ads_block", "brands_carousel", "deals_tabs", "product_grid_212",
+                         "best_sellers", "full_banner", "product_slider"]
 
 
 def test_pristine_detection():
