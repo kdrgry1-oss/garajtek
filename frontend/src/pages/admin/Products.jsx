@@ -183,6 +183,37 @@ function DescriptionEditor({ value, onChange }) {
 const PRODUCTS_VIEW_KEY = "store_products_view";
 const _loadProductsView = () => { try { return JSON.parse(localStorage.getItem(PRODUCTS_VIEW_KEY) || "{}") || {}; } catch (e) { return {}; } };
 
+/** Varyantı olmayan ürünün stoğu — varyant eklemeden doğrudan girilir.
+ *  Varyant varsa stok varyantların toplamıdır (sunucu da böyle hesaplar), alan bilgi gösterir. */
+function SimpleStockField({ formData, setFormData }) {
+  const hasV = (formData.variants || []).length > 0;
+  if (hasV) {
+    const total = formData.variants.reduce((s, v) => s + (parseInt(v.stock, 10) || 0), 0);
+    return (
+      <div className="p-4 rounded-lg bg-gray-50 border text-sm text-gray-600" data-testid="simple-stock-info">
+        Toplam stok <b className="text-gray-900">{total}</b> — varyantlı üründe stok her varyantın satırından girilir.
+      </div>
+    );
+  }
+  return (
+    <div className="p-4 rounded-lg bg-orange-50 border border-orange-200 flex flex-wrap items-end gap-4" data-testid="simple-stock-field">
+      <label className="flex flex-col text-xs font-bold text-gray-600 uppercase">
+        Stok Adedi (varyantsız ürün)
+        <input
+          type="number" min="0" step="1"
+          value={formData.stock ?? 0}
+          onChange={(e) => setFormData({ ...formData, stock: e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value, 10) || 0) })}
+          className="mt-1 w-32 border border-gray-300 rounded-lg px-3 py-2 text-base font-bold bg-white focus:border-black outline-none"
+          data-testid="simple-stock-input"
+        />
+      </label>
+      <p className="text-xs text-gray-500 flex-1 min-w-[200px]">
+        Ürünün beden/renk gibi seçeneği yoksa varyant eklemenize gerek yok; stoğu buraya girip kaydedin.
+      </p>
+    </div>
+  );
+}
+
 export default function AdminProducts() {
   const storeInfo = useStoreInfo();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1040,6 +1071,12 @@ export default function AdminProducts() {
 
       {
         delete payload.newVariant;
+        // Varyantsız ürün stoğu: elle değiştirilmediyse gönderme → form açıkken gelen
+        // sipariş/iade düşümü ezilmez (varyantlardaki _stock0 korumasının aynısı).
+        const stockTouched = Number(payload.stock || 0) !== Number(payload._stock0 ?? -1);
+        if (editingProduct && !(payload.variants || []).length && !stockTouched) delete payload.stock;
+        else if (payload.stock !== undefined) payload.stock = Math.max(0, parseInt(payload.stock, 10) || 0);
+        delete payload._stock0;
         if (editingProduct) {
           await axios.put(`${API}/products/${editingProduct.id}`, payload, { headers });
           toast.success("Ürün güncellendi");
@@ -1406,6 +1443,7 @@ export default function AdminProducts() {
       // dokunmadı" durumunu ayırt eder ve form açıkken gelen sipariş/iade hareketini
       // EZMEZ. Dokunulmuş alan (stock !== _stock0) ise aynen yazılır.
       variants: (product.variants || []).map((v) => ({ ...v, _stock0: Number(v.stock || 0) })),
+      _stock0: Number(product.stock || 0),
       attributes: (() => {
         const base = {};
         const a = product.attributes;
@@ -2413,6 +2451,7 @@ export default function AdminProducts() {
 
               {/* Pricing Tab */}
               <TabsContent value="pricing" className="space-y-6 m-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <SimpleStockField formData={formData} setFormData={setFormData} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4">
                     <h3 className="font-semibold text-gray-900 border-b pb-2 mb-4">Fiyatlandırma</h3>
@@ -2783,6 +2822,8 @@ export default function AdminProducts() {
                         />
                     </div>
                   </div>
+
+                  <SimpleStockField formData={formData} setFormData={setFormData} />
 
                   <VariantLabelsField formData={formData} setFormData={setFormData} />
 
