@@ -1,0 +1,115 @@
+# Mail sunucusu (deploy/mail) kurulumu — SSH'a elle bağlanmadan, dağıtımın SSH anahtarıyla.
+# Yalnız elle çalışır: GitHub › Actions › "Mail sunucusu kur" › Run workflow.
+#   islem=kontrol → PTR, giden 25 portu, DNS ve mevcut kurulum durumu (hiçbir şey değiştirmez)
+#   islem=kur     → deploy/mail/mail-kur.sh (idempotent; tekrar çalıştırmak kutuları/DKIM'i korur)
+# Sonda Cloudflare'e eklenecek DKIM TXT değeri log'a yazılır.
+name: Mail sunucusu kur
+
+on:
+  workflow_dispatch:
+    inputs:
+      islem:
+        description: "kontrol (değişiklik yapmaz) veya kur"
+        required: true
+        default: kontrol
+        type: choice
+        options: [kontrol, kur]
+      le_email:
+        description: "Let's Encrypt bildirim e-postası (opsiyonel)"
+        required: false
+        default: ""
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  APP: /opt/garajtek
+  DOMAIN: ${{ vars.SITE_DOMAIN || 'garajtek.com' }}
+
+jobs:
+  mail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+          VDS_USER: ${{ secrets.VDS_USER }}
+          VDS_SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
+          VDS_SSH_PORT: ${{ secrets.VDS_SSH_PORT }}
+          VDS_KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+        run: |
+          test -n "$VDS_HOST" || { echo "::error::VDS_HOST secret tanımlı değil"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VDS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          PORT="${VDS_SSH_PORT:-22}"
+          if [ -n "$VDS_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$VDS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$PORT" -H "$VDS_HOST" > ~/.ssh/known_hosts 2>/dev/null
+          fi
+          cat > ~/.ssh/config <<EOF
+          Host vds
+            HostName $VDS_HOST
+            User ${VDS_USER:-root}
+            Port $PORT
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            ServerAliveInterval 30
+          EOF
+          ssh vds 'echo "SSH OK: $(hostname)"'
+
+      - name: Upload mail scripts
+        env:
+          VDS_USER: ${{ secrets.VDS_USER }}
+        run: |
+          SUDO=""; [ -n "$VDS_USER" ] && [ "$VDS_USER" != "root" ] && SUDO="sudo -n"
+          ssh vds "$SUDO mkdir -p $APP/deploy/mail"
+          RSYNC_PATH="rsync"; [ -n "$SUDO" ] && RSYNC_PATH="sudo -n rsync"
+          rsync -rlptz --rsync-path="$RSYNC_PATH" deploy/mail/ "vds:$APP/deploy/mail/"
+
+      - name: Kontrol (PTR, port 25, DNS)
+        env:
+          VDS_USER: ${{ secrets.VDS_USER }}
+        run: |
+          SUDO=""; [ -n "$VDS_USER" ] && [ "$VDS_USER" != "root" ] && SUDO="sudo -n"
+          ssh vds "set +e
+            IP=\$(curl -4 -s --max-time 10 https://api.ipify.org || hostname -I | awk '{print \$1}')
+            echo \"Sunucu IP: \$IP\"
+            echo -n 'PTR (rDNS): '; (getent hosts \$IP | awk '{print \$2}') || echo '-'
+            echo -n 'Giden 25 portu: '; timeout 6 bash -c 'exec 3<>/dev/tcp/gmail-smtp-in.l.google.com/25' 2>/dev/null && echo ACIK || echo KAPALI
+            echo -n 'mail.$DOMAIN A: '; getent ahostsv4 mail.$DOMAIN | awk 'NR==1{print \$1}'
+            echo -n 'Mail aracı: '; [ -x /usr/local/sbin/garajtek-mail ] && echo KURULU || echo 'kurulu değil'
+            $SUDO systemctl is-active postfix dovecot opendkim 2>/dev/null | paste -sd' ' | sed 's/^/Servisler (postfix dovecot opendkim): /'
+            true"
+
+      - name: Kur
+        if: inputs.islem == 'kur'
+        env:
+          VDS_USER: ${{ secrets.VDS_USER }}
+          LE_EMAIL: ${{ inputs.le_email }}
+        run: |
+          SUDO=""; [ -n "$VDS_USER" ] && [ "$VDS_USER" != "root" ] && SUDO="sudo -n"
+          EXTRA=""
+          if [ -n "$LE_EMAIL" ]; then
+            printf '%s' "$LE_EMAIL" | grep -Eq '^[^@ ]+@[^@ ]+\.[a-z]{2,}$' || { echo "::error::le_email geçersiz"; exit 1; }
+            EXTRA="--le-email $LE_EMAIL"
+          fi
+          ssh vds "$SUDO bash $APP/deploy/mail/mail-kur.sh $DOMAIN mail.$DOMAIN $EXTRA"
+
+      - name: DKIM kaydı
+        if: inputs.islem == 'kur'
+        env:
+          VDS_USER: ${{ secrets.VDS_USER }}
+        run: |
+          SUDO=""; [ -n "$VDS_USER" ] && [ "$VDS_USER" != "root" ] && SUDO="sudo -n"
+          echo "Cloudflare › DNS › Add record → Type: TXT, Name: default._domainkey, Content:"
+          ssh vds "$SUDO /usr/local/sbin/garajtek-mail dkim-record" || true
