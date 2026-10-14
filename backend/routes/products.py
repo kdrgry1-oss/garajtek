@@ -616,6 +616,43 @@ def _fuzzy_tr_regex(s: str) -> str:
     return '.{0,1}'.join(parts)   # .{0,2}→.{0,1}: subsequence sıkılaştı → alakasız "abuk sabuk" eşleşme azalır
 
 
+def _search_field_ors(esc: str) -> list:
+    """Serbest aramanın baktığı alanlar ('description' bilerek yok — uzun metin alakasız eşleşir)."""
+    fields = (
+        "name", "keywords", "stock_code", "sku", "barcode", "variants.barcode", "variants.sku",
+        "variants.stock_code", "urun_karti_id", "variants.urun_id", "id", "brand",
+        "variants.color", "variants.size",
+        # Ürün tipi/özellik değerleri (ör. attributes[].value = "Büstiyer"), kategori adı ve
+        # ana renk — isimde geçmese de tipi/kategorisi eşleşen ürün gelsin.
+        "attributes.value", "category_name", "color",
+    )
+    return [{f: {"$regex": esc, "$options": "i"}} for f in fields]
+
+
+def _search_words(s: str) -> list:
+    """Aramayı kelimelere böler (tekrarsız, en çok 8 kelime) — kelime sırasından bağımsız eşleşme için."""
+    out = []
+    for w in (s or "").split():
+        w = w.strip(".,;:!?\"'()[]")
+        if w and w.lower() not in (x.lower() for x in out):
+            out.append(w)
+    return out[:8]
+
+
+def _search_rel_expr(search: str) -> dict:
+    """Alaka puanı: tam ifade isimde 100, tüm kelimeler isimde (farklı sırada) 80, kategoride 30."""
+    rx = _search_tr_regex(search)
+
+    def _m(field, r):
+        return {"$regexMatch": {"input": {"$toString": {"$ifNull": [f"${field}", ""]}}, "regex": r, "options": "i"}}
+
+    parts = [{"$cond": [_m("name", rx), 100, 0]}, {"$cond": [_m("category_name", rx), 30, 0]}]
+    words = _search_words(search)
+    if len(words) > 1:
+        parts.append({"$cond": [{"$and": [_m("name", _search_tr_regex(w)) for w in words]}, 80, 0]})
+    return {"$add": parts}
+
+
 _MEMBERS_ONLY_CACHE = {"ids": set(), "ts": 0.0}
 
 
@@ -1026,28 +1063,12 @@ async def _build_products_query(
         # NOT: 'description' arama alanlarından ÇIKARILDI — uzun açıklama metinleri başka ürün
         # adlarını da içerebildiği için arama alakasız ürünleri
         # getiriyordu. Arama artık isim/anahtar kelime/kod/kategori/özellik/renk üzerinden yürür.
-        query["$or"] = [
-            {"name": {"$regex": esc, "$options": "i"}},
-            {"keywords": {"$regex": esc, "$options": "i"}},
-            {"stock_code": {"$regex": esc, "$options": "i"}},
-            {"sku": {"$regex": esc, "$options": "i"}},
-            {"barcode": {"$regex": esc, "$options": "i"}},
-            {"variants.barcode": {"$regex": esc, "$options": "i"}},
-            {"variants.sku": {"$regex": esc, "$options": "i"}},
-            {"variants.stock_code": {"$regex": esc, "$options": "i"}},
-            {"urun_karti_id": {"$regex": esc, "$options": "i"}},
-            {"variants.urun_id": {"$regex": esc, "$options": "i"}},
-            {"id": {"$regex": esc, "$options": "i"}},
-            {"brand": {"$regex": esc, "$options": "i"}},
-            {"variants.color": {"$regex": esc, "$options": "i"}},
-            {"variants.size": {"$regex": esc, "$options": "i"}},
-            # Ürün tipi/özellik değerleri (ör. attributes[].value = "Büstiyer"),
-            # kategori adı ve ana renk — müşteri "büstiyer" arayınca tipi büstiyer
-            # olan ürün de gelsin (isim/açıklamada geçmese bile).
-            {"attributes.value": {"$regex": esc, "$options": "i"}},
-            {"category_name": {"$regex": esc, "$options": "i"}},
-            {"color": {"$regex": esc, "$options": "i"}},
-        ]
+        query["$or"] = _search_field_ors(esc)
+        # KELİME SIRASINDAN BAĞIMSIZ: "lift makaslı" / "4 ton kriko" gibi kelimeleri karışık
+        # sırayla yazılan aramalar da bulunur — her kelime (herhangi bir alanda) geçiyorsa eşleşir.
+        _words = _search_words(search)
+        if len(_words) > 1:
+            query["$or"].append({"$and": [{"$or": _search_field_ors(_search_tr_regex(w))} for w in _words]})
 
     if is_featured is not None:
         query["is_featured"] = is_featured
@@ -1392,11 +1413,7 @@ async def get_products(
         # ALAKA (E3): arama varken İSİMDE geçen ürün önce gelsin (stoktakiler arasında).
         # Böylece "büstiyer" arayınca yalnız açıklamada geçen alakasız ürün üste çıkmaz.
         if search:
-            _rx = _search_tr_regex(search)
-            pipeline.append({"$addFields": {"_rel": {"$add": [
-                {"$cond": [{"$regexMatch": {"input": {"$toString": {"$ifNull": ["$name", ""]}}, "regex": _rx, "options": "i"}}, 100, 0]},
-                {"$cond": [{"$regexMatch": {"input": {"$toString": {"$ifNull": ["$category_name", ""]}}, "regex": _rx, "options": "i"}}, 30, 0]},
-            ]}}})
+            pipeline.append({"$addFields": {"_rel": _search_rel_expr(search)}})
             pipeline.append({"$sort": {"_in_stock": -1, "_rel": -1, sort: sort_order, "_id": 1}})
         elif _card_sort:
             # MANUEL KATEGORİ SIRASI: panelden sürükle-bırak ile belirlenmişse ona uyulur.
@@ -1450,17 +1467,13 @@ async def get_products(
             # ALAKA SIRALAMASI: arama varken İSİMDE geçen ürünler önce gelsin (aksi halde
             # yalnız açıklama/özellikte geçen alakasız ürün üste çıkabiliyordu — "büstiyer"
             # arayınca isimsiz Takım'ın en üstte gelmesi gibi). name > kategori > diğer.
-            _rx = _search_tr_regex(search)
             # Panelde de "Fiyat" sıralaması vitrindeki gibi EFEKTİF fiyata (geçerli indirimli
             # fiyat, yoksa satış fiyatı) göre yapılır.
             _eff = sort == "price"
             rel_pipeline = [
                 {"$match": query},
                 *(_EFF_PRICE_STAGES if _eff else []),
-                {"$addFields": {"_rel": {"$add": [
-                    {"$cond": [{"$regexMatch": {"input": {"$toString": {"$ifNull": ["$name", ""]}}, "regex": _rx, "options": "i"}}, 100, 0]},
-                    {"$cond": [{"$regexMatch": {"input": {"$toString": {"$ifNull": ["$category_name", ""]}}, "regex": _rx, "options": "i"}}, 30, 0]},
-                ]}}},
+                {"$addFields": {"_rel": _search_rel_expr(search)}},
                 {"$sort": {"_rel": -1, ("_eff_price" if _eff else sort): sort_order, "_id": 1}},
                 {"$skip": skip},
                 {"$limit": limit},
