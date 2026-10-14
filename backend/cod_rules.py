@@ -23,7 +23,8 @@ def _truthy(v) -> bool:
 
 async def cod_config(db) -> Dict[str, Any]:
     from business_rules import get_rule
-    s = await db.settings.find_one({"id": "main"}, {"_id": 0, "payment_methods": 1, "cod_default_applied": 1}) or {}
+    # "id" projeksiyonda: belge var ama iki alan da yoksa {} (falsy) dönüp göçü atlamasın
+    s = await db.settings.find_one({"id": "main"}, {"_id": 0, "id": 1, "payment_methods": 1, "cod_default_applied": 1}) or {}
     if s and not s.get("cod_default_applied"):
         await ensure_cod_default(db)  # tek seferlik varsayılan (yönetici seçimi korunur)
         s = await db.settings.find_one({"id": "main"}, {"_id": 0, "payment_methods": 1}) or {}
@@ -78,8 +79,8 @@ async def ensure_cod_default(db) -> str:
     "Açıkça değiştirildi" = audit_logs'ta payment_methods'u değiştiren settings.update kaydı var.
     Dönüş: "enabled" | "kept" (yönetici seçimi korundu) | "done" (önceden uygulandı) | "no-settings"."""
     import json
-    doc = await db.settings.find_one({"id": "main"}, {"_id": 0, "payment_methods": 1, "cod_default_applied": 1})
-    if not doc:
+    doc = await db.settings.find_one({"id": "main"}, {"_id": 0, "id": 1, "payment_methods": 1, "cod_default_applied": 1})
+    if doc is None:
         return "no-settings"  # ilk GET /settings varsayılanı (kapıda ödeme açık + işaret) yazar
     if doc.get("cod_default_applied"):
         return "done"

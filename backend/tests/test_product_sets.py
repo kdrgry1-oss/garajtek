@@ -340,3 +340,15 @@ def test_cod_default_keeps_explicit_admin_choice(db):
     run(db.audit_logs.delete_many({}))
     run(db.settings.insert_one({"id": "main", "payment_methods": {"credit_card": True, "cash_on_delivery": False}}))
     assert run(cod_rules.ensure_cod_default(db)) == "enabled"
+
+
+def test_cod_default_runs_when_settings_has_neither_field(db):
+    # Belge var ama payment_methods / cod_default_applied yok → projeksiyon {} dönse de göç çalışmalı
+    run(db.settings.insert_one({"id": "main", "site_name": "X"}))
+    assert run(cod_rules.ensure_cod_default(db)) == "enabled"
+    doc = run(db.settings.find_one({"id": "main"}))
+    assert doc["payment_methods"]["cash_on_delivery"] is True and doc["cod_default_applied"] is True
+    # cod_config yolu da aynı durumda göçü tetikler
+    run(db.settings.delete_many({}))
+    run(db.settings.insert_one({"id": "main"}))
+    assert run(cod_rules.cod_config(db))["enabled"] is True

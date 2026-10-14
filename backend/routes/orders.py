@@ -841,19 +841,88 @@ def _allowed_payment_method(v) -> str:
     return pm
 
 
+def _pct_amount_half_up(base: float, pct: float) -> float:
+    """base × pct/100, yarım kuruşta YUKARI yuvarlanır (Decimal ROUND_HALF_UP) — kasa
+    (Checkout.jsx) ile aynı kural. round() hem ikili float hatası hem banker yuvarlaması
+    yüzünden 678,30×%5 = 33,915 → 33,91 veriyordu; kasa 33,92 gösterdiği için kayıtlı toplam
+    onaylanan tutardan 1 kuruş sapıyordu (bulgu #10)."""
+    from decimal import Decimal, ROUND_HALF_UP
+    b = Decimal(str(round(float(base or 0), 2)))
+    amt = b * Decimal(str(float(pct or 0))) / Decimal(100)
+    return float(amt.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+_ADDR_FIELD_LABELS = {"first_name": "ad", "last_name": "soyad", "address": "adres",
+                      "city": "il", "district": "ilçe", "phone": "telefon"}
+
+
+def _is_valid_tckn(value) -> bool:
+    """TCKN algoritma kontrolü — frontend checkout/utils.js isValidTCKN ile aynı kural."""
+    s = str(value or "")
+    if not re.fullmatch(r"[1-9]\d{10}", s):
+        return False
+    d = [int(c) for c in s]
+    d10 = ((d[0] + d[2] + d[4] + d[6] + d[8]) * 7 - (d[1] + d[3] + d[5] + d[7])) % 10
+    d11 = sum(d[:10]) % 10
+    return d[9] == d10 and d[10] == d11
+
+
+def _validate_checkout_payload(order_data: dict, current_user: dict = None) -> None:
+    """Sunucu tarafı adres/iletişim/fatura doğrulaması (bulgu #9): kurallar yalnız istemcide
+    (checkout/utils.js validateAddress + Checkout validateAll) çalışıyordu; bot ya da eski istemci
+    kargolanamaz/faturalanamaz sipariş açıp stok tutabiliyordu. Kurallar frontend ile AYNI
+    (daha sıkı değil) — geçerli istemci akışları (kasa + kapıda hızlı sipariş) etkilenmez."""
+    def _addr(a, label):
+        if not isinstance(a, dict):
+            raise HTTPException(status_code=400, detail=f"{label} eksik veya hatalı")
+        for k, name in _ADDR_FIELD_LABELS.items():
+            if not str(a.get(k) or "").strip():
+                raise HTTPException(status_code=400, detail=f"{label} eksik veya hatalı: {name}")
+        if len(re.sub(r"\D", "", str(a.get("phone") or ""))) < 10:
+            raise HTTPException(status_code=400, detail=f"{label} eksik veya hatalı: telefon (en az 10 hane)")
+
+    ship = order_data.get("shipping_address")
+    _addr(ship, "Teslimat adresi")
+    # E-posta: kasa oturum e-postasını düşer; kapıda hızlı siparişte opsiyonel → girildiyse biçim kontrolü
+    _email = str(ship.get("email") or (current_user or {}).get("email") or "").strip()
+    if _email and not _EMAIL_RE.match(_email):
+        raise HTTPException(status_code=400, detail="Geçerli bir e-posta adresi girin")
+    bill = order_data.get("billing_address")
+    if order_data.get("billing_same_as_shipping") is False and bill:
+        _addr(bill, "Fatura adresi")
+    bi = order_data.get("billing_info")
+    if isinstance(bi, dict) and bi.get("is_corporate"):
+        if not str(bi.get("company_name") or "").strip():
+            raise HTTPException(status_code=400, detail="Firma ünvanı gereklidir")
+        if not str(bi.get("tax_office") or "").strip():
+            raise HTTPException(status_code=400, detail="Vergi dairesi gereklidir")
+        tn = re.sub(r"\D", "", str(bi.get("tax_number") or ""))
+        if len(tn) not in (10, 11):
+            raise HTTPException(status_code=400, detail="VKN (10 hane) veya TCKN (11 hane) girin")
+        if len(tn) == 11 and not _is_valid_tckn(tn):
+            raise HTTPException(status_code=400, detail="Geçerli bir TC kimlik numarası girin")
+
+
 @router.get("/by-number/{order_number}")
 @(limiter.limit("30/minute") if limiter else (lambda f: f))
-async def get_order_by_number(order_number: str, request: Request):
+async def get_order_by_number(order_number: str, request: Request,
+                              current_user: dict = Depends(get_current_user)):
     """Sipariş numarasıyla siparişi getir (public — ödeme sonrası başarı sayfası için).
-    PII maskelenir (telefon/email son kısımları gizlenir, adres detayı sınırlanır)."""
+    PII maskelenir (telefon/email son kısımları gizlenir; sokak/kapı adresi yalnız oturumdaki
+    sipariş sahibine açık döner, diğerlerine maskelenir — il/ilçe görünür)."""
     order = await db.orders.find_one(
         {"order_number": order_number},
-        {"_id": 0, "admin_notes": 0, "payment_id": 0, "user_id": 0, "customer_ip": 0, "user_agent": 0,
+        {"_id": 0, "admin_notes": 0, "payment_id": 0, "customer_ip": 0, "user_agent": 0,
          "billing_address": 0, "billing_info": 0, "attribution": 0, "payment_receipt": 0,
+         "idempotency_key": 0,
          "iyzico_retrieve_response": 0, "iyzico_init_response": 0, "iyzico_response": 0}
     )
     if not order:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
+    # Sahiplik yalnız açık adres kararı için okunur; yanıtta user_id dönmez.
+    _owner_uid = order.pop("user_id", None)
+    _is_owner = bool(current_user and _owner_uid and current_user.get("id") == _owner_uid)
 
     def _mask_email(e: str) -> str:
         if not e or "@" not in e:
@@ -870,6 +939,10 @@ async def get_order_by_number(order_number: str, request: Request):
         n = str(n or "").strip()
         return (n[:1] + "***") if n else ""
 
+    def _mask_address(a: str) -> str:
+        a = str(a or "").strip()
+        return (a[:3] + "***") if a else ""
+
     ship = order.get("shipping_address") or {}
     if ship:
         order["shipping_address"] = {
@@ -877,7 +950,9 @@ async def get_order_by_number(order_number: str, request: Request):
             "last_name": _mask_name(ship.get("last_name", "")),
             "phone": _mask_phone(ship.get("phone", "")),
             "email": _mask_email(ship.get("email", "")),
-            "address": (ship.get("address") or "")[:40] + ("..." if len(ship.get("address") or "") > 40 else ""),
+            # KVKK: numara sıralı → anonim çağrıda sokak/kapı no sızmasın (40 karakter kesmesi
+            # çoğu adresi tamamen gösteriyordu). Sahibine tam adres.
+            "address": (ship.get("address") or "") if _is_owner else _mask_address(ship.get("address", "")),
             "city": ship.get("city", ""),
             "district": ship.get("district", ""),
         }
@@ -1421,6 +1496,9 @@ async def create_order(
                 "message": "Mevcut sipariş kullanıldı",
             }
 
+    # Adres / iletişim / fatura bilgisi sunucuda da doğrulanır (stok düşülmeden ÖNCE).
+    _validate_checkout_payload(order_data, current_user)
+
     # STOK KİLİTLEME KORUMASI (2026-09-29): ödeme bekleyen sipariş stoğu düşer ve iptal/iade
     # süresine kadar tutar. Aynı kişi (üye / e-posta / telefon) veya aynı IP çok sayıda ÖDENMEMİŞ
     # sipariş açıp stoğu kilitleyemesin. Eşik İşletme Kuralları'ndan (0 = kapalı). IP eşiği
@@ -1445,12 +1523,20 @@ async def create_order(
             _who.append({"shipping_address.phone": {"$regex": re.escape(_ph) + "$"}})
         _n_who = await db.orders.count_documents({**_base, "$or": _who}) if _who else 0
         _n_ip = await db.orders.count_documents({**_base, "customer_ip": client_ip}) if client_ip else 0
-        if _n_who >= _pend_max or _n_ip >= _pend_max * 3:
-            logger.warning(f"[stok-kilit] ödenmemiş sipariş sınırı: user={uid} ip={client_ip} "
+        if _n_who >= _pend_max:
+            logger.warning(f"[stok-kilit] ödenmemiş sipariş sınırı (kişi): user={uid} ip={client_ip} "
                            f"kisi={_n_who} ip_say={_n_ip} esik={_pend_max}")
             raise HTTPException(status_code=429, detail=(
                 "Ödemesi tamamlanmamış siparişleriniz var. Lütfen önce mevcut siparişinizin ödemesini "
                 "tamamlayın ya da bir süre sonra tekrar deneyin. Yardım için bizimle iletişime geçebilirsiniz."))
+        if _n_ip >= _pend_max * 3:
+            # Yalnız IP eşiği doldu: sayılan siparişler aynı ağdaki BAŞKA müşterilerin olabilir
+            # (CGNAT/ofis) → müşteriye "sizin siparişiniz var" denmez, nötr mesaj verilir.
+            logger.warning(f"[stok-kilit] ödenmemiş sipariş sınırı (ip): user={uid} ip={client_ip} "
+                           f"kisi={_n_who} ip_say={_n_ip} esik={_pend_max * 3}")
+            raise HTTPException(status_code=429, detail=(
+                "Şu anda bu bağlantı üzerinden sipariş alınamıyor. Lütfen bir süre sonra tekrar deneyin "
+                "veya bizimle iletişime geçin."))
 
     order = {
         "id": generate_id(),
@@ -1738,7 +1824,7 @@ async def create_order(
         except Exception:
             _pm_pct = 5.0
         if _pm_pct > 0:
-            _pm_disc = round((_subtotal - _server_discount) * _pm_pct / 100.0, 2)
+            _pm_disc = _pct_amount_half_up(_subtotal - _server_discount, _pm_pct)
     order["payment_discount"] = _pm_disc
     order["bank_transfer_discount_pct"] = (_pm_pct if _pm_disc > 0 else 0)
 
@@ -2545,11 +2631,19 @@ async def update_order_status(
 
     # DENETİM FIX: reaktivasyon (iptal/iade → aktif fulfillment) stok re-decrement'i için
     # ÖNCEKİ durumu güncellemeden ÖNCE yakala.
-    _prev_doc = await db.orders.find_one({"id": order_id}, {"_id": 0, "status": 1})
+    _prev_doc = await db.orders.find_one({"id": order_id}, {"_id": 0, "status": 1,
+                                                            "shipped_at": 1, "delivered_at": 1})
     _prev_status = (_prev_doc or {}).get("status")
 
     _now = datetime.now(timezone.utc).isoformat()
     _set = {"status": status, "updated_at": _now}
+    # Elle (tekil/toplu) kargolandı/teslim edildi: tarih alanları yazılmıyordu → iade penceresi
+    # (_effective_delivered_at) hiç başlamıyor, kapıda ödemede iade kalıcı kapanıyordu (bulgu #13).
+    # Mevcut tarih (kargo senkronunun yazdığı) EZİLMEZ.
+    if status in ("shipped", "delivered") and not (_prev_doc or {}).get("shipped_at"):
+        _set["shipped_at"] = _now
+    if status == "delivered" and not (_prev_doc or {}).get("delivered_at"):
+        _set["delivered_at"] = _now
     if status == "return_approved":
         _set["return_approved_at"] = _now
     if status in ("refunded", "partial_refunded"):
@@ -2770,7 +2864,10 @@ async def update_order_status(
             # çekilince stok TEKRAR DÜŞÜLMELİ. Eskiden düşülmediği için iade edilmiş +1 stok
             # üzerinde kalıp aynı ürün ikinci kez satılabiliyordu. İdempotent: yalnız daha önce
             # restock EDİLDİYSE (restore hareketi var) bir kez düş, sonra restore hareketini sil.
-            _ACTIVE_FULFILL = {"confirmed", "preparing", "processing", "ready_to_ship",
+            # Açık ama henüz onaylanmamış durumlar da (onay/ödeme bekleyen) stok tutar: iptalden
+            # bunlara geri çekilen sipariş iade edilen stoğu tekrar düşmeli (bulgu #30, oversell).
+            _ACTIVE_FULFILL = {"pending", "awaiting_payment", "payment_notified",
+                               "confirmed", "preparing", "processing", "ready_to_ship",
                                "shipped", "in_transit", "out_for_delivery", "delivered"}
             # B5/B8: iade/iptal sonrası tekrar aktif fulfillment'a çekilince, DAHA ÖNCE İADE
             # EDİLEN miktarı geri düş — tüm siparişi değil, yalnız gerçekten restock edilmiş
@@ -7214,6 +7311,36 @@ async def reject_return(return_id: str, payload: dict,
 # Madde 3 — Gider Pusulası (site iadeleri) (P5)
 # ============================================================================
 
+def _gp_vat_totals(lines: list, net_total: float, default_rate: float, n_product: int = None):
+    """Gider pusulası KDV toplamı — oran bazında. lines: [(oran, KDV-dahil tutar)], ilk n_product
+    satır ürün kalemleridir. Satır toplamı net_total'dan saparsa (kargo mahsubu / elle tutar)
+    fark en büyük ÜRÜN oranı grubuna yazılır. Dönüş: (vat_rate, vat_amount, net_without_vat,
+    vat_breakdown). vat_rate: tek oran varsa o, karmada en büyük ürün grubunun oranı (Excel
+    dışa aktarımı bunu yalnız oranı bilinmeyen kalem için varsayılan olarak kullanır)."""
+    by_rate = {}
+    for r, g in lines:
+        by_rate[float(r)] = _round2(by_rate.get(float(r), 0.0) + _round2(g))
+    prod_rates = {float(r) for r, _ in (lines[:n_product] if n_product is not None else lines)}
+    if not by_rate or _round2(sum(by_rate.values())) <= 0.009:
+        by_rate = {float(default_rate): _round2(net_total)}
+        prod_rates = {float(default_rate)}
+    _cands = [r for r in by_rate if r in prod_rates] or list(by_rate)
+    main_rate = max(_cands, key=lambda r: by_rate[r])
+    diff = _round2(net_total - sum(by_rate.values()))
+    if abs(diff) >= 0.01:
+        by_rate[main_rate] = _round2(max(0.0, by_rate[main_rate] + diff))
+    breakdown, vat_total = {}, 0.0
+    for r, g in sorted(by_rate.items()):
+        if g <= 0.009:
+            continue
+        v = _round2(g * r / (100 + r))
+        vat_total = _round2(vat_total + v)
+        breakdown[f"{r:g}"] = {"gross": g, "vat": v, "matrah": _round2(g - v)}
+    rates = [float(k) for k in breakdown] or [main_rate]
+    vat_rate = rates[0] if len(rates) == 1 else main_rate
+    return vat_rate, vat_total, _round2(net_total - vat_total), breakdown
+
+
 @router.post("/returns/{return_id}/gider-pusulasi")
 async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = Body(default=None),
                                      preview: bool = Query(False),
@@ -7480,9 +7607,7 @@ async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = B
             total_gross = net_total          # gider pusulası: brüt < net olamaz
         total_discount = _round2(max(0.0, total_gross - net_total))
 
-    vat_rate = settings.get("default_vat_rate", 10) if settings else 10
-    vat_amount = round(net_total * vat_rate / (100 + vat_rate), 2)
-    net_without_vat = round(net_total - vat_amount, 2)
+    _default_vat = float((settings.get("default_vat_rate", 10) if settings else 10) or 10)
 
     # ORTAK numara serisi (harici kanal + site). İDEMPOTENT: bu iade için pusula ZATEN varsa
     # numarayı KORU (yeniden hesaplama yeni numara YAKMAZ) → mevcut pusulaları düzeltebiliriz.
@@ -7500,7 +7625,11 @@ async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = B
     # Kalem satırları GERÇEK ödeneni gösterir: net = item.price × (1 − sipariş indirim oranı).
     # Böylece pusuladaki kalem tutarları TOPLAMI, faturayla/ödemeyle tutarlı olur.
     gp_items = []
+    # KDV oranı kalem bazında (bulgu #35): kalem/ürün vat_rate, yoksa ayar varsayılanı.
+    _gp_vat_map = await _product_vat_map({"items": items})
+    _gp_rates = []
     for it in items:
+        _gp_rates.append(_item_kdv(it, _gp_vat_map, _default_vat))
         _list_unit = _round2(it.get("unit_price", it.get("price", 0)))
         _net_unit = _eff_net_unit(it)
         gp_items.append({
@@ -7554,6 +7683,17 @@ async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = B
             "reason": "Vade farkı (taksit)",
         })
 
+    # Toplam KDV kalemlerin GERÇEK oranlarından (ürün kendi oranı; kargo/vade %20) — eskiden tüm
+    # tutar ayardaki default_vat_rate (%10) ile bölünüyordu → %20'lik üründe KDV eksik çıkıyordu.
+    _vat_lines = [(_gp_rates[i], _round2(_round2(g["net_price"]) * int(g.get("quantity", 1) or 1)))
+                  for i, g in enumerate(gp_items[:len(_gp_rates)])]
+    if cargo_line:
+        _vat_lines.append((20.0, _round2(cargo_line["net_price"] * int(cargo_line.get("qty", 1) or 1))))
+    if vade_line:
+        _vat_lines.append((20.0, _round2(vade_line["net_price"] * int(vade_line.get("qty", 1) or 1))))
+    vat_rate, vat_amount, net_without_vat, vat_breakdown = _gp_vat_totals(
+        _vat_lines, net_total, _default_vat, len(_gp_rates))
+
     # #13: Bedava kargo alınan siparişten KISMİ iade → kargo kampanya koşulu değişti (muhasebe uyarısı).
     _cargo_campaign_warning = ""
     if (not paid_shipping) and (not is_full):
@@ -7606,6 +7746,7 @@ async def site_return_gider_pusulasi(return_id: str, payload: Optional[dict] = B
             "vat_rate": vat_rate,
             "vat_amount": vat_amount,
             "net_without_vat": net_without_vat,
+            "vat_breakdown": vat_breakdown,
         },
         "cargo": {
             "included": bool(cargo_line),
