@@ -1383,7 +1383,28 @@ export default function AdminOrders({ unpaidView = false }) {
                           <FolderOpen size={15} />
                         </button>
                         {/* 2. (kaldırıldı) Kargoya Ver → üst bar "Toplu Barkod Oluştur" + sipariş detayından yapılır */}
-                        {/* 3. (kaldırıldı) Fatura Yazdır → üst bar "Toplu Fatura Yazdır" kullanılır */}
+                        {/* 3. Fatura — BirFatura faturayı KENDİ panelinde keser (siparişi çeker, PDF linkini geri yazar).
+                            Kesilmişse yeşil: PDF açılır; değilse gri: BirFatura paneli açılır. */}
+                        {(() => {
+                          const pdf = order.invoice_pdf_url || order.invoice_link || order.invoice?.pdf_url || "";
+                          const no = order.invoice_number || order.invoice?.invoice_number || "";
+                          if (pdf || no) {
+                            return (
+                              <button type="button" title={`Fatura kesildi${no ? `: ${no}` : ""} — PDF'i aç`} data-testid={`order-invoice-${order.id}`}
+                                onClick={() => (pdf ? window.open(pdf, "_blank", "noopener,noreferrer") : openDetail(order))}
+                                className="tci-btn" style={{ background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }}>
+                                <FileText size={15} />
+                              </button>
+                            );
+                          }
+                          return (
+                            <a href="https://uygulama.birfatura.com" target="_blank" rel="noopener noreferrer" data-testid={`order-invoice-${order.id}`}
+                              title="Fatura henüz kesilmedi — BirFatura panelinde 'Onaylanmış Siparişler'den faturalayın (BirFatura siparişi otomatik çeker; kesilince PDF burada görünür)"
+                              className="tci-btn" style={{ color: "#9ca3af" }}>
+                              <FileText size={15} />
+                            </a>
+                          );
+                        })()}
                         {/* 5. (kaldırıldı) Kargo Etiketi → sipariş detayından / üst bardan yapılır */}
                         {/* 5b. (kaldırıldı) Kargo Durum Yenile — kargo verisi artık otomatik
                             çekildiği için manuel yenile butonuna gerek kalmadı. */}
