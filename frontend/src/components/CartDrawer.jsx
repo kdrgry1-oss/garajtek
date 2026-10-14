@@ -95,14 +95,14 @@ export function MiniCartList({ items, onNavigate, removeItem, updateQuantity, co
 
 export default function CartDrawer() {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, total, itemCount, clearCart } = useCart();
-  const { shippingFee, freeShippingThreshold } = useShipping();
+  const { shippingFee, freeShippingThreshold, shippingRules } = useShipping();
   const freeShippingLimit = freeShippingThreshold || 0;
   const [promoDiscount, setPromoDiscount] = useState(0);
 
   // Ücretsiz kargo eşiği — sunucuyla aynı taban (indirim SONRASI tutar).
   // Kargo da /sepet ile AYNI hesaplanır → çekmecedeki "Toplam" (ve WhatsApp mesajındaki
   // "Toplam") sepet sayfasındaki Toplam ile aynı tutarı gösterir (önceden kargo hariçti).
-  const shipQ = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee });
+  const shipQ = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee, rules: shippingRules });
   const netTotal = shipQ.basis;
   const remaining = freeShippingThreshold != null ? Math.max(0, freeShippingThreshold - netTotal) : 0;
 

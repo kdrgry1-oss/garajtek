@@ -1797,7 +1797,10 @@ async def create_order(
             excluded_ids=_excl,
         )
         _server_discount = round(float(_ev.get("total_discount", 0) or 0), 2)
-        _free_shipping = bool(_ev.get("free_shipping"))
+        # Eşiği belirleyen otomatik kampanya bayrağı SAYILMAZ (onun minimumu eşikle uygulanır);
+        # girilen 'Kargo bedava' kuponu / koşullu kampanya ise eşikten bağımsız ücretsiz kargo verir.
+        from shipping_rules import promo_free_shipping as _promo_fs
+        _free_shipping = _promo_fs(_ev.get("applied") or [])
         order["applied_promotions"] = _ev.get("applied") or []
         # Bulanık kupon çözümleme: müşteri 'hoş geldin %10' gibi bir varyant yazdıysa siparişe
         # KANONİK kod (HOSGELDIN10) yazılır → record_order_redemptions kuponu birebir bulur.
@@ -1815,18 +1818,45 @@ async def create_order(
     # tutar üzerinden ayar-tabanlı yüzde (varsayılan %5). Sunucu-otoriter: istemci değil sunucu
     # hesaplar. Yalnızca havale/eft ödeme yönteminde uygulanır.
     _pm_disc = 0.0
+    _bank_disc = 0.0
+    _pm_pct = 0.0
     _pm_lc = (order.get("payment_method") or "").lower()
     if _pm_lc in ("bank_transfer", "havale", "eft", "havale_eft", "banka_havale"):
         try:
+            # Boş/geçersiz değer AYAR SAYFASI ve kasa ile aynı yorumlanır (varsayılan %5).
+            # Eskiden "" → `"" or 0` = %0 sayılıyor, kasa %5 gösterdiği için her havale 409 alıyordu.
+            from .settings import effective_pct_setting as _eff_pct
             _pmset = await db.settings.find_one(
                 {"id": "main"}, {"_id": 0, "bank_transfer_discount_pct": 1}) or {}
-            _pm_pct = float(_pmset.get("bank_transfer_discount_pct", 5) or 0)
+            _pm_pct = _eff_pct(_pmset, "bank_transfer_discount_pct")
         except Exception:
             _pm_pct = 5.0
         if _pm_pct > 0:
-            _pm_disc = _pct_amount_half_up(_subtotal - _server_discount, _pm_pct)
+            _bank_disc = _pct_amount_half_up(_subtotal - _server_discount, _pm_pct)
+    order["bank_transfer_discount_pct"] = (_pm_pct if _bank_disc > 0 else 0)
+    # ÖDEME TİPİ İNDİRİMİ (Panel › Kargo & Ödeme Kampanyaları › Ödeme Tipi İndirimleri):
+    # kasa ile AYNI kural kaynağı (catalog_extras.payment_type_discount_rules) ve aynı taban
+    # (ara toplam − kupon/kampanya indirimi). Eskiden kasada gösterilip sunucuda hiç
+    # uygulanmıyordu. Havale bu listede yok (yukarıdaki yüzde geçerli; çift indirim olmaz).
+    _ptype_disc = 0.0
+    try:
+        from .catalog_extras import (payment_type_discount_rules as _pt_rules,
+                                     payment_type_discount_amount as _pt_amount,
+                                     _canon_pay_method as _pt_canon)
+        _pt_rule = (await _pt_rules()).get(_pt_canon(order.get("payment_method")))
+        if _pt_rule:
+            _ptype_disc = _pt_amount(_pt_rule, _subtotal - _server_discount)
+            if _ptype_disc > 0:
+                order["payment_type_discount"] = {
+                    "label": _pt_rule.get("label") or "Ödeme indirimi",
+                    "type": _pt_rule.get("type"), "percent": _pt_rule.get("percent"),
+                    "amount": _ptype_disc,
+                }
+    except Exception as _pt_err:
+        logger.warning(f"Ödeme tipi indirimi hesaplanamadı (0 kabul edildi): {_pt_err}")
+        _ptype_disc = 0.0
+    _pm_disc = round(_bank_disc + _ptype_disc, 2)
     order["payment_discount"] = _pm_disc
-    order["bank_transfer_discount_pct"] = (_pm_pct if _pm_disc > 0 else 0)
 
     # Kargo: sunucu ayarından (ücretsiz kargo eşiği VEYA kupon free_shipping). Y25 de burada çözülür.
     try:
@@ -1844,8 +1874,19 @@ async def create_order(
         _thr = float(_thr) if _thr not in (None, "") else None
     except Exception:
         _ship_fee, _thr = 0.0, None
+    # Panel › Kargo Kuralları: vitrinle (/api/settings.shipping_rules) AYNI liste; eşleşen kural
+    # ücreti belirler, 'Kargo bedava' kural ücretsiz yapar. Eskiden yalnız kasa okuyordu →
+    # kural varken her sipariş 409 (kasa 49, sunucu 99) alıyordu.
+    try:
+        from .settings import active_shipping_rules as _ship_rules_fn
+        _ship_rules = await _ship_rules_fn()
+    except Exception:
+        _ship_rules = []
     from shipping_rules import shipping_quote
-    _ship_quote = shipping_quote(_subtotal, [_server_discount, _pm_disc], _thr, _ship_fee, _free_shipping)
+    # Ödeme yöntemi indirimi (havale/ödeme tipi) eşik tabanına GİRMEZ (bkz. shipping_quote).
+    _ship_quote = shipping_quote(_subtotal, [_server_discount], _thr, _ship_fee, _free_shipping,
+                                 rules=_ship_rules)
+    _ship_fee = _ship_quote["fee"]
     _shipping = _ship_quote["cost"]
     order["shipping_cost"] = round(_shipping, 2)
     # #13/#14: Bedava kargo kampanyası (kupon free_shipping VEYA eşik) izini sakla —
@@ -1907,8 +1948,8 @@ async def create_order(
     # Final eligibility includes points actually spent (never trust requested points).
     # Reconcile the fee BEFORE gift-card reservation and the approved-total check.
     _ship_quote = shipping_quote(
-        _subtotal, [_server_discount, _pm_disc, order.get("points_used", 0)],
-        _thr, _ship_fee, _free_shipping)
+        _subtotal, [_server_discount, order.get("points_used", 0)],
+        _thr, _ship_fee, _free_shipping, rules=_ship_rules)
     order["total"] = round(order["total"] + _ship_quote["cost"] - _shipping, 2)
     _shipping = _ship_quote["cost"]
     order["shipping_cost"] = _shipping
@@ -2021,13 +2062,20 @@ async def create_order(
             "code": _code,
             "amount": _amt,
         })
-    if _pm_disc > 0:
+    if _bank_disc > 0:
         _pmpct = order.get("bank_transfer_discount_pct") or 0
         _breakdown.append({
             "type": "payment",
-            "label": f"Havale/EFT indirimi" + (f" (%{int(_pmpct)})" if _pmpct else ""),
+            "label": f"Havale/EFT indirimi" + (f" (%{_pmpct:g})" if _pmpct else ""),
             "code": "",
-            "amount": round(_pm_disc, 2),
+            "amount": round(_bank_disc, 2),
+        })
+    if _ptype_disc > 0:
+        _breakdown.append({
+            "type": "payment",
+            "label": (order.get("payment_type_discount") or {}).get("label") or "Ödeme indirimi",
+            "code": "",
+            "amount": round(_ptype_disc, 2),
         })
     order["discount_breakdown"] = _breakdown
     order["discount_total"] = round(_server_discount + _pm_disc, 2)
@@ -6218,19 +6266,12 @@ async def _storefront_free_shipping():
     fee = _round2(fee or 0.0)
     threshold = None
     try:
-        from shipping_rules import campaign_live
-        async for _c in db.coupons.find(
-            {"is_active": True, "free_shipping": True, "auto_apply": True},
-            {"_id": 0, "min_cart_total": 1, "start_at": 1, "end_at": 1},
-        ):
-            if not campaign_live(_c):   # süresi dolmuş kampanya eşiği düşürmez
-                continue
-            mc = _c.get("min_cart_total")
-            if mc in (None, ""):
-                continue
-            mc = float(mc)
-            if threshold is None or mc < threshold:
-                threshold = mc
+        # settings.resolve_free_shipping_threshold ile AYNI süzgeç: süresi dolmuş ya da
+        # ödeme yöntemi/kategori/ürün… ile KISITLI kampanya genel eşiği düşürmez.
+        from shipping_rules import threshold_from_campaigns
+        _camps = await db.coupons.find(
+            {"is_active": True, "free_shipping": True, "auto_apply": True}, {"_id": 0}).to_list(500)
+        threshold = threshold_from_campaigns(_camps)
     except Exception:
         threshold = None
     return threshold, fee

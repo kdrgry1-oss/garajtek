@@ -829,8 +829,11 @@ async def _get_first_order_exempt_emails() -> set:
 
 
 async def _evaluate_single(c: dict, cart_total: float, items: list,
-                           user_id=None, email: str = "", payment_method: str = "") -> dict:
-    """Tek kuponu dogrular + indirimini hesaplar. apply_coupon VE motor ayni cekirdegi kullanir."""
+                           user_id=None, email: str = "", payment_method: str = "",
+                           min_base=None) -> dict:
+    """Tek kuponu dogrular + indirimini hesaplar. apply_coupon VE motor ayni cekirdegi kullanir.
+    min_base: min_cart_total kontrolünün tabanı (motor: SET İNDİRİMİ SONRASI tutar). Verilmezse
+    cart_total. İndirim matematiği her zaman cart_total/items üzerinden yapılır."""
     if not c.get("is_active"):
         return {"valid": False, "reason": "Kupon pasif", "discount": 0}
     # İSTİSNA: admin bazı müşterileri ilk-sipariş/kişi-başı-limit kontrolünden muaf tutabilir
@@ -863,7 +866,8 @@ async def _evaluate_single(c: dict, cart_total: float, items: list,
             _end = f"{_end}T23:59:59+00:00"
         if _end < now.isoformat():
             return {"valid": False, "reason": "Kupon süresi dolmuş", "discount": 0}
-    if c.get("min_cart_total", 0) and cart_total < c["min_cart_total"]:
+    _min_base = cart_total if min_base is None else min_base
+    if c.get("min_cart_total", 0) and _min_base < c["min_cart_total"]:
         return {"valid": False, "reason": f"Minimum sepet tutarı ₺{c['min_cart_total']:.2f}", "discount": 0}
     if c.get("usage_limit"):
         # A1.2: redemption + in-flight (ödenmemiş) siparişler birlikte sayılır (baypas kapatıldı).
@@ -927,10 +931,19 @@ async def _evaluate_single(c: dict, cart_total: float, items: list,
         if total_qty < int(c["min_quantity"]):
             return {"valid": False, "reason": f"En az {int(c['min_quantity'])} ürün gerekli", "discount": 0}
     discount = _compute_discount(c, cart_total, items)
+    # KAPSAMLI ücretsiz kargo: kampanya kategori/ürün ile sınırlıysa sepette kapsamdaki en az
+    # bir ürün olmalı. Eskiden kapsam kontrol edilmeden free_shipping=True dönüyordu → yalnız
+    # 'Liftler' için açılan kargo bedava kampanyası her sepete ücretsiz kargo veriyordu.
+    _fs = bool(c.get("free_shipping"))
+    if _fs and (c.get("categories") or c.get("products")):
+        _ac = {str(x) for x in (c.get("categories") or []) if x is not None}
+        _ap = {str(x) for x in (c.get("products") or []) if x is not None}
+        _ex = {str(x) for x in (c.get("excluded_products") or []) if x is not None}
+        _fs = any(_item_in_scope(it, _ac, _ap, _ex) for it in (items or []))
     return {
         "valid": True, "coupon_id": c["id"], "code": c["code"],
         "title": c.get("title", ""), "type": c.get("type"), "value": c.get("value"),
-        "discount": discount, "free_shipping": bool(c.get("free_shipping")),
+        "discount": discount, "free_shipping": _fs,
     }
 
 
@@ -1402,7 +1415,11 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
     # 2) Tekil degerlendirme
     valid, rejected = [], []
     for cid, c in candidates.items():
-        ev = await _evaluate_single(c, cart_total, items, user_id, email, payment_method)
+        # Min. sipariş tutarı TÜM kampanya türlerinde set indirimi SONRASI tutara göre (ücretsiz
+        # kargo kapısı da net tutarı kullanır). Eskiden yüzde kampanyası brüt, ücretsiz kargo net
+        # tutara bakıyordu → aynı 'Min. sipariş' alanı aynı sepette iki farklı sonuç veriyordu.
+        ev = await _evaluate_single(c, cart_total, items, user_id, email, payment_method,
+                                    round(cart_total - _set_total, 2))
         if ev.get("valid") and (ev.get("discount", 0) > 0 or ev.get("free_shipping")):
             valid.append({
                 "c": c, "discount": ev["discount"], "free_shipping": ev.get("free_shipping", False),
@@ -1497,6 +1514,7 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
         str(a["c"]["id"]),
     ))
     applied = []
+    free_shipping_blocked = []
     running = cart_total
     # KALEM-BAŞI KALAN FİYAT: sonraki kampanya, önceki kampanyaların O KALEMDEN düştüğü
     # tutardan sonra kalan fiyat üzerinden hesaplanır. Eskiden tüm sepete tek bir oran
@@ -1530,6 +1548,14 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
         if fs:
             _fs_min = float(cand["c"].get("min_cart_total") or 0)
             if _fs_min and round(running, 2) < _fs_min:
+                # Sessiz düşme yok: neden uygulanmadığı ayrıca bildirilir (kasa gösterebilir).
+                free_shipping_blocked.append({
+                    "coupon_id": cand["c"]["id"], "code": cand["c"].get("code", ""),
+                    "title": cand["c"].get("title", ""), "min_cart_total": _fs_min,
+                    "net_total": round(running, 2), "needed": round(_fs_min - running, 2),
+                    "reason": (f"Ücretsiz kargo için indirimler düşüldükten sonra "
+                               f"₺{_fs_min:.2f} gerekli"),
+                })
                 continue
         if d <= 0 and not fs:
             continue
@@ -1625,16 +1651,16 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
     # Motorun İÇİNDE hesaplanır → kasa önizlemesi ile sipariş toplamı TEK KAYNAKTAN gelir
     # (onaylanan = çekilen). Kampanya tavanından SONRA, ayrı bir kalem olarak eklenir;
     # kupon/kampanya ile birlikte uygulanabilir. Ayar: settings.main.edu_discount_pct
-    # (0 veya boş → kapalı). E-posta sunucuya gelen sipariş/kasa e-postasıdır.
+    # (0 → kapalı; boş/geçersiz → ayar sayfasıyla aynı varsayılan %5 — settings.effective_pct_setting).
+    # E-posta sunucuya gelen sipariş/kasa e-postasıdır.
     edu_pct, edu_amount = 0.0, 0.0
     try:
         _em = str(email or "").strip().lower()
         if _em.endswith(".edu.tr") and "edu_discount" not in _excl_syn:
             _es = await db.settings.find_one({"id": "main"},
                                              {"_id": 0, "edu_discount_pct": 1}) or {}
-            _raw = _es.get("edu_discount_pct")
-            edu_pct = 5.0 if _raw in (None, "") else float(_raw or 0)
-            edu_pct = max(0.0, min(edu_pct, 90.0))
+            from .settings import effective_pct_setting as _eff_pct
+            edu_pct = _eff_pct(_es, "edu_discount_pct")
             if edu_pct > 0:
                 # Kampanya indirimi düşüldükten SONRAKİ tutar üzerinden (üye indirimiyle aynı taban)
                 edu_amount = min(round(_base_extra * edu_pct / 100.0, 2),
@@ -1651,6 +1677,8 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
         })
         total = round(total + edu_amount, 2)
 
+    from shipping_rules import campaign_sets_threshold as _sets_threshold
+
     # TEŞHİS GÜNLÜĞÜ: müşteri kod yazdı ama uygulanmadı → kaydet (admin /admin/coupons/attempts)
     if entered:
         await _log_coupon_attempt(entered_code, entered_resolved, entered_id, rejected, applied,
@@ -1661,6 +1689,9 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
             "coupon_id": a["c"]["id"], "code": a["c"].get("code", ""),
             "title": a["c"].get("title", ""), "type": a["c"].get("type"),
             "discount": a["applied_discount"], "free_shipping": a["free_shipping"],
+            # Genel ücretsiz kargo EŞİĞİNİ belirleyen (koşulsuz otomatik) kampanya mı? Kasa ve
+            # sipariş bu kampanyanın bayrağını eşikten ayrıca SAYMAZ (shipping_rules.promo_free_shipping).
+            "threshold_campaign": bool(a["free_shipping"]) and _sets_threshold(a["c"]),
             "priority": a["priority"], "combinable": a["combinable"], "stack_group": a["stack_group"],
             "combinable_with": a.get("combinable_with") or [],
             **({"set_id": a["set_id"]} if a.get("set_id") else {}),
@@ -1674,6 +1705,7 @@ async def evaluate_cart_promotions(cart_total: float, items: list,
         "member_discount_pct": member_pct if member_amount > 0 else 0,
         "member_group_name": member_group if member_amount > 0 else "",
         "free_shipping": any(a["free_shipping"] for a in applied),
+        "free_shipping_blocked": free_shipping_blocked,
         "capped": capped,
         "cap_pct": cap_pct,
         "rejected": rejected,

@@ -20,6 +20,19 @@ export const normalizePctSettings = (s) => {
   return out;
 };
 
+// Ödeme yöntemleri: panel, vitrinle (Checkout.jsx) AYNI kuralla gösterir — kart/havale anahtarı
+// YOKSA açık (vitrin `!== false`), kapıda ödeme yalnız açıkça true ise açık. Eskiden panel eksik
+// anahtarı KAPALI gösterirken vitrin AÇIK sunuyordu; kaydette üç anahtar da açıkça yazılır.
+export const normalizePaymentMethods = (pm) => {
+  const p = pm || {};
+  return {
+    ...p,
+    credit_card: p.credit_card !== false,
+    bank_transfer: p.bank_transfer !== false,
+    cash_on_delivery: p.cash_on_delivery === true,
+  };
+};
+
 function MaintenanceSubscribers() {
   const [data, setData] = useState({ total: 0, subscribers: [] });
 
@@ -107,7 +120,7 @@ export default function AdminSettings() {
   const fetchSettings = async () => {
     try {
       const res = await axios.get(`${API}/settings`);
-      setSettings(res.data);
+      setSettings({ ...res.data, payment_methods: normalizePaymentMethods(res.data?.payment_methods) });
     } catch (err) {
       console.error(err);
     } finally {

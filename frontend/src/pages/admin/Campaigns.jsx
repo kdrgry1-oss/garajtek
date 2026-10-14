@@ -552,6 +552,7 @@ export default function AdminCampaigns() {
               <div>
                 <label className={lblCls}>Min. Sipariş Tutarı (₺)</label>
                 <input type="number" value={formData.min_order_amount} onChange={(e) => setFormData({ ...formData, min_order_amount: parseFloat(e.target.value) || 0 })} className={inputCls} />
+                <p className="text-[11px] text-gray-500 mt-1">Set indirimi düşülmüş sepet tutarına bakılır. Ücretsiz kargoda tüm kampanya/kupon indirimleri düşüldükten sonraki tutar esas alınır.</p>
               </div>
             </div>
 

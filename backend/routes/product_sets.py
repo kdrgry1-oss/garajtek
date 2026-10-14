@@ -237,12 +237,22 @@ async def cod_quote(payload: dict):
     fee = float(resolve_shipping_fee(sset) or 0)
     thr = await resolve_free_shipping_threshold(sset)
     thr = float(thr) if thr not in (None, "") else None
-    sq = shipping_quote(subtotal, [discount], thr, fee, bool(ev.get("free_shipping")))
-    total = round(subtotal - discount + sq["cost"] + cfg["fee"], 2)
+    # Sipariş (orders.create_order) ile aynı: kargo kuralları + eşikten bağımsız kupon bayrağı
+    # + kapıda ödeme için Ödeme Tipi İndirimi (gösterilen = çekilen; aksi halde 409).
+    from .settings import active_shipping_rules
+    from shipping_rules import promo_free_shipping
+    from .catalog_extras import payment_type_discount_rules, payment_type_discount_amount
+    sq = shipping_quote(subtotal, [discount], thr, fee, promo_free_shipping(ev.get("applied")),
+                        rules=await active_shipping_rules())
+    _pay_rule = (await payment_type_discount_rules()).get("cash_on_delivery")
+    pay_disc = payment_type_discount_amount(_pay_rule, subtotal - discount)
+    total = round(subtotal - discount - pay_disc + sq["cost"] + cfg["fee"], 2)
     return {"available": not reason, "reason": reason, "lines": lines, "subtotal": subtotal, "discount": discount,
             "promotions": [{"title": a.get("title"), "discount": a.get("discount")} for a in ev.get("applied") or []
-                           if float(a.get("discount") or 0) > 0],
-            "shipping": sq["cost"], "cod_fee": cfg["fee"], "total": total}
+                           if float(a.get("discount") or 0) > 0]
+                          + ([{"title": (_pay_rule or {}).get("label") or "Kapıda ödeme indirimi",
+                               "discount": pay_disc}] if pay_disc > 0 else []),
+            "shipping": sq["cost"], "cod_fee": cfg["fee"], "payment_discount": pay_disc, "total": total}
 
 
 # ───────────────────────────── Panel ─────────────────────────────

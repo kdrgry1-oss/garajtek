@@ -65,22 +65,16 @@ def resolve_shipping_fee(settings: dict) -> float:
 
 
 async def resolve_free_shipping_threshold(settings: dict):
-    """Ücretsiz kargo eşiği: aktif 'otomatik' free_shipping kampanyalarının EN DÜŞÜK
-    min tutarı; kampanya yoksa ayardaki free_shipping_threshold. None = eşik yok."""
+    """Ücretsiz kargo eşiği: aktif, KOŞULSUZ 'otomatik' free_shipping kampanyalarının EN DÜŞÜK
+    min tutarı; kampanya yoksa ayardaki free_shipping_threshold. None = eşik yok.
+    Ödeme yöntemi/kategori/ürün/ilk sipariş… ile kısıtlı kampanya eşiği BELİRLEMEZ
+    (shipping_rules.campaign_sets_threshold) — o kampanyayı kampanya motoru koşullarıyla uygular."""
     threshold = None
     try:
-        from shipping_rules import campaign_live
-        async for _c in db.coupons.find({"is_active": True, "free_shipping": True, "auto_apply": True},
-                                        {"_id": 0, "min_cart_total": 1, "start_at": 1, "end_at": 1}):
-            # Süresi dolmuş/başlamamış kampanya eşiği düşürmez (Ekinoks bitince 0 TL kaldı).
-            if not campaign_live(_c):
-                continue
-            mc = _c.get("min_cart_total")
-            if mc in (None, ""):
-                continue
-            mc = float(mc)
-            if threshold is None or mc < threshold:
-                threshold = mc
+        from shipping_rules import threshold_from_campaigns
+        _camps = await db.coupons.find(
+            {"is_active": True, "free_shipping": True, "auto_apply": True}, {"_id": 0}).to_list(500)
+        threshold = threshold_from_campaigns(_camps)
     except Exception:
         threshold = None
     if threshold is None:
@@ -90,6 +84,44 @@ async def resolve_free_shipping_threshold(settings: dict):
         except Exception:
             threshold = None
     return threshold
+
+
+async def active_shipping_rules() -> list:
+    """Panel › Kargo Kuralları'ndaki AKTİF kurallar (vitrin + sipariş aynı listeyi kullanır).
+    Yalnız fiyatlamaya gereken alanlar döner (iç not/şehir filtresi vb. yok)."""
+    try:
+        rows = await db.shipping_rules.find({"is_active": True}, {"_id": 0}).to_list(100)
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        try:
+            out.append({
+                "min_cart": float(r.get("min_cart") or 0),
+                "max_cart": float(r.get("max_cart") or 0) or None,
+                "shipping_cost": float(r.get("shipping_cost") or 0),
+                "free_shipping": bool(r.get("free_shipping")),
+            })
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def effective_pct_setting(settings: dict, key: str) -> float:
+    """Havale/öğrenci indirim yüzdesini AYAR SAYFASI ile aynı yorumla okur:
+    alan yok / None / "" / sayı değil → varsayılan (%5); aksi halde 0–90'a sıkıştırılır.
+    (0 = kapalı.) Sipariş, kasa önizlemesi ve kampanya motoru bu tek yorumu kullanır."""
+    dflt = float(_PCT_SETTINGS_DEFAULTS.get(key, 0))
+    v = (settings or {}).get(key)
+    if v is None or isinstance(v, bool) or (isinstance(v, str) and not v.strip()):
+        return dflt
+    try:
+        n = float(str(v).replace(",", ".")) if isinstance(v, str) else float(v)
+    except (TypeError, ValueError):
+        return dflt
+    if n != n:  # NaN
+        return dflt
+    return max(0.0, min(n, 90.0))
 
 def _valid_email(value: str) -> bool:
     if not value or len(value) > 254 or any(ch.isspace() for ch in value):
@@ -189,6 +221,8 @@ async def get_settings():
     # Storefront kargo bilgisi (sabit kod yerine ayardan) — TEK KAYNAK (bkz. resolve_shipping_fee)
     settings["shipping_fee"] = resolve_shipping_fee(settings)
     settings["free_shipping_threshold"] = await resolve_free_shipping_threshold(settings)
+    # Kargo Kuralları: sepet/çekmece/kasa ve sipariş (orders.create_order) AYNI listeyi kullanır.
+    settings["shipping_rules"] = await active_shipping_rules()
 
     settings["tenant_config"] = await get_tenant_config(db)
     return settings
@@ -204,6 +238,19 @@ async def update_settings(
     before_tenant = await db.settings.find_one({"id": "tenant_config"}, {"_id": 0}) or {}
     settings_data.pop("_id", None)
     _normalize_pct_settings(settings_data)
+    # GET /settings'in TÜRETİLMİŞ alanları geri yazılmasın: admin ekranı tüm yanıtı geri
+    # POST ediyor. Kargo kuralları kendi koleksiyonunda; eşik kampanyadan türetildiyse
+    # settings.free_shipping_threshold'a kalıcı yazılırsa kampanya bitince/kısıtlanınca da
+    # eski (ör. 0) eşik geçerli kalıyordu.
+    settings_data.pop("shipping_rules", None)
+    if "free_shipping_threshold" in settings_data:
+        try:
+            _derived = await resolve_free_shipping_threshold(before_main)
+        except Exception:
+            _derived = None
+        if settings_data.get("free_shipping_threshold") == _derived \
+                and before_main.get("free_shipping_threshold") != _derived:
+            settings_data.pop("free_shipping_threshold", None)
     # New admin clients write the canonical nested document. Keep it out of
     # settings.main so there is only one authoritative copy.
     tenant_payload = settings_data.pop("tenant_config", None)

@@ -10,6 +10,13 @@ import { Plus, Trash2, Edit, RefreshCw, Send, Tag, Store, BellRing, MessageSquar
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Ödeme Tipi İndirimi yöntem etiketleri (kasa anahtarları; eski 'havale'/'iyzico' kayıtları da).
+const PAY_METHOD_LABELS = {
+  credit_card: "Kredi Kartı", iyzico: "Kredi Kartı",
+  cash_on_delivery: "Kapıda Ödeme",
+  bank_transfer: "Havale/EFT (Ayarlar'daki yüzde geçerli)", havale: "Havale/EFT (Ayarlar'daki yüzde geçerli)",
+};
 const h = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
 // ======= Generic CRUD admin page builder =======
@@ -446,7 +453,7 @@ export function ShippingPaymentRules() {
                     <td className="p-3 text-right">{r.free_shipping ? "—" : `₺${r.shipping_cost}`}</td>
                     <td className="p-3 text-center">{r.free_shipping ? "✓" : "—"}</td>
                   </> : <>
-                    <td className="p-3 font-medium">{r.payment_method}</td>
+                    <td className="p-3 font-medium">{PAY_METHOD_LABELS[r.payment_method] || r.payment_method}</td>
                     <td className="p-3">{r.label}</td>
                     <td className="p-3 text-right">{r.discount_type === "percent" ? `%${r.discount_value}` : `₺${r.discount_value}`}</td>
                     <td className="p-3 text-right">₺{r.min_cart || 0}</td>
@@ -470,15 +477,16 @@ export function ShippingPaymentRules() {
                   <div><label className="text-xs">Min Sepet Tutarı</label><input type="number" value={form.min_cart || 0} onChange={(e) => setForm({ ...form, min_cart: parseFloat(e.target.value) })} className="w-full mt-1 px-3 py-2 border rounded text-sm" /></div>
                   <div><label className="text-xs">Kargo Ücreti</label><input type="number" value={form.shipping_cost || 0} onChange={(e) => setForm({ ...form, shipping_cost: parseFloat(e.target.value) })} className="w-full mt-1 px-3 py-2 border rounded text-sm" /></div>
                   <label className="flex items-center gap-2"><input type="checkbox" checked={!!form.free_shipping} onChange={(e) => setForm({ ...form, free_shipping: e.target.checked })} /><span className="text-sm">Kargo bedava</span></label>
+                  <p className="text-[11px] text-gray-500">Sepet, ödeme ve sipariş aynı kuralı kullanır. Taban: ara toplam (indirim öncesi); en yüksek min tutarlı uyan kural geçerlidir. Ücretsiz kargo eşiği/kuponu varsa kargo yine ücretsizdir.</p>
                 </>
               ) : (
                 <>
                   <div><label className="text-xs">Ödeme Yöntemi</label>
-                    <select value={form.payment_method || "havale"} onChange={(e) => setForm({ ...form, payment_method: e.target.value })} className="w-full mt-1 px-3 py-2 border rounded text-sm">
-                      <option value="havale">Havale/EFT</option>
-                      <option value="iyzico">Kredi Kartı (Iyzico)</option>
+                    <select value={form.payment_method || "credit_card"} onChange={(e) => setForm({ ...form, payment_method: e.target.value })} className="w-full mt-1 px-3 py-2 border rounded text-sm">
+                      <option value="credit_card">Kredi Kartı</option>
                       <option value="cash_on_delivery">Kapıda Ödeme</option>
                     </select>
+                    <p className="text-[11px] text-gray-500 mt-1">Havale/EFT indirimi Ayarlar › Ödeme Yöntemleri'ndeki yüzdeyle uygulanır. Taban: ara toplam − kupon/kampanya indirimi.</p>
                   </div>
                   <div><label className="text-xs">İndirim Tipi</label>
                     <select value={form.discount_type || "percent"} onChange={(e) => setForm({ ...form, discount_type: e.target.value })} className="w-full mt-1 px-3 py-2 border rounded text-sm">

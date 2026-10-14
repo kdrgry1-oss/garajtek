@@ -74,7 +74,7 @@ export default function Cart() {
       .finally(() => setSearchParams({}, { replace: true }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-  const { shippingFee, freeShippingThreshold } = useShipping();
+  const { shippingFee, freeShippingThreshold, shippingRules } = useShipping();
   const freeShippingLimit = freeShippingThreshold || 0;
 
   // Madde 4 — Kampanya motoru: sepet sayfası da checkout ile AYNI motoru çağırır.
@@ -109,7 +109,7 @@ export default function Cart() {
   // toplam baz alınıyordu → hem "X TL daha" yazısı yanlış çıkıyor hem de sepet ekranı
   // "ücretsiz kargo" gösterip siparişte kargo ücreti ekleniyordu (tutarsızlık).
   // Payment/points choices are not known in the cart: this is an estimate only.
-  const shipping = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee });
+  const shipping = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee, rules: shippingRules });
   const netTotal = shipping.basis;
   const remaining = freeShippingThreshold != null ? Math.max(0, freeShippingThreshold - netTotal) : 0;
   const shippingCost = shipping.cost;

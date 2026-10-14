@@ -74,15 +74,24 @@ describe("checkout address isolation", () => {
     });
   });
 
-  test.each([[4210.52, false], [4210.53, true]])('rendered checkout includes bank discount at %s boundary', async (total, free) => {
+  // Bulgu #23: havale indirimi ücretsiz kargo tabanına GİRMEZ (sunucu ile aynı) — eşik ara toplam −
+  // kampanya indirimine bakar. Eşiği belirleyen otomatik kampanya (threshold_campaign) ayrıca sayılmaz.
+  test.each([[3999.99, false], [4000, true], [4210.52, true]])('bank discount does not move free-shipping threshold (%s)', async (total, free) => {
     mockTotal = total;
-    axios.post.mockResolvedValue({ data: { applied: [{ code: 'KARGO0', title: 'Ücretsiz Kargo', free_shipping: true, discount: 0 }], total_discount: 0 } });
+    axios.post.mockResolvedValue({ data: { applied: [{ code: 'KARGO0', title: 'Ücretsiz Kargo', free_shipping: true, threshold_campaign: true, discount: 0 }], total_discount: 0 } });
     await act(async () => root.render(<Checkout />));
     const row = $(container, "shipping-cost");
     expect(row.textContent.includes('Ücretsiz')).toBe(free);
     expect(row.textContent).toContain(formatTRY(99));
     const promos = $(container, "applied-promotions");
     expect(promos.textContent.includes('Ücretsiz Kargo')).toBe(free);
+  });
+
+  test("free-shipping coupon (not threshold-setting) waives shipping below the threshold (bulgu #19)", async () => {
+    mockTotal = 500;
+    axios.post.mockResolvedValue({ data: { applied: [{ code: 'SYNCFREE', title: 'Kargo bedava', free_shipping: true, threshold_campaign: false, discount: 0 }], total_discount: 0 } });
+    await act(async () => root.render(<Checkout />));
+    expect($(container, "shipping-cost").textContent).toContain('Ücretsiz');
   });
 
   test("account switch clears address and ignores the former account's delayed response", async () => {

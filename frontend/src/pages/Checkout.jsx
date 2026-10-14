@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { shippingQuote } from "../lib/shippingRules";
+import { shippingQuote, promoFreeShipping } from "../lib/shippingRules";
+import { effectivePct, paymentTypeDiscount } from "../lib/paymentDiscounts";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useShipping } from "../lib/shipping";
@@ -277,25 +278,15 @@ export default function Checkout() {
   });
 
   // Sipariş tutarları (türetilmiş) — useEffect'lerden ÖNCE tanımlanmalı (TDZ hatası önlenir)
-  const { shippingFee, freeShippingThreshold } = useShipping();
-
-  // DENETİM FIX (#46): Kargo Kuralları (shipping_rules) sepet tutarına göre kargo bedelini
-  // belirlesin. Eşleşen kural varsa onun bedeli kullanılır; yoksa genel settings.shipping_fee'ye
-  // düşülür (fallback → regresyon yok). Ücretsiz kargo kuponu/eşiği yine önceliklidir.
-  const [ruleShipCost, setRuleShipCost] = useState(null); // null = kural yok/yüklenmedi
-  useEffect(() => {
-    if (!total) { setRuleShipCost(null); return; }
-    let cancel = false;
-    axios
-      .get(`${API}/admin/rules/shipping/resolve?cart_total=${total}`)
-      .then((r) => { if (!cancel) setRuleShipCost(r.data?.matched ? Number(r.data.shipping_cost || 0) : null); })
-      .catch(() => { if (!cancel) setRuleShipCost(null); });
-    return () => { cancel = true; };
-  }, [total]);
+  // Kargo Kuralları (Panel › Kargo & Ödeme Kampanyaları) /api/settings.shipping_rules'tan gelir ve
+  // shippingQuote({ rules }) ile uygulanır — sepet, çekmece ve sunucu (create_order) AYNI kuralı
+  // kullanır. Eskiden yalnız kasa ayrı bir uçtan okuyordu → sunucu farklı kargo hesaplayıp 409
+  // veriyordu; 'Kargo bedava' kuralı da `> 0` kontrolü yüzünden yok sayılıyordu.
+  const { shippingFee, freeShippingThreshold, shippingRules } = useShipping();
 
   // DENETİM FIX (#45): Ödeme Tipi İndirimleri (payment_discounts) — seçili ödeme yöntemine göre
-  // aktif indirim uygulanır. Havale (bank_transfer) zaten bankPct ile ele alındığından çift
-  // sayımı önlemek için burada hariç tutulur; asıl değer credit_card/diğer yöntemlerdedir.
+  // aktif indirim uygulanır; sunucu (create_order) aynı kuralı aynı tabandan uygular. Havale
+  // (bank_transfer) bankPct ile ele alınır, resolve ucu onu zaten döndürmez (çift sayım yok).
   const [payDiscounts, setPayDiscounts] = useState({});
   useEffect(() => {
     let cancel = false;
@@ -310,9 +301,9 @@ export default function Checkout() {
   // (/coupons/evaluate + create_order aynı kaynak). Burada AYRICA düşülmemeli.
 
   // Y25: Ücretsiz kargo kuponu uygulandıysa kargo 0 gösterilir. Eşik ya da kupon → kargo bedava.
-  const hasFreeShippingPromo = (appliedPromotions || []).some((p) => p && p.free_shipping);
-  // A rule's preliminary zero fee cannot bypass the final merchandise minimum.
-  const baseShipFee = ruleShipCost > 0 ? ruleShipCost : shippingFee;
+  // Eşiği belirleyen otomatik kampanya sayılmaz (minimumu eşikle uygulanır); 'Kargo bedava'
+  // kuponu / koşullu kampanya eşikten bağımsız ücretsiz kargo verir (sunucu ile aynı).
+  const hasFreeShippingPromo = promoFreeShipping(appliedPromotions);
   const giftWrapTotal = giftWrap ? GIFT_WRAP_PRICE : 0;
   const codFee = (pmOk && paymentMethod === "cash_on_delivery") ? COD_FEE : 0;
   // Puan tavanı SUNUCUYLA aynı tabandan hesaplanır: (ara toplam − kupon/kampanya indirimi).
@@ -322,20 +313,22 @@ export default function Checkout() {
   // Havale/EFT indirimi — kupon indiriminden SONRAKİ tutar üzerinden (sunucu ile aynı mantık).
   const isBankTransfer = pmOk && paymentMethod === "bank_transfer";
   const bankTransferDiscount = (isBankTransfer && bankPct > 0)
-    ? Math.round((total - discount) * (bankPct / 100) * 100) / 100
+    ? paymentTypeDiscount({ type: "percent", percent: bankPct }, total - discount) // kuruşta yarım-yukarı (sunucu ile aynı)
     : 0;
   // Genelleştirilmiş ödeme tipi indirimi (havale hariç — o bankTransferDiscount ile geliyor)
   const _payRule = pmOk ? payDiscounts[paymentMethod] : null;
   const paymentMethodDiscount = (_payRule && !isBankTransfer)
-    ? (((_payRule.percent || 0) > 0)
-        ? Math.round((total - discount) * ((_payRule.percent || 0) / 100) * 100) / 100
-        : (Number(_payRule.amount) || 0))
+    ? paymentTypeDiscount(_payRule, total - discount)
     : 0;
+  // Ödeme yöntemi indirimleri (havale/ödeme tipi) ücretsiz kargo tabanına GİRMEZ (sunucu ile aynı):
+  // aksi halde havale seçince kargo geri ekleniyor, "indirim" toplamı sepetten yüksek yapıyordu.
   const shipping = shippingQuote({
     subtotal: total,
-    discounts: [discount, bankTransferDiscount, paymentMethodDiscount, pointsDeduction],
-    threshold: freeShippingThreshold, fee: baseShipFee, freeShippingPromotion: hasFreeShippingPromo,
+    discounts: [discount, pointsDeduction],
+    threshold: freeShippingThreshold, fee: shippingFee, freeShippingPromotion: hasFreeShippingPromo,
+    rules: shippingRules,
   });
+  const baseShipFee = shipping.fee;
   const shippingCost = shipping.cost;
   const visiblePromotions = appliedPromotions.filter((p) => !p.free_shipping || shipping.free || Number(p.discount) > 0);
   const preGiftTotal = Math.max(0, total + shippingCost - discount - bankTransferDiscount - paymentMethodDiscount - pointsDeduction + giftWrapTotal + codFee);
@@ -381,7 +374,7 @@ export default function Checkout() {
         });
         // Havale/EFT teşvik indirimi yüzdesi (ayardan; varsayılan %5)
         const bp = r.data?.bank_transfer_discount_pct;
-        setBankPct(bp === null || bp === undefined || bp === "" ? 5 : Number(bp) || 0);
+        setBankPct(effectivePct(bp));
       })
       .catch(() => { /* sessiz: varsayılan değerlerde kal */ });
     return () => { alive = false; };

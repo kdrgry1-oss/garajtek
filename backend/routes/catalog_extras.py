@@ -493,7 +493,9 @@ async def upsert_pay(payload: dict, current_user: dict = Depends(require_admin))
     rid = payload.get("id") or str(uuid.uuid4())
     doc = {
         "id": rid,
-        "payment_method": payload.get("payment_method", "havale"),
+        # Kasa anahtarlarıyla (credit_card/cash_on_delivery/bank_transfer) kaydedilir; panelin
+        # eski 'iyzico'/'havale' değerleri de kanonik anahtara çevrilir (aksi halde hiç eşleşmiyordu).
+        "payment_method": _canon_pay_method(payload.get("payment_method")) or "credit_card",
         "discount_type": payload.get("discount_type", "percent"),  # percent | fixed
         "discount_value": float(payload.get("discount_value") or 0),
         "min_cart": float(payload.get("min_cart") or 0),
@@ -521,24 +523,89 @@ async def resolve_shipping(cart_total: float = Query(0)):
     return {"matched": False, "shipping_cost": None}
 
 
-# DENETİM FIX (#45): "Ödeme Tipi İndirimleri" hiçbir yerde tüketilmiyordu — public resolve
-# ucu ile checkout, seçili ödeme yöntemine göre aktif indirimi çözebilir. Yalnız aktif kayıtlar.
-@rules_router.get("/payment-discounts/resolve")
-async def resolve_payment_discounts():
+def _canon_pay_method(m) -> str:
+    """Ödeme yöntemi anahtarını kasanın kullandığı kanonik değere indirger
+    (coupons._norm_pm ile aynı eşleme): havale/eft → bank_transfer, iyzico/kart → credit_card,
+    kapıda → cash_on_delivery."""
+    s = str(m or "").strip().lower()
+    if s in ("bank_transfer", "havale", "eft", "havale_eft", "banka_havale", "wire"):
+        return "bank_transfer"
+    if s in ("cash_on_delivery", "kapida", "kapıda", "cod", "kapida_odeme"):
+        return "cash_on_delivery"
+    if s in ("credit_card", "card", "kredi_karti", "kredi_kart", "banka_kredi_karti", "iyzico"):
+        return "credit_card"
+    return s
+
+
+def _pay_rule_view(it: dict) -> dict:
+    """Kayıtlı kural (discount_type/discount_value) → kasa/sipariş görünümü.
+    KÖK SEBEP: resolve eskiden olmayan 'type/percent/amount' alanlarını okuyordu → panelde
+    'Aktif %10' görünen kural her yerde 0 TL indirim veriyordu. Eski alanlar geri uyum için okunur."""
+    dt = (it.get("discount_type") or it.get("type") or "").strip().lower()
+    if dt not in ("percent", "fixed"):
+        dt = "percent" if it.get("percent") is not None else "fixed"
+    try:
+        val = float(it.get("discount_value") if it.get("discount_value") not in (None, "")
+                    else (it.get("percent") if dt == "percent" else it.get("amount")) or 0)
+    except (TypeError, ValueError):
+        val = 0.0
+    val = max(0.0, val)
+    if dt == "percent":
+        val = min(val, 90.0)
+    try:
+        min_cart = max(0.0, float(it.get("min_cart") or 0))
+    except (TypeError, ValueError):
+        min_cart = 0.0
+    return {
+        "type": dt,
+        "percent": val if dt == "percent" else 0.0,
+        "amount": val if dt == "fixed" else 0.0,
+        "min_cart": min_cart,
+        "label": it.get("label") or it.get("name") or "",
+    }
+
+
+async def payment_type_discount_rules() -> dict:
+    """Aktif Ödeme Tipi İndirimleri: {kanonik_yöntem: görünüm}. Vitrin (resolve ucu) ve
+    sipariş (orders.create_order) AYNI fonksiyonu kullanır → gösterilen = çekilen.
+    Havale/EFT burada YOK: havale indirimi Ayarlar › Ödeme Yöntemleri'ndeki yüzdeyle uygulanır
+    (çift indirim olmasın). Aynı yönteme birden çok kural varsa en son güncellenen geçerlidir."""
     items = await db.payment_discounts.find({"is_active": {"$ne": False}}, {"_id": 0}).to_list(100)
-    # method → {type: 'percent'|'fixed', value: X, label}
+    items.sort(key=lambda x: str(x.get("updated_at") or x.get("created_at") or ""))
     out = {}
     for it in items:
-        m = (it.get("method") or it.get("payment_method") or "").strip()
-        if not m:
+        m = _canon_pay_method(it.get("method") or it.get("payment_method"))
+        if not m or m == "bank_transfer":
             continue
-        out[m] = {
-            "type": (it.get("type") or ("percent" if it.get("percent") is not None else "fixed")),
-            "percent": float(it.get("percent") or 0),
-            "amount": float(it.get("amount") or 0),
-            "label": it.get("label") or it.get("name") or "",
-        }
-    return {"discounts": out}
+        v = _pay_rule_view(it)
+        if v["percent"] <= 0 and v["amount"] <= 0:
+            continue
+        out[m] = v
+    return out
+
+
+def payment_type_discount_amount(rule: dict, base: float) -> float:
+    """Kural + taban (ara toplam − kupon/kampanya indirimi) → indirim tutarı.
+    Taban min_cart'ın altındaysa 0. Yüzde: kuruş yarım-yukarı yuvarlanır (kasa ile aynı);
+    sabit tutar tabanı geçemez."""
+    from decimal import Decimal, ROUND_HALF_UP
+    if not rule:
+        return 0.0
+    base = max(0.0, round(float(base or 0), 2))
+    if base <= 0 or base + 1e-9 < float(rule.get("min_cart") or 0):
+        return 0.0
+    if rule.get("type") == "percent" and float(rule.get("percent") or 0) > 0:
+        amt = (Decimal(str(base)) * Decimal(str(rule["percent"])) / Decimal(100)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return float(min(amt, Decimal(str(base))))
+    return round(min(float(rule.get("amount") or 0), base), 2)
+
+
+# DENETİM FIX (#45): "Ödeme Tipi İndirimleri" — public resolve ucu; kasa seçili ödeme yöntemine
+# göre aktif indirimi buradan çözer, sipariş aynı kuralları sunucuda uygular. Yalnız aktif kayıtlar.
+@rules_router.get("/payment-discounts/resolve")
+async def resolve_payment_discounts():
+    return {"discounts": await payment_type_discount_rules()}
 
 
 # ---------- Extra Reports: hourly sales, city, profit, stock movements ----------
