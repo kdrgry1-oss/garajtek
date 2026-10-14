@@ -100,7 +100,10 @@ export default function CartDrawer() {
   const [promoDiscount, setPromoDiscount] = useState(0);
 
   // Ücretsiz kargo eşiği — sunucuyla aynı taban (indirim SONRASI tutar).
-  const netTotal = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee }).basis;
+  // Kargo da /sepet ile AYNI hesaplanır → çekmecedeki "Toplam" (ve WhatsApp mesajındaki
+  // "Toplam") sepet sayfasındaki Toplam ile aynı tutarı gösterir (önceden kargo hariçti).
+  const shipQ = shippingQuote({ subtotal: total, discounts: [promoDiscount], threshold: freeShippingThreshold, fee: shippingFee });
+  const netTotal = shipQ.basis;
   const remaining = freeShippingThreshold != null ? Math.max(0, freeShippingThreshold - netTotal) : 0;
 
   useEffect(() => {
@@ -132,7 +135,9 @@ export default function CartDrawer() {
 
   if (!isOpen) return null;
   const close = () => setIsOpen(false);
-  const { listSum, grand, totalDisc } = cartSummary(items, promoDiscount);
+  const { listSum, grand: grandNoShip, totalDisc } = cartSummary(items, promoDiscount);
+  const shipCost = shipQ.cost;
+  const grand = grandNoShip + shipCost;
 
   return (
     <div className="electro">
@@ -189,9 +194,13 @@ export default function CartDrawer() {
                     <span className="font-size-14">-{fmtPrice(totalDisc)}</span>
                   </div>
                 )}
+                <div className="flex-center-between mb-1" data-testid="drawer-shipping">
+                  <span className="font-size-14">Kargo</span>
+                  <span className="font-size-14">{shipCost === 0 ? <span className="text-green">Ücretsiz</span> : fmtPrice(shipCost)}</span>
+                </div>
                 <div className="flex-center-between border-top pt-2 mb-3">
                   <strong className="font-size-16">Toplam</strong>
-                  <strong className="font-size-18">{fmtPrice(grand)}</strong>
+                  <strong className="font-size-18" data-testid="drawer-grand-total">{fmtPrice(grand)}</strong>
                 </div>
                 {freeShippingThreshold != null && remaining <= 0 && (
                   <p className="font-size-12 text-green text-center mb-3">Sepetiniz ücretsiz kargo eşiğinde. Kargo, ödeme adımında kesinleşir.</p>

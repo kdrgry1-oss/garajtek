@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 import Breadcrumb from "../components/electro/Breadcrumb";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
+import { PASSWORD_MIN_LENGTH } from "../lib/password";
 import {
   createGooglePopupFlow,
   googleErrorMessage,
@@ -404,7 +405,7 @@ export default function Login() {
                   </div>
                   <div className="form-group mb-4">
                     <label className="form-label" htmlFor="registerPassword">Şifre <span className="text-danger">*</span></label>
-                    <input type="password" className="form-control" id="registerPassword" autoComplete="new-password" placeholder="En az 6 karakter" value={formData.reg_password || ""} onChange={set("reg_password")} required minLength={6} />
+                    <input type="password" className="form-control" id="registerPassword" autoComplete="new-password" placeholder={`En az ${PASSWORD_MIN_LENGTH} karakter`} value={formData.reg_password || ""} onChange={set("reg_password")} required minLength={PASSWORD_MIN_LENGTH} />
                   </div>
                   <p className="text-gray-90 mb-4">Kişisel verileriniz siparişlerinizi yönetmek ve deneyiminizi geliştirmek amacıyla <a href="/sayfa/kvkk" className="text-blue">KVKK Aydınlatma Metni</a>'nde açıklandığı şekilde işlenir.</p>
                   <div className="mb-6">

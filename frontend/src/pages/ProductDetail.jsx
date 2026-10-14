@@ -16,6 +16,8 @@ import { useAuth } from "../context/AuthContext";
 import { useShipping } from "../lib/shipping";
 import { trackViewContent, trackAddToCart } from "../utils/pixelEvents";
 import { sortLikeSize } from "../utils/sizeSort";
+import { cartAddPlan } from "../lib/cartStock";
+import { useCardPaymentAvailable } from "../lib/paymentAvailability";
 import Breadcrumb from "../components/electro/Breadcrumb";
 import Carousel from "../components/electro/Carousel";
 import QuantityInput from "../components/electro/QuantityInput";
@@ -149,10 +151,18 @@ const pushRecentlyViewed = (snap) => {
   } catch { /* sessiz */ }
 };
 
+// Yapışkan "Sepete Ekle" çubuğu ekrandayken body'ye sınıf → yüzen WhatsApp butonu çubuğun
+// ÜSTÜNE kayar (storefront.css). Aksi halde mobilde butonun üstüne binip dokunuşu yakalıyor,
+// ürün sepete eklenmek yerine WhatsApp açılıyordu. Ref callback: çubuk mount → ekle, unmount → kaldır.
+const _stickyAtcRef = (el) => {
+  try { document.body.classList.toggle("gt-sticky-atc-open", !!el); } catch { /* yoksay */ }
+};
+
 export default function ProductDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { addItem, isOpen: cartOpen } = useCart();
+  const { addItem, items: cartItems, isOpen: cartOpen } = useCart();
+  const cardPayOk = useCardPaymentAvailable();   // "Taksitli Ödeme" rozeti için
   const catTree = useCategoryTree();
   const [pdpTab, setPdpTab] = useState("description");
   const touchX = useRef(0);
@@ -389,10 +399,13 @@ export default function ProductDetail() {
         const _bySize = _wantSize
           ? (res.data?.variants || []).find((v) => String(v.size || "").toUpperCase() === _wantSize.toUpperCase() && (v.stock || 0) > 0)
           : null;
+        // Varsayılan: ekranda gösterilen (beden/ölçü sıralı) listedeki İLK stoklu seçenek —
+        // API sırasındaki ilk değil (ör. 6x7…20x22 mm listesinde 14x15 seçili geliyordu).
+        const _sortedVariants = sortLikeSize(res.data?.variants || [], (v) => v.size);
         const defaultVariant =
           _bySize ||
-          (res.data?.variants || []).find((v) => (v.stock || 0) > 0) ||
-          (res.data?.variants || [])[0] || null;
+          _sortedVariants.find((v) => (v.stock || 0) > 0) ||
+          _sortedVariants[0] || null;
 
         // FAZ 9+ — Pixel ViewContent event
         trackViewContent({
@@ -464,22 +477,35 @@ export default function ProductDetail() {
       return false;
     }
     
-    addItem(product, selectedVariant, quantity);
+    // Sepetteki mevcut adet + yeni adet stoğu aşıyor mu? (CartContext adedi sessizce
+    // sınırladığından burada kontrol edilmezse sepet artmadığı halde "sepete eklendi" denirdi.)
+    const plan = cartAddPlan(cartItems, product, selectedVariant, quantity);
+    if (plan.add <= 0) {
+      toast.error(`Stokta yalnız ${plan.stock} adet var, sepetinizde zaten ${plan.inCart} adet bulunuyor`);
+      return "in_cart";   // Hemen Al: ürün zaten sepette → ödemeye geçilebilir
+    }
+
+    addItem(product, selectedVariant, plan.add);
     // FAZ 9+ — Pixel AddToCart event
     trackAddToCart({
       product_id: product.id,
       name: product.name,
       category: product.category_name,
       price: selectedVariant?.price || product.sale_price || product.price,
-      quantity,
+      quantity: plan.add,
       size: selectedVariant?.size,
       color: selectedVariant?.color,
       variant_id: selectedVariant?.id,
     });
-    toast.success(selectedVariant 
-      ? `${product.name} - ${selectedVariant.size} sepete eklendi` 
-      : "Ürün sepete eklendi"
-    );
+    const _label = selectedVariant ? `${product.name} - ${selectedVariant.size}` : "Ürün";
+    if (plan.add < quantity) {
+      toast.warning(`Stok sınırı: ${_label} için sepete ${plan.add} adet eklendi (sepetinizde toplam ${plan.inCart + plan.add} adet)`);
+    } else {
+      toast.success(selectedVariant 
+        ? `${product.name} - ${selectedVariant.size} sepete eklendi` 
+        : "Ürün sepete eklendi"
+      );
+    }
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1600);
     return true;
@@ -487,7 +513,8 @@ export default function ProductDetail() {
 
   // "Hemen Al": sepete ekler ve doğrudan ödeme sayfasına geçer (kart/havale vb. tüm yöntemler).
   const handleBuyNow = () => {
-    if (handleAddToCart()) navigate("/odeme");
+    const r = handleAddToCart();
+    if (r === true || r === "in_cart") navigate("/odeme");
   };
 
   const handleSizeSelect = (variant) => {
@@ -639,7 +666,7 @@ export default function ProductDetail() {
 
         {/* Mobil/masaüstü yapışkan ürün çubuğu — sepet paneli açıkken gizlenir */}
         {showStickyHeader && !cartOpen && !oosSelected && (
-          <div className="el-sticky-atc d-xl-none" data-testid="sticky-product-bar">
+          <div className="el-sticky-atc d-xl-none" data-testid="sticky-product-bar" ref={_stickyAtcRef}>
             <div className="d-flex align-items-center">
               <img src={optimizeImg(displayImages[0], 150)} alt="" width="44" height="44" className="mr-2" style={{ objectFit: "contain" }} />
               <div className="flex-grow-1 min-width-0 mr-2">
@@ -845,7 +872,8 @@ export default function ProductDetail() {
                   <div className="row text-center border-top border-bottom py-3 mx-0 mb-3" data-testid="pdp-trust-badges">
                     <div className="col-4 border-right"><i className="ec ec-returning font-size-24 d-block mb-1" /><span className="font-size-12">Kolay İade</span></div>
                     <div className="col-4 border-right"><i className="ec ec-transport font-size-24 d-block mb-1" /><span className="font-size-12">Hızlı Teslimat</span></div>
-                    <div className="col-4"><i className="ec ec-payment font-size-24 d-block mb-1" /><span className="font-size-12">Taksitli Ödeme</span></div>
+                    {/* Taksit yalnız kartla ödeme gerçekten açıksa vaat edilir (kasa ile aynı kural) */}
+                    <div className="col-4"><i className="ec ec-payment font-size-24 d-block mb-1" /><span className="font-size-12" data-testid="pdp-badge-payment">{cardPayOk ? "Taksitli Ödeme" : "Güvenli Ödeme"}</span></div>
                   </div>
 
                   {(shipCfg?.showSocialShare !== false) && (

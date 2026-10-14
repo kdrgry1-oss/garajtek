@@ -25,6 +25,7 @@ import "./checkout.css";
 import { SetPendingGuard } from "../components/sets/SetCartParts";
 import { setPayload } from "../lib/productSets";
 import { useCodCheck } from "../lib/cod";
+import { getIdemKey, clearIdemKeys, cartClearedElsewhere, resolvePaymentMethod } from "../lib/checkoutGuards";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -136,7 +137,7 @@ export default function Checkout() {
   const [excludedIds, setExcludedIds] = useState([]); // musterinin X ile kaldirdigi kampanyalar
 
   // ÇİFT SİPARİŞ KORUMASI: idempotency anahtarı. KÖK NEDEN #2 düzeltmesi — anahtar
-  // sepet imzasına göre sessionStorage'da SAKLANIR. 3DS akışında sayfa document.write ile
+  // sepet imzasına göre localStorage'da SAKLANIR (sekmeler arası ortak; bkz. lib/checkoutGuards). 3DS akışında sayfa document.write ile
   // ezilip banka dönüşünde TAM SAYFA yeniden yüklendiği için eski useRef her remount'ta YENİ
   // anahtar üretiyordu → her deneme YENİ sipariş + tekrar stok düşümü + müşteri 2-3 kez
   // deneyince mükerrer sipariş. Artık AYNI sepette (retry/reload) anahtar SABİT kalır →
@@ -156,26 +157,13 @@ export default function Checkout() {
     try { if (sig) h = btoa(unescape(encodeURIComponent(sig))).replace(/[^A-Za-z0-9]/g, "").slice(0, 40); } catch { h = String(sig).length + "_" + (sig.length ? sig.charCodeAt(0) : 0); }
     return "store_idem_" + h;
   };
-  const _getIdemKey = () => {
-    const storeKey = _idemStoreKey();
-    try {
-      let k = window.sessionStorage.getItem(storeKey);
-      if (!k) { k = _newIdemKey(); window.sessionStorage.setItem(storeKey, k); }
-      return k;
-    } catch { return _newIdemKey(); }
-  };
+  // localStorage: aynı sepetle açılan İKİNCİ SEKME de aynı anahtarı gönderir → sunucu mevcut
+  // siparişi döndürür (sessionStorage sekmeye özel olduğundan iki ayrı sipariş açılıyordu).
+  const _idemStorage = () => { try { return window.localStorage; } catch { return null; } };
+  const _getIdemKey = () => getIdemKey(_idemStorage(), _idemStoreKey(), _newIdemKey);
   // Başarılı ödeme sonrası TÜM idem anahtarlarını temizle → aynı sepet daha sonra tekrar
   // alınırsa eski (ödenmiş) sipariş döndürülmesin, yeni sipariş açılsın.
-  const _clearIdemKeys = () => {
-    try {
-      const rm = [];
-      for (let i = 0; i < window.sessionStorage.length; i++) {
-        const key = window.sessionStorage.key(i);
-        if (key && key.indexOf("store_idem_") === 0) rm.push(key);
-      }
-      rm.forEach((k) => window.sessionStorage.removeItem(k));
-    } catch { /* yoksay */ }
-  };
+  const _clearIdemKeys = () => clearIdemKeys(_idemStorage());
   const idemKeyRef = useRef(null);
   if (idemKeyRef.current == null) idemKeyRef.current = _getIdemKey();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -227,6 +215,11 @@ export default function Checkout() {
     credit_card: enabledPM.credit_card && cardReady !== false,
     cash_on_delivery: enabledPM.cash_on_delivery && codCheck.available !== false,
   };
+  // Seçili yöntem gerçekten kullanılabilir mi? Hiçbir yöntem yoksa (ör. havale kapalı, kapıda
+  // ödeme tutar sınırını aşıyor, iyzico yok) eski seçim (COD) bedelini/indirimini ekleyip
+  // butonu açık bırakıyordu → ücret/indirim hesapları ve gönderim bu bayrağa bağlıdır.
+  const pmOk = !!pmAvail[paymentMethod];
+  const noPM = !pmAvail.credit_card && !pmAvail.bank_transfer && !pmAvail.cash_on_delivery;
 
   // İşletme Kuralları (admin panelinden yönetilir) — kodda sabit değil.
   const [bizRules, setBizRules] = useState({});
@@ -321,18 +314,18 @@ export default function Checkout() {
   // A rule's preliminary zero fee cannot bypass the final merchandise minimum.
   const baseShipFee = ruleShipCost > 0 ? ruleShipCost : shippingFee;
   const giftWrapTotal = giftWrap ? GIFT_WRAP_PRICE : 0;
-  const codFee = paymentMethod === "cash_on_delivery" ? COD_FEE : 0;
+  const codFee = (pmOk && paymentMethod === "cash_on_delivery") ? COD_FEE : 0;
   // Puan tavanı SUNUCUYLA aynı tabandan hesaplanır: (ara toplam − kupon/kampanya indirimi).
   const pointsDeduction = usePoints
     ? Math.min(userPoints, Math.max(0, total - discount) * (POINTS_MAX_PCT / 100))
     : 0;
   // Havale/EFT indirimi — kupon indiriminden SONRAKİ tutar üzerinden (sunucu ile aynı mantık).
-  const isBankTransfer = paymentMethod === "bank_transfer";
+  const isBankTransfer = pmOk && paymentMethod === "bank_transfer";
   const bankTransferDiscount = (isBankTransfer && bankPct > 0)
     ? Math.round((total - discount) * (bankPct / 100) * 100) / 100
     : 0;
   // Genelleştirilmiş ödeme tipi indirimi (havale hariç — o bankTransferDiscount ile geliyor)
-  const _payRule = payDiscounts[paymentMethod];
+  const _payRule = pmOk ? payDiscounts[paymentMethod] : null;
   const paymentMethodDiscount = (_payRule && !isBankTransfer)
     ? (((_payRule.percent || 0) > 0)
         ? Math.round((total - discount) * ((_payRule.percent || 0) / 100) * 100) / 100
@@ -394,13 +387,11 @@ export default function Checkout() {
     return () => { alive = false; };
   }, []);
 
-  // Seçili ödeme yöntemi kapatılmışsa ilk aktif yönteme düş
+  // Seçili ödeme yöntemi kapatılmışsa ilk aktif yönteme düş; HİÇBİRİ yoksa seçimi boşalt
+  // (aksi halde gizli kapıda ödeme seçili kalıp hizmet bedeli toplama ekleniyordu).
   useEffect(() => {
-    const order = ["credit_card", "bank_transfer", "cash_on_delivery"];
-    if (!pmAvail[paymentMethod]) {
-      const first = order.find((k) => pmAvail[k]);
-      if (first) setPaymentMethod(first);
-    }
+    const next = resolvePaymentMethod(paymentMethod, pmAvail);
+    if (next !== paymentMethod) setPaymentMethod(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pmAvail.credit_card, pmAvail.bank_transfer, pmAvail.cash_on_delivery, paymentMethod]);
 
@@ -767,6 +758,15 @@ export default function Checkout() {
     if (e?.preventDefault) e.preventDefault();
     setSubmitError("");
     if (items.length === 0) { setSubmitError("Sepetiniz boş"); return; }
+    // Bayat sekme: sepet başka bir sekmede siparişe dönüştürülüp temizlenmiş → ikinci sipariş açma.
+    if (cartClearedElsewhere(_idemStorage(), items.length)) {
+      setSubmitError("Bu sepetle başka bir sekmede sipariş verildi. Siparişlerinizi kontrol edin ya da sayfayı yenileyin.");
+      return;
+    }
+    if (!pmOk) {
+      setSubmitError("Şu anda aktif bir ödeme yöntemi bulunmuyor. Lütfen daha sonra tekrar deneyin ya da bizimle iletişime geçin.");
+      return;
+    }
     if (pendingItems.length > 0) {
       setSubmitError("Sepetinizdeki setlerde stokta olmayan ürün var. Değiştirin ya da setten çıkararak devam edin.");
       return;
@@ -1110,7 +1110,7 @@ export default function Checkout() {
               </Checkbox>
             </div>
 
-            <button type="submit" className="gt-btn gt-btn-primary gt-btn-pay" disabled={loading} data-testid="place-order-btn" aria-busy={loading}>
+            <button type="submit" className="gt-btn gt-btn-primary gt-btn-pay" disabled={loading || noPM || !pmOk} data-testid="place-order-btn" aria-busy={loading}>
               {loading
                 ? <><span className="gt-spinner" aria-hidden="true" /> İşleniyor…</>
                 : (isCard ? "Şimdi öde" : "Siparişi tamamla")}

@@ -34,6 +34,10 @@ import ProductCard from "../components/ProductCard";
 import { useAuth } from "../context/AuthContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { SITE_NAME } from "../lib/brand";
+// Avatar baş harfleri Türkçe büyük harf kuralıyla (i → İ)
+import { initialsOf } from "../lib/initials";
+import { PASSWORD_MIN_LENGTH, passwordTooShort } from "../lib/password";
+import { orderExtraFeeRows } from "../lib/orderSummary";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -75,13 +79,6 @@ const formatDate = (str, opts = { day: "numeric", month: "long", year: "numeric"
   try { return new Date(str).toLocaleDateString("tr-TR", opts); } catch { return "-"; }
 };
 
-const initialsOf = (u) => {
-  const a = (u?.first_name || "").trim();
-  const b = (u?.last_name  || "").trim();
-  if (a || b) return ((a[0] || "") + (b[0] || "")).toUpperCase();
-  const e = u?.email || "";
-  return e ? e.slice(0, 2).toUpperCase() : "FA";
-};
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -836,7 +833,7 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
             )}
           </div>
 
-          {/* Özet — ara toplam, indirimler (ayrı ayrı), kargo, toplam */}
+          {/* Özet — ara toplam, indirimler (ayrı ayrı), kargo, ek ücretler, toplam */}
           <div className="pt-4 border-t border-gray-200 space-y-1.5 text-sm">
             {(order.subtotal != null) && (
               <div className="flex justify-between text-gray-600"><span>Ara Toplam</span><span>{Number(order.subtotal || 0).toFixed(2)} ₺</span></div>
@@ -856,6 +853,10 @@ function OrderCard({ order, expanded, onToggle, onChanged }) {
             {(order.shipping_cost != null) && (
               <div className="flex justify-between text-gray-600"><span>Kargo</span><span>{Number(order.shipping_cost || 0) === 0 ? "Ücretsiz" : `${Number(order.shipping_cost).toFixed(2)} ₺`}</span></div>
             )}
+            {/* Hediye paketi / kapıda ödeme hizmet bedeli — sunucu toplama ekliyor, satırlar toplamı tutsun */}
+            {orderExtraFeeRows(order).map((r) => (
+              <div key={r.key} className="flex justify-between text-gray-600" data-testid={`order-fee-${r.key}`}><span>{r.label}</span><span>{r.amount.toFixed(2)} ₺</span></div>
+            ))}
             <div className="pt-2 mt-1 border-t border-gray-200 flex items-center justify-between">
               <span className="text-xs text-gray-500">Toplam</span>
               <span className="text-lg font-medium">{(order.total ?? 0).toFixed(2)} ₺</span>
@@ -1091,7 +1092,7 @@ function SecurityPane() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (form.new_password.length < 6) return toast.error("Yeni şifre en az 6 karakter olmalı");
+    if (passwordTooShort(form.new_password)) return toast.error(`Yeni şifre en az ${PASSWORD_MIN_LENGTH} karakter olmalı`);
     if (form.new_password !== form.confirm) return toast.error("Yeni şifreler eşleşmiyor");
     setBusy(true);
     try {
@@ -1115,7 +1116,7 @@ function SecurityPane() {
       <h2 className="text-sm text-gray-700 mb-2 flex items-center gap-2">
         <Lock size={14} /> Şifre Değiştir
       </h2>
-      <p className="text-xs text-gray-500 mb-6">Mevcut şifrenizi girip yeni bir şifre belirleyin. En az 6 karakter olmalı.</p>
+      <p className="text-xs text-gray-500 mb-6">Mevcut şifrenizi girip yeni bir şifre belirleyin. En az {PASSWORD_MIN_LENGTH} karakter olmalı.</p>
       <form onSubmit={submit} className="space-y-5">
         <Field label="Mevcut Şifre" type="password" value={form.current_password} onChange={(v) => setForm({ ...form, current_password: v })} />
         <Field label="Yeni Şifre" type="password" value={form.new_password} onChange={(v) => setForm({ ...form, new_password: v })} />

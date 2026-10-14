@@ -41,6 +41,15 @@ export function sizeRank(name) {
     if (!Number.isNaN(na)) return [1, na + (Number.isNaN(nb) ? 0 : nb / 1000)];
   }
 
+  // 2b) Ölçü/boyut (6x7 mm, 10x11, 12,5 x 14 cm, 1/2" değil) → sayısal: ilk ölçü, eşitse ikinci.
+  //     Önceden "Diğer"e düşüp metin olarak sıralanıyordu ("10x11" < "6x7").
+  const dm = raw.match(/^(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m|")?$/);
+  if (dm) {
+    const a = parseFloat(dm[1].replace(",", "."));
+    const b = parseFloat(dm[2].replace(",", "."));
+    return [1, a + b / 1000];
+  }
+
   // 3) Saf sayısal (36, 38, 40)
   const m = n.match(/^(\d+)$/);
   if (m) return [1, parseInt(m[1], 10)];
@@ -59,6 +68,7 @@ export function sortLikeSize(arr, getName) {
     const rb = sizeRank(get(y));
     if (ra[0] !== rb[0]) return ra[0] - rb[0];
     if (typeof ra[1] === "number" && typeof rb[1] === "number") return ra[1] - rb[1];
-    return String(ra[1]).localeCompare(String(rb[1]), "tr");
+    // numeric: "M8" < "M10", "8 mm" < "10 mm" (metin içi sayılar sayı gibi karşılaştırılır)
+    return String(ra[1]).localeCompare(String(rb[1]), "tr", { numeric: true });
   });
 }

@@ -8,6 +8,8 @@ import BankTransferInfo from "../components/BankTransferInfo";
 import { useAuth } from "../context/AuthContext";
 import { useStoreInfo } from "../lib/storeInfo";
 import { fmtPrice } from "../components/electro/format";
+import { orderExtraFeeRows, orderHasEmail } from "../lib/orderSummary";
+import { PASSWORD_MIN_LENGTH, passwordTooShort } from "../lib/password";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -92,7 +94,12 @@ export default function OrderSuccess() {
                 <i className="fas fa-check font-size-30 text-gray-90" />
               </span>
               <h1 className="font-size-26 font-weight-light mb-2" data-testid="order-success-title">Teşekkür Ederiz!</h1>
-              <p className="text-gray-90 mb-0">Siparişiniz başarıyla alındı. Sipariş detayları ve takip bilgileri e-posta adresinize gönderildi.</p>
+              {/* E-posta isteğe bağlı (kapıda ödeme hızlı sipariş) — yoksa "e-postanıza gönderildi" denmez */}
+              {orderHasEmail(order) ? (
+                <p className="text-gray-90 mb-0" data-testid="order-success-note">Siparişiniz başarıyla alındı. Sipariş detayları ve takip bilgileri e-posta adresinize gönderildi.</p>
+              ) : (
+                <p className="text-gray-90 mb-0" data-testid="order-success-note">Siparişiniz başarıyla alındı. Sipariş durumunu sipariş numaranızla <Link to="/siparis-takip" className="text-blue">Sipariş Takip</Link> sayfasından izleyebilirsiniz.</p>
+              )}
             </div>
             <div className="border border-color-1 rounded-lg text-center py-5 px-4 mb-6">
               <div className="font-size-13 text-gray-5 text-uppercase mb-1">Sipariş Numarası</div>
@@ -162,6 +169,10 @@ export default function OrderSuccess() {
                       ? order.discount_breakdown.map((d, i) => <tr key={i} className="text-green"><th>{d.label}{d.code ? ` · ${d.code}` : ""}</th><td className="text-right">-{fmtPrice(d.amount || 0)}</td></tr>)
                       : (order?.discount || 0) > 0 && <tr className="text-green"><th>İndirim{order.coupon_code ? ` · ${order.coupon_code}` : ""}</th><td className="text-right">-{fmtPrice(order.discount)}</td></tr>}
                     <tr><th>Kargo</th><td className="text-right">{(order?.shipping_cost || 0) === 0 ? "Ücretsiz" : fmtPrice(order.shipping_cost)}</td></tr>
+                    {/* Hediye paketi / kapıda ödeme bedeli toplama dahil — satırlar toplamı tutsun */}
+                    {orderExtraFeeRows(order).map((r) => (
+                      <tr key={r.key} data-testid={`order-success-${r.key}`}><th>{r.label}</th><td className="text-right">{fmtPrice(r.amount)}</td></tr>
+                    ))}
                     <tr><th className="font-size-16">Toplam</th><td className="text-right font-size-16 font-weight-bold">{fmtPrice(order?.total || 0)}</td></tr>
                   </tbody>
                 </table>
@@ -184,11 +195,11 @@ export default function OrderSuccess() {
                 <>
                   <div className="d-flex">
                     <input type="password" value={signupPwd} onChange={(e) => setSignupPwd(e.target.value)}
-                      placeholder="En az 6 karakter şifre"
+                      placeholder={`En az ${PASSWORD_MIN_LENGTH} karakter şifre`}
                       data-testid="guest-signup-password"
                       className="form-control rounded-left-pill" />
                     <button onClick={async () => {
-                      if (signupPwd.length < 6) { toast.error("Şifre en az 6 karakter olmalı"); return; }
+                      if (passwordTooShort(signupPwd)) { toast.error(`Şifre en az ${PASSWORD_MIN_LENGTH} karakter olmalı`); return; }
                       setSignupBusy(true);
                       try {
                         const r = await axios.post(`${API}/auth/guest-convert/send-code`, { order_id: orderNumber });

@@ -187,6 +187,33 @@ describe("shopify-style checkout behaviour", () => {
     expect($(container, "cod-fee-row").textContent).toContain(formatTRY(25));
   });
 
+  test("no payment method available: no COD fee in the summary and the order button is disabled", async () => {
+    // Havale kapalı, kapıda ödeme açık ama tutar sınırını aşıyor, iyzico yapılandırılmamış.
+    axios.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/settings")
+      ? { payment_methods: { credit_card: true, bank_transfer: false, cash_on_delivery: true } }
+      : url.endsWith("/payment/status") ? { configured: false }
+      : url.endsWith("/business-rules") ? { "shipping.cod_fee": 25 } : {} }));
+    axios.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/storefront/cod-check")
+      ? { available: false, reason: "Kapıda ödeme en fazla 25.000 ₺" }
+      : { applied: [], eligible: [], total_discount: 0 } }));
+    await act(async () => root.render(<Checkout />));
+    await flush();
+    expect($(container, "cod-fee-row")).toBeNull();
+    expect($(container, "grand-total").textContent).not.toContain(formatTRY(125));
+    expect($(container, "place-order-btn").disabled).toBe(true);
+  });
+
+  test("idempotency key is shared across tabs (localStorage) and a stale tab cannot re-order", async () => {
+    await act(async () => root.render(<Checkout />));
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith("store_idem_"));
+    expect(keys.length).toBe(1);
+    // Başka sekmede sipariş verildi → ortak sepet temizlendi; bu sekmenin belleğinde hâlâ ürün var.
+    localStorage.setItem("cart", "[]");
+    await act(async () => { $(container, "place-order-btn").click(); });
+    expect($(container, "checkout-error-banner").textContent).toContain("başka bir sekmede");
+    expect(axios.post).not.toHaveBeenCalledWith(expect.stringMatching(/\/orders$/), expect.anything(), expect.anything());
+  });
+
   test("cash on delivery is hidden by default", async () => {
     await act(async () => root.render(<Checkout />));
     expect($(container, "pm-cash_on_delivery")).toBeNull();

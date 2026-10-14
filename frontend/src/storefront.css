@@ -129,3 +129,11 @@
    "WhatsApp'tan Sipariş" butonu onun yerini alır (mobilde Ödemeye Geç'i kapatıyordu). */
 body.gt-cart-drawer-open [data-store-contact-fab="true"],
 body.gt-cart-drawer-open [data-testid="whatsapp-fab"] { display: none !important; }
+
+/* Ürün sayfasında yapışkan "Sepete Ekle" çubuğu (mobil/tablet, d-xl-none) görünürken yüzen
+   WhatsApp butonu çubuğun ÜSTÜNE kaydırılır — sağ alttaki "Sepete Ekle"nin üstüne binip
+   dokunuşu yakalıyordu (ProductDetail.jsx gt-sticky-atc-open sınıfını ekler/kaldırır). */
+@media (max-width: 1199.98px) {
+  body.gt-sticky-atc-open [data-store-contact-fab="true"],
+  body.gt-sticky-atc-open [data-testid="whatsapp-fab"] { bottom: calc(86px + env(safe-area-inset-bottom)) !important; }
+}
