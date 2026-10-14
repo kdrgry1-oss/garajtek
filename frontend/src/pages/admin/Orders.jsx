@@ -1322,7 +1322,7 @@ export default function AdminOrders({ unpaidView = false }) {
                         let label = '';
                         if (pm === 'transfer' || pm === 'havale' || pm === 'bank_transfer' || pm === 'eft') label = 'Havale/EFT';
                         else if (pm === 'credit_card' || pm === 'card' || pm === 'iyzico' || pm === 'cc') label = 'Kredi Kartı';
-                        else if (pm === 'cod' || pm === 'kapida') label = 'Kapıda';
+                        else if (pm === 'cod' || pm === 'kapida' || pm === 'cash_on_delivery' || pm === 'kapida_odeme') label = 'Kapıda';
                         else if (isOtherChannelOrder(order) || pm === 'marketplace') label = OTHER_LABEL;
                         if (!label) return <span className="text-sm text-gray-400">—</span>;
                         const isHavale = (pm === 'transfer' || pm === 'havale' || pm === 'bank_transfer' || pm === 'eft');
