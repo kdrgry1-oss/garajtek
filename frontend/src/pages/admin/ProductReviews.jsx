@@ -10,6 +10,8 @@ export default function ProductReviews() {
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("pending");
   const [loading, setLoading] = useState(false);
+  const [replyEdit, setReplyEdit] = useState(null); // { id, text }
+  const [textEdit, setTextEdit] = useState(null);   // { id, title, comment }
 
   const load = async () => {
     setLoading(true);
@@ -28,6 +30,25 @@ export default function ProductReviews() {
     } catch (_) { toast.error("Hata"); }
   };
 
+  const saveReply = async () => {
+    if (!replyEdit) return;
+    try {
+      await axios.put(`${API}/admin/reviews/${replyEdit.id}`, { admin_reply: replyEdit.text.trim() }, { headers: authHeaders() });
+      toast.success(replyEdit.text.trim() ? "Cevap kaydedildi" : "Cevap kaldırıldı");
+      setReplyEdit(null); load();
+    } catch (_) { toast.error("Cevap kaydedilemedi"); }
+  };
+
+  const saveText = async () => {
+    if (!textEdit) return;
+    if (!textEdit.comment.trim()) { toast.error("Yorum metni boş olamaz"); return; }
+    try {
+      await axios.put(`${API}/admin/reviews/${textEdit.id}`, { title: textEdit.title, comment: textEdit.comment }, { headers: authHeaders() });
+      toast.success("Yorum güncellendi");
+      setTextEdit(null); load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Yorum kaydedilemedi"); }
+  };
+
   const del = async (rid) => {
     if (!await window.appConfirm("Yorum silinsin mi?")) return;
     await axios.delete(`${API}/admin/reviews/${rid}`, { headers: authHeaders() });
@@ -38,7 +59,7 @@ export default function ProductReviews() {
     <div className="space-y-5" data-testid="reviews-page">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><MessageSquare /> Ürün Yorumları</h1>
-        <p className="text-sm text-gray-500 mt-1">Müşteri yorumlarını moderasyondan geçirin.</p>
+        <p className="text-sm text-gray-500 mt-1">Yeni yorumlar "Beklemede" sekmesine düşer; onaylananlar ürün sayfasında yayınlanır. Argo vb. içeriği "Düzenle" ile temizleyebilir, mağaza cevabını "Cevap Yaz" ile ekleyebilirsiniz.</p>
       </div>
 
       <div className="flex gap-2">
@@ -77,10 +98,53 @@ export default function ProductReviews() {
                     ))}
                   </div>
                 </div>
-                {r.title && <div className="font-medium mt-2">{r.title}</div>}
-                <div className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{r.comment}</div>
-                {r.admin_reply && <div className="mt-2 p-2 bg-blue-50 text-blue-900 text-xs rounded"><strong>Cevabımız:</strong> {r.admin_reply}</div>}
+                {textEdit?.id === r.id ? (
+                  <div className="mt-2 space-y-2" data-testid={`edit-form-${r.id}`}>
+                    <input value={textEdit.title} onChange={(e) => setTextEdit({ ...textEdit, title: e.target.value })}
+                      maxLength={200} placeholder="Başlık (opsiyonel)" className="w-full border rounded p-2 text-sm" />
+                    <textarea value={textEdit.comment} onChange={(e) => setTextEdit({ ...textEdit, comment: e.target.value })}
+                      rows={4} maxLength={2000} className="w-full border rounded p-2 text-sm" data-testid={`edit-text-${r.id}`} />
+                    <div className="text-xs text-gray-500">Argo, hakaret veya kişisel bilgiyi temizlemek için kullanın. Müşterinin ilk metni saklanır; sitede yorumun altında "Mağaza tarafından düzenlendi" yazar.</div>
+                    <div className="flex gap-2">
+                      <button onClick={saveText} className="text-xs px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-900" data-testid={`edit-save-${r.id}`}>Kaydet</button>
+                      <button onClick={() => setTextEdit(null)} className="text-xs px-3 py-1 border rounded hover:bg-gray-50">Vazgeç</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {r.title && <div className="font-medium mt-2">{r.title}</div>}
+                    <div className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{r.comment}</div>
+                    {r.is_edited && (
+                      <details className="mt-1 text-xs text-gray-500">
+                        <summary className="cursor-pointer">Düzenlendi{r.edited_by ? ` (${r.edited_by})` : ""} — müşterinin ilk metni</summary>
+                        <div className="mt-1 p-2 bg-gray-50 rounded whitespace-pre-wrap">{r.original_title ? `${r.original_title}\n` : ""}{r.original_comment}</div>
+                      </details>
+                    )}
+                  </>
+                )}
+                {replyEdit?.id === r.id ? (
+                  <div className="mt-2 space-y-2" data-testid={`reply-form-${r.id}`}>
+                    <textarea value={replyEdit.text} onChange={(e) => setReplyEdit({ id: r.id, text: e.target.value })}
+                      rows={3} maxLength={2000} autoFocus placeholder="Mağaza olarak cevabınız (ürün sayfasında yorumun altında görünür)"
+                      className="w-full border rounded p-2 text-sm" data-testid={`reply-text-${r.id}`} />
+                    <div className="flex gap-2">
+                      <button onClick={saveReply} className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700" data-testid={`reply-save-${r.id}`}>Kaydet</button>
+                      <button onClick={() => setReplyEdit(null)} className="text-xs px-3 py-1 border rounded hover:bg-gray-50">Vazgeç</button>
+                    </div>
+                  </div>
+                ) : r.admin_reply ? (
+                  <div className="mt-2 p-2 bg-blue-50 text-blue-900 text-xs rounded"><strong>Cevabımız:</strong> {r.admin_reply}</div>
+                ) : null}
                 <div className="flex gap-2 mt-3">
+                  {textEdit?.id !== r.id && (
+                    <button onClick={() => setTextEdit({ id: r.id, title: r.title || "", comment: r.comment || "" })} data-testid={`edit-${r.id}`}
+                      className="text-xs px-3 py-1 bg-gray-50 text-gray-800 border border-gray-200 rounded hover:bg-gray-100">Düzenle</button>
+                  )}
+                  {replyEdit?.id !== r.id && (
+                    <button onClick={() => setReplyEdit({ id: r.id, text: r.admin_reply || "" })} data-testid={`reply-${r.id}`}
+                      className="text-xs px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded hover:bg-blue-100">
+                      {r.admin_reply ? "Cevabı Düzenle" : "Cevap Yaz"}</button>
+                  )}
                   {status !== "approved" && (
                     <button onClick={() => moderate(r.id, "approved")} data-testid={`approve-${r.id}`}
                       className="text-xs px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded hover:bg-emerald-200">Onayla</button>

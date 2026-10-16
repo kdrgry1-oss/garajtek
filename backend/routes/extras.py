@@ -249,7 +249,8 @@ async def submit_review(payload: dict, current_user: dict = Depends(require_auth
 async def list_approved_reviews(pid: str, limit: int = Query(50, ge=1, le=200)):
     # Müşteri yorumları (db.reviews, onaylı)
     rows = await db.reviews.find(
-        {"product_id": pid, "status": "approved"}, {"_id": 0, "user_id": 0}
+        {"product_id": pid, "status": "approved"},
+        {"_id": 0, "user_id": 0, "original_comment": 0, "original_title": 0, "edited_by": 0, "moderated_by": 0}
     ).sort("created_at", -1).to_list(limit)
     merged = rows[:limit]
 
@@ -291,7 +292,41 @@ async def update_review(rid: str, payload: dict, current_user: dict = Depends(re
         update["moderated_at"] = datetime.now(timezone.utc).isoformat()
         update["moderated_by"] = current_user.get("email", "")
     if "admin_reply" in payload:
-        update["admin_reply"] = payload["admin_reply"][:2000]
+        update["admin_reply"] = str(payload.get("admin_reply") or "").strip()[:2000]
+    # Metin düzenleme (argo/kişisel bilgi temizliği): müşterinin ilk metni bir kez saklanır,
+    # vitrinde "Mağaza tarafından düzenlendi" notu gösterilir (yorum sessizce değiştirilmez).
+    if "comment" in payload or "title" in payload:
+        cur = await db.reviews.find_one({"id": rid}, {"_id": 0}) or {}
+        if not cur:
+            raise HTTPException(status_code=404, detail="Yorum bulunamadı")
+        changed = False
+        if "comment" in payload:
+            c = str(payload.get("comment") or "").strip()[:2000]
+            if not c:
+                raise HTTPException(status_code=400, detail="Yorum metni boş olamaz")
+            if c != (cur.get("comment") or ""):
+                update["comment"] = c
+                changed = True
+                if "original_comment" not in cur:
+                    update["original_comment"] = cur.get("comment") or ""
+        if "title" in payload:
+            t = str(payload.get("title") or "").strip()[:200]
+            if t != (cur.get("title") or ""):
+                update["title"] = t
+                changed = True
+                if "original_title" not in cur:
+                    update["original_title"] = cur.get("title") or ""
+        if changed:
+            for k in ("comment", "title"):   # ilk metin bütün olarak saklansın
+                if f"original_{k}" not in cur:
+                    update.setdefault(f"original_{k}", cur.get(k) or "")
+            update["is_edited"] = True
+            update["edited_at"] = datetime.now(timezone.utc).isoformat()
+            update["edited_by"] = current_user.get("email", "")
+    if not update:
+        if "comment" in payload or "title" in payload:
+            return {"success": True}
+        raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
     res = await db.reviews.update_one({"id": rid}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Yorum bulunamadı")

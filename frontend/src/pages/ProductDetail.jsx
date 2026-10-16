@@ -1035,6 +1035,7 @@ export default function ProductDetail() {
                         <div className="text-warning text-ls-n2 font-size-16 mb-2">{stars(r.rating)}</div>
                         {r.title && <h4 className="font-size-15 mb-1">{r.title}</h4>}
                         {r.comment && <p className="text-gray-90">{r.comment}</p>}
+                        {r.is_edited && <div className="font-size-12 text-gray-23 mt-n2 mb-2" data-testid="review-edited-note">Mağaza tarafından düzenlendi</div>}
                         <div className="mb-2">
                           <strong>{r.user_name || "Müşteri"}</strong>
                           {r.verified && <span className="badge badge-success ml-2">Doğrulanmış Alışveriş</span>}
