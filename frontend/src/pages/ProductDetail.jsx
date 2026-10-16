@@ -31,6 +31,7 @@ import { CodInfoRow } from "../components/electro/CodInfo";
 import CodQuickOrder from "../components/cod/CodQuickOrder";
 import WhatsAppOrderButton from "../components/cod/WhatsAppOrderButton";
 import { withActiveVariants } from "../lib/activeVariants";
+import ProductLightbox from "../components/ProductLightbox";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -260,6 +261,7 @@ export default function ProductDetail() {
   }, [_rvIdsKey]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   // Masaüstü büyük görsel büyüteci (hover → imlecin olduğu bölge büyür)
   const [zoom, setZoom] = useState({ on: false, x: 50, y: 50 });
   const [selectedSize, setSelectedSize] = useState(null);
@@ -695,8 +697,15 @@ export default function ProductDetail() {
                     href={curImg}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="Görseli yeni sekmede tam boyutta aç"
+                    title="Görseli büyüt"
                     data-testid="pdp-image-fullsize"
+                    onClick={(e) => {
+                      // Ctrl/Cmd/orta tık: tarayıcı varsayılanı (yeni sekme); normal tık: sayfa içi galeri
+                      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1 || e.defaultPrevented) return;
+                      e.preventDefault();
+                      setZoom({ on: false, x: 50, y: 50 });
+                      setLightboxOpen(true);
+                    }}
                     className="el-pdp-main d-flex"
                     onMouseEnter={() => setZoom((z) => ({ ...z, on: true }))}
                     onMouseLeave={() => setZoom({ on: false, x: 50, y: 50 })}
@@ -722,6 +731,10 @@ export default function ProductDetail() {
                     </Link>
                   )}
                 </div>
+                {lightboxOpen && displayImages.length > 0 && (
+                  <ProductLightbox images={displayImages} index={Math.min(selectedImage, displayImages.length - 1)}
+                    onIndex={setSelectedImage} onClose={() => setLightboxOpen(false)} alt={product.name} optimize={optimizeImg} />
+                )}
                 {product.image_credit && (
                   <div className="el-pdp-credit" data-testid="pdp-image-credit">{product.image_credit}</div>
                 )}
