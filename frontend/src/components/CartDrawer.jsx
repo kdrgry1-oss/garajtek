@@ -2,6 +2,7 @@
 // (CartContext.addItem → setIsOpen(true)) ve mobil header'daki sepet ikonundan açılır.
 // İş mantığı aynen korunur: kampanya/kupon değerlendirme (/coupons/evaluate), ücretsiz kargo
 // eşiği (shippingQuote), kalem indirim görünümü (cartLineView), sepet paylaş, analitik.
+import ClearCartButton from "./ClearCartButton";
 import { Link } from "react-router-dom";
 import { Fragment, useEffect, useState } from "react";
 import axios from "axios";
@@ -148,10 +149,7 @@ export default function CartDrawer() {
             <div className="d-flex align-items-center justify-content-between pt-4 px-4 pb-3 border-bottom">
               <h3 className="font-size-18 mb-0">Sepetim ({itemCount})</h3>
               {items.length > 0 && (
-                <button type="button" className="btn btn-link p-0 ml-auto mr-3 font-size-13 text-gray-90" data-testid="drawer-clear-cart"
-                  onClick={() => { if (window.confirm("Sepetteki tüm ürünler silinsin mi?")) clearCart(); }}>
-                  <i className="far fa-trash-alt mr-1" />Sepeti Temizle
-                </button>
+                <ClearCartButton onClear={clearCart} className="ml-auto mr-3" align="justify-content-end" testId="drawer-clear-cart" />
               )}
               <button type="button" className="close" onClick={close} data-testid="close-cart" aria-label="Kapat">
                 <i className="ec ec-close-remove" />

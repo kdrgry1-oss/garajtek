@@ -1,3 +1,4 @@
+import ClearCartButton from "../components/ClearCartButton";
 import { Link, useSearchParams } from "react-router-dom";
 import { Fragment, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
@@ -203,10 +204,7 @@ export default function Cart() {
         <div className="container">
           <div className="mb-4"><h1 className="text-center">Sepetim <span className="font-size-20 text-gray-90">({itemCount} ürün)</span></h1>
             <div className="text-center">
-              <button type="button" className="btn btn-link font-size-14 text-gray-90" data-testid="cart-clear-all"
-                onClick={() => { if (window.confirm("Sepetteki tüm ürünler silinsin mi?")) clearCart(); }}>
-                <i className="far fa-trash-alt mr-1" />Sepeti Temizle
-              </button>
+              <ClearCartButton onClear={clearCart} align="justify-content-center" testId="cart-clear-all" />
             </div>
           </div>
 
