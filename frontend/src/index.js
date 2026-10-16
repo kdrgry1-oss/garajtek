@@ -1,8 +1,10 @@
+// Copyright (c) 2026 kdrgry1-oss. Tüm hakları saklıdır. Bkz. LICENSE.
 // build: 2026-08-09c — root ErrorBoundary (render çökmesini yakalar + beacon + chunk-hatası oto-kurtarma)
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@/index.css";
 import App from "@/App";
+import { licenseOk } from "@/lib/license";
 
 // Kök hata sınırı: React render sırasında bir bileşen çökerse TÜM uygulama unmount olup
 // #root boşalır (beyaz ekran → self-heal reload → "site açılmıyor"). Burada yakalayıp:
@@ -64,7 +66,13 @@ class RootErrorBoundary extends React.Component {
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
-  <RootErrorBoundary>
-    <App />
-  </RootErrorBoundary>,
+  licenseOk() ? (
+    <RootErrorBoundary>
+      <App />
+    </RootErrorBoundary>
+  ) : (
+    <div style={{ fontFamily: "sans-serif", padding: "48px 16px", textAlign: "center", color: "#333" }}>
+      Bu yazılım yalnız lisanslı alan adında çalışır.
+    </div>
+  ),
 );

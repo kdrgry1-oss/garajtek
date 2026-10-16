@@ -834,7 +834,7 @@ _ALLOWED_PAYMENT_METHODS = {
 def _allowed_payment_method(v) -> str:
     """Site siparişinde yalnız kart / havale-EFT / kapıda ödeme (denetim 2026-09-29): bilinmeyen bir
     yöntem ('marketplace' vb.) siparişi 'Ödeme Bekleniyor' yerine 'pending' açıp admin bildirimi
-    tetikliyordu (CLAUDE.md değişmez 2). Bilinmeyen değer → 400."""
+    tetikliyordu (proje değişmezi 2). Bilinmeyen değer → 400."""
     pm = str(v or "credit_card").strip().lower()
     if pm not in _ALLOWED_PAYMENT_METHODS:
         raise HTTPException(status_code=400, detail="Geçersiz ödeme yöntemi")
@@ -1967,7 +1967,7 @@ async def create_order(
     # iptalde _restock_order_once kancası idempotent iade eder. Tutarın TAMAMI çekle
     # karşılanırsa sipariş paid/confirmed açılır — istemci girdisi DEĞİL, sunucunun kendi
     # yakaladığı değer olduğundan "yalnız gerçek ödeme = paid" değişmezinin belgeli 2. yoludur
-    # (CLAUDE.md). Kod geçersizse sipariş REDDEDİLİR (müşteri çeksiz sipariş vermiş olmasın).
+    # (proje kuralı). Kod geçersizse sipariş REDDEDİLİR (müşteri çeksiz sipariş vermiş olmasın).
     _gc_code = str(order_data.get("gift_card_code") or "").strip().upper()
     if _gc_code:
         try:
@@ -3003,7 +3003,7 @@ async def mark_order_paid(
     order_doc = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order_doc:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
-    # CLAUDE.md değişmez #1 (denetim 2026-09-29): KART siparişi yalnız iyzico onayıyla 'paid' olur;
+    # Proje değişmezi #1 (denetim 2026-09-29): KART siparişi yalnız iyzico onayıyla 'paid' olur;
     # elle işaretlenemez (yarıda kalan 3DS siparişi ödemesiz sevk edilmesin). Parası çekilmiş kart
     # siparişini mutabakat cron'u (15 dk) iyzico'dan doğrulayıp kendisi 'paid' yapar.
     _pm = str(order_doc.get("payment_method") or "").strip().lower()
@@ -4284,7 +4284,7 @@ async def ship_order(
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı")
 
     # DENETİM (bizlogic F4): ödeme guard'ı yoktu → ÖDENMEMİŞ (awaiting_payment) veya İPTAL sipariş
-    # kargoya verilebiliyordu (CLAUDE.md Değişmez 2/4). Yalnız ödenmiş/onaylı sipariş sevk edilir.
+    # kargoya verilebiliyordu (proje değişmezi 2/4). Yalnız ödenmiş/onaylı sipariş sevk edilir.
     _ps = str(existing.get("payment_status") or "")
     _st = str(existing.get("status") or "")
     if _ps != "paid" and _st not in ("confirmed", "processing", "shipped", "delivered", "undelivered"):

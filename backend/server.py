@@ -1,4 +1,6 @@
 """
+Copyright (c) 2026 kdrgry1-oss. Tüm hakları saklıdır. Bkz. LICENSE.
+
 E-Commerce API - Main Server
 Modular architecture with routes
 """
@@ -736,6 +738,11 @@ app.add_middleware(BodySizeLimitMiddleware)
 # ---------------------------------------------------------------------------
 from security.monitoring import ErrorTrackingMiddleware
 app.add_middleware(ErrorTrackingMiddleware)
+
+# LİSANS KİLİDİ — en dışta çalışır (en son eklenen ara katman ilk çalışır): başka alan adıyla
+# gelen her istek 403. Bkz. licensing.py ve LICENSE.
+from licensing import LicenseMiddleware
+app.add_middleware(LicenseMiddleware)
 
 # Main API Router
 api_router = APIRouter(prefix="/api")

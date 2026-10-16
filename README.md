@@ -1,4 +1,8 @@
-# E-Ticaret Platformu (Beyaz Etiket)
+# E-Ticaret Platformu
+
+> **Tescilli yazılım — tüm hakları saklıdır.** Yalnız `garajtek.com` alan adında çalışmak üzere
+> lisanslanmıştır; başka alan adında çalıştırılamaz, kopyalanamaz (bkz. [LICENSE](LICENSE), [AGENTS.md](AGENTS.md)).
+> Lisans kilidi: `backend/licensing.py`, `frontend/src/lib/license.js`.
 
 Türkiye pazarına göre kurulmuş, çok kanallı bir moda/perakende e-ticaret platformu:
 vitrin (web), yönetim paneli, e-fatura, kargo, ödeme,

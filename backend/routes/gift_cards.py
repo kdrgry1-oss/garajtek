@@ -5,7 +5,7 @@ Hediye Çeki / Mağaza Kredisi (C2).
   oluşturur; bakiye kısmi kullanılabilir, kalan sonraki siparişe devreder.
 - Ödemede kod girilir: sunucu bakiyeyi ATOMİK rezerve eder (create_order içinde),
   sipariş toplamı düşer. Tutarın TAMAMI çekle karşılanırsa sipariş sunucu-tarafı
-  değer yakalandığı için paid/confirmed açılır (CLAUDE.md'de belgeli ikinci yol).
+  değer yakalandığı için paid/confirmed açılır (proje kurallarında belgeli ikinci yol).
 - Sipariş iptal/otomatik iptal olursa bakiye idempotent şekilde iade edilir
   (orders._restock_order_once içindeki kanca → refund_gift_card_once).
 

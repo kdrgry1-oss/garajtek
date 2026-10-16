@@ -4188,7 +4188,7 @@ async def gated_stock_restock_audit(
     """GATED (dry-run VARSAYILAN): iptal/iade edilmiş, stoğu GERÇEKTEN DÜŞÜLMÜŞ ama GERİ
     EKLENMEMİŞ siparişleri bulur (stok sızıntısı). apply=true ile idempotent + STOK-ONLY düzeltir.
 
-    GÜVENLİK (CLAUDE.md kritik alan):
+    GÜVENLİK (kritik alan):
       • Yalnız DEDUCT hareketi OLAN (gerçekten düşülmüş) + RESTORE hareketi OLMAYAN sipariş
         seçilir → hiç düşülmemiş (iptalle gelen) sipariş yanlışlıkla +stok ALMAZ.
       • Düzeltme: _restock_order_once(order,'backfill_increment') → _restock_authoritative

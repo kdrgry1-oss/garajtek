@@ -666,7 +666,7 @@ async def _retrieve_and_finalize(token: str) -> dict:
         resp = await c.post(f"{settings['base_url']}{RETRIEVE_PATH}", content=body_str.encode("utf-8"), headers=headers)
     data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"status": "failure"}
 
-    # TEK YETKİLİ YOL (CLAUDE.md değişmez 1; denetim 2026-09-29): eskiden bu eski hosted-form yolu
+    # TEK YETKİLİ YOL (proje değişmezi 1; denetim 2026-09-29): eskiden bu eski hosted-form yolu
     # siparişi kendisi, DURUM KONTROLSÜZ paid/confirmed yapıyordu (replay ile kargolanmış/iptal
     # sipariş geri "onaylandı"ya dönebiliyordu). Artık tutar+sipariş eşleşmesi, paymentId replay
     # kalkanı, idempotency ve bildirim/CAPI tek yerden: _mark_order_from_payment.

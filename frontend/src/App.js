@@ -1,3 +1,4 @@
+// Copyright (c) 2026 kdrgry1-oss. Tüm hakları saklıdır. Bkz. LICENSE.
 import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation, useNavigationType } from "react-router-dom";
 import { useEffect, useLayoutEffect, useRef, lazy, Suspense } from "react";
 import { Toaster } from "sonner";
